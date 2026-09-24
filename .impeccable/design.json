@@ -1,0 +1,154 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-24T00:00:00.000Z",
+  "title": "Design System: SoFun Club — White + Curtain Crimson",
+  "extensions": {
+    "colorMeta": {
+      "curtain-crimson": { "role": "primary",  "displayName": "Curtain Crimson", "canonical": "#c62419", "tonalRamp": ["#5a0c09","#7d1110","#9a1c13","#c62419","#e02d20","#f05a50","#f89d97","#fcd8d6"] },
+      "crimson-light":   { "role": "primary",  "displayName": "Crimson Light",   "canonical": "#e02d20", "tonalRamp": ["#7d1110","#9a1c13","#c62419","#e02d20","#f05a50","#f89d97","#fcd8d6","#fff0ef"] },
+      "crimson-dark":    { "role": "primary",  "displayName": "Crimson Dark",    "canonical": "#9a1c13", "tonalRamp": ["#3d0806","#5a0c09","#7d1110","#9a1c13","#c62419","#e02d20","#f05a50","#fcd8d6"] },
+      "paper":           { "role": "surface",  "displayName": "Paper",           "canonical": "#ffffff", "tonalRamp": ["#e8e8e8","#f0f0f0","#f5f5f5","#f8f8f8","#fafafa","#fcfcfc","#fefefe","#ffffff"] },
+      "paper-tint":      { "role": "surface",  "displayName": "Paper Tint",      "canonical": "#f8f8f8", "tonalRamp": ["#e0e0e0","#e8e8e8","#f0f0f0","#f5f5f5","#f8f8f8","#fafafa","#fcfcfc","#ffffff"] },
+      "paper-sunk":      { "role": "surface",  "displayName": "Paper Sunk",      "canonical": "#f0f0f0", "tonalRamp": ["#cccccc","#d8d8d8","#e0e0e0","#e8e8e8","#f0f0f0","#f5f5f5","#fafafa","#ffffff"] },
+      "ink":             { "role": "text",     "displayName": "Ink",             "canonical": "#1a1a1a", "tonalRamp": ["#000000","#0a0a0a","#111111","#1a1a1a","#2a2a2a","#3a3a3a","#555555","#888888"] },
+      "ink-2":           { "role": "text",     "displayName": "Ink-2",           "canonical": "#555555", "tonalRamp": ["#111111","#1a1a1a","#2a2a2a","#3a3a3a","#555555","#777777","#999999","#bbbbbb"] },
+      "ink-3":           { "role": "text",     "displayName": "Ink-3",           "canonical": "#888888", "tonalRamp": ["#2a2a2a","#3a3a3a","#555555","#777777","#888888","#aaaaaa","#cccccc","#f0f0f0"] },
+      "void":            { "role": "surface",  "displayName": "Void",            "canonical": "#09090f", "tonalRamp": ["#000000","#05050a","#09090f","#111119","#1a1a26","#2a2a3a","#555577","#aaaacc"] },
+      "surface":         { "role": "surface",  "displayName": "Surface",         "canonical": "#0e0e1a", "tonalRamp": ["#05050a","#09090f","#0e0e1a","#151525","#1c1c2c","#2a2a3a","#555577","#aaaacc"] },
+      "card-dark":       { "role": "surface",  "displayName": "Card Dark",       "canonical": "#12121e", "tonalRamp": ["#09090f","#0e0e1a","#12121e","#1a1a2a","#22223a","#2a2a4a","#555588","#aaaacc"] },
+      "chalk":           { "role": "text",     "displayName": "Chalk",           "canonical": "#e8e4dc", "tonalRamp": ["#888880","#aaa9a0","#bbbbaa","#ccccbb","#d8d4cc","#e8e4dc","#f0ede8","#faf8f5"] },
+      "case-amber":      { "role": "tertiary", "displayName": "Case Amber",      "canonical": "#c8a050", "tonalRamp": ["#5a4520","#7d6030","#a07840","#c8a050","#d8b468","#e8c880","#f0d8a0","#f8ecd0"] },
+      "line-green":      { "role": "tertiary", "displayName": "LINE Green",      "canonical": "#06c755", "tonalRamp": ["#013d18","#025c24","#048335","#06c755","#30d972","#6ae69e","#a8f0c6","#d4f8e3"] }
+    },
+    "typographyMeta": {
+      "display":  { "displayName": "Display",  "purpose": "Hero headlines only. Always uppercase, always Barlow Condensed. Latin only." },
+      "headline": { "displayName": "Headline", "purpose": "Section titles. Always uppercase, Barlow Condensed. One per major section." },
+      "title":    { "displayName": "Title",    "purpose": "Card titles, modal titles, profile names. Sarabun 700. Sentence case." },
+      "body":     { "displayName": "Body",     "purpose": "Long-form descriptions, synopsis. Cap at 65-75ch. Sarabun 400." },
+      "label":    { "displayName": "Label",    "purpose": "Button text, nav text, badge text. Sarabun 700 UPPERCASE 0.1em tracking." }
+    },
+    "shadows": [
+      { "name": "ambient-rest",    "value": "0 2px 12px rgba(0,0,0,0.07)",            "purpose": "Default card/panel at idle on white surfaces." },
+      { "name": "lifted",          "value": "0 8px 32px rgba(0,0,0,0.15)",            "purpose": "Hover cards, important panels on white surfaces." },
+      { "name": "cta-press-white", "value": "0 8px 24px rgba(198,36,25,0.4)",         "purpose": "Primary crimson CTA button hover on white pages." },
+      { "name": "cta-press-dark",  "value": "0 8px 24px rgba(255,255,255,0.15)",      "purpose": "Primary white CTA button hover on dark hero pages." },
+      { "name": "stage-spotlight", "value": "0 20px 60px rgba(0,0,0,0.4)",            "purpose": "Modals only. The follow-spot." },
+      { "name": "scene-vignette",  "value": "radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.45) 100%)", "purpose": "Hero video overlay." }
+    ],
+    "motion": [
+      { "name": "ease-out-quart", "value": "cubic-bezier(0.16,1,0.3,1)", "purpose": "Card hover stripe reveal, modal entrance." },
+      { "name": "ease-standard",  "value": "cubic-bezier(0.4,0,0.2,1)", "purpose": "Default state transitions." },
+      { "name": "ticker",         "value": "60s linear infinite",        "purpose": "Ticker band scroll. Pause under prefers-reduced-motion." },
+      { "name": "particle",       "value": "linear infinite",            "purpose": "Crimson particle drift on hero. Disabled under prefers-reduced-motion." }
+    ],
+    "breakpoints": [
+      { "name": "mobile",  "value": "0px"   },
+      { "name": "desktop", "value": "768px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button (white page)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Crimson-on-white CTA. The single red element in the catalog.",
+      "html": "<button class=\"ds-btn-primary\">สำรองที่นั่ง</button>",
+      "css": ".ds-btn-primary { background: #c62419; color: #ffffff; border: 2px solid #c62419; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 13px 30px; border-radius: 8px; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: background 0.2s, box-shadow 0.2s, transform 0.2s; display: inline-flex; align-items: center; gap: 8px; } .ds-btn-primary:hover { background: #9a1c13; border-color: #9a1c13; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(198,36,25,0.4); } .ds-btn-primary:active { transform: translateY(0); } .ds-btn-primary:focus-visible { outline: 2px solid rgba(198,36,25,0.5); outline-offset: 3px; } .ds-btn-primary:disabled { background: #cccccc; border-color: #cccccc; color: #888888; cursor: not-allowed; transform: none; }"
+    },
+    {
+      "name": "Primary Button (dark hero)",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "White-on-dark CTA for the hero section.",
+      "html": "<button class=\"ds-btn-primary-dark\">สำรองที่นั่ง</button>",
+      "css": ".ds-btn-primary-dark { background: #ffffff; color: #09090f; border: 2px solid #ffffff; font-size: 13px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 13px 30px; border-radius: 8px; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: background 0.2s, box-shadow 0.2s, transform 0.2s; display: inline-flex; align-items: center; gap: 8px; } .ds-btn-primary-dark:hover { background: #e8e8e8; border-color: #e8e8e8; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(255,255,255,0.15); } .ds-btn-primary-dark:focus-visible { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 3px; }"
+    },
+    {
+      "name": "Secondary Button (white page)",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Crimson ghost outline on white. Used alongside primary CTA.",
+      "html": "<button class=\"ds-btn-secondary\">ดูสคริปต์ทั้งหมด</button>",
+      "css": ".ds-btn-secondary { background: transparent; color: #c62419; border: 1px solid #c62419; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding: 13px 30px; border-radius: 8px; cursor: pointer; font-family: 'Sarabun', sans-serif; transition: all 0.2s; } .ds-btn-secondary:hover { background: #c62419; color: #ffffff; } .ds-btn-secondary:focus-visible { outline: 2px solid rgba(198,36,25,0.5); outline-offset: 3px; }"
+    },
+    {
+      "name": "Script Card (white register)",
+      "kind": "card",
+      "refersTo": "card-script",
+      "description": "White-surface collectible card. Crimson left stripe reveals on hover.",
+      "html": "<div class=\"ds-script-card\"><div class=\"ds-script-card-stripe\"></div><div style=\"padding:14px\"><div style=\"font-size:20px;font-weight:700;color:#1a1a1a;margin-bottom:8px\">ฆาตกรรมบนเกาะ</div><div style=\"font-size:13px;color:#888888\">สยองขวัญ · 6–12 คน · 3 ชั่วโมง</div></div></div>",
+      "css": ".ds-script-card { position: relative; background: #ffffff; border-radius: 16px; border: 1px solid rgba(0,0,0,0.08); box-shadow: 0 2px 12px rgba(0,0,0,0.07); transition: all 0.25s cubic-bezier(0.16,1,0.3,1); overflow: hidden; } .ds-script-card-stripe { position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: #c62419; transform: scaleY(0); transform-origin: bottom; transition: transform 0.25s cubic-bezier(0.16,1,0.3,1); } .ds-script-card:hover { box-shadow: 0 8px 32px rgba(0,0,0,0.15); transform: translateY(-2px); background: rgba(198,36,25,0.03); } .ds-script-card:hover .ds-script-card-stripe { transform: scaleY(1); }"
+    },
+    {
+      "name": "Tag Chip (active)",
+      "kind": "chip",
+      "refersTo": "chip-tag",
+      "description": "Genre and atmosphere active filter tag.",
+      "html": "<span class=\"ds-tag ds-tag--active\">สยองขวัญ</span><span class=\"ds-tag\">ทั้งหมด</span>",
+      "css": ".ds-tag { display: inline-flex; align-items: center; background: rgba(0,0,0,0.06); color: #555555; border: 1px solid transparent; border-radius: 5px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; font-family: 'Sarabun', sans-serif; cursor: pointer; transition: all 0.2s; } .ds-tag--active { background: rgba(198,36,25,0.12); color: #c62419; border-color: rgba(198,36,25,0.3); }"
+    },
+    {
+      "name": "Text Input (light)",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Search and form fields on white backgrounds. Crimson focus ring.",
+      "html": "<div class=\"ds-input-wrap\"><svg class=\"ds-input-icon\" width=\"16\" height=\"16\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.35-4.35\"/></svg><input class=\"ds-input\" placeholder=\"ค้นหาสคริปต์...\"/></div>",
+      "css": ".ds-input-wrap { position: relative; display: flex; align-items: center; } .ds-input-icon { position: absolute; left: 14px; color: #888888; pointer-events: none; } .ds-input { width: 100%; background: #f0f0f0; border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; color: #1a1a1a; font-size: 15px; font-family: 'Sarabun', sans-serif; padding: 11px 16px 11px 44px; transition: border-color 0.2s, box-shadow 0.2s; } .ds-input::placeholder { color: #888888; } .ds-input:focus { outline: none; border-color: rgba(198,36,25,0.5); box-shadow: 0 0 0 3px rgba(198,36,25,0.08); }"
+    },
+    {
+      "name": "Difficulty Badge",
+      "kind": "chip",
+      "description": "Color-coded difficulty indicator.",
+      "html": "<span class=\"ds-diff ds-diff--expert\">ยากมาก</span> <span class=\"ds-diff ds-diff--hard\">ยาก</span> <span class=\"ds-diff ds-diff--normal\">ปานกลาง</span> <span class=\"ds-diff ds-diff--easy\">ง่าย</span>",
+      "css": ".ds-diff { display: inline-flex; align-items: center; color: #ffffff; border-radius: 5px; font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 7px; font-family: 'Sarabun', sans-serif; } .ds-diff--expert { background: #c62419; } .ds-diff--hard { background: #d97706; } .ds-diff--normal { background: #2563eb; } .ds-diff--easy { background: #16a34a; }"
+    },
+    {
+      "name": "Top Navigation",
+      "kind": "nav",
+      "description": "White nav with crimson bottom rule — the persistent structural accent.",
+      "html": "<nav class=\"ds-top-nav\"><div class=\"ds-nav-logo\">SoFun</div><div class=\"ds-nav-links\"><a class=\"ds-nav-link ds-nav-link--active\" href=\"#\">หน้าแรก</a><a class=\"ds-nav-link\" href=\"#\">สคริปต์</a></div></nav>",
+      "css": ".ds-top-nav { display: flex; align-items: center; justify-content: space-between; height: 60px; padding: 0 24px; background: rgba(255,255,255,0.97); border-bottom: 2px solid #c62419; backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 100; } .ds-nav-logo { font-family: 'Barlow Condensed', sans-serif; font-weight: 900; font-size: 20px; color: #1a1a1a; letter-spacing: -0.01em; text-transform: uppercase; } .ds-nav-links { display: flex; gap: 8px; } .ds-nav-link { font-family: 'Sarabun', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; text-decoration: none; color: #555555; padding: 6px 12px; border-radius: 6px; transition: all 0.2s; } .ds-nav-link--active { color: #c62419; background: rgba(198,36,25,0.08); } .ds-nav-link:hover:not(.ds-nav-link--active) { color: #1a1a1a; background: rgba(0,0,0,0.05); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Velvet Curtain",
+    "overview": "SoFun Club is the cold open of a thriller. Two registers: near-black void for the hero and immersive sections, white paper for the catalog. A single binding accent — Curtain Crimson (#c62419) — marks decisive actions across both registers. Two colors. Maximum drama.",
+    "keyCharacteristics": [
+      "Two-register structure: void near-black (#09090f) for hero/ticker, white (#ffffff) for catalog",
+      "Single accent: Curtain Crimson (#c62419) — ticker bg, nav bottom rule, CTAs, active filters, card hover stripe",
+      "Barlow Condensed uppercase display + Sarabun body across Thai / English / 中",
+      "Motion: crimson particles on dark hero, crimson ticker, crimson scroll progress bar",
+      "prefers-reduced-motion degrades all animations to instant transitions"
+    ],
+    "rules": [
+      { "name": "The Single Accent Rule",       "body": "Curtain Crimson is the only accent hue. Every crimson element has a function: CTA, active state, ticker, progress bar. Never decorative.",      "section": "colors" },
+      { "name": "The Register Separation Rule", "body": "White on dark, ink on white. Do not mix registers on the same surface.",                                                                        "section": "colors" },
+      { "name": "The Earned-Red Rule",          "body": "Crimson does not decorate. It marks: CTAs (act now), active states (you are here), ticker (announcement), progress bar (you are this far).",   "section": "colors" },
+      { "name": "The Latin-Only Display Rule",  "body": "Barlow Condensed is Latin display only. Thai/中 uses Sarabun.",                                                                                 "section": "typography" },
+      { "name": "The No-Gradient-Text Rule",    "body": "No background-clip:text gradients. Emphasis from weight, size, and the single crimson accent only.",                                            "section": "typography" },
+      { "name": "The CTA-Glow-Only Rule",       "body": "Crimson glow shadows (rgba(198,36,25,...)) are reserved for primary CTA buttons in hover/active state only.",                                  "section": "elevation" }
+    ],
+    "dos": [
+      "Do use Curtain Crimson only where decisive action or emphasis is required: CTA, active state, ticker, progress bar, card hover stripe.",
+      "Do maintain the two-register structure — dark void hero, white catalog body.",
+      "Do apply the 3px crimson left stripe on script card hover.",
+      "Do use crimson focus rings on input fields.",
+      "Do keep the crimson bottom border on the top navigation.",
+      "Do pair Barlow Condensed uppercase with Sarabun body.",
+      "Do add prefers-reduced-motion alternatives for every animation.",
+      "Do keep LINE Green exclusively on the LINE auth affordance.",
+      "Do use chalk/parchment text (#e8e4dc) for body copy on the dark hero register."
+    ],
+    "donts": [
+      "Don't introduce any second accent color alongside Curtain Crimson.",
+      "Don't use crimson as decorative fills or shadows on cards, modals, or nav backgrounds.",
+      "Don't use background-clip:text gradient headlines.",
+      "Don't use dripping-blood fonts, neon spider webs, skull motifs. Reference is Knives Out, not Spirit Halloween.",
+      "Don't use cream/sand/beige backgrounds on utility pages — white (#ffffff) is the catalog base.",
+      "Don't use Barlow Condensed for Thai or 中 display copy.",
+      "Don't add tracked uppercase eyebrows above every section.",
+      "Don't propagate the card crimson left-stripe to other cards, callouts, or alerts.",
+      "Don't introduce boardgame-retailer bright primaries, esports neon-cyan, or RGB gradients."
+    ]
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "courier new",
+        "reason": "Thermal receipt component intentionally uses Courier New monospace — standard receipt font matching the thermal printer aesthetic requested by user",
+        "createdAt": "2026-07-28T13:25:22.998Z"
+      }
+    ]
+  }
+}

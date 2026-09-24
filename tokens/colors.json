@@ -1,0 +1,265 @@
+{
+  "$schema": "https://design-tokens.github.io/community-group/format/",
+  "$description": "SoFun Club — 3-tier DTCG color tokens. Brand: Curtain Crimson × Void Dark × White Catalog. Archetype: Dramatic × Storytelling. OKLCH-generated ramps, WCAG AA verified.",
+
+  "primitive": {
+    "$description": "Raw palette — never reference directly in components",
+
+    "crimson": {
+      "$description": "Curtain Crimson — brand anchor. oklch ramp H=27.5°. 500=brand (#c62419). 500 on white: 5.72:1 ✓ text. 600 on white: 7.4:1 ✓ UI.",
+      "50":  { "$type": "color", "$value": "#fff2f1" },
+      "100": { "$type": "color", "$value": "#ffdcda" },
+      "200": { "$type": "color", "$value": "#ffb3ae" },
+      "300": { "$type": "color", "$value": "#f5817a" },
+      "400": { "$type": "color", "$value": "#e0504a" },
+      "500": { "$type": "color", "$value": "#c62419", "$description": "Brand color — Curtain Crimson. oklch(45.8% 0.210 27.5)" },
+      "600": { "$type": "color", "$value": "#a81c13", "$description": "C_DEEP. oklch(39% 0.200 27.5)" },
+      "700": { "$type": "color", "$value": "#8b1611" },
+      "800": { "$type": "color", "$value": "#6a110c" },
+      "900": { "$type": "color", "$value": "#430b07" },
+      "950": { "$type": "color", "$value": "#2c0604" }
+    },
+
+    "void": {
+      "$description": "Void Neutral — cold cinematic dark. oklch ramp H=250°, chroma 0.004–0.020. Slight blue cast is intentional (cinematic). 950=VOID (#09090f), 900=SURFACE (#0e0e1a), 800=CARD (#181828).",
+      "50":  { "$type": "color", "$value": "#f8f8fc" },
+      "100": { "$type": "color", "$value": "#ededf6" },
+      "200": { "$type": "color", "$value": "#d5d5e8" },
+      "300": { "$type": "color", "$value": "#b0b0ca" },
+      "400": { "$type": "color", "$value": "#8686a6" },
+      "500": { "$type": "color", "$value": "#5c5c7e", "$description": "6.1:1 on white ✓ placeholder text" },
+      "600": { "$type": "color", "$value": "#3c3c5e", "$description": "10.1:1 on white ✓" },
+      "700": { "$type": "color", "$value": "#252540" },
+      "800": { "$type": "color", "$value": "#181828", "$description": "CARD dark bg" },
+      "900": { "$type": "color", "$value": "#0e0e1a", "$description": "SURFACE dark bg" },
+      "950": { "$type": "color", "$value": "#09090f",  "$description": "VOID hero bg — slight blue cast intentional" }
+    },
+
+    "chalk": { "$type": "color", "$value": "#e8e4dc", "$description": "Warm text on dark void — not pure white, avoids harshness" },
+
+    "amber": {
+      "$description": "Case Amber — achievement / star ratings only",
+      "400": { "$type": "color", "$value": "#d4a84c" },
+      "500": { "$type": "color", "$value": "#c8a050", "$description": "Achievement gold" },
+      "600": { "$type": "color", "$value": "#a8823a" }
+    },
+
+    "line": { "$type": "color", "$value": "#06c755", "$description": "LINE Green — auth flow only, never use as general accent" },
+
+    "white": { "$type": "color", "$value": "#ffffff" },
+    "black": { "$type": "color", "$value": "#09090f", "$description": "Near-black with cinematic blue cast — prefer over pure #000" }
+  },
+
+  "semantic": {
+    "$description": "Purpose-based tokens — use these in designs, layouts, and Figma",
+
+    "action": {
+      "primary":            { "$type": "color", "$value": "{primitive.crimson.500}", "$description": "5.72:1 on white. White text on it: 5.72:1 ✓" },
+      "primary-hover":      { "$type": "color", "$value": "{primitive.crimson.600}" },
+      "primary-active":     { "$type": "color", "$value": "{primitive.crimson.700}" },
+      "secondary":          { "$type": "color", "$value": "{primitive.void.100}" },
+      "secondary-hover":    { "$type": "color", "$value": "{primitive.void.200}" },
+      "secondary-active":   { "$type": "color", "$value": "{primitive.void.300}" },
+      "destructive":        { "$type": "color", "$value": "{primitive.crimson.600}", "$description": "Same token as primary-hover — never reuse primary for destructive" },
+      "destructive-hover":  { "$type": "color", "$value": "{primitive.crimson.700}" }
+    },
+
+    "text": {
+      "primary":     { "$type": "color", "$value": "{primitive.void.950}", "$description": "#09090f — 15.3:1 on white ✓" },
+      "secondary":   { "$type": "color", "$value": "{primitive.void.600}", "$description": "#3c3c5e — 10.1:1 on white ✓" },
+      "tertiary":    { "$type": "color", "$value": "{primitive.void.500}", "$description": "#5c5c7e — 6.1:1 on white ✓ (WCAG placeholder)" },
+      "disabled":    { "$type": "color", "$value": "{primitive.void.300}", "$description": "Exempt from contrast — conveys disabled state" },
+      "on-action":   { "$type": "color", "$value": "{primitive.white}", "$description": "5.72:1 on crimson-500 ✓" },
+      "on-dark":     { "$type": "color", "$value": "{primitive.chalk}", "$description": "Warm text on void surfaces. Chalk on #09090f: high contrast ✓" },
+      "link":        { "$type": "color", "$value": "{primitive.crimson.500}" },
+      "link-hover":  { "$type": "color", "$value": "{primitive.crimson.600}" },
+      "link-dark":   { "$type": "color", "$value": "{primitive.crimson.300}", "$description": "Lighter shade for dark hero bg — avoids under-contrast" }
+    },
+
+    "surface": {
+      "page":        { "$type": "color", "$value": "{primitive.white}", "$description": "White catalog register" },
+      "card":        { "$type": "color", "$value": "{primitive.void.50}",  "$description": "#f8f8fc — slightly cold white, not cream" },
+      "raised":      { "$type": "color", "$value": "{primitive.white}" },
+      "sunken":      { "$type": "color", "$value": "{primitive.void.100}" },
+      "dark-hero":   { "$type": "color", "$value": "{primitive.void.950}", "$description": "Hero/dark register surface" },
+      "dark-card":   { "$type": "color", "$value": "{primitive.void.900}", "$description": "Dark register cards/panels" },
+      "dark-raised": { "$type": "color", "$value": "{primitive.void.800}" },
+      "overlay":     { "$type": "color", "$value": "rgba(9, 9, 15, 0.75)", "$description": "Modal/drawer backdrop — void-tinted" },
+      "disabled":    { "$type": "color", "$value": "{primitive.void.200}" }
+    },
+
+    "border": {
+      "default":       { "$type": "color", "$value": "{primitive.void.200}", "$description": "Decorative dividers/card edges — sub-3:1 by design" },
+      "strong":        { "$type": "color", "$value": "{primitive.void.400}", "$description": "#8686a6 — 3.1:1 on white. Essential control boundary, WCAG 1.4.11 ✓" },
+      "focus":         { "$type": "color", "$value": "{primitive.crimson.500}", "$description": "Crimson focus ring — brand-consistent" },
+      "error":         { "$type": "color", "$value": "{primitive.crimson.500}" },
+      "dark-wire":     { "$type": "color", "$value": "rgba(255, 255, 255, 0.07)",  "$description": "WIRE — subtle borders on dark panels" },
+      "dark-wire-2":   { "$type": "color", "$value": "rgba(255, 255, 255, 0.13)", "$description": "WIRE_2 — slightly stronger dark borders" },
+      "disabled":      { "$type": "color", "$value": "{primitive.void.200}" }
+    },
+
+    "interactive": {
+      "hover-overlay":    { "$type": "color", "$value": "rgba(9, 9, 15, 0.04)",   "$description": "Light surface hover tint" },
+      "active-overlay":   { "$type": "color", "$value": "rgba(9, 9, 15, 0.08)" },
+      "dark-hover":       { "$type": "color", "$value": "rgba(255, 255, 255, 0.04)", "$description": "Dark surface hover tint" },
+      "dark-active":      { "$type": "color", "$value": "rgba(255, 255, 255, 0.08)" },
+      "selected-bg":      { "$type": "color", "$value": "{primitive.crimson.50}" },
+      "selected-border":  { "$type": "color", "$value": "{primitive.crimson.200}" },
+      "focus-ring":       { "$type": "color", "$value": "{primitive.crimson.500}" },
+      "focus-ring-alpha": { "$type": "color", "$value": "rgba(198, 36, 25, 0.08)", "$description": "Soft focus glow for inputs" }
+    },
+
+    "feedback": {
+      "success-bg":      { "$type": "color", "$value": "#f0fdf4" },
+      "success-text":    { "$type": "color", "$value": "#166534" },
+      "success-border":  { "$type": "color", "$value": "#86efac" },
+      "success-icon":    { "$type": "color", "$value": "#16a34a" },
+      "warning-bg":      { "$type": "color", "$value": "#fffbeb" },
+      "warning-text":    { "$type": "color", "$value": "#92400e" },
+      "warning-border":  { "$type": "color", "$value": "#fcd34d" },
+      "warning-icon":    { "$type": "color", "$value": "#d97706" },
+      "error-bg":        { "$type": "color", "$value": "{primitive.crimson.50}" },
+      "error-text":      { "$type": "color", "$value": "{primitive.crimson.800}" },
+      "error-border":    { "$type": "color", "$value": "{primitive.crimson.200}" },
+      "error-icon":      { "$type": "color", "$value": "{primitive.crimson.600}" },
+      "info-bg":         { "$type": "color", "$value": "#eff6ff" },
+      "info-text":       { "$type": "color", "$value": "#1e40af" },
+      "info-border":     { "$type": "color", "$value": "#93c5fd" },
+      "info-icon":       { "$type": "color", "$value": "#2563eb" }
+    },
+
+    "brand": {
+      "$description": "Named brand spots for direct reference in brand-specific moments",
+      "crimson":     { "$type": "color", "$value": "{primitive.crimson.500}" },
+      "crimson-deep":{ "$type": "color", "$value": "{primitive.crimson.600}" },
+      "void":        { "$type": "color", "$value": "{primitive.void.950}" },
+      "chalk":       { "$type": "color", "$value": "{primitive.chalk}" },
+      "amber":       { "$type": "color", "$value": "{primitive.amber.500}" },
+      "line-green":  { "$type": "color", "$value": "{primitive.line}" }
+    }
+  },
+
+  "component": {
+    "$description": "Component-scoped tokens — use in component implementations",
+
+    "button": {
+      "primary-bg":           { "$type": "color", "$value": "{semantic.action.primary}" },
+      "primary-bg-hover":     { "$type": "color", "$value": "{semantic.action.primary-hover}" },
+      "primary-bg-active":    { "$type": "color", "$value": "{semantic.action.primary-active}" },
+      "primary-text":         { "$type": "color", "$value": "{semantic.text.on-action}" },
+      "secondary-bg":         { "$type": "color", "$value": "{semantic.action.secondary}" },
+      "secondary-bg-hover":   { "$type": "color", "$value": "{semantic.action.secondary-hover}" },
+      "secondary-text":       { "$type": "color", "$value": "{semantic.text.primary}" },
+      "ghost-bg":             { "$type": "color", "$value": "transparent" },
+      "ghost-bg-hover":       { "$type": "color", "$value": "{semantic.interactive.hover-overlay}" },
+      "ghost-text":           { "$type": "color", "$value": "{semantic.text.primary}" },
+      "ghost-dark-text":      { "$type": "color", "$value": "{primitive.chalk}" },
+      "ghost-dark-border":    { "$type": "color", "$value": "rgba(255, 255, 255, 0.35)" },
+      "ghost-dark-bg-hover":  { "$type": "color", "$value": "rgba(255, 255, 255, 0.06)" },
+      "destructive-bg":       { "$type": "color", "$value": "{semantic.action.destructive}" },
+      "destructive-bg-hover": { "$type": "color", "$value": "{semantic.action.destructive-hover}" },
+      "destructive-text":     { "$type": "color", "$value": "{semantic.text.on-action}" },
+      "disabled-bg":          { "$type": "color", "$value": "{semantic.surface.disabled}" },
+      "disabled-text":        { "$type": "color", "$value": "{semantic.text.disabled}" }
+    },
+
+    "input": {
+      "bg":              { "$type": "color", "$value": "{semantic.surface.card}" },
+      "bg-dark":         { "$type": "color", "$value": "{primitive.void.800}" },
+      "bg-disabled":     { "$type": "color", "$value": "{semantic.surface.disabled}" },
+      "border":          { "$type": "color", "$value": "{semantic.border.default}" },
+      "border-hover":    { "$type": "color", "$value": "{semantic.border.strong}" },
+      "border-focus":    { "$type": "color", "$value": "{semantic.border.focus}" },
+      "border-error":    { "$type": "color", "$value": "{semantic.border.error}" },
+      "text":            { "$type": "color", "$value": "{semantic.text.primary}" },
+      "placeholder":     { "$type": "color", "$value": "{semantic.text.tertiary}" },
+      "focus-glow":      { "$type": "color", "$value": "{semantic.interactive.focus-ring-alpha}" }
+    },
+
+    "card": {
+      "bg":           { "$type": "color", "$value": "{semantic.surface.card}" },
+      "border":       { "$type": "color", "$value": "{semantic.border.default}" },
+      "bg-dark":      { "$type": "color", "$value": "{semantic.surface.dark-card}" },
+      "border-dark":  { "$type": "color", "$value": "{semantic.border.dark-wire}" },
+      "hover-stripe": { "$type": "color", "$value": "{semantic.action.primary}", "$description": "3px left accent on card hover" }
+    },
+
+    "nav": {
+      "bg":          { "$type": "color", "$value": "rgba(255, 255, 255, 0.97)" },
+      "border":      { "$type": "color", "$value": "{semantic.action.primary}", "$description": "2px bottom crimson border — velvet curtain signature" },
+      "text":        { "$type": "color", "$value": "{semantic.text.primary}" },
+      "text-active": { "$type": "color", "$value": "{semantic.action.primary}" }
+    },
+
+    "ticker": {
+      "bg":   { "$type": "color", "$value": "{semantic.action.primary}" },
+      "text": { "$type": "color", "$value": "{primitive.white}" }
+    },
+
+    "badge": {
+      "brand-bg":      { "$type": "color", "$value": "{semantic.action.primary}" },
+      "brand-text":    { "$type": "color", "$value": "{primitive.white}" },
+      "neutral-bg":    { "$type": "color", "$value": "{primitive.void.100}" },
+      "neutral-text":  { "$type": "color", "$value": "{semantic.text.secondary}" },
+      "amber-bg":      { "$type": "color", "$value": "rgba(200, 160, 80, 0.12)" },
+      "amber-text":    { "$type": "color", "$value": "#7a5c1a" },
+      "dark-neutral-bg":   { "$type": "color", "$value": "rgba(255, 255, 255, 0.10)" },
+      "dark-neutral-text": { "$type": "color", "$value": "{primitive.chalk}" }
+    },
+
+    "achievement": {
+      "color": { "$type": "color", "$value": "{primitive.amber.500}" },
+      "glow":  { "$type": "color", "$value": "rgba(200, 160, 80, 0.25)" }
+    },
+
+    "progress": {
+      "bar":    { "$type": "color", "$value": "{semantic.action.primary}" },
+      "track":  { "$type": "color", "$value": "{semantic.border.default}" },
+      "shadow": { "$type": "color", "$value": "rgba(198, 36, 25, 0.45)" }
+    },
+
+    "particle": {
+      "color": { "$type": "color", "$value": "rgba(198, 36, 25, 0.45)" }
+    }
+  },
+
+  "dark": {
+    "$description": "Dark mode semantic overrides — apply via [data-theme='dark'] or per section via [data-register='dark']",
+
+    "text": {
+      "primary":     { "$type": "color", "$value": "{primitive.chalk}",          "$description": "Warm #e8e4dc on #09090f — high contrast ✓" },
+      "secondary":   { "$type": "color", "$value": "#93918e", "$description": "CHALK_2 blended on void-950. rgba(232,228,220,0.62)→#09090f≈#93918e. 6.1:1 on void-950 ✓" },
+      "tertiary":    { "$type": "color", "$value": "#7a7870", "$description": "rgba(232,228,220,0.42) blended on void-950. 4.6:1 on void-950 ✓" },
+      "disabled":    { "$type": "color", "$value": "#4d4b43", "$description": "rgba(232,228,220,0.25) blended on void-950 — decorative, exempt" },
+      "on-action":   { "$type": "color", "$value": "{primitive.white}" },
+      "link":        { "$type": "color", "$value": "{primitive.crimson.300}", "$description": "#f5817a — lighter for dark bg legibility" },
+      "link-hover":  { "$type": "color", "$value": "{primitive.crimson.200}" }
+    },
+
+    "surface": {
+      "page":    { "$type": "color", "$value": "{primitive.void.950}" },
+      "card":    { "$type": "color", "$value": "{primitive.void.900}" },
+      "raised":  { "$type": "color", "$value": "{primitive.void.800}" },
+      "sunken":  { "$type": "color", "$value": "#030308" }
+    },
+
+    "border": {
+      "default":  { "$type": "color", "$value": "#1e1e25", "$description": "WIRE blended on void-950. rgba(255,255,255,0.07)→#09090f≈#1e1e25. Decorative." },
+      "strong":   { "$type": "color", "$value": "#848487", "$description": "Essential control border on dark. rgba(255,255,255,0.50)→#09090f≈#848487. 5.2:1 on void-950 ✓" },
+      "focus":    { "$type": "color", "$value": "{primitive.crimson.500}" }
+    },
+
+    "action": {
+      "primary":          { "$type": "color", "$value": "{primitive.crimson.500}", "$description": "Unchanged — white text on crimson 5.72:1 ✓" },
+      "primary-hover":    { "$type": "color", "$value": "{primitive.crimson.400}" },
+      "secondary":        { "$type": "color", "$value": "{primitive.void.800}" },
+      "secondary-hover":  { "$type": "color", "$value": "{primitive.void.700}" }
+    },
+
+    "interactive": {
+      "hover-overlay":  { "$type": "color", "$value": "rgba(255, 255, 255, 0.04)" },
+      "active-overlay": { "$type": "color", "$value": "rgba(255, 255, 255, 0.08)" },
+      "selected-bg":    { "$type": "color", "$value": "rgba(198, 36, 25, 0.12)" }
+    }
+  }
+}

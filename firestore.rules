@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Scripts (game catalog) — public read, admin write
+    match /scripts/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+
+      // Reviews — public read, any LINE member can write their own review
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow write: if true;
+      }
+    }
+
+    // Parties — public read, any write (LINE users, no Firebase Auth)
+    match /parties/{partyId} {
+      allow read: if true;
+      allow write: if true;
+
+      match /messages/{msgId} {
+        allow read, write: if true;
+      }
+    }
+
+    // Members — public read (profile lookups), any user can create/update own doc
+    match /members/{userId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if request.auth != null;
+    }
+
+    // Orders — admin creates, LINE users can read and update their own order
+    match /orders/{orderId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update: if true;
+      allow delete: if request.auth != null;
+    }
+
+    // Menu items — public read, admin write
+    match /menuItems/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Payments — any can create (member submits slip), admin reads/updates
+    match /payments/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Play history — admin writes, public read
+    match /playHistory/{id} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+
+    // Settings — promotion: public read; payment: admin only
+    match /settings/promotion {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /settings/payment {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /settings/{docId} {
+      allow read, write: if request.auth != null;
+    }
+
+    // Bookings — any LINE user can read/create/update (join, pay deposit); admin deletes
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if true;
+      allow update: if true;
+      allow delete: if request.auth != null;
+    }
+
+    // Wheel state & history — public read for live display screen, allow write
+    match /wheelSettings/{docId} {
+      allow read, write: if true;
+    }
+    match /wheelHistory/{docId} {
+      allow read, write: if true;
+    }
+
+    // Deny everything else
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
