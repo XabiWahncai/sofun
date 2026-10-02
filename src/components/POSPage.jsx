@@ -265,6 +265,49 @@ export const newPOSSession = () => ({
   discount: 0,
 })
 
+// ── Web Audio API sound alert (plays pleasant chime every 5s on customer order) ──
+const playOrderAlertSound = () => {
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext
+    if (!AudioCtx) return
+    if (!window._posAudioCtx) {
+      window._posAudioCtx = new AudioCtx()
+    }
+    const ctx = window._posAudioCtx
+    if (ctx.state === 'suspended') {
+      ctx.resume().catch(() => {})
+    }
+
+    const now = ctx.currentTime
+    // 4-tone ascending bell chime: C5 (523.25) -> E5 (659.25) -> G5 (783.99) -> C6 (1046.50)
+    const notes = [
+      { f: 523.25, t: 0,    d: 0.14 },
+      { f: 659.25, t: 0.11, d: 0.14 },
+      { f: 783.99, t: 0.22, d: 0.16 },
+      { f: 1046.50, t: 0.35, d: 0.40 },
+    ]
+
+    notes.forEach(({ f, t, d }) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(f, now + t)
+
+      gain.gain.setValueAtTime(0.001, now + t)
+      gain.gain.linearRampToValueAtTime(0.28, now + t + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + t + d)
+
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      osc.start(now + t)
+      osc.stop(now + t + d + 0.05)
+    })
+  } catch (e) {
+    console.warn('Audio alert error:', e)
+  }
+}
+
 export default function POSPage({
   initialUid, adminUser, allGames, showToast, onClose,
   sessions, activeId,
@@ -386,6 +429,93 @@ export default function POSPage({
   const [selectedEnding, setSelectedEnding] = useState('')
   const autoClosedRef = useRef(new Set())
 
+  // Unlock Web Audio API on first user interaction
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        if (AudioCtx) {
+          if (!window._posAudioCtx) window._posAudioCtx = new AudioCtx()
+          if (window._posAudioCtx.state === 'suspended') window._posAudioCtx.resume().catch(() => {})
+        }
+      } catch {}
+    }
+    window.addEventListener('click', unlock, { passive: true })
+    window.addEventListener('touchstart', unlock, { passive: true })
+    window.addEventListener('keydown', unlock, { passive: true })
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  const [soundMuted, setSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem('sofun_pos_sound_muted') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  const toggleSoundMute = () => {
+    setSoundMuted(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem('sofun_pos_sound_muted', String(next))
+      } catch {}
+      if (!next) {
+        playOrderAlertSound()
+        showToast('เปิดเสียงแจ้งเตือนออเดอร์แล้ว 🔔')
+      } else {
+        showToast('ปิดเสียงแจ้งเตือนแล้ว 🔇')
+      }
+      return next
+    })
+  }
+
+  // Other orders in today's orders that have pending member food items
+  const otherPendingOrders = useMemo(() => {
+    return todayOrders.filter(o =>
+      o.id !== activeSession?.confirmedOrderId &&
+      Array.isArray(o.memberFoodQueue) &&
+      o.memberFoodQueue.length > 0
+    )
+  }, [todayOrders, activeSession?.confirmedOrderId])
+
+  const totalPendingQueueCount = memberQueue.length + otherPendingOrders.reduce((sum, o) => sum + (o.memberFoodQueue?.length || 0), 0)
+
+  const soundTimerRef = useRef(null)
+
+  // Loop alert chime every 5 seconds while there are pending orders
+  useEffect(() => {
+    if (totalPendingQueueCount === 0 || soundMuted) {
+      if (soundTimerRef.current) {
+        clearInterval(soundTimerRef.current)
+        soundTimerRef.current = null
+      }
+      return
+    }
+
+    // Orders pending and not muted: start 5-second interval if not already running
+    if (!soundTimerRef.current) {
+      playOrderAlertSound()
+      soundTimerRef.current = setInterval(() => {
+        playOrderAlertSound()
+      }, 5000)
+    }
+  }, [totalPendingQueueCount, soundMuted])
+
+  // Cleanup sound interval on unmount
+  useEffect(() => {
+    return () => {
+      if (soundTimerRef.current) {
+        clearInterval(soundTimerRef.current)
+        soundTimerRef.current = null
+      }
+    }
+  }, [])
+
   useEffect(() => {
     setShowQueue(false)
     setShowPaidMembers(false)
@@ -407,9 +537,13 @@ export default function POSPage({
     const orderId = activeSession?.confirmedOrderId
     if (!orderId || memberQueue.length === 0) return
 
+    const queuedItems = [...memberQueue]
+    // Optimistically clear immediately to silence sound and update UI instantaneously
+    setMemberQueue([])
+
     const cur = activeSession.order || []
     const updated = [...cur]
-    for (const qi of memberQueue) {
+    for (const qi of queuedItems) {
       const key = qi.menuId + '|' + (qi.addons || []).map(a => a.name).sort().join(',') + '|' + (qi.orderedBy?.uid || '')
       const idx = updated.findIndex(x => x.key === key)
       if (idx >= 0) {
@@ -424,7 +558,7 @@ export default function POSPage({
     const d = Number(activeSession.discount) || 0
     await updateDoc(doc(db, 'orders', orderId), {
       memberFoodQueue: [],
-      memberFoodHistory: arrayUnion(...memberQueue),
+      memberFoodHistory: arrayUnion(...queuedItems),
       foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
       foodTotal: newFoodTotal,
       gameTotal: newGamePrice,
@@ -433,7 +567,7 @@ export default function POSPage({
       grandTotal: Math.max(0, newFoodTotal + newGamePrice - d * activeSession.members.length),
     })
     setShowQueue(false)
-    showToast(`รับ ${memberQueue.length} รายการจากลูกค้าแล้ว ✓`)
+    showToast(`รับ ${queuedItems.length} รายการจากลูกค้าแล้ว ✓`)
 
     // Print via hidden iframe — srcdoc always renders as HTML, no popup/encoding issues
     const now = new Date()
@@ -631,6 +765,99 @@ export default function POSPage({
   const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
   const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
 
+  const acceptOtherQueue = async (order) => {
+    const queue = order.memberFoodQueue || []
+    if (queue.length === 0) return
+    try {
+      const cur = (order.foodItems || []).map(x => ({
+        key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name).join(',') + '|' + (x.orderedBy?.uid || ''),
+        menuId: x.menuId || '',
+        name: x.name,
+        basePrice: x.price || 0,
+        addons: x.addons || [],
+        totalPrice: x.price || 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+      }))
+      const updated = [...cur]
+      for (const qi of queue) {
+        const key = (qi.menuId || qi.name) + '|' + (qi.addons || []).map(a => a.name).sort().join(',') + '|' + (qi.orderedBy?.uid || '')
+        const idx = updated.findIndex(x => x.key === key)
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], qty: updated[idx].qty + qi.qty }
+        } else {
+          updated.push({ key, menuId: qi.menuId || '', name: qi.name, basePrice: qi.totalPrice, addons: qi.addons || [], totalPrice: qi.totalPrice, qty: qi.qty, orderedBy: qi.orderedBy || null })
+        }
+      }
+      const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+      const membersCount = (order.members || []).length
+      const gameUnitPrice = order.gameUnitPrice || (order.gameTotal && membersCount ? Math.round(order.gameTotal / membersCount) : 0)
+      const gameTotal = membersCount * gameUnitPrice
+      const d = Number(order.discount) || 0
+      await updateDoc(doc(db, 'orders', order.id), {
+        memberFoodQueue: [],
+        memberFoodHistory: arrayUnion(...queue),
+        foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
+        foodTotal: newFoodTotal,
+        grandTotal: Math.max(0, newFoodTotal + gameTotal - d * membersCount),
+      })
+      showToast(`รับ ${queue.length} รายการจาก ${order.room || order.scriptTitle || 'ลูกค้า'} แล้ว ✓`)
+
+      // Print ticket
+      const now = new Date()
+      const isPaid = (order.members || []).length > 0 &&
+        order.members.every(m => order.memberPayments?.[m.uid]?.verified)
+      const html = buildKitchenTicketHTML(queue, order, now, isPaid)
+      const frame = document.createElement('iframe')
+      frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:80mm;height:297mm;border:0;visibility:hidden;pointer-events:none'
+      document.body.appendChild(frame)
+      frame.srcdoc = html
+      frame.onload = () => {
+        setTimeout(() => {
+          try { frame.contentWindow.focus(); frame.contentWindow.print() } catch (e) { console.warn('print error', e) }
+          setTimeout(() => { try { document.body.removeChild(frame) } catch {} }, 5000)
+        }, 300)
+      }
+    } catch (e) {
+      showToast('รับออเดอร์ล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  const openExistingOrder = (order) => {
+    const existing = safeSessions.find(s => s.confirmedOrderId === order.id)
+    if (existing) {
+      setActiveId(existing.id)
+      return
+    }
+    const newS = {
+      id: Date.now() + Math.random(),
+      label: order.scriptTitle ? `${order.scriptTitle} (${order.room || 'ตี้'})` : `ปาร์ตี้ ${sessionCounter++}`,
+      createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : new Date().toISOString(),
+      members: order.members || [],
+      scriptId: order.scriptId || '',
+      eventName: '',
+      customPrice: '',
+      dm: order.dm || '',
+      npc: order.npc || '',
+      room: order.room || '',
+      order: (order.foodItems || []).map(x => ({
+        key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name).join(',') + '|' + (x.orderedBy?.uid || ''),
+        menuId: x.menuId || '',
+        name: x.name,
+        basePrice: x.price || 0,
+        addons: x.addons || [],
+        totalPrice: x.price || 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+      })),
+      confirmedOrderId: order.id,
+      promoName: order.promoName || '',
+      discount: order.discount || 0,
+    }
+    setSessions(prev => [...(Array.isArray(prev) ? prev : []), newS])
+    setActiveId(newS.id)
+  }
+
   const closeTable = () => {
     setSelectedEnding('')
     setShowEndingModal(true)
@@ -774,11 +1001,21 @@ export default function POSPage({
 
       {/* ── TODAY BAR ── */}
       <div className="pos-today-bar">
-        <div className="pos-today-info" onClick={() => setShowHistory(h => !h)}>
-          <i className="fas fa-calendar-day" />
-          <span>ปาร์ตี้วันนี้: <strong>{todayOrders.length} รอบ</strong></span>
-          <span className="pos-today-total">฿{todayOrders.reduce((s, o) => s + (o.grandTotal || 0), 0).toLocaleString()}</span>
-          <i className={`fas fa-chevron-${showHistory ? 'up' : 'down'}`} style={{ marginLeft: 'auto', fontSize: 11, opacity: 0.6 }} />
+        <div className="pos-today-bar-inner">
+          <div className="pos-today-info" onClick={() => setShowHistory(h => !h)}>
+            <i className="fas fa-calendar-day" />
+            <span>ปาร์ตี้วันนี้: <strong>{todayOrders.length} รอบ</strong></span>
+            <span className="pos-today-total">฿{todayOrders.reduce((s, o) => s + (o.grandTotal || 0), 0).toLocaleString()}</span>
+            <i className={`fas fa-chevron-${showHistory ? 'up' : 'down'}`} style={{ fontSize: 11, opacity: 0.6 }} />
+          </div>
+          <button
+            className={`pos-sound-header-btn${soundMuted ? ' muted' : (totalPendingQueueCount > 0 ? ' sounding' : '')}`}
+            onClick={(e) => { e.stopPropagation(); toggleSoundMute() }}
+            title={soundMuted ? 'คลิกเพื่อเปิดเสียงแจ้งเตือนออเดอร์' : 'เสียงเตือนเปิดอยู่ (ดังทุก 5 วินาทีเมื่อมีออเดอร์ใหม่)'}
+          >
+            <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}${totalPendingQueueCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
+            <span>{soundMuted ? 'ปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
+          </button>
         </div>
         {showHistory && (
           <div className="pos-today-list">
@@ -803,40 +1040,87 @@ export default function POSPage({
       {/* ── SESSION TABS ── */}
       <div className="pos-tabs-wrap">
         <div className="pos-tabs">
-          {safeSessions.map(s => (
-            <div
-              key={s.id}
-              className={`pos-tab${s.id === activeSession.id ? ' active' : ''}${s.confirmedOrderId ? ' confirmed' : ''}`}
-              onClick={() => setActiveId(s.id)}
-            >
-              <span className="pos-tab-label">
-                {s.confirmedOrderId && <i className="fas fa-check-circle" style={{ marginRight: 5, color: 'var(--feedback-success-icon)', fontSize: 10 }} />}
-                {(() => {
-                  const game = allGames.find(g => g.id === s.scriptId)
-                  const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
-                  return game ? `${game.title} ${date}` : s.label
-                })()}
-                {(s.members || []).length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
-              </span>
-              {safeSessions.length > 1 && (
-                <button className="pos-tab-close" onClick={e => { e.stopPropagation(); removeSession(s.id) }}>
-                  <i className="fas fa-times" />
-                </button>
-              )}
-            </div>
-          ))}
+          {safeSessions.map(s => {
+            const isCurrent = s.id === activeSession.id
+            const pendingCount = isCurrent
+              ? memberQueue.length
+              : (todayOrders.find(o => o.id === s.confirmedOrderId)?.memberFoodQueue?.length || 0)
+            return (
+              <div
+                key={s.id}
+                className={`pos-tab${isCurrent ? ' active' : ''}${s.confirmedOrderId ? ' confirmed' : ''}${pendingCount > 0 ? ' has-pending' : ''}`}
+                onClick={() => setActiveId(s.id)}
+              >
+                <span className="pos-tab-label">
+                  {s.confirmedOrderId && <i className="fas fa-check-circle" style={{ marginRight: 5, color: 'var(--feedback-success-icon)', fontSize: 10 }} />}
+                  {(() => {
+                    const game = allGames.find(g => g.id === s.scriptId)
+                    const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
+                    return game ? `${game.title} ${date}` : s.label
+                  })()}
+                  {(s.members || []).length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
+                  {pendingCount > 0 && (
+                    <span className="pos-tab-alert-badge" title={`มีออเดอร์ใหม่รอรับ ${pendingCount} รายการ`}>
+                      <i className="fas fa-bell fa-shake" /> {pendingCount}
+                    </span>
+                  )}
+                </span>
+                {safeSessions.length > 1 && (
+                  <button className="pos-tab-close" onClick={e => { e.stopPropagation(); removeSession(s.id) }}>
+                    <i className="fas fa-times" />
+                  </button>
+                )}
+              </div>
+            )
+          })}
           <button className="pos-tab-add" onClick={addSession}>
             <i className="fas fa-plus" /> ปาร์ตี้ใหม่
           </button>
         </div>
       </div>
 
-      {/* ── MEMBER FOOD QUEUE ── */}
+      {/* ── OTHER TABLES QUEUE ALERTS ── */}
+      {otherPendingOrders.map(o => (
+        <div key={o.id} className="pos-queue-bar other-table">
+          <div className="pos-queue-bar-top">
+            <span className="pos-queue-badge other">
+              <i className="fas fa-bell fa-shake" /> มีออเดอร์ใหม่จาก {o.room ? `ห้อง ${o.room}` : (o.scriptTitle || 'ปาร์ตี้อื่น')} ({(o.memberFoodQueue || []).length} รายการ)
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className={`pos-queue-sound-btn ${soundMuted ? 'muted' : 'active'}`}
+                onClick={toggleSoundMute}
+                title={soundMuted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน'}
+              >
+                <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}`} />
+              </button>
+              <button className="pos-queue-switch-btn" onClick={() => openExistingOrder(o)}>
+                <i className="fas fa-arrow-right" /> ไปที่ปาร์ตี้นี้
+              </button>
+              <button className="pos-queue-accept-all" onClick={() => acceptOtherQueue(o)}>
+                <i className="fas fa-check-double" /> รับทั้งหมด
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* ── MEMBER FOOD QUEUE (CURRENT SESSION) ── */}
       {memberQueue.length > 0 && (
         <div className="pos-queue-bar">
           <div className="pos-queue-bar-top">
-            <span className="pos-queue-badge"><i className="fas fa-bell" /> {memberQueue.length} รายการจากลูกค้า</span>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <span className="pos-queue-badge">
+              <i className="fas fa-bell fa-shake" /> {memberQueue.length} รายการจากลูกค้า
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className={`pos-queue-sound-btn ${soundMuted ? 'muted' : 'active'}`}
+                onClick={toggleSoundMute}
+                title={soundMuted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน (เตือนทุก 5 วินาที)'}
+              >
+                <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}`} />
+                <span>{soundMuted ? 'เปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
+              </button>
               <button className="pos-queue-toggle" onClick={() => setShowQueue(v => !v)}>
                 {showQueue ? 'ซ่อน' : 'ดูรายการ'} <i className={`fas fa-chevron-${showQueue ? 'up' : 'down'}`} />
               </button>

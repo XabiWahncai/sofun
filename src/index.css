@@ -1633,17 +1633,25 @@ nav {
 
 /* ── POS: member food queue notification ────────────────────────────────── */
 .pos-queue-bar {
-  background: rgba(217,119,6,0.07); border-bottom: 1.5px solid rgba(217,119,6,0.28);
+  background: rgba(217,119,6,0.08); border-bottom: 1.5px solid rgba(217,119,6,0.32);
+  animation: posQueuePulse 2.5s infinite;
+}
+.pos-queue-bar.other-table {
+  background: rgba(14, 165, 233, 0.08); border-bottom: 1.5px solid rgba(14, 165, 233, 0.32);
+  animation: posQueuePulseSky 2.5s infinite;
 }
 .pos-queue-bar-top {
   max-width: 1340px; margin: 0 auto;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 10px 24px; gap: 8px;
+  padding: 10px 24px; gap: 8px; flex-wrap: wrap;
 }
 .pos-queue-badge {
   font-size: 13px; font-weight: 700; color: #b45309;
   display: flex; align-items: center; gap: 7px;
   font-family: 'Google Sans', 'Sarabun', sans-serif;
+}
+.pos-queue-badge.other {
+  color: #0369a1;
 }
 .pos-queue-toggle {
   background: none; border: 1.5px solid rgba(217,119,6,0.4); border-radius: 8px;
@@ -1651,6 +1659,23 @@ nav {
   font-family: 'Google Sans', 'Sarabun', sans-serif; font-weight: 700; transition: background 0.12s;
 }
 .pos-queue-toggle:hover { background: rgba(255,255,255,0.6); }
+.pos-queue-sound-btn {
+  background: rgba(217,119,6,0.12); border: 1.5px solid rgba(217,119,6,0.35); border-radius: 8px;
+  padding: 5px 10px; font-size: 12px; font-weight: 700; color: #b45309;
+  cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'Google Sans', 'Sarabun', sans-serif; transition: all 0.15s ease;
+}
+.pos-queue-sound-btn:hover { background: rgba(217,119,6,0.22); }
+.pos-queue-sound-btn.muted {
+  background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.15); color: #888;
+}
+.pos-queue-switch-btn {
+  background: #0284c7; color: #fff; border: none; border-radius: 8px;
+  padding: 6px 12px; font-size: 11px; font-weight: 800; letter-spacing: 0.04em;
+  cursor: pointer; font-family: 'Google Sans', 'Sarabun', sans-serif;
+  display: inline-flex; align-items: center; gap: 5px; transition: background 0.15s;
+}
+.pos-queue-switch-btn:hover { background: #0369a1; }
 .pos-queue-accept-all {
   background: var(--crimson-500); color: #fff; border: none; border-radius: 8px;
   padding: 6px 12px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em;
@@ -1669,6 +1694,60 @@ nav {
   border-radius: 10px; padding: 1px 7px; font-weight: 700;
 }
 .pos-queue-item-price { font-weight: 800; color: #1a1a1a; font-size: 12px; font-family: 'Google Sans', 'Sarabun', sans-serif; }
+
+@keyframes posBellShake {
+  0%, 100% { transform: rotate(0deg); }
+  15% { transform: rotate(14deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(10deg); }
+  60% { transform: rotate(-6deg); }
+  75% { transform: rotate(2deg); }
+}
+.fa-shake {
+  animation: posBellShake 1s infinite ease-in-out;
+  transform-origin: top center;
+  display: inline-block;
+}
+@keyframes posQueuePulse {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(217, 119, 6, 0); }
+  50% { box-shadow: inset 0 0 12px rgba(217, 119, 6, 0.2); }
+}
+@keyframes posQueuePulseSky {
+  0%, 100% { box-shadow: inset 0 0 0 0 rgba(14, 165, 233, 0); }
+  50% { box-shadow: inset 0 0 12px rgba(14, 165, 233, 0.2); }
+}
+@keyframes posTabAlertGlow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.5); }
+  50% { box-shadow: 0 0 0 5px rgba(245, 158, 11, 0.12); }
+}
+.pos-tab.has-pending {
+  border-color: #f59e0b !important;
+  animation: posTabAlertGlow 1.5s infinite;
+}
+.pos-tab-alert-badge {
+  background: #f59e0b; color: #fff;
+  border-radius: 20px; padding: 1px 6px;
+  font-size: 10px; font-weight: 800;
+  display: inline-flex; align-items: center; gap: 4px;
+  margin-left: 4px;
+}
+.pos-sound-header-btn {
+  background: rgba(0,0,0,0.05); border: 1px solid rgba(0,0,0,0.12);
+  border-radius: 20px; padding: 4px 10px; font-size: 11px; font-weight: 700;
+  color: #555; cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+  font-family: 'Google Sans', 'Sarabun', sans-serif; transition: all 0.15s;
+}
+.pos-sound-header-btn:hover { background: rgba(0,0,0,0.09); color: #222; }
+.pos-sound-header-btn.muted { background: rgba(0,0,0,0.03); color: #999; border-color: rgba(0,0,0,0.08); }
+.pos-sound-header-btn.sounding {
+  background: #f59e0b; border-color: #d97706; color: #fff;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+}
+.pos-today-bar-inner {
+  max-width: 1340px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 24px; gap: 12px;
+}
 
 /* ── POS: ordering-for selector ────────────────────────────────────────── */
 .pos-ordering-bar {
@@ -1802,8 +1881,6 @@ nav {
   border-bottom: 1px solid rgba(0,0,0,0.07);
 }
 .pos-today-info {
-  max-width: 1340px; margin: 0 auto;
-  padding: 10px 24px;
   display: flex; align-items: center; gap: 12px;
   font-size: 13px; font-family: 'Google Sans', 'Sarabun', sans-serif;
   color: rgba(0,0,0,0.5); cursor: pointer;
