@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { collection, onSnapshot, doc, getDoc, updateDoc, query, where } from 'firebase/firestore'
+import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc } from 'firebase/firestore'
 import { getToken, onMessage } from 'firebase/messaging'
 
 import { db, getMessagingInstance, VAPID_KEY } from './firebase'
@@ -60,29 +60,51 @@ export default function App() {
   const [showRegister, setShowRegister] = useState(false)
   const [liffLoading, setLiffLoading] = useState(false)
   const [scanUid, setScanUid] = useState(null)
-  const [posSessions, setPosSessions] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('sofun_pos_sessions'))
-      if (saved?.sessions?.length > 0) return saved.sessions
-    } catch {}
-    const s = newPOSSession(); return [s]
-  })
+  const [posSessions, setPosSessions] = useState([])
   const [posActiveId, setPosActiveId] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem('sofun_pos_sessions'))
-      if (saved?.activeId) return saved.activeId
-    } catch {}
-    return null
+    try { return localStorage.getItem('sofun_pos_active_id') || null } catch { return null }
   })
   const [activeMemberOrder, setActiveMemberOrder] = useState(null)
   const liffInitialized = useRef(false)
+  const posWriteTimerRef = useRef(null)
+  const posLoadedRef = useRef(false)
 
-  // ── Persist POS sessions across refresh ───────────────────────────
+  // ── Shared POS sessions across admins via Firestore ───────────────
+  useEffect(() => {
+    const docRef = doc(db, 'pos_live', 'current')
+    const unsub = onSnapshot(docRef, snap => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setPosSessions(data.sessions || [])
+        posLoadedRef.current = true
+      } else if (!posLoadedRef.current) {
+        posLoadedRef.current = true
+        const first = newPOSSession()
+        setDoc(docRef, { sessions: [first] }).catch(e => console.warn('POS init failed:', e))
+      }
+    }, err => console.warn('POS sync subscribe failed:', err))
+    return unsub
+  }, [])
+
+  // ── Persist active party id per-admin (local only) ────────────────
   useEffect(() => {
     try {
-      localStorage.setItem('sofun_pos_sessions', JSON.stringify({ sessions: posSessions, activeId: posActiveId }))
+      if (posActiveId) localStorage.setItem('sofun_pos_active_id', String(posActiveId))
     } catch {}
-  }, [posSessions, posActiveId])
+  }, [posActiveId])
+
+  // Setter wrapper: writes to Firestore (debounced) so other admins see updates
+  const handlePosSessionsChange = useCallback((updater) => {
+    setPosSessions(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      clearTimeout(posWriteTimerRef.current)
+      posWriteTimerRef.current = setTimeout(() => {
+        setDoc(doc(db, 'pos_live', 'current'), { sessions: next })
+          .catch(e => console.warn('POS sync write failed:', e))
+      }, 350)
+      return next
+    })
+  }, [])
 
   // ── Handle URL params ──────────────────────────────────────────────
   useEffect(() => {
@@ -333,7 +355,7 @@ export default function App() {
       {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} lineUser={lineUser} />}
       {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} />}
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} />}
-      {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} />}
+      {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}
       {currentPage === 'qr' && <QRPage lineUser={lineUser} />}
       {currentPage === 'order' && activeMemberOrder && (
@@ -348,7 +370,7 @@ export default function App() {
           showToast={showToast}
           sessions={posSessions}
           activeId={posActiveId}
-          onSessionsChange={setPosSessions}
+          onSessionsChange={handlePosSessionsChange}
           onActiveIdChange={setPosActiveId}
           onScanConsumed={() => setScanUid(null)}
           onClose={() => { setScanUid(null); showPage('adminscan') }}
