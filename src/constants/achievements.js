@@ -30,6 +30,18 @@ export const ACHIEVEMENTS = {
     bg: 'rgba(251,191,36,0.12)',
     border: 'rgba(251,191,36,0.30)',
   },
+  new_era: {
+    id: 'new_era',
+    rarity: 'legendary',
+    icon: 'fa-bolt',
+    label: 'New Era',
+    labelTH: 'ยุคใหม่',
+    desc: 'Pioneered the dawn of a new generation. Stepping into uncharted history.',
+    descTH: 'ผู้เปิดศักราชใหม่ ก้าวสู่หน้าประวัติศาสตร์ที่ไม่เคยมีใครทำได้',
+    color: '#06b6d4',
+    bg: 'rgba(6,182,212,0.14)',
+    border: 'rgba(6,182,212,0.35)',
+  },
   villain: {
     id: 'villain',
     rarity: 'epic',
