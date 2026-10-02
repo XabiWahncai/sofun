@@ -30,7 +30,7 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
   }
 
   const verifyPayload = async (payload) => {
-    if (!easySlipApiKey) { setResult({ ok: false, msg: 'ยังไม่ได้ตั้งค่า EasySlip API Key' }); return }
+    if (!easySlipApiKey) { setResult({ ok: false, msg: '951ed947-cc32-494a-b261-439557af11bf' }); return }
     setVerifying(true)
     try {
       const body = { payload }
@@ -805,7 +805,7 @@ export default function POSPage({
       {/* ── SESSION TABS ── */}
       <div className="pos-tabs-wrap">
         <div className="pos-tabs">
-          {sessions.map(s => (
+          {(sessions || []).map(s => (
             <div
               key={s.id}
               className={`pos-tab${s.id === activeId ? ' active' : ''}${s.confirmedOrderId ? ' confirmed' : ''}`}
@@ -818,9 +818,9 @@ export default function POSPage({
                   const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
                   return game ? `${game.title} ${date}` : s.label
                 })()}
-                {s.members.length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
+                {(s.members?.length || 0) > 0 && <span className="pos-tab-count">{s.members.length}</span>}
               </span>
-              {sessions.length > 1 && (
+              {(sessions?.length || 0) > 1 && (
                 <button className="pos-tab-close" onClick={e => { e.stopPropagation(); removeSession(s.id) }}>
                   <i className="fas fa-times" />
                 </button>
@@ -871,18 +871,18 @@ export default function POSPage({
           <div className="pos-section-title"><i className="fas fa-users" /> สมาชิก — {activeSession.label}</div>
 
           <div className="pos-members-list">
-            {activeSession.members.length === 0 && <div className="pos-empty">ยังไม่มีสมาชิก</div>}
+            {(activeSession?.members || []).length === 0 && <div className="pos-empty">ยังไม่มีสมาชิก</div>}
 
             {/* Unpaid members */}
-            {activeSession.members.filter(m => !memberPayments[m.uid]?.verified).map(m => (
+            {(activeSession?.members || []).filter(m => !memberPayments[m.uid]?.verified).map(m => (
               <div key={m.uid} className="pos-member-row">
                 {m.avatar
                   ? <img src={m.avatar} alt="" className="pos-member-avatar" />
-                  : <div className="pos-member-avatar-ph">{m.name[0]}</div>
+                  : <div className="pos-member-avatar-ph">{(m.name || '?')[0]}</div>
                 }
                 <div className="pos-member-info">
                   <div className="pos-member-name">
-                    {m.name}
+                    {m.name || 'ไม่ระบุชื่อ'}
                     {memberPayments[m.uid]?.easyslipPending && (
                       <span className="pos-member-pending-badge" title="รอ Bangkok Bank ยืนยันอัตโนมัติ">
                         <i className="fas fa-hourglass-half" /> รอ BK
@@ -895,14 +895,14 @@ export default function POSPage({
                     )}
                   </div>
                   {selectedGame?.characters?.length > 0 ? (
-                    <select className="pos-char-select" value={m.character} onChange={e => setCharacter(m.uid, e.target.value)}>
+                    <select className="pos-char-select" value={m.character || ''} onChange={e => setCharacter(m.uid, e.target.value)}>
                       <option value="">— เลือกตัวละคร —</option>
                       {selectedGame.characters.map((c, i) => (
                         <option key={i} value={c.name}>{c.name}</option>
                       ))}
                     </select>
                   ) : (
-                    <input className="pos-char-input" placeholder="ตัวละคร..." value={m.character} onChange={e => setCharacter(m.uid, e.target.value)} />
+                    <input className="pos-char-input" placeholder="ตัวละคร..." value={m.character || ''} onChange={e => setCharacter(m.uid, e.target.value)} />
                   )}
                   <div className="pos-personal-disc-row">
                     <input
@@ -925,26 +925,26 @@ export default function POSPage({
             ))}
 
             {/* Paid members — collapsible */}
-            {activeSession.members.filter(m => memberPayments[m.uid]?.verified).length > 0 && (
+            {(activeSession?.members || []).filter(m => memberPayments[m.uid]?.verified).length > 0 && (
               <div className="pos-paid-section">
                 <button
                   className="pos-paid-collapse-btn"
                   onClick={() => setShowPaidMembers(v => !v)}
                 >
-                  <span><i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)' }} /> จ่ายแล้ว {activeSession.members.filter(m => memberPayments[m.uid]?.verified).length} คน · ฿{Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0).toLocaleString()}</span>
+                  <span><i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)' }} /> จ่ายแล้ว {(activeSession?.members || []).filter(m => memberPayments[m.uid]?.verified).length} คน · ฿{Object.values(memberPayments).filter(p => p?.verified).reduce((s, p) => s + (Number(p?.amount) || 0), 0).toLocaleString()}</span>
                   <i className={`fas fa-chevron-${showPaidMembers ? 'up' : 'down'}`} />
                 </button>
-                {showPaidMembers && activeSession.members.filter(m => memberPayments[m.uid]?.verified).map(m => (
+                {showPaidMembers && (activeSession?.members || []).filter(m => memberPayments[m.uid]?.verified).map(m => (
                   <div key={m.uid} className="pos-member-row" style={{ opacity: 0.5 }}>
                     {m.avatar
                       ? <img src={m.avatar} alt="" className="pos-member-avatar" />
-                      : <div className="pos-member-avatar-ph">{m.name[0]}</div>
+                      : <div className="pos-member-avatar-ph">{(m.name || '?')[0]}</div>
                     }
                     <div className="pos-member-info">
                       <div className="pos-member-name">
-                        {m.name}
+                        {m.name || 'ไม่ระบุชื่อ'}
                         <span className="pos-member-paid-badge">
-                          <i className="fas fa-check-circle" /> ฿{Number(memberPayments[m.uid].amount || 0).toLocaleString()}
+                          <i className="fas fa-check-circle" /> ฿{Number(memberPayments[m.uid]?.amount || 0).toLocaleString()}
                         </span>
                       </div>
                       {m.character && <div style={{ fontSize: 12, color: '#555555' }}>{m.character}</div>}
@@ -1267,15 +1267,15 @@ export default function POSPage({
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                     {editingBillKey === x.key ? (
                       <>
-                        {activeSession.members.map(m => (
-                          <button key={m.uid} onClick={() => assignBillOwner(x.key, { uid: m.uid, name: m.name, avatar: m.avatar || '' })} style={{
+                        {(activeSession?.members || []).map(m => (
+                          <button key={m.uid} onClick={() => assignBillOwner(x.key, { uid: m.uid, name: m.name || '', avatar: m.avatar || '' })} style={{
                             fontSize: 10, padding: '3px 8px', borderRadius: 12,
                             background: x.orderedBy?.uid === m.uid ? 'var(--crimson-500)' : 'rgba(0,0,0,0.06)',
                             color: x.orderedBy?.uid === m.uid ? '#fff' : 'var(--text-secondary)',
                             border: `1px solid ${x.orderedBy?.uid === m.uid ? 'var(--crimson-500)' : 'var(--border-default)'}`,
                             cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
                           }}>
-                            {m.name.split(' ')[0]}
+                            {(m.name || '?').split(' ')[0]}
                           </button>
                         ))}
                         {x.orderedBy && (
@@ -1305,7 +1305,7 @@ export default function POSPage({
                         cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
                       }}>
                         <i className="fas fa-user-tag" style={{ marginRight: 4 }} />
-                        {x.orderedBy ? x.orderedBy.name.split(' ')[0] : 'ระบุเจ้าบิล'}
+                        {x.orderedBy ? (x.orderedBy.name || '?').split(' ')[0] : 'ระบุเจ้าบิล'}
                       </button>
                     )}
                   </div>
@@ -1313,13 +1313,13 @@ export default function POSPage({
               ))}
               {totalDiscount > 0 && (
                 <div className="pos-summary-discount">
-                  <span><i className="fas fa-tag" /> {activeSession.promoName || 'ส่วนลด'}{activeSession.members.length > 0 && ` (฿${discount}×${activeSession.members.length}คน)`}</span>
+                  <span><i className="fas fa-tag" /> {activeSession?.promoName || 'ส่วนลด'}{(activeSession?.members || []).length > 0 && ` (฿${discount}×${(activeSession?.members || []).length}คน)`}</span>
                   <span>−฿{totalDiscount.toLocaleString()}</span>
                 </div>
               )}
-              {activeSession.members.filter(m => Number(m.personalDiscount) > 0).map(m => (
+              {(activeSession?.members || []).filter(m => Number(m.personalDiscount) > 0).map(m => (
                 <div key={m.uid} className="pos-summary-discount personal">
-                  <span><i className="fas fa-user-tag" /> {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}</span>
+                  <span><i className="fas fa-user-tag" /> {(m.name || '?').split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}</span>
                   <span>−฿{Number(m.personalDiscount).toLocaleString()}</span>
                 </div>
               ))}
@@ -1364,7 +1364,7 @@ export default function POSPage({
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
                       เลือกสมาชิกที่จ่ายรวมกัน
                     </div>
-                    {activeSession.members
+                    {(activeSession?.members || [])
                       .filter(m => !memberPayments[m.uid]?.verified)
                       .map(m => {
                         const bill = getMemberBill(m)
@@ -1383,7 +1383,7 @@ export default function POSPage({
                           }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <i className={`fas fa-${sel ? 'check-square' : 'square'}`} style={{ color: sel ? 'var(--crimson-500)' : 'var(--border-strong)', fontSize: 13 }} />
-                              <span style={{ fontSize: 13, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>{m.name.split(' ')[0]}</span>
+                              <span style={{ fontSize: 13, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>{(m.name || '?').split(' ')[0]}</span>
                             </span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>
                               ฿{bill.toLocaleString()}
@@ -1398,7 +1398,7 @@ export default function POSPage({
                         </span>
                         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--crimson-500)' }}>
                           ฿{[...groupPaySelected].reduce((s, uid) => {
-                            const m = activeSession.members.find(x => x.uid === uid)
+                            const m = (activeSession?.members || []).find(x => x.uid === uid)
                             return s + (m ? getMemberBill(m) : 0)
                           }, 0).toLocaleString()}
                         </span>

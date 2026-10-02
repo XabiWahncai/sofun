@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc } from 'firebase/firestore'
+import { onAuthStateChanged } from 'firebase/auth'
 import { getToken, onMessage } from 'firebase/messaging'
 
-import { db, getMessagingInstance, VAPID_KEY } from './firebase'
+import { db, auth, getMessagingInstance, VAPID_KEY } from './firebase'
 import liff from '@line/liff'
 import Nav from './components/Nav'
 import HomePage from './components/HomePage'
@@ -52,9 +53,12 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [toast, setToast] = useState({ msg: '', type: 'success', visible: false })
+  const [firebaseUser, setFirebaseUser] = useState(null)
+  useEffect(() => onAuthStateChanged(auth, user => setFirebaseUser(user)), [])
   const [lineUser, setLineUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sofun_line_user')) } catch { return null }
   })
+  const isAdmin = lineUser?.role === 'admin' || !!firebaseUser
   const [liffReady, setLiffReady] = useState(false)
   const [liffProfile, setLiffProfile] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
@@ -306,17 +310,6 @@ export default function App() {
     })
   }, [])
 
-  // ── Block non-admin from admin-only pages ──────────────────────────
-  useEffect(() => {
-    if (liffReady) {
-      if (!lineUser || lineUser.role !== 'admin') {
-        if (['pos', 'admin', 'adminscan'].includes(currentPage)) {
-          setCurrentPage('home')
-          window.history.replaceState({ page: 'home' }, '', '/')
-        }
-      }
-    }
-  }, [currentPage, lineUser, liffReady])
 
   // ── Active order for current member (non-admin) ─────────────────────
   useEffect(() => {
@@ -364,6 +357,7 @@ export default function App() {
         currentPage={currentPage}
         showPage={showPage}
         lineUser={lineUser}
+        isAdmin={isAdmin}
         onLogin={handleLineLogin}
         onLogout={handleLogout}
         liffLoading={liffLoading}
@@ -379,20 +373,75 @@ export default function App() {
       {currentPage === 'order' && activeMemberOrder && (
         <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} />
       )}
-      {currentPage === 'adminscan' && lineUser?.role === 'admin' && <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />}
-      {currentPage === 'pos' && lineUser?.role === 'admin' && (
-        <POSPage
-          initialUid={scanUid}
-          adminUser={lineUser}
-          allGames={allGames}
-          showToast={showToast}
-          sessions={posSessions}
-          activeId={posActiveId}
-          onSessionsChange={handlePosSessionsChange}
-          onActiveIdChange={setPosActiveId}
-          onScanConsumed={() => setScanUid(null)}
-          onClose={() => { setScanUid(null); showPage('adminscan') }}
-        />
+      {currentPage === 'adminscan' && (
+        isAdmin ? (
+          <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />
+        ) : (
+          <div style={{
+            minHeight: '75vh', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', color: '#fff',
+            background: 'var(--surface-sunken)'
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%', background: 'rgba(198,36,25,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16
+            }}>
+              <i className="fas fa-lock" style={{ fontSize: 24, color: '#c62419' }} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>เข้าสู่ระบบสำหรับ Admin</h2>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, maxWidth: 300, margin: '0 0 20px', lineHeight: 1.5 }}>
+              กรุณาเข้าสู่ระบบด้วยบัญชีแอดมินเพื่อสแกน QR Code
+            </p>
+            <button className="nav-login-btn" onClick={handleLineLogin} style={{ padding: '10px 18px', fontSize: 13 }}>
+              <i className="fab fa-line" style={{ marginRight: 6 }} /> เข้าสู่ระบบด้วย LINE
+            </button>
+          </div>
+        )
+      )}
+      {currentPage === 'pos' && (
+        isAdmin ? (
+          <POSPage
+            initialUid={scanUid}
+            adminUser={lineUser || (firebaseUser ? { name: firebaseUser.email, role: 'admin' } : null)}
+            allGames={allGames}
+            showToast={showToast}
+            sessions={posSessions}
+            activeId={posActiveId}
+            onSessionsChange={handlePosSessionsChange}
+            onActiveIdChange={setPosActiveId}
+            onScanConsumed={() => setScanUid(null)}
+            onClose={() => { setScanUid(null); showPage('adminscan') }}
+          />
+        ) : (
+          <div style={{
+            minHeight: '75vh', display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', padding: '24px', textAlign: 'center', color: '#fff',
+            background: 'var(--surface-sunken)'
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: '50%', background: 'rgba(198,36,25,0.15)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16
+            }}>
+              <i className="fas fa-lock" style={{ fontSize: 24, color: '#c62419' }} />
+            </div>
+            <h2 style={{ fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>เข้าสู่ระบบสำหรับ Admin</h2>
+            <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: 13, maxWidth: 300, margin: '0 0 20px', lineHeight: 1.5 }}>
+              กรุณาเข้าสู่ระบบด้วยบัญชีแอดมินเพื่อใช้งานระบบ POS
+            </p>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+              <button className="nav-login-btn" onClick={handleLineLogin} style={{ padding: '10px 18px', fontSize: 13 }}>
+                <i className="fab fa-line" style={{ marginRight: 6 }} /> เข้าสู่ระบบด้วย LINE
+              </button>
+              <button
+                className="btn-secondary"
+                onClick={() => showPage('admin')}
+                style={{ padding: '10px 18px', fontSize: 13, background: 'rgba(255,255,255,0.08)', color: '#fff', border: '1px solid rgba(255,255,255,0.15)', borderRadius: 10 }}
+              >
+                เข้าสู่ระบบด้วยรหัส Admin
+              </button>
+            </div>
+          </div>
+        )
       )}
       {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} />}
       {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} />}

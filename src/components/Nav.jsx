@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useLang } from '../LangContext'
 import logoImg from '../assets/Logo.jpg'
 
-export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout, liffLoading, hasActiveOrder }) {
+export default function Nav({ currentPage, showPage, lineUser, isAdmin, onLogin, onLogout, liffLoading, hasActiveOrder }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { lang, toggle, t } = useLang()
+  const effectiveAdmin = isAdmin || lineUser?.role === 'admin'
 
   const handleNav = (page) => {
     showPage(page)
@@ -81,7 +82,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
             </button>
           )}
 
-          {lineUser?.role === 'admin' && (
+          {effectiveAdmin && (
             <>
               <button className="nav-pos-btn" onClick={() => handleNav('pos')}>
                 <i className="fas fa-cash-register" /> POS
@@ -175,7 +176,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
             <span>สั่งอาหาร</span>
           </button>
         )}
-        {lineUser?.role === 'admin' && (
+        {effectiveAdmin && (
           <button className={`bottom-nav-item${currentPage === 'pos' ? ' active' : ''}`} onClick={() => handleNav('pos')}>
             <i className="fas fa-cash-register" />
             <span>POS</span>

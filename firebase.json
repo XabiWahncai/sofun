@@ -15,12 +15,15 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css)",
-        "headers": [{ "key": "Cache-Control", "value": "max-age=31536000" }]
+        "source": "**",
+        "headers": [
+          { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
+          { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" }
+        ]
       },
       {
-        "source": "**",
-        "headers": [{ "key": "X-Frame-Options", "value": "SAMEORIGIN" }]
+        "source": "**/*.@(js|css|png|jpg|jpeg|gif|svg|webp|ico|woff|woff2)",
+        "headers": [{ "key": "Cache-Control", "value": "max-age=31536000, immutable" }]
       }
     ]
   }
