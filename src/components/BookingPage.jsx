@@ -31,15 +31,15 @@ const STATUS_LABELS = {
   cancelled: 'ปิดตี้แล้ว',
 }
 
-const STATUS_STYLES = {
-  pending: 'bg-amber-50 text-amber-700 border-amber-200',
-  confirmed: 'bg-blue-50 text-blue-700 border-blue-200',
-  locked: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  collapsed: 'bg-rose-50 text-rose-700 border-rose-200',
-  cancelled: 'bg-slate-100 text-slate-600 border-slate-200',
+const STATUS_COLORS = {
+  pending:   { bg: 'rgba(0,0,0,0.05)',       color: '#555555', border: 'rgba(0,0,0,0.14)'     },
+  confirmed: { bg: 'rgba(200,160,80,0.12)',   color: '#1a1a1a', border: 'rgba(200,160,80,0.35)'},
+  locked:    { bg: 'rgba(200,160,80,0.18)',   color: '#1a1a1a', border: 'rgba(200,160,80,0.45)'},
+  collapsed: { bg: 'rgba(198,36,25,0.07)',    color: '#c62419', border: 'rgba(198,36,25,0.2)' },
+  cancelled: { bg: 'rgba(0,0,0,0.05)',        color: '#555555', border: 'rgba(0,0,0,0.14)'    },
 }
 
-const TIME_SLOTS = ['13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00', '20:00']
+const TIME_SLOTS = ['13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00']
 
 // ── PromptPay QR Generation (EMVCo standard) ──────────────────────────────────
 function crc16(str) {
@@ -103,17 +103,25 @@ function convertImg(url, w = 400) {
 }
 
 // ── Status Badge Component ─────────────────────────────────────────────────────
-function StatusBadge({ status, size = 'text-[11px]', label }) {
-  const style = STATUS_STYLES[status] || 'bg-slate-100 text-slate-600 border-slate-200'
+function StatusBadge({ status, label }) {
+  const s = STATUS_COLORS[status] || STATUS_COLORS.cancelled
   return (
-    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold border ${size} ${style}`}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80" />
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: '5px',
+      padding: '2px 9px', borderRadius: '20px',
+      fontSize: '10px', fontWeight: 700, letterSpacing: '0.03em',
+      background: s.bg, color: s.color, border: `1px solid ${s.border}`,
+      flexShrink: 0, whiteSpace: 'nowrap',
+    }}>
+      <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor' }} />
       {label || STATUS_LABELS[status] || status}
     </span>
   )
 }
 
-// ── Interactive Room Calendar with Selected Day Panel ─────────────────────────
+const DAY_NAMES_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์']
+
+// ── Google-Calendar-style Monthly Grid ────────────────────────────────────────
 function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onBookToday }) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
@@ -135,7 +143,6 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
   const todayStr = toDateStr(today)
   const activeDateStr = selectedDate || todayStr
 
-  // Group active bookings by date
   const bookingsByDate = {}
   bookings.forEach(b => {
     if (!b.date || b.status === 'cancelled' || b.status === 'collapsed') return
@@ -143,7 +150,6 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
     bookingsByDate[b.date].push(b)
   })
 
-  // Selected day bookings sorted by time
   const selectedDayBookings = (bookingsByDate[activeDateStr] || [])
     .slice()
     .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
@@ -154,301 +160,152 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
   while (cells.length % 7 !== 0) cells.push(null)
 
   return (
-    <div className="flex flex-col gap-4 font-sans text-slate-800">
-      {/* Calendar Header: Month/Year + Navigation */}
-      <div className="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-100">
-        <div className="flex items-baseline gap-2">
-          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            {MONTH_NAMES[viewMonth]}
-          </h2>
-          <span className="text-sm sm:text-base font-bold text-slate-500">
-            {viewYear + 543}
-          </span>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontFamily: 'Sarabun, sans-serif' }}>
 
-        <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-xl">
-          <button
-            onClick={goToday}
-            className="px-3 py-1.5 rounded-lg text-xs font-bold text-slate-700 hover:text-slate-900 hover:bg-white transition-all shadow-xs flex items-center gap-1.5"
-          >
-            <i className="fas fa-calendar-day text-[#c62419] text-[10px]" />
-            <span>วันนี้</span>
+      {/* ── Header: Month + Nav ─────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>
+          {MONTH_NAMES[viewMonth]}{' '}
+          <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>{viewYear + 543}</span>
+        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <button onClick={goToday} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-default)', background: '#fff', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.color='var(--crimson-500)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border-default)'; e.currentTarget.style.color='var(--text-secondary)' }}>
+            วันนี้
           </button>
-          <div className="w-px h-4 bg-slate-200" />
-          <button
-            onClick={prevMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white transition-colors"
-            title="เดือนก่อนหน้า"
-          >
-            <i className="fas fa-chevron-left text-xs" />
-          </button>
-          <button
-            onClick={nextMonth}
-            className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white transition-colors"
-            title="เดือนถัดไป"
-          >
-            <i className="fas fa-chevron-right text-xs" />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-default)', borderRadius: '8px', overflow: 'hidden' }}>
+            {[{fn:prevMonth,icon:'fa-chevron-left'},{fn:nextMonth,icon:'fa-chevron-right'}].map(({fn,icon},i) => (
+              <button key={icon} onClick={fn} style={{ width: '32px', height: '32px', border: 'none', borderLeft: i===1 ? '1px solid var(--border-default)' : 'none', background: '#fff', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.background='rgba(0,0,0,0.04)'}
+                onMouseLeave={e => e.currentTarget.style.background='#fff'}>
+                <i className={`fas ${icon}`} style={{ fontSize: '10px' }} />
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Room Filter Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        <button
-          onClick={() => setSelectedRoomFilter('all')}
-          className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border ${
-            selectedRoomFilter === 'all'
-              ? 'bg-[#c62419] text-white border-[#c62419] shadow-sm'
-              : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-          }`}
-        >
-          ทุกห้อง ({ALL_ROOMS.length})
+      {/* ── Room Filter Chips ─────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+        <button onClick={() => setSelectedRoomFilter('all')} style={{ flexShrink: 0, padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s', background: selectedRoomFilter === 'all' ? 'var(--crimson-500)' : '#fff', borderColor: selectedRoomFilter === 'all' ? 'var(--crimson-500)' : 'var(--border-default)', color: selectedRoomFilter === 'all' ? '#fff' : 'var(--text-secondary)' }}>
+          ทุกห้อง
         </button>
         {ALL_ROOMS.map(r => {
           const isSel = selectedRoomFilter === r
           const rc = ROOM_COLORS[r] || '#64748b'
           return (
-            <button
-              key={r}
-              onClick={() => setSelectedRoomFilter(curr => curr === r ? 'all' : r)}
-              className={`shrink-0 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold transition-all border ${
-                isSel
-                  ? 'border-current shadow-sm'
-                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-              }`}
-              style={{
-                color: isSel ? rc : undefined,
-                backgroundColor: isSel ? `${rc}14` : undefined,
-                borderColor: isSel ? rc : undefined,
-              }}
-            >
-              <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: rc }} />
-              <span>{r}</span>
+            <button key={r} onClick={() => setSelectedRoomFilter(curr => curr === r ? 'all' : r)} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 11px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${isSel ? rc : 'var(--border-default)'}`, background: isSel ? `${rc}12` : '#fff', color: isSel ? rc : 'var(--text-secondary)', transition: 'all 0.15s' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rc, flexShrink: 0 }} />
+              {r}
             </button>
           )
         })}
       </div>
 
-      {/* Monthly Grid Container */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white overflow-hidden shadow-xs">
+      {/* ── Monthly Grid ─────────────────────────────────────────────── */}
+      <div style={{ borderRadius: '16px', border: '1px solid var(--border-default)', overflow: 'hidden', background: '#fff' }}>
         {/* Day-of-week header */}
-        <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50/80 text-center py-2 text-[11px] font-bold tracking-wider uppercase">
-          {DAY_NAMES.map((d, i) => (
-            <div key={d} className={i === 0 ? 'text-[#c62419]' : 'text-slate-500'}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+          {DAY_NAMES_FULL.map((d, i) => (
+            <div key={d} style={{ padding: '10px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: i === 0 ? 'var(--crimson-500)' : 'var(--text-tertiary)', borderBottom: '1px solid var(--border-default)', background: 'rgba(0,0,0,0.015)', letterSpacing: '0.01em' }}>
               {d}
             </div>
           ))}
         </div>
 
-        {/* Days Matrix */}
-        <div className="grid grid-cols-7 gap-px bg-slate-200/80">
+        {/* Calendar cells */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
           {cells.map((day, idx) => {
             const col = idx % 7
             const isSun = col === 0
+            const isLastCol = col === 6
+            const isLastRow = idx >= cells.length - 7
+
+            const borderRight = isLastCol ? 'none' : '1px solid var(--border-default)'
+            const borderBottom = isLastRow ? 'none' : '1px solid var(--border-default)'
 
             if (!day) {
               return (
-                <div key={`empty-${idx}`} className="bg-slate-50/40 min-h-[76px] sm:min-h-[88px]" />
+                <div key={`e-${idx}`} style={{ minHeight: '110px', background: 'rgba(0,0,0,0.018)', borderRight, borderBottom }} />
               )
             }
 
             const dateStr = `${viewYear}-${pad2(viewMonth + 1)}-${pad2(day)}`
             let dayBookings = bookingsByDate[dateStr] || []
-            if (selectedRoomFilter !== 'all') {
-              dayBookings = dayBookings.filter(b => b.room === selectedRoomFilter)
-            }
+            if (selectedRoomFilter !== 'all') dayBookings = dayBookings.filter(b => b.room === selectedRoomFilter)
+            const dayBookingsSorted = dayBookings.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''))
             const isToday = todayStr === dateStr
             const isSel = activeDateStr === dateStr
             const isPast = dateStr < todayStr
+
+            const cellBg = isSel ? 'rgba(198,36,25,0.04)' : isToday ? 'rgba(245,158,11,0.04)' : isPast ? 'rgba(0,0,0,0.018)' : '#fff'
+            const numColor = isToday ? '#fff' : isSel ? 'var(--crimson-500)' : isSun ? 'var(--crimson-500)' : isPast ? 'var(--text-tertiary)' : 'var(--text-primary)'
+            const numBg = isToday ? 'var(--crimson-500)' : isSel ? 'rgba(198,36,25,0.1)' : 'transparent'
 
             return (
               <div
                 key={day}
                 onClick={() => onDayClick(dateStr)}
-                className={`group relative p-1.5 sm:p-2 min-h-[76px] sm:min-h-[88px] transition-all flex flex-col justify-between cursor-pointer ${
-                  isSel
-                    ? 'bg-red-50/70 ring-2 ring-inset ring-[#c62419] z-10'
-                    : isToday
-                      ? 'bg-amber-50/40 hover:bg-slate-50'
-                      : isPast
-                        ? 'bg-slate-50/70 text-slate-400 hover:bg-white'
-                        : 'bg-white hover:bg-slate-50'
-                }`}
+                style={{ minHeight: '110px', padding: '8px 6px 6px', display: 'flex', flexDirection: 'column', gap: '3px', cursor: 'pointer', background: cellBg, borderRight, borderBottom, transition: 'background 0.12s', position: 'relative' }}
+                onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0,0,0,0.025)' }}
+                onMouseLeave={e => e.currentTarget.style.background = cellBg}
               >
-                {/* Cell Header: Count Badge + Day Number */}
-                <div className="flex items-center justify-between mb-1">
-                  {dayBookings.length > 0 ? (
-                    <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded-full bg-red-100 text-[#c62419]">
-                      {dayBookings.length}
-                    </span>
-                  ) : <span />}
-
-                  <span className={`w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-bold leading-none ${
-                    isToday
-                      ? 'bg-[#c62419] text-white shadow-xs'
-                      : isSel
-                        ? 'text-[#c62419] font-black'
-                        : isSun
-                          ? 'text-[#c62419]'
-                          : isPast
-                            ? 'text-slate-400'
-                            : 'text-slate-800'
-                  }`}>
+                {/* Day number — top right */}
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px' }}>
+                  <span style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: numColor, background: numBg, flexShrink: 0 }}>
                     {day}
                   </span>
                 </div>
 
-                {/* Event Pills */}
-                <div className="flex flex-col gap-1 w-full">
-                  {dayBookings.slice(0, 2).map(b => {
-                    const rc = ROOM_COLORS[b.room] || '#64748b'
-                    return (
-                      <button
-                        key={b.id}
-                        title={`${b.gameName || b.room} — ${b.time || ''}`}
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          onEventClick?.(b)
-                        }}
-                        className="w-full text-left truncate rounded px-1.5 py-0.5 text-[10px] font-bold tracking-tight transition-transform hover:scale-[1.02] border"
-                        style={{
-                          backgroundColor: `${rc}12`,
-                          borderColor: `${rc}30`,
-                          color: rc,
-                        }}
-                      >
-                        {b.time && <span className="opacity-80 mr-1">{b.time}</span>}
-                        <span>{b.room || b.gameName || 'รอบเล่น'}</span>
-                      </button>
-                    )
-                  })}
-                  {dayBookings.length > 2 && (
-                    <div className="text-[9px] font-bold text-slate-500 px-1 leading-tight">
-                      +{dayBookings.length - 2} อื่นๆ
-                    </div>
-                  )}
-                </div>
+                {/* Event bars */}
+                {dayBookingsSorted.slice(0, 3).map(b => {
+                  const rc = ROOM_COLORS[b.room] || '#64748b'
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
+                      title={`${b.gameName || b.room} — ${b.time || ''}`}
+                      style={{ width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: '6px', border: 'none', background: `${rc}18`, borderLeft: `3px solid ${rc}`, cursor: 'pointer', transition: 'opacity 0.12s', minWidth: 0 }}
+                      onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
+                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                    >
+                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
+                        {b.gameName || b.room || 'รอบ'}
+                      </div>
+                      {b.time && (
+                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', lineHeight: 1.2 }}>{b.time}</div>
+                      )}
+                    </button>
+                  )
+                })}
+                {dayBookingsSorted.length > 3 && (
+                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', paddingLeft: '4px' }}>+{dayBookingsSorted.length - 3} เพิ่มเติม</div>
+                )}
               </div>
             )
           })}
         </div>
       </div>
 
-      {/* Selected Day Schedule Panel */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-sm">
-        <div className="flex items-center justify-between flex-wrap gap-3 pb-3 border-b border-slate-100">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[#c62419] text-base">✦</span>
-              <h3 className="text-base font-black text-slate-900 tracking-tight">
-                {activeDateStr === todayStr ? 'รอบการเล่นวันนี้' : `รอบการเล่นวันที่ ${fmtDate(activeDateStr)}`}
-              </h3>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {selectedDayBookings.length > 0
-                ? `พบการจอง ${selectedDayBookings.length} รายการสำหรับวันที่เลือก`
-                : 'ยังไม่มีคิวการจองในวันนี้ — เปิดห้องเป็นตี้แรกได้เลย!'}
-            </p>
+      {/* ── Selected Day Action Bar ───────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '14px 18px', borderRadius: '14px', background: '#fff', border: '1px solid var(--border-default)' }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '2px' }}>
+            {activeDateStr === todayStr ? 'วันนี้' : fmtDate(activeDateStr)}
           </div>
-
-          <button
-            onClick={() => onBookToday?.(activeDateStr)}
-            className="px-4 py-2 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
-          >
-            <i className="fas fa-plus text-[10px]" />
-            <span>+ จองรอบวันนี้</span>
-          </button>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
+            {selectedDayBookings.length > 0 ? `${selectedDayBookings.length} รอบ — ${selectedDayBookings.map(b => b.room || b.gameName).slice(0,2).join(', ')}${selectedDayBookings.length > 2 ? ' ...' : ''}` : 'ยังไม่มีรอบ — เปิดตี้แรกได้เลย'}
+          </div>
         </div>
-
-        {/* Sessions List or Empty State */}
-        {selectedDayBookings.length === 0 ? (
-          <div className="py-8 px-4 rounded-xl bg-slate-50/60 border border-dashed border-slate-200 text-center my-2">
-            <div className="w-12 h-12 rounded-2xl bg-red-50 text-[#c62419] flex items-center justify-center mx-auto mb-2.5 text-lg">
-              <i className="fas fa-door-open" />
-            </div>
-            <h4 className="text-sm font-bold text-slate-900 mb-1">
-              วันนี้ทุกห้องยังว่างอยู่
-            </h4>
-            <p className="text-xs text-slate-500 max-w-sm mx-auto mb-3.5 leading-relaxed">
-              คุณสามารถเป็นคนแรกที่เปิดห้อง นัดหมายเวลา และชวนเพื่อนมาร่วมสืบคดีได้ทันที
-            </p>
-            <button
-              onClick={() => onBookToday?.(activeDateStr)}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-50 text-[#c62419] border border-red-200 text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              + เปิดตี้จองวันนี้
-            </button>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
-            {selectedDayBookings.map(b => {
-              const rc = ROOM_COLORS[b.room] || '#64748b'
-              const bImg = b.gameImage ? convertImg(b.gameImage, 300) : null
-              const totalM = b.members?.length || 0
-              return (
-                <div
-                  key={b.id}
-                  onClick={() => onEventClick?.(b)}
-                  className="group flex gap-3 p-3 rounded-xl bg-white border border-slate-200/90 hover:border-[#c62419] hover:shadow-md transition-all cursor-pointer relative overflow-hidden"
-                >
-                  {/* Poster Thumbnail */}
-                  <div className="w-16 h-20 rounded-lg overflow-hidden shrink-0 bg-slate-100 relative">
-                    {bImg ? (
-                      <img
-                        src={bImg}
-                        alt=""
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400">
-                        <i className="fas fa-dice-d20 text-lg" />
-                      </div>
-                    )}
-                    {b.time && (
-                      <div className="absolute bottom-0 inset-x-0 bg-slate-900/85 backdrop-blur-xs text-white text-[10px] font-mono font-bold text-center py-0.5">
-                        {b.time}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-1">
-                        <span
-                          className="inline-flex items-center gap-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full border"
-                          style={{
-                            color: rc,
-                            borderColor: `${rc}35`,
-                            backgroundColor: `${rc}10`,
-                          }}
-                        >
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rc }} />
-                          {b.room || 'ไม่ระบุห้อง'}
-                        </span>
-                        <StatusBadge status={b.status} size="text-[10px]" />
-                      </div>
-
-                      <h4 className="text-sm font-bold text-slate-900 group-hover:text-[#c62419] transition-colors truncate">
-                        {b.gameName || 'การจองห้อง'}
-                      </h4>
-                    </div>
-
-                    <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
-                      <span className="flex items-center gap-1.5">
-                        <i className="fas fa-users text-[#c62419] text-[10px]" />
-                        <span>{totalM}/{b.maxMembers || 6} คน</span>
-                      </span>
-                      <span className="text-xs font-bold text-[#c62419] group-hover:translate-x-0.5 transition-transform">
-                        ดูรายละเอียด ›
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+        <button
+          onClick={() => onBookToday?.(activeDateStr)}
+          style={{ flexShrink: 0, padding: '9px 18px', borderRadius: '10px', background: 'var(--crimson-500)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'background 0.15s, transform 0.1s', whiteSpace: 'nowrap' }}
+          onMouseEnter={e => { e.currentTarget.style.background='var(--crimson-600)'; e.currentTarget.style.transform='translateY(-1px)' }}
+          onMouseLeave={e => { e.currentTarget.style.background='var(--crimson-500)'; e.currentTarget.style.transform='translateY(0)' }}
+        >
+          <i className="fas fa-plus" style={{ fontSize: '10px' }} />จองวันนี้
+        </button>
       </div>
     </div>
   )
@@ -466,124 +323,95 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   const paidPct = total > 0 ? (paidCount / total) * 100 : 0
   const allPaid = paidCount === total && total > 0
   const rc = ROOM_COLORS[booking.room] || '#64748b'
+  const isCollapsed = booking.status === 'collapsed'
 
   return (
     <div
       onClick={() => onOpen(booking)}
-      className="group relative flex rounded-2xl bg-white border border-slate-200/90 hover:border-[#c62419] hover:shadow-md transition-all duration-200 overflow-hidden cursor-pointer"
+      style={{
+        position: 'relative', borderRadius: '14px',
+        border: `1px solid ${isCollapsed ? 'rgba(185,28,28,0.2)' : 'var(--border-default)'}`,
+        background: isCollapsed ? 'rgba(185,28,28,0.04)' : 'var(--surface-card)',
+        cursor: 'pointer', overflow: 'hidden', display: 'flex',
+        transition: 'box-shadow 0.2s, border-color 0.2s',
+      }}
+      onMouseEnter={e => { if (!isCollapsed) e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)' }}
+      onMouseLeave={e => { e.currentTarget.style.borderColor=isCollapsed?'rgba(185,28,28,0.25)':'var(--border-default)'; e.currentTarget.style.boxShadow='none' }}
     >
       {/* Left: Image Strip */}
-      <div className="w-20 sm:w-24 shrink-0 relative overflow-hidden bg-slate-100">
-        {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt=""
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-slate-300">
-            <i className="fas fa-scroll text-2xl" />
-          </div>
-        )}
+      <div style={{ width: '72px', flexShrink: 0, position: 'relative', overflow: 'hidden', background: 'var(--surface-sunken)' }}>
+        {imgSrc
+          ? <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.75) contrast(1.1)', display: 'block' }} />
+          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)', fontSize: '22px' }}><i className="fas fa-scroll" /></div>
+        }
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: rc }} />
       </div>
 
       {/* Right: Content */}
-      <div className="flex-1 min-w-0 p-3.5 sm:p-4 flex flex-col justify-between gap-2">
-        <div>
-          {/* Top Title & Status */}
-          <div className="flex items-start justify-between gap-2 mb-1.5">
-            <h4 className="text-sm sm:text-base font-bold text-slate-900 group-hover:text-[#c62419] transition-colors truncate">
-              {booking.gameName || 'การจองห้อง'}
-            </h4>
-            <StatusBadge
-              status={booking.status}
-              size="text-[10px]"
-              label={booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined}
-            />
+      <div style={{ flex: '1 1 0%', minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
+        {/* Title + Status */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '5px' }}>
+          <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+            {booking.gameName || 'การจองห้อง'}
           </div>
-
-          {/* Metadata Chips */}
-          <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
-            <span className="inline-flex items-center gap-1 font-medium">
-              <i className="fas fa-calendar text-[10px] text-slate-400" />
-              {fmtDate(booking.date)}
-            </span>
-            {booking.time && (
-              <span className="inline-flex items-center gap-1 font-mono text-slate-700 font-semibold">
-                <i className="fas fa-clock text-[10px] text-slate-400" />
-                {booking.time} น.
-              </span>
-            )}
-            {booking.room && (
-              <span
-                className="inline-flex items-center gap-1 font-bold text-[11px]"
-                style={{ color: rc }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: rc }} />
-                {booking.room}
-              </span>
-            )}
-            {isLeader && (
-              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-red-50 text-[#c62419] border border-red-200">
-                หัวหน้า
-              </span>
-            )}
-          </div>
+          <StatusBadge status={booking.status} label={booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined} />
         </div>
 
-        {/* Progress & Actions Footer */}
-        <div className="flex items-center justify-between gap-3 pt-1 border-t border-slate-100">
-          {/* Members & Deposit Bar */}
-          <div className="flex-1 flex flex-col gap-1">
-            <div className="flex justify-between text-[11px] text-slate-500 font-medium">
+        {/* Meta chips */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <i className="fas fa-calendar" style={{ fontSize: '10px', opacity: 0.55 }} />{fmtDate(booking.date)}
+          </span>
+          {booking.time && (
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <i className="fas fa-clock" style={{ fontSize: '10px', opacity: 0.55 }} />{booking.time}
+            </span>
+          )}
+          {booking.room && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: rc, fontWeight: 700 }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rc, flexShrink: 0 }} />{booking.room}
+            </span>
+          )}
+          {isLeader && (
+            <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.12)', padding: '2px 8px', borderRadius: '10px' }}>หัวหน้า</span>
+          )}
+        </div>
+
+        {/* Progress footer */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-default)' }}>
+          <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600 }}>
               <span>สมาชิก {total}/{booking.maxMembers || '?'}</span>
-              <span className={allPaid ? 'text-emerald-600 font-bold' : 'text-slate-500'}>
-                มัดจำ {paidCount}/{total}
-              </span>
+              <span style={{ color: allPaid ? '#047857' : 'var(--text-tertiary)' }}>มัดจำ {paidCount}/{total}</span>
             </div>
-            <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  allPaid ? 'bg-emerald-500' : 'bg-[#c62419]'
-                }`}
-                style={{ width: `${Math.min(100, Math.max(5, paidPct))}%` }}
-              />
+            <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, Math.max(5, paidPct))}%`, background: allPaid ? '#10b981' : 'var(--crimson-500)', borderRadius: '6px', transition: 'width 0.3s ease-out' }} />
             </div>
           </div>
 
-          {/* Countdown Pill */}
           {countdown && (
-            <div className={`shrink-0 px-2.5 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 border ${
-              isUrgent
-                ? 'bg-rose-50 border-rose-200 text-rose-700 animate-pulse'
-                : 'bg-amber-50 border-amber-200 text-amber-700'
-            }`}>
-              <i className="fas fa-clock text-[9px]" />
-              <span>{countdown}</span>
+            <div style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: isUrgent ? '#ef4444' : '#d97706', border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.25)'}` }}>
+              <i className="fas fa-clock" style={{ fontSize: '9px' }} />{countdown}
             </div>
           )}
 
-          {/* Leader Action to Close Collapsed Party */}
           {isLeader && booking.status === 'collapsed' && onCloseBooking && (
             <button
-              onClick={(e) => {
-                e.stopPropagation()
-                onCloseBooking(booking)
-              }}
-              className="shrink-0 px-2.5 py-1 rounded-lg bg-red-50 hover:bg-[#c62419] text-[#c62419] hover:text-white border border-red-200 text-xs font-bold transition-all flex items-center gap-1"
+              onClick={e => { e.stopPropagation(); onCloseBooking(booking) }}
               title="ปิดตี้ที่ล่ม"
+              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', background: 'rgba(198,36,25,0.15)', border: '1px solid rgba(198,36,25,0.35)', color: 'var(--crimson-500)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'background 0.15s, color 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background='var(--crimson-500)'; e.currentTarget.style.color='#fff' }}
+              onMouseLeave={e => { e.currentTarget.style.background='rgba(198,36,25,0.15)'; e.currentTarget.style.color='var(--crimson-500)' }}
             >
-              <i className="fas fa-times-circle" />
-              <span>ปิดตี้</span>
+              <i className="fas fa-times-circle" />ปิดตี้
             </button>
           )}
         </div>
       </div>
 
-      {/* Leader Notification Badge */}
       {isLeader && pendingRequests > 0 && (
-        <div className="absolute top-2 right-2 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-sm pointer-events-none">
-          {pendingRequests} คำขอรออนุมัติ
+        <div style={{ position: 'absolute', top: '8px', right: '8px', background: '#f59e0b', color: '#000', fontSize: '10px', fontWeight: 900, padding: '2px 8px', borderRadius: '20px', pointerEvents: 'none' }}>
+          {pendingRequests} คำขอ
         </div>
       )}
     </div>
@@ -595,12 +423,11 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
   const [step, setStep] = useState('datetime') // 'datetime' | 'game'
   const [selectedDate, setSelectedDate] = useState(defaultDate || '')
   const [selectedTime, setSelectedTime] = useState('')
-  const [customTime, setCustomTime] = useState('')
   const [selectedGame, setSelectedGame] = useState(null)
   const [search, setSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  const finalTime = customTime || selectedTime
+  const finalTime = selectedTime
 
   // Active bookings on the selected date
   const activeDateBookings = selectedDate
@@ -661,99 +488,143 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
     }
   }
 
+  const C   = '#c62419'
+  const INK = '#1a1a1a'
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+      style={{ background: 'rgba(26,26,26,0.5)', backdropFilter: 'blur(8px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-xl bg-white border border-slate-200 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col font-sans text-slate-800 animate-in slide-in-from-bottom duration-200">
-        {/* Mobile Swipe Bar */}
-        <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto mt-3 sm:hidden" />
+      <div
+        className="w-full sm:max-w-lg flex flex-col overflow-hidden"
+        style={{
+          background: '#ffffff',
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          borderBottomLeftRadius: window.matchMedia('(min-width:640px)').matches ? 28 : 0,
+          borderBottomRightRadius: window.matchMedia('(min-width:640px)').matches ? 28 : 0,
+          maxHeight: '94dvh',
+          boxShadow: '0 40px 100px rgba(26,26,26,0.22)',
+        }}
+      >
+        {/* Drag handle */}
+        <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden" style={{ background: 'rgba(26,26,26,0.12)' }} />
 
-        {/* Modal Header */}
-        <div className="p-5 pb-3 flex items-center justify-between border-b border-slate-100">
-          <div>
-            <h3 className="text-lg font-black text-slate-900 tracking-tight">
-              จองรอบเกม & เปิดตี้ใหม่
-            </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {step === 'datetime' ? 'ขั้นตอนที่ 1 / 2 — ระบุวันและเวลาที่ต้องการ' : 'ขั้นตอนที่ 2 / 2 — เลือกบทละครสืบสวน'}
+        {/* Header */}
+        <div className="flex items-start justify-between pt-7 pb-6" style={{ paddingLeft: 32, paddingRight: 32 }}>
+          <div className="min-w-0 flex-1">
+            {/* Eyebrow */}
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: C }}>
+                ขั้นตอน {step === 'datetime' ? '1' : '2'} / 2
+              </span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(26,26,26,0.08)' }} />
+              {/* Step dots */}
+              <div className="flex items-center gap-1.5">
+                <div className="rounded-full" style={{ width: step === 'datetime' ? 20 : 6, height: 6, background: C, transition: 'width 240ms' }} />
+                <div className="rounded-full" style={{ width: step === 'game' ? 20 : 6, height: 6, background: step === 'game' ? C : 'rgba(26,26,26,0.14)', transition: 'width 240ms' }} />
+              </div>
+            </div>
+            <h3 className="font-black leading-[1.15] tracking-tight" style={{ color: INK, fontSize: 24 }}>จองรอบเกม</h3>
+            <p className="text-[13px] mt-1.5 leading-snug" style={{ color: 'rgba(26,26,26,0.55)' }}>
+              {step === 'datetime' ? 'เลือกวันที่และเวลาที่คุณต้องการเล่น' : 'เลือกสคริปต์ที่ต้องการเล่นในรอบนี้'}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
+            className="w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 ml-4"
+            style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.5)', marginTop: 2 }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.color = 'rgba(26,26,26,0.5)' }}
           >
-            <i className="fas fa-times text-xs" />
+            <i className="fas fa-times text-sm" />
           </button>
         </div>
 
-        {/* Step Progress Bar */}
-        <div className="flex gap-2 px-5 pt-3">
-          <div className={`h-1 flex-1 rounded-full transition-all ${
-            step === 'datetime' || step === 'game' ? 'bg-[#c62419]' : 'bg-slate-100'
-          }`} />
-          <div className={`h-1 flex-1 rounded-full transition-all ${
-            step === 'game' ? 'bg-[#c62419]' : 'bg-slate-100'
-          }`} />
-        </div>
+        {/* Body */}
+        <div
+          className="overflow-y-auto flex-1 flex flex-col"
+          style={{ paddingLeft: 32, paddingRight: 32, paddingBottom: 32, gap: 36 }}
+        >
 
-        {/* Modal Body */}
-        <div className="p-5 overflow-y-auto flex-1">
-          {/* STEP 1: Date & Time */}
+          {/* ── STEP 1: Date & Time ── */}
           {step === 'datetime' && (
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  วันที่ต้องการจอง *
-                </label>
+            <>
+              {/* Date picker */}
+              <div className="flex flex-col gap-3.5">
+                <div className="flex items-baseline justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.45)' }}>
+                    วันที่จอง
+                  </label>
+                  {selectedDate && (
+                    <span className="text-[11px] font-semibold" style={{ color: C }}>
+                      {fmtDate(selectedDate)}
+                    </span>
+                  )}
+                </div>
                 <input
                   type="date"
                   min={toDateStr(new Date())}
                   value={selectedDate}
-                  onChange={e => {
-                    setSelectedDate(e.target.value)
-                    setSelectedTime('')
-                    setCustomTime('')
+                  onChange={e => { setSelectedDate(e.target.value); setSelectedTime('') }}
+                  className="w-full px-5 text-[15px] font-semibold outline-none transition-all"
+                  style={{
+                    height: 56,
+                    background: '#faf7f5',
+                    border: `1.5px solid ${selectedDate ? C : 'rgba(26,26,26,0.08)'}`,
+                    borderRadius: 14,
+                    color: selectedDate ? INK : 'rgba(26,26,26,0.4)',
+                    colorScheme: 'light',
                   }}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-medium focus:ring-2 focus:ring-red-100 focus:border-[#c62419] outline-none transition-all"
+                  onFocus={e => { e.target.style.borderColor = C; e.target.style.boxShadow = `0 0 0 4px ${C}14` }}
+                  onBlur={e => { e.target.style.borderColor = selectedDate ? C : 'rgba(26,26,26,0.08)'; e.target.style.boxShadow = 'none' }}
                 />
+                {selectedDate && activeDateBookings.length > 0 && (
+                  <div className="flex items-start gap-3 px-4 py-3 text-[12px]" style={{ background: '#faf7f5', borderRadius: 12 }}>
+                    <i className="fas fa-info-circle mt-0.5 shrink-0 text-[13px]" style={{ color: C }} />
+                    <span style={{ color: 'rgba(26,26,26,0.65)', lineHeight: 1.55 }}>
+                      วันนี้มี <strong style={{ color: INK }}>{activeDateBookings.length} การจอง</strong> อยู่แล้ว — เลขที่ปรากฏบนรอบคือจำนวนที่ถูกจอง
+                    </span>
+                  </div>
+                )}
               </div>
 
-              {/* Active Bookings Notice */}
-              {selectedDate && activeDateBookings.length > 0 && (
-                <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2.5">
-                  <i className="fas fa-calendar-check text-sm shrink-0 text-amber-600" />
-                  <span>วันนี้มีการจองแล้ว {activeDateBookings.length} รายการ — เลือกรอบเวลาเพื่อเช็คความพร้อม</span>
+              {/* Time slots */}
+              <div className="flex flex-col gap-4">
+                <div className="flex items-baseline justify-between">
+                  <label className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.45)' }}>
+                    รอบเวลา
+                  </label>
+                  <span className="text-[11px]" style={{ color: 'rgba(26,26,26,0.4)' }}>
+                    13:00 – 19:00
+                  </span>
                 </div>
-              )}
-
-              {/* Time Slots Selection */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  รอบเวลาเริ่มต้น *
-                </label>
-                <div className="grid grid-cols-4 gap-2">
+                <div className="grid grid-cols-4" style={{ gap: 10 }}>
                   {TIME_SLOTS.map(t => {
-                    const isActive = selectedTime === t && !customTime
+                    const isActive = selectedTime === t
                     const count = slotCounts[t] || 0
                     return (
                       <button
                         key={t}
                         type="button"
-                        onClick={() => { setSelectedTime(t); setCustomTime('') }}
-                        className={`relative py-2.5 px-2 rounded-xl text-xs font-bold transition-all border ${
-                          isActive
-                            ? 'bg-[#c62419] text-white border-[#c62419] shadow-sm'
-                            : count > 0
-                              ? 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100'
-                              : 'bg-white text-slate-700 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                        }`}
+                        onClick={() => setSelectedTime(t)}
+                        className="relative flex flex-col items-center justify-center font-black transition-all"
+                        style={{
+                          height: 66,
+                          background: isActive ? C : '#faf7f5',
+                          border: `1.5px solid ${isActive ? C : count > 0 ? `${C}30` : 'transparent'}`,
+                          borderRadius: 14,
+                          boxShadow: isActive ? `0 8px 24px ${C}35` : 'none',
+                          color: isActive ? '#fff' : INK,
+                          transform: isActive ? 'translateY(-1px)' : 'translateY(0)',
+                        }}
                       >
-                        {t}
-                        {count > 0 && !isActive && (
-                          <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full bg-amber-500 text-white text-[9px] font-black px-1 flex items-center justify-center">
-                            {count}
+                        <span className="text-[15px] leading-none">{t}</span>
+                        {count > 0 && (
+                          <span className="text-[10px] font-bold mt-1.5" style={{ color: isActive ? 'rgba(255,255,255,0.8)' : C, letterSpacing: '0.02em' }}>
+                            {count} จอง
                           </span>
                         )}
                       </button>
@@ -762,68 +633,89 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                 </div>
               </div>
 
-              {/* Custom Time Option */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                  หรือระบุเวลาเอง (ถ้าต้องการ)
-                </label>
-                <input
-                  type="time"
-                  value={customTime}
-                  onChange={e => {
-                    setCustomTime(e.target.value)
-                    setSelectedTime('')
-                  }}
-                  className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-mono text-sm focus:ring-2 focus:ring-red-100 focus:border-[#c62419] outline-none"
-                />
-              </div>
-
-              {/* Next Step CTA */}
+              {/* CTA */}
               <button
                 disabled={!selectedDate || !finalTime}
                 onClick={() => setStep('game')}
-                className={`w-full py-3.5 rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 mt-2 ${
-                  selectedDate && finalTime
-                    ? 'bg-[#c62419] hover:bg-[#9a1c13] text-white shadow-md shadow-red-900/20 cursor-pointer'
-                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                }`}
+                className="w-full font-black transition-all flex items-center justify-center gap-3"
+                style={{
+                  height: 56,
+                  background: selectedDate && finalTime ? C : '#f0ebe9',
+                  color: selectedDate && finalTime ? '#fff' : 'rgba(26,26,26,0.3)',
+                  boxShadow: selectedDate && finalTime ? `0 10px 28px ${C}35` : 'none',
+                  cursor: selectedDate && finalTime ? 'pointer' : 'not-allowed',
+                  borderRadius: 14,
+                  fontSize: 15,
+                  letterSpacing: '0.01em',
+                  marginTop: 4,
+                }}
               >
-                <span>ขั้นตอนถัดไป: เลือกบทละคร</span>
-                <i className="fas fa-arrow-right text-xs" />
+                {selectedDate && finalTime ? (
+                  <>
+                    <span>ถัดไป — เลือกสคริปต์</span>
+                    <i className="fas fa-arrow-right text-xs" />
+                  </>
+                ) : (
+                  <span>เลือกวันและเวลาก่อน</span>
+                )}
               </button>
-            </div>
+            </>
           )}
 
-          {/* STEP 2: Select Game */}
+          {/* ── STEP 2: Select Game ── */}
           {step === 'game' && (
-            <div className="flex flex-col gap-4">
-              {/* Selected Slot Recap */}
-              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center justify-between">
-                <span>
-                  🗓️ วันที่: <strong className="text-slate-900">{fmtDate(selectedDate)}</strong> · เวลา: <strong className="text-[#c62419]">{finalTime} น.</strong>
-                </span>
+            <>
+              {/* Slot recap */}
+              <div className="flex items-center justify-between" style={{ padding: '14px 18px', background: '#faf7f5', borderRadius: 14 }}>
+                <div className="flex items-center gap-3 text-[13px]">
+                  <div className="flex items-center justify-center shrink-0" style={{ width: 32, height: 32, background: `${C}10`, borderRadius: 10 }}>
+                    <i className="fas fa-calendar-check text-xs" style={{ color: C }} />
+                  </div>
+                  <div className="flex flex-col leading-tight">
+                    <span className="text-[12px] font-medium" style={{ color: 'rgba(26,26,26,0.55)' }}>{fmtDate(selectedDate)}</span>
+                    <span className="font-black text-[14px]" style={{ color: INK }}>{finalTime} น.</span>
+                  </div>
+                </div>
                 <button
                   onClick={() => setStep('datetime')}
-                  className="text-xs text-[#c62419] hover:underline font-bold"
+                  className="font-bold transition-colors"
+                  style={{ color: C, fontSize: 12, padding: '6px 12px', background: `${C}10`, borderRadius: 999 }}
                 >
-                  แก้ไข
+                  เปลี่ยน
                 </button>
               </div>
 
-              {/* Search Box */}
-              <div className="relative">
-                <i className="fas fa-search absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs" />
+              {/* Search */}
+              <div className="relative" style={{ marginTop: -8 }}>
+                <i className="fas fa-search absolute left-5 top-1/2 -translate-y-1/2 text-[13px] pointer-events-none" style={{ color: 'rgba(26,26,26,0.35)' }} />
                 <input
                   type="text"
-                  placeholder="ค้นหาชื่อเกม / สคริปต์..."
+                  placeholder="ค้นหาชื่อสคริปต์..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs placeholder-slate-400 focus:ring-2 focus:ring-red-100 focus:border-[#c62419] outline-none"
+                  className="w-full outline-none transition-all"
+                  style={{
+                    paddingLeft: 46, paddingRight: 20,
+                    height: 52,
+                    background: '#faf7f5',
+                    border: '1.5px solid transparent',
+                    borderRadius: 14,
+                    color: INK,
+                    fontSize: 14,
+                  }}
+                  onFocus={e => { e.target.style.borderColor = C; e.target.style.background = '#fff'; e.target.style.boxShadow = `0 0 0 4px ${C}14` }}
+                  onBlur={e => { e.target.style.borderColor = 'transparent'; e.target.style.background = '#faf7f5'; e.target.style.boxShadow = 'none' }}
                 />
               </div>
 
-              {/* Game List Selector */}
-              <div className="flex flex-col gap-2 max-h-64 overflow-y-auto pr-1">
+              {/* Game list */}
+              <div className="flex flex-col overflow-y-auto" style={{ gap: 10, maxHeight: 280, margin: '-4px -4px 0', padding: '4px 4px 0' }}>
+                {filteredGames.length === 0 && (
+                  <div className="text-center flex flex-col items-center gap-3" style={{ color: 'rgba(26,26,26,0.35)', padding: '48px 0' }}>
+                    <i className="fas fa-search text-2xl" style={{ opacity: 0.5 }} />
+                    <span className="text-sm">ไม่พบสคริปต์ที่ค้นหา</span>
+                  </div>
+                )}
                 {filteredGames.map(g => {
                   const isSel = selectedGame?.id === g.id
                   const isExact = exactSlotBookedIds.has(g.id)
@@ -833,96 +725,122 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                     <div
                       key={g.id}
                       onClick={() => setSelectedGame(g)}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all cursor-pointer ${
-                        isSel
-                          ? 'bg-red-50/60 border-[#c62419] shadow-xs ring-1 ring-[#c62419]'
-                          : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                      }`}
+                      className="flex items-center transition-all cursor-pointer"
+                      style={{
+                        gap: 14,
+                        padding: 12,
+                        background: isSel ? `${C}08` : '#fff',
+                        border: `1.5px solid ${isSel ? C : 'rgba(26,26,26,0.06)'}`,
+                        borderRadius: 14,
+                        boxShadow: isSel ? `0 8px 20px ${C}1a` : '0 1px 2px rgba(26,26,26,0.02)',
+                        transform: isSel ? 'translateY(-1px)' : 'none',
+                      }}
                     >
-                      <div className="w-12 h-14 rounded-lg overflow-hidden bg-slate-100 shrink-0">
+                      <div className="shrink-0 overflow-hidden" style={{ width: 48, height: 60, borderRadius: 10, background: '#f5f1ef' }}>
                         {gImg ? (
-                          <img src={gImg} alt="" className="w-full h-full object-cover" />
+                          <img src={gImg} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-400 text-sm">
-                            <i className="fas fa-dice-d20" />
+                          <div className="w-full h-full flex items-center justify-center">
+                            <i className="fas fa-theater-masks text-base" style={{ color: 'rgba(26,26,26,0.25)' }} />
                           </div>
                         )}
                       </div>
-
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                          {g.title}
-                        </h4>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-1 flex-wrap">
-                          <span>👥 {g.players || (g.characters ? `${g.characters.length} คน` : '6-8 คน')}</span>
-                          {g.difficulty && <span>· ความยาก: {g.difficulty}</span>}
+                        <div className="flex items-start justify-between gap-2">
+                          <h4 className="font-bold leading-[1.3] line-clamp-2" style={{ color: INK, fontSize: 14 }}>{g.title}</h4>
+                          {isSel && (
+                            <div className="flex items-center justify-center shrink-0" style={{ width: 22, height: 22, background: C, borderRadius: 999 }}>
+                              <i className="fas fa-check text-[10px]" style={{ color: '#fff' }} />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
+                          <span className="flex items-center gap-1" style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)' }}>
+                            <i className="fas fa-users text-[9px]" />
+                            {g.players || (g.characters ? `${g.characters.length} คน` : '6–8 คน')}
+                          </span>
+                          {g.difficulty && (
+                            <>
+                              <span style={{ color: 'rgba(26,26,26,0.2)' }}>·</span>
+                              <span style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)' }}>{g.difficulty}</span>
+                            </>
+                          )}
                           {isExact && (
-                            <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
-                              จองเวลานี้แล้ว
+                            <span style={{ padding: '2px 8px', background: C, color: '#fff', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>
+                              จองแล้ว
                             </span>
                           )}
                         </div>
                       </div>
-
-                      {isSel && (
-                        <i className="fas fa-check-circle text-[#c62419] text-base shrink-0 mr-1" />
-                      )}
                     </div>
                   )
                 })}
               </div>
 
-              {/* Conflict Note */}
+              {/* Notices */}
               {selectedGame && exactSlotBookedIds.has(selectedGame.id) && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex items-center gap-2">
-                  <i className="fas fa-exclamation-triangle shrink-0 text-amber-600" />
-                  <span>เกมนี้มีการจองเวลา {finalTime} แล้ว — ยังสามารถส่งคำขอได้ โดยแอดมินจะเป็นผู้พิจารณา</span>
+                <div className="flex items-start gap-3 text-[12px]" style={{ padding: '14px 16px', background: `${C}08`, border: `1px solid ${C}22`, borderRadius: 12 }}>
+                  <i className="fas fa-exclamation-circle mt-0.5 shrink-0 text-[13px]" style={{ color: C }} />
+                  <span style={{ color: 'rgba(26,26,26,0.75)', lineHeight: 1.55 }}>เกมนี้มีการจองรอบ <strong style={{ color: INK }}>{finalTime}</strong> แล้ว — ส่งคำขอได้ แอดมินจะพิจารณาให้</span>
+                </div>
+              )}
+              {selectedGame && !exactSlotBookedIds.has(selectedGame.id) && (
+                <div className="flex items-start gap-3 text-[12px]" style={{ padding: '14px 16px', background: '#faf7f5', borderRadius: 12 }}>
+                  <i className="fas fa-info-circle mt-0.5 shrink-0 text-[13px]" style={{ color: C }} />
+                  <span style={{ color: 'rgba(26,26,26,0.7)', lineHeight: 1.55 }}>หลังแอดมินยืนยัน มีเวลา 3 วันชำระมัดจำ <strong style={{ color: INK }}>฿{selectedGame.deposit || 0}/คน</strong></span>
                 </div>
               )}
 
-              {/* Deposit Info */}
-              {selectedGame && (
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
-                  <i className="fas fa-info-circle text-[#c62419]" />
-                  <span>หลังแอดมินยืนยันห้อง มีเวลา 3 วันในการชำระมัดจำ ฿{selectedGame.deposit || 0}/คน</span>
-                </div>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-2.5 pt-2 border-t border-slate-100">
+              {/* Back + Confirm */}
+              <div className="flex gap-3" style={{ marginTop: 4 }}>
                 <button
                   type="button"
                   onClick={() => setStep('datetime')}
-                  className="flex-1 py-3 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs transition-colors"
+                  className="flex items-center justify-center transition-all shrink-0"
+                  style={{
+                    width: 56, height: 56,
+                    background: '#faf7f5',
+                    color: 'rgba(26,26,26,0.6)',
+                    borderRadius: 14,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#faf7f5'; e.currentTarget.style.color = 'rgba(26,26,26,0.6)' }}
                 >
-                  ย้อนกลับ
+                  <i className="fas fa-arrow-left text-sm" />
                 </button>
                 <button
                   type="button"
                   disabled={!selectedGame || submitting}
                   onClick={handleSubmit}
-                  className={`flex-2 py-3 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 ${
-                    selectedGame && !submitting
-                      ? 'bg-[#c62419] hover:bg-[#9a1c13] text-white shadow-md shadow-red-900/20 cursor-pointer'
-                      : 'bg-slate-200 text-slate-400 cursor-not-allowed'
-                  }`}
+                  className="flex-1 font-black transition-all flex items-center justify-center gap-3"
+                  style={{
+                    height: 56,
+                    background: selectedGame && !submitting ? C : '#f0ebe9',
+                    color: selectedGame && !submitting ? '#fff' : 'rgba(26,26,26,0.3)',
+                    boxShadow: selectedGame && !submitting ? `0 10px 28px ${C}35` : 'none',
+                    cursor: selectedGame && !submitting ? 'pointer' : 'not-allowed',
+                    borderRadius: 14,
+                    fontSize: 15,
+                    letterSpacing: '0.01em',
+                  }}
                 >
                   {submitting ? (
                     <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>กำลังส่งคำขอ...</span>
+                      <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+                      <span>กำลังส่ง...</span>
                     </>
                   ) : (
                     <>
-                      <i className="fas fa-paper-plane text-[10px]" />
+                      <i className="fas fa-paper-plane text-xs" />
                       <span>ยืนยันการจอง</span>
                     </>
                   )}
                 </button>
               </div>
-            </div>
+            </>
           )}
         </div>
+        <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </div>
     </div>
   )
@@ -987,115 +905,225 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
     }
   }
 
+  const stepIndex = step === 'qr' ? 0 : step === 'upload' ? 1 : 2
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden font-sans text-slate-800 animate-in slide-in-from-bottom duration-200">
-        <div className="p-5 flex items-center justify-between border-b border-slate-100">
-          <div>
-            <h3 className="text-base font-black text-slate-900">ชำระเงินมัดจำ</h3>
+      <div className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+
+        {/* Mobile drag handle */}
+        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 sm:hidden shrink-0" />
+
+        {/* Header */}
+        <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-0.5">
+              {/* Step dots */}
+              <div className="flex items-center gap-1">
+                {[0, 1, 2].map(i => (
+                  <div
+                    key={i}
+                    className={`rounded-full transition-all ${
+                      i === stepIndex
+                        ? 'w-4 h-1.5 bg-[#c62419]'
+                        : i < stepIndex
+                          ? 'w-1.5 h-1.5 bg-[#c62419]/40'
+                          : 'w-1.5 h-1.5 bg-slate-200'
+                    }`}
+                  />
+                ))}
+              </div>
+              <span className="text-[10px] text-slate-400 font-medium">
+                {step === 'qr' ? 'สแกน & โอน' : step === 'upload' ? 'แนบหลักฐาน' : 'เสร็จสิ้น'}
+              </span>
+            </div>
+            <h3 className="text-base font-black text-slate-900 leading-tight">ชำระมัดจำ</h3>
             <p className="text-xs text-slate-500 mt-0.5 truncate">{booking.gameName}</p>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800 flex items-center justify-center transition-colors"
-          >
-            <i className="fas fa-times text-xs" />
-          </button>
+          {step !== 'done' && (
+            <button
+              onClick={onClose}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors shrink-0 mt-1"
+            >
+              <i className="fas fa-times text-xs" />
+            </button>
+          )}
         </div>
 
-        <div className="p-6">
-          {step === 'done' && (
-            <div className="text-center py-6">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto mb-4 text-2xl">
-                <i className="fas fa-check" />
+        {/* ── QR Step ── */}
+        {step === 'qr' && (
+          <div className="px-5 pb-6 flex flex-col gap-5">
+            {promptPayPhone ? (
+              <>
+                {/* Amount hero */}
+                <div className="flex items-baseline justify-between px-4 py-3.5 rounded-xl bg-[#c62419]/5 border border-[#c62419]/12">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">ยอดมัดจำต่อคน</p>
+                    <p className="text-3xl font-black text-[#c62419] leading-none">฿{amount.toLocaleString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[11px] text-slate-400 leading-snug">
+                      {booking.date ? fmtDate(booking.date) : ''}
+                    </p>
+                    {booking.time && (
+                      <p className="text-xs font-bold text-slate-700">{booking.time} น.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* QR code */}
+                <div className="flex flex-col items-center gap-3">
+                  <div className="p-4 rounded-2xl bg-white border-2 border-slate-100 shadow-md">
+                    <QRCodeSVG value={qrPayload} size={176} bgColor="#ffffff" fgColor="#0f172a" level="M" />
+                  </div>
+
+                  {/* PromptPay info */}
+                  <div className="text-center">
+                    <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">PromptPay</p>
+                    <p className="text-sm font-black text-slate-900 font-mono tracking-wide">{promptPayPhone}</p>
+                  </div>
+
+                  {/* Instructions */}
+                  <ol className="w-full flex flex-col gap-2 mt-1">
+                    {[
+                      'สแกน QR ด้านบนผ่านแอปธนาคาร',
+                      `โอน ฿${amount} แล้วบันทึกหน้าจอสลิป`,
+                      'กดปุ่มด้านล่างเพื่อแนบสลิป',
+                    ].map((txt, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-xs text-slate-600">
+                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
+                        <span>{txt}</span>
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+
+                {/* Upload CTA */}
+                <label className="w-full h-12 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-black text-sm flex items-center justify-center gap-2.5 shadow-md shadow-[#c62419]/25 cursor-pointer transition-all">
+                  <i className="fas fa-image" />
+                  <span>โอนแล้ว — แนบสลิปที่นี่</span>
+                  <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                </label>
+              </>
+            ) : (
+              <div className="text-center py-10 text-slate-400 text-sm flex flex-col items-center gap-3">
+                <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
+                  <i className="fas fa-qrcode text-2xl opacity-30" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-600">ยังไม่ได้ตั้งค่าบัญชี</p>
+                  <p className="text-xs text-slate-400 mt-1">ติดต่อแอดมินเพื่อรับข้อมูลการโอนเงิน</p>
+                </div>
+                <button onClick={onClose} className="mt-2 h-10 px-6 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition-colors">
+                  ปิด
+                </button>
               </div>
-              <h4 className="text-base font-bold text-slate-900 mb-2">ส่งสลิปสำเร็จแล้ว</h4>
-              <p className="text-xs text-slate-500 max-w-xs mx-auto mb-6 leading-relaxed">
-                แอดมินจะตรวจสอบสลิปและยืนยันการชำระเงินโดยเร็วที่สุด (ปกติภายใน 24 ชม.)
-              </p>
+            )}
+          </div>
+        )}
+
+        {/* ── Upload / Preview Step ── */}
+        {step === 'upload' && (
+          <div className="px-5 pb-6 flex flex-col gap-4">
+            {/* Amount reminder */}
+            <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
+              <i className="fas fa-receipt text-[#c62419] text-sm shrink-0" />
+              <span className="text-xs text-slate-600">ตรวจสอบยอด <strong className="text-slate-900">฿{amount}</strong> ก่อนส่ง</span>
+            </div>
+
+            {/* Slip preview */}
+            {slipPreview && (
+              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center" style={{ maxHeight: '280px' }}>
+                <img src={slipPreview} alt="slip" className="w-full object-contain" style={{ maxHeight: '280px' }} />
+              </div>
+            )}
+
+            {/* Label tag */}
+            <p className="text-center text-[11px] text-slate-400">
+              ตรวจสอบความถูกต้องของสลิปก่อนกดยืนยัน
+            </p>
+
+            {/* Action row */}
+            <div className="flex gap-2">
               <button
-                onClick={onClose}
-                className="w-full py-3 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-bold text-xs transition-colors"
+                type="button"
+                onClick={() => { setSlipFile(null); setSlipPreview(''); setStep('qr') }}
+                className="w-11 h-11 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors shrink-0"
               >
-                ปิดหน้าต่าง
+                <i className="fas fa-arrow-left text-xs" />
+              </button>
+              <button
+                type="button"
+                disabled={uploading}
+                onClick={handleSubmit}
+                className={`flex-1 h-11 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
+                  uploading
+                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                    : 'bg-[#c62419] hover:bg-[#9a1c13] text-white shadow-md shadow-[#c62419]/25'
+                }`}
+              >
+                {uploading ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                    <span>กำลังส่ง...</span>
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane text-xs" />
+                    <span>ยืนยันส่งสลิป</span>
+                  </>
+                )}
               </button>
             </div>
-          )}
+          </div>
+        )}
 
-          {step === 'upload' && (
-            <div className="flex flex-col gap-4 text-center">
-              <div className="text-xs text-slate-600 font-medium">ตรวจสอบความถูกต้องของสลิป</div>
-              {slipPreview && (
-                <div className="max-h-64 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center">
-                  <img src={slipPreview} alt="slip preview" className="max-h-64 object-contain" />
+        {/* ── Done Step ── */}
+        {step === 'done' && (
+          <div className="px-5 pb-8 flex flex-col items-center gap-4 text-center">
+            {/* Icon */}
+            <div className="relative">
+              <div className="w-20 h-20 rounded-full bg-[#c62419]/8 flex items-center justify-center">
+                <div className="w-14 h-14 rounded-full bg-[#c62419]/15 flex items-center justify-center">
+                  <i className="fas fa-check text-[#c62419] text-2xl" />
                 </div>
-              )}
-              <div className="flex gap-2 mt-2">
-                <button
-                  type="button"
-                  onClick={() => { setSlipFile(null); setSlipPreview(''); setStep('qr') }}
-                  className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 font-bold text-xs hover:bg-slate-50 transition-colors"
-                >
-                  เลือกใหม่
-                </button>
-                <button
-                  type="button"
-                  disabled={uploading}
-                  onClick={handleSubmit}
-                  className="flex-1 py-3 rounded-xl bg-[#06c755] hover:bg-[#05a848] text-white font-bold text-xs transition-colors flex items-center justify-center gap-2"
-                >
-                  {uploading ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>กำลังอัปโหลด...</span>
-                    </>
-                  ) : (
-                    <span>ยืนยันส่งสลิป</span>
-                  )}
-                </button>
               </div>
             </div>
-          )}
 
-          {step === 'qr' && (
-            <div className="flex flex-col items-center">
-              {promptPayPhone ? (
-                <>
-                  <div className="p-4 rounded-2xl bg-white border border-slate-200 shadow-md mb-3">
-                    <QRCodeSVG value={qrPayload} size={190} bgColor="#fff" fgColor="#0f172a" level="M" />
-                  </div>
-                  <div className="text-sm font-mono font-bold text-slate-800 mb-1">
-                    PromptPay: {promptPayPhone}
-                  </div>
-                  <div className="text-xs text-slate-500 mb-6">
-                    ยอดชำระ: <strong className="text-emerald-600 font-bold">฿{amount}</strong> ต่อคน
-                  </div>
-
-                  <label className="w-full py-3.5 px-4 rounded-xl bg-[#06c755] hover:bg-[#05a848] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer transition-all">
-                    <i className="fas fa-upload text-sm" />
-                    <span>โอนเงินแล้ว — แนบสลิปที่นี่</span>
-                    <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
-                  </label>
-                </>
-              ) : (
-                <div className="text-center py-8 text-slate-400 text-xs">
-                  <i className="fas fa-exclamation-circle text-2xl mb-2 block opacity-40" />
-                  <span>ยังไม่ได้ตั้งค่าบัญชี PromptPay ของร้าน</span>
-                </div>
-              )}
+            <div>
+              <h4 className="text-lg font-black text-slate-900">ส่งสลิปสำเร็จ</h4>
+              <p className="text-xs text-slate-500 mt-1.5 max-w-[220px] leading-relaxed">
+                แอดมินจะตรวจสอบและยืนยันภายใน 24 ชม. ระบบจะแจ้งผลทาง LINE
+              </p>
             </div>
-          )}
-        </div>
+
+            {/* Booking recap */}
+            <div className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-left flex items-center gap-3">
+              <i className="fas fa-calendar-check text-[#c62419] text-sm shrink-0" />
+              <div>
+                <p className="font-bold text-slate-900 truncate">{booking.gameName}</p>
+                <p className="mt-0.5">{booking.date ? fmtDate(booking.date) : ''}{booking.time ? ` · ${booking.time} น.` : ''}</p>
+              </div>
+            </div>
+
+            <button
+              onClick={onClose}
+              className="w-full h-12 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-black text-sm transition-colors shadow-md shadow-[#c62419]/20"
+            >
+              เสร็จสิ้น
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 // ── Booking Detail & Party Lounge Modal ───────────────────────────────────────
-function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }) {
+export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }) {
   const [joining, setJoining] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -1254,138 +1282,161 @@ function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }
     showToast('คัดลอกลิงก์แล้ว')
   }
 
+  const C = '#c62419'
+  const INK = '#1a1a1a'
+
   return (
     <>
       <div
-        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4"
+        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-6 pt-10 sm:pt-6 pb-0 sm:pb-6"
+        style={{ background: 'rgba(26,26,26,0.5)', backdropFilter: 'blur(10px)' }}
         onClick={e => e.target === e.currentTarget && onClose()}
       >
-        <div className="w-full max-w-xl bg-white border border-slate-200 rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden max-h-[92vh] flex flex-col font-sans text-slate-800 animate-in slide-in-from-bottom duration-200">
-          {/* Hero Cover Header */}
-          <div className="relative h-48 sm:h-52 overflow-hidden shrink-0">
-            {imgSrc ? (
-              <img src={imgSrc} alt="" className="w-full h-full object-cover filter brightness-75" />
-            ) : (
-              <div className="w-full h-full bg-slate-900" />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-transparent" />
+        <div
+          className="w-full sm:max-w-xl overflow-hidden max-h-[94dvh] flex flex-col"
+          style={{
+            background: '#ffffff',
+            color: INK,
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            borderBottomLeftRadius: 'env(safe-area-inset-bottom)' ? 0 : 28,
+            boxShadow: '0 50px 120px rgba(26,26,26,0.25)',
+          }}
+        >
 
-            {/* Room Chip in Hero */}
-            {booking.room && (
-              <div className="absolute top-4 left-4">
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold backdrop-blur-md border shadow-sm text-white"
-                  style={{
-                    backgroundColor: `${rc}40`,
-                    borderColor: `${rc}80`,
-                  }}
-                >
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: rc }} />
-                  {booking.room}
-                </span>
-              </div>
+          {/* Drag handle */}
+          <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden shrink-0" style={{ background: 'rgba(26,26,26,0.12)' }} />
+
+          {/* ── HERO (white editorial) ── */}
+          <div className="relative overflow-hidden shrink-0" style={{ minHeight: 'clamp(180px,26vw,230px)', background: '#faf7f5' }}>
+            {/* Blurred bg (subtle color wash) */}
+            {imgSrc && (
+              <img src={imgSrc} aria-hidden alt="" className="absolute inset-0 w-full h-full object-cover"
+                style={{ filter: 'blur(32px) brightness(1.15) saturate(0.55) opacity(0.28)', transform: 'scale(1.18)' }} />
             )}
 
-            {/* Close Button */}
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-black/40 hover:bg-black/70 text-white flex items-center justify-center border border-white/20 backdrop-blur-xs transition-colors"
-            >
-              <i className="fas fa-times text-xs" />
-            </button>
+            {/* Soft crimson glow */}
+            <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 55% at 78% 18%, ${C}10 0%, transparent 65%)` }} />
 
-            {/* Bottom Title & Date */}
-            <div className="absolute bottom-4 left-5 right-5">
-              <StatusBadge status={booking.status} size="text-[10px]" />
-              <h2 className="text-xl sm:text-2xl font-black text-white mt-1.5 tracking-tight truncate">
-                {booking.gameName || 'การจองห้อง'}
-              </h2>
-              <div className="flex items-center gap-2 text-xs text-slate-200 mt-1">
-                <span>{fmtDate(booking.date)}</span>
-                {booking.time && (
-                  <span className="flex items-center gap-1 font-mono">
-                    <span className="opacity-40">·</span>
-                    <i className="fas fa-clock text-[10px] text-slate-300" />
-                    {booking.time} น.
-                  </span>
-                )}
+            {/* Bottom fade to card bg */}
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.6) 55%, #ffffff 100%)' }} />
+
+            {/* Content */}
+            <div className="absolute inset-0 flex items-end gap-5 pt-14" style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 22 }}>
+
+              {/* Poster thumbnail */}
+              {imgSrc && (
+                <div className="shrink-0 self-end" style={{ width: 'clamp(76px,17vw,100px)' }}>
+                  <div className="overflow-hidden" style={{ aspectRatio: '2/3', borderRadius: 14, boxShadow: '0 18px 44px rgba(26,26,26,0.22), 0 0 0 1px rgba(26,26,26,0.06)' }}>
+                    <img src={imgSrc} alt={booking.gameName} className="w-full h-full object-cover" />
+                  </div>
+                </div>
+              )}
+
+              {/* Title block */}
+              <div className="flex-1 min-w-0 pb-1">
+                <StatusBadge status={booking.status} />
+                <h2 className="font-black mt-2.5 leading-[1.1] tracking-tight" style={{ color: INK, fontSize: 'clamp(22px,5.2vw,30px)' }}>
+                  {booking.gameName || 'การจองห้อง'}
+                </h2>
+                <div className="flex items-center gap-2 mt-2 flex-wrap" style={{ fontSize: 12.5, color: 'rgba(26,26,26,0.55)' }}>
+                  <i className="fas fa-calendar-alt text-[10px]" style={{ color: C }} />
+                  <span className="font-medium">{fmtDate(booking.date)}</span>
+                  {booking.time && (
+                    <>
+                      <span style={{ color: 'rgba(26,26,26,0.2)' }}>·</span>
+                      <span className="font-mono font-bold" style={{ color: INK }}>{booking.time} น.</span>
+                    </>
+                  )}
+                  {booking.room && (
+                    <>
+                      <span style={{ color: 'rgba(26,26,26,0.2)' }}>·</span>
+                      <span style={{ color: rc, fontWeight: 700 }}>{booking.room}</span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
+
+            {/* Close */}
+            <button onClick={onClose} className="absolute top-5 right-5 w-10 h-10 rounded-full flex items-center justify-center transition-all"
+              style={{ background: '#ffffff', border: '1px solid rgba(26,26,26,0.08)', color: 'rgba(26,26,26,0.55)', boxShadow: '0 4px 12px rgba(26,26,26,0.08)' }}
+              onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.background = '#f5f1ef' }}
+              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(26,26,26,0.55)'; e.currentTarget.style.background = '#ffffff' }}
+            >
+              <i className="fas fa-times text-sm" />
+            </button>
           </div>
 
-          {/* Modal Body */}
-          <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-4">
-            {/* Urgent Countdown Banner */}
+          {/* ── BODY ── */}
+          <div className="overflow-y-auto flex-1 flex flex-col" style={{ gap: 0 }}>
+
+            {/* Countdown / warning */}
             {countdown && booking.status === 'confirmed' && (
-              <div className={`p-3.5 rounded-xl border flex items-center gap-3 ${
-                isUrgent
-                  ? 'bg-rose-50 border-rose-200 text-rose-800 animate-pulse'
-                  : 'bg-amber-50 border-amber-200 text-amber-800'
-              }`}>
-                <i className="fas fa-clock text-base shrink-0" />
-                <div className="flex-1 text-xs">
-                  <div className="font-bold">ต้องชำระมัดจำภายใน {countdown}</div>
-                  <div className="text-[11px] opacity-80 mt-0.5">เมื่อสมาชิกจ่ายครบทุกคน ระบบจะยืนยันล็อกห้องให้ทันที</div>
+              <div className={`mt-5 flex items-center gap-3.5 ${isUrgent ? 'animate-pulse' : ''}`}
+                style={{
+                  marginLeft: 28, marginRight: 28,
+                  padding: '16px 18px', borderRadius: 16,
+                  background: isUrgent ? `${C}0c` : '#faf7f5',
+                  border: `1px solid ${isUrgent ? `${C}38` : 'rgba(26,26,26,0.07)'}`,
+                  color: isUrgent ? C : INK,
+                }}>
+                <i className={`fas fa-${isUrgent ? 'exclamation-triangle' : 'clock'} shrink-0`} style={{ fontSize: 15, color: C }} />
+                <div className="min-w-0">
+                  <div className="font-black text-[14px]">ต้องชำระมัดจำภายใน {countdown}</div>
+                  <div className="text-[12px] mt-0.5" style={{ color: 'rgba(26,26,26,0.5)' }}>เมื่อจ่ายครบ ระบบล็อกห้องทันที</div>
                 </div>
               </div>
             )}
 
-            {/* Collapsed Warning */}
             {booking.status === 'collapsed' && (
-              <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <i className="fas fa-exclamation-triangle shrink-0 text-rose-600" />
-                  <span>ปาร์ตี้นี้ล่มเนื่องจากหมดเวลาชำระมัดจำ</span>
+              <div className="mt-5 flex items-center justify-between gap-3"
+                style={{
+                  marginLeft: 28, marginRight: 28,
+                  padding: '14px 18px', borderRadius: 16,
+                  background: `${C}0c`, border: `1px solid ${C}30`, color: C,
+                }}>
+                <div className="flex items-center gap-2.5 text-[13px] font-semibold">
+                  <i className="fas fa-exclamation-triangle shrink-0" />
+                  <span>หมดเวลาชำระมัดจำ — ปาร์ตี้ล่ม</span>
                 </div>
                 {isLeader && (
-                  <button
-                    onClick={handleCloseBooking}
-                    disabled={closing}
-                    className="px-3 py-1 rounded-lg bg-[#c62419] hover:bg-[#9a1c13] text-white font-bold text-xs shrink-0 transition-colors"
-                  >
-                    {closing ? 'กำลังปิดตี้...' : 'ปิดตี้'}
+                  <button onClick={handleCloseBooking} disabled={closing}
+                    className="font-bold text-xs shrink-0 transition-opacity hover:opacity-85"
+                    style={{ padding: '7px 14px', borderRadius: 999, background: C, color: '#fff' }}>
+                    {closing ? 'กำลังปิด...' : 'ปิดตี้'}
                   </button>
                 )}
               </div>
             )}
 
-            {/* Pending Requests for Leader */}
+            {/* Join requests */}
             {isLeader && (booking.joinRequests?.length > 0) && (
-              <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-200">
-                <div className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
-                  <i className="fas fa-bell text-[11px] text-amber-600" />
-                  <span>คำขอเข้าร่วมปาร์ตี้ ({booking.joinRequests.length})</span>
+              <div className="mt-5" style={{ marginLeft: 28, marginRight: 28, padding: '18px 20px', borderRadius: 18, background: '#faf7f5', border: `1px solid ${C}22` }}>
+                <div className="flex items-center gap-2 mb-3.5">
+                  <i className="fas fa-bell text-[11px]" style={{ color: C }} />
+                  <span className="text-[11px] font-black uppercase tracking-[0.15em]" style={{ color: C }}>คำขอเข้าร่วม ({booking.joinRequests.length})</span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2.5">
                   {booking.joinRequests.map(req => (
-                    <div
-                      key={req.uid}
-                      className="flex items-center justify-between gap-3 p-2 rounded-lg bg-white border border-slate-200"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {req.avatar ? (
-                          <img src={req.avatar} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
-                            {(req.name || '?')[0]}
-                          </div>
-                        )}
-                        <span className="text-xs font-bold text-slate-800 truncate">{req.name}</span>
+                    <div key={req.uid} className="flex items-center justify-between gap-3"
+                      style={{ padding: '10px 12px', borderRadius: 12, background: '#ffffff', border: '1px solid rgba(26,26,26,0.06)' }}>
+                      <div className="flex items-center gap-3 min-w-0">
+                        {req.avatar
+                          ? <img src={req.avatar} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
+                          : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shrink-0" style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.55)' }}>{(req.name || '?')[0]}</div>
+                        }
+                        <span className="text-sm font-bold truncate" style={{ color: INK }}>{req.name}</span>
                       </div>
-
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <button
-                          onClick={() => handleApproveRequest(req)}
-                          disabled={approvingUid === req.uid}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold transition-colors"
-                        >
-                          รับ
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={() => handleApproveRequest(req)} disabled={approvingUid === req.uid}
+                          className="font-bold text-xs transition-opacity hover:opacity-85"
+                          style={{ padding: '7px 14px', borderRadius: 999, background: C, color: '#fff' }}>
+                          {approvingUid === req.uid ? '...' : 'รับ'}
                         </button>
-                        <button
-                          onClick={() => handleRejectRequest(req)}
-                          disabled={rejectingUid === req.uid}
-                          className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-[#c62419] text-[11px] font-bold transition-colors"
-                        >
+                        <button onClick={() => handleRejectRequest(req)} disabled={rejectingUid === req.uid}
+                          className="font-bold text-xs transition-colors"
+                          style={{ padding: '7px 14px', borderRadius: 999, background: '#f5f1ef', color: 'rgba(26,26,26,0.6)' }}>
                           ปฏิเสธ
                         </button>
                       </div>
@@ -1395,193 +1446,246 @@ function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }
               </div>
             )}
 
-            {/* Members Section */}
-            <div>
-              <div className="flex items-center justify-between text-xs mb-2">
-                <span className="font-bold text-slate-700 uppercase tracking-wider">
-                  สมาชิก ({total}/{booking.maxMembers || 6})
-                </span>
-                <span className={allPaid ? 'text-emerald-600 font-bold' : 'text-slate-500'}>
-                  จ่ายมัดจำแล้ว {paidCount}/{total}
-                </span>
+            {/* Members section */}
+            <div className="flex flex-col" style={{ padding: '24px 28px', gap: 16 }}>
+
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.45)' }}>สมาชิก</span>
+                  <span className="text-[11px] font-black" style={{ padding: '3px 10px', borderRadius: 999, background: '#f5f1ef', color: INK }}>{total}/{booking.maxMembers || 6}</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] font-bold" style={{ color: allPaid && total > 0 ? C : 'rgba(26,26,26,0.4)' }}>มัดจำ {paidCount}/{total}</span>
+                  {allPaid && total > 0 && <i className="fas fa-check-circle text-xs" style={{ color: C }} />}
+                </div>
               </div>
 
-              {/* Progress */}
-              <div className="w-full bg-slate-100 rounded-full h-1.5 mb-3 overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${
-                    allPaid ? 'bg-emerald-500' : 'bg-[#c62419]'
-                  }`}
-                  style={{ width: `${Math.min(100, Math.max(5, paidPct))}%` }}
-                />
-              </div>
-
-              {/* Members List */}
-              <div className="flex flex-col gap-2">
+              {/* Avatar overview row */}
+              <div className="flex items-center gap-2.5 flex-wrap">
                 {(booking.members || []).map(m => (
-                  <div
-                    key={m.uid}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200/90"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="relative shrink-0">
-                        {m.avatar ? (
-                          <img
-                            src={m.avatar}
-                            alt=""
-                            className={`w-9 h-9 rounded-full object-cover ${
-                              m.paidDeposit ? 'ring-2 ring-emerald-500' : ''
-                            }`}
-                          />
-                        ) : (
-                          <div className={`w-9 h-9 rounded-full bg-slate-200 flex items-center justify-center font-bold text-xs text-slate-700 ${
-                            m.paidDeposit ? 'ring-2 ring-emerald-500' : ''
-                          }`}>
-                            {(m.name || '?')[0]}
-                          </div>
-                        )}
+                  <div key={m.uid} className="relative shrink-0" title={m.name}>
+                    {m.avatar
+                      ? <img src={m.avatar} alt={m.name} className="w-11 h-11 rounded-full object-cover"
+                          style={m.paidDeposit
+                            ? { outline: `2.5px solid ${C}`, outlineOffset: 2 }
+                            : m.slipStatus === 'pending_verification'
+                              ? { outline: `2.5px solid ${C}45`, outlineOffset: 2 }
+                              : { outline: '2px solid rgba(26,26,26,0.08)', outlineOffset: 2 }} />
+                      : <div className="w-11 h-11 rounded-full flex items-center justify-center font-black text-sm"
+                          style={m.paidDeposit
+                            ? { background: `${C}14`, color: C, outline: `2.5px solid ${C}`, outlineOffset: 2 }
+                            : { background: '#f5f1ef', color: 'rgba(26,26,26,0.5)', outline: '2px solid rgba(26,26,26,0.06)', outlineOffset: 2 }}>
+                          {(m.name || '?')[0]}
+                        </div>
+                    }
+                    {m.paidDeposit && (
+                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                        style={{ background: C, border: '1.5px solid #ffffff' }}>
+                        <i className="fas fa-check" style={{ fontSize: 7, color: '#fff' }} />
                       </div>
+                    )}
+                    {m.uid === booking.leaderId && !m.paidDeposit && (
+                      <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                        style={{ background: C, border: '1.5px solid #ffffff' }}>
+                        <i className="fas fa-crown" style={{ fontSize: 6, color: '#fff' }} />
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {Array.from({ length: Math.max(0, (booking.maxMembers || 0) - total) }).map((_, i) => (
+                  <div key={`ea-${i}`} className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
+                    style={{ border: '1.5px dashed rgba(26,26,26,0.14)', color: 'rgba(26,26,26,0.22)' }}>
+                    <i className="fas fa-plus" style={{ fontSize: 10 }} />
+                  </div>
+                ))}
+              </div>
 
+              {/* Progress bar */}
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#f0ebe9' }}>
+                <div className="h-full rounded-full transition-all duration-700"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, paidPct))}%`,
+                    background: C,
+                    boxShadow: `0 0 10px ${C}55`,
+                  }} />
+              </div>
+
+              {/* Member detail list */}
+              <div className="flex flex-col gap-2.5">
+                {(booking.members || []).map(m => (
+                  <div key={m.uid} className="flex items-center justify-between gap-3"
+                    style={{
+                      padding: '12px 14px', borderRadius: 16,
+                      background: m.paidDeposit ? `${C}08` : m.slipStatus === 'pending_verification' ? `${C}05` : '#faf7f5',
+                      border: `1px solid ${m.paidDeposit ? `${C}22` : m.slipStatus === 'pending_verification' ? `${C}14` : 'rgba(26,26,26,0.06)'}`,
+                    }}>
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className="shrink-0">
+                        {m.avatar
+                          ? <img src={m.avatar} alt="" className="w-10 h-10 rounded-full object-cover"
+                              style={m.paidDeposit ? { outline: `2px solid ${C}`, outlineOffset: 1.5 } : {}} />
+                          : <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-sm"
+                              style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.5)' }}>
+                              {(m.name || '?')[0]}
+                            </div>
+                        }
+                      </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 truncate">
-                          <span>{m.name}</span>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-[14px] font-bold truncate" style={{ color: INK }}>{m.name}</span>
                           {m.uid === booking.leaderId && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-red-100 text-[#c62419]">
-                              หัวหน้า
+                            <span className="text-[9px] font-black uppercase tracking-wider"
+                              style={{ padding: '2px 8px', borderRadius: 999, background: `${C}10`, color: C, border: `1px solid ${C}24` }}>
+                              <i className="fas fa-crown mr-1" style={{ fontSize: 7 }} />หัวหน้า
                             </span>
                           )}
                         </div>
                         {m.slipStatus === 'pending_verification' && !m.paidDeposit && (
-                          <div className="text-[10px] text-amber-700 font-medium mt-0.5">
-                            รอแอดมินตรวจสลิป
+                          <div className="text-[11px] mt-0.5 font-medium" style={{ color: 'rgba(26,26,26,0.55)' }}>
+                            <i className="fas fa-hourglass-half mr-1 text-[9px]" style={{ color: C }} />รอแอดมินตรวจสลิป
                           </div>
                         )}
                         {m.paidDeposit && (
-                          <div className="text-[10px] text-emerald-600 font-medium mt-0.5">
-                            ชำระมัดจำเรียบร้อย
+                          <div className="text-[11px] mt-0.5 font-bold" style={{ color: C }}>
+                            <i className="fas fa-check-circle mr-1 text-[9px]" />ชำระมัดจำแล้ว
                           </div>
                         )}
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2 shrink-0">
                       {m.slipUrl && (
-                        <a
-                          href={m.slipUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="w-7 h-7 rounded-lg overflow-hidden border border-slate-300 block shadow-xs"
-                          title="ดูสลิป"
-                        >
+                        <a href={m.slipUrl} target="_blank" rel="noopener noreferrer"
+                          className="w-8 h-8 overflow-hidden block"
+                          style={{ borderRadius: 8, border: '1px solid rgba(26,26,26,0.1)' }} title="ดูสลิป">
                           <img src={m.slipUrl} alt="" className="w-full h-full object-cover" />
                         </a>
                       )}
-                      <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full ${
-                        m.paidDeposit
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : m.slipStatus === 'pending_verification'
-                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                            : 'bg-slate-100 text-slate-500 border border-slate-200'
-                      }`}>
+                      <span className="text-[11px] font-bold"
+                        style={{
+                          padding: '5px 11px', borderRadius: 999,
+                          background: m.paidDeposit ? C : m.slipStatus === 'pending_verification' ? `${C}0c` : '#ffffff',
+                          color: m.paidDeposit ? '#fff' : m.slipStatus === 'pending_verification' ? C : 'rgba(26,26,26,0.4)',
+                          border: m.paidDeposit ? 'none' : `1px solid ${m.slipStatus === 'pending_verification' ? `${C}2c` : 'rgba(26,26,26,0.1)'}`,
+                        }}>
                         {m.paidDeposit ? 'จ่ายแล้ว' : m.slipStatus === 'pending_verification' ? 'รอตรวจ' : 'ยังไม่จ่าย'}
                       </span>
                     </div>
                   </div>
                 ))}
 
-                {/* Empty Slots */}
                 {Array.from({ length: Math.max(0, (booking.maxMembers || 0) - total) }).map((_, i) => (
-                  <div
-                    key={`slot-${i}`}
-                    className="p-2.5 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 font-medium bg-white"
-                  >
-                    ว่าง — รอสมาชิกเข้าร่วม
+                  <div key={`es-${i}`} className="text-center text-[12px] font-medium"
+                    style={{ padding: '14px 12px', borderRadius: 16, background: '#faf7f5', border: '1px dashed rgba(26,26,26,0.1)', color: 'rgba(26,26,26,0.35)' }}>
+                    ที่ว่าง — รอสมาชิกเข้าร่วม
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Admin Note if any */}
+            {/* Admin note */}
             {booking.adminNote && (
-              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
-                <span className="font-bold text-amber-700 mr-1.5">[โน้ตจากแอดมิน]</span>
+              <div style={{ marginLeft: 28, marginRight: 28, marginBottom: 20, padding: '16px 18px', borderRadius: 16, background: '#faf7f5', border: `1px solid ${C}22`, color: 'rgba(26,26,26,0.78)', fontSize: 13.5, lineHeight: 1.55 }}>
+                <div className="font-black text-[10px] uppercase tracking-[0.15em] mb-1.5" style={{ color: C }}>โน้ตจากแอดมิน</div>
                 {booking.adminNote}
               </div>
             )}
 
-            {/* Action Bar */}
-            <div className="flex flex-col gap-2 pt-2 border-t border-slate-100">
-              {/* Join Request Button */}
+            {/* ── ACTION BAR ── */}
+            <div className="flex flex-col mt-auto" style={{ padding: '0 28px 24px', gap: 12 }}>
+              <div style={{ height: 1, background: 'rgba(26,26,26,0.07)', marginBottom: 4 }} />
+
+              {/* Join */}
               {!isMember && !myRequest && lineUser && ['confirmed', 'pending'].includes(booking.status) && total < (booking.maxMembers || 99) && (
-                <button
-                  onClick={handleRequestJoin}
-                  disabled={joining}
-                  className="w-full py-3.5 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-red-900/15 transition-all cursor-pointer"
-                >
-                  {joining ? (
-                    <>
-                      <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      <span>กำลังส่งคำขอ...</span>
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-user-plus" />
-                      <span>ขอเข้าร่วมปาร์ตี้นี้</span>
-                    </>
-                  )}
+                <button onClick={handleRequestJoin} disabled={joining}
+                  className="w-full font-black flex items-center justify-center gap-2.5 transition-all"
+                  style={{
+                    padding: '18px 20px', borderRadius: 16, fontSize: 15, letterSpacing: '0.01em',
+                    background: C, color: '#fff',
+                    boxShadow: `0 10px 28px ${C}3f`,
+                  }}>
+                  {joining
+                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /><span>กำลังส่งคำขอ...</span></>
+                    : <><i className="fas fa-user-plus" /><span>ขอเข้าร่วมปาร์ตี้</span></>
+                  }
                 </button>
               )}
 
-              {/* Pending Request Badge */}
+              {/* Pending join badge */}
               {!isMember && myRequest && lineUser && (
-                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold text-center">
-                  คุณได้ส่งคำขอเข้าร่วมแล้ว — รอหัวปาร์ตี้อนุมัติ
+                <div className="font-bold text-center text-[13px]"
+                  style={{ padding: '14px 16px', borderRadius: 16, background: '#faf7f5', border: `1px solid ${C}22`, color: C }}>
+                  <i className="fas fa-clock mr-2 text-xs" />คุณได้ส่งคำขอแล้ว — รอหัวปาร์ตี้อนุมัติ
                 </div>
               )}
 
-              {/* Pay Deposit Button */}
+              {/* Pay deposit */}
               {isMember && booking.status === 'confirmed' && !myMember?.paidDeposit && myMember?.slipStatus !== 'pending_verification' && (
-                <button
-                  onClick={() => setShowDepositPay(true)}
-                  className="w-full py-3.5 rounded-xl bg-[#06c755] hover:bg-[#05a848] text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
-                >
-                  <i className="fas fa-qrcode text-sm" />
+                <button onClick={() => setShowDepositPay(true)}
+                  className="w-full font-black flex items-center justify-center gap-3 transition-all"
+                  style={{
+                    padding: '18px 20px', borderRadius: 16, fontSize: 15, letterSpacing: '0.01em',
+                    background: C, color: '#fff',
+                    boxShadow: `0 10px 28px ${C}3f`,
+                  }}>
+                  <i className="fas fa-qrcode text-base" />
                   <span>จ่ายมัดจำ ฿{booking.depositAmount} / แนบสลิป</span>
                 </button>
               )}
 
-              {/* Secondary Actions */}
-              <div className="flex gap-2">
-                <button
-                  onClick={handleShare}
-                  className="flex-1 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
+              {/* Slip submitted */}
+              {isMember && myMember?.slipStatus === 'pending_verification' && !myMember?.paidDeposit && (
+                <div className="flex items-center gap-3.5"
+                  style={{ padding: '14px 16px', borderRadius: 16, background: '#faf7f5', border: `1px solid ${C}22`, color: INK }}>
+                  <i className="fas fa-hourglass-half shrink-0" style={{ fontSize: 15, color: C }} />
+                  <div>
+                    <div className="font-black text-[14px]">ส่งสลิปแล้ว — รอแอดมินตรวจสอบ</div>
+                    <div className="text-[12px] mt-0.5" style={{ color: 'rgba(26,26,26,0.55)' }}>แอดมินจะแจ้งผลทาง LINE</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Secondary row */}
+              <div className="flex gap-2.5">
+                <button onClick={handleShare}
+                  className="flex-1 font-bold flex items-center justify-center gap-2 transition-all"
+                  style={{
+                    padding: '14px 16px', borderRadius: 14, fontSize: 13.5,
+                    background: '#f5f1ef', color: copied ? C : INK,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#ebe4e1'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#f5f1ef'}
                 >
-                  <i className={`fas fa-${copied ? 'check text-emerald-600' : 'share-alt'}`} />
+                  <i className={`fas fa-${copied ? 'check' : 'share-alt'}`} />
                   <span>{copied ? 'คัดลอกแล้ว' : 'แชร์ชวนเพื่อน'}</span>
                 </button>
 
                 {isMember && !isLeader && (
-                  <button
-                    onClick={handleLeave}
-                    disabled={leaving}
-                    className="flex-1 py-2.5 rounded-xl bg-red-50 hover:bg-[#c62419] text-[#c62419] hover:text-white border border-red-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
-                  >
+                  <button onClick={handleLeave} disabled={leaving}
+                    className="flex-1 font-bold flex items-center justify-center gap-2 transition-all"
+                    style={{
+                      padding: '14px 16px', borderRadius: 14, fontSize: 13.5,
+                      background: `${C}0c`, color: C, border: `1px solid ${C}26`,
+                    }}>
                     <i className="fas fa-sign-out-alt" />
                     <span>ออกจากปาร์ตี้</span>
                   </button>
                 )}
 
                 {isLeader && ['collapsed', 'pending'].includes(booking.status) && (
-                  <button
-                    onClick={handleCloseBooking}
-                    disabled={closing}
-                    className="flex-1 py-2.5 rounded-xl bg-red-50 hover:bg-[#c62419] text-[#c62419] hover:text-white border border-red-200 font-bold text-xs flex items-center justify-center gap-2 transition-colors"
-                  >
+                  <button onClick={handleCloseBooking} disabled={closing}
+                    className="flex-1 font-bold flex items-center justify-center gap-2 transition-all"
+                    style={{
+                      padding: '14px 16px', borderRadius: 14, fontSize: 13.5,
+                      background: `${C}0c`, color: C, border: `1px solid ${C}26`,
+                    }}>
                     <i className="fas fa-times-circle" />
-                    <span>{closing ? 'กำลังปิด...' : 'ปิดตี้'}</span>
+                    <span>{closing ? 'กำลังปิดตี้...' : 'ปิดตี้'}</span>
                   </button>
                 )}
               </div>
+
+              <div className="sm:hidden" style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
             </div>
           </div>
         </div>
@@ -1703,68 +1807,60 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-slate-500 font-sans">
-        <div className="w-10 h-10 border-3 border-slate-200 border-t-[#c62419] rounded-full animate-spin" />
-        <div className="text-xs font-semibold tracking-wide">กำลังโหลดระบบจองห้อง...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: '12px', color: 'var(--text-tertiary)', fontFamily: 'Sarabun, sans-serif', background: '#f5f5f7' }}>
+        <div style={{ width: '36px', height: '36px', border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--crimson-500)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ fontSize: '12px', fontWeight: 600, letterSpacing: '0.05em' }}>กำลังโหลดระบบจองห้อง...</div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-slate-800 font-sans pt-14 pb-20">
-      {/* ── Editorial Header Section ────────────────────────────────────────── */}
-      <section className="bg-white border-b border-slate-200/90 relative">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
-            <div className="max-w-2xl">
-              {/* Category Eyebrow */}
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-100 text-[#c62419] text-xs font-bold uppercase tracking-wider mb-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#c62419]" />
-                <span>SOFUN MYSTERY LOUNGE · BOOKING SYSTEM</span>
+    <div style={{ minHeight: '100vh', background: '#f5f5f7', fontFamily: 'Sarabun, sans-serif', paddingTop: '56px', paddingBottom: '80px' }}>
+      {/* ── Hero Header ───────────────────────────────────────────────────── */}
+      <section style={{ position: 'relative', overflow: 'hidden', background: '#fff', borderBottom: '1px solid var(--border-default)', padding: '48px 24px 40px' }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 50% 100% at 0% 50%, rgba(198,36,25,0.06) 0%, transparent 60%), radial-gradient(ellipse 40% 80% at 100% 0%, rgba(198,36,25,0.04) 0%, transparent 60%)', pointerEvents: 'none' }} />
+        <div style={{ maxWidth: '1200px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Tag + Title */}
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(198,36,25,0.1)', border: '1px solid rgba(198,36,25,0.3)', color: 'var(--crimson-500)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: '14px' }}>
+                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--crimson-400)' }} />
+                SOFUN MYSTERY LOUNGE · BOOKING SYSTEM
               </div>
-
-              {/* Title & Description */}
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-tight mb-2.5">
+              <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 'clamp(28px,5vw,48px)', color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.15, margin: '0 0 10px', textTransform: 'uppercase' }}>
                 จองรอบเกม & ตารางห้อง
               </h1>
-              <p className="text-sm sm:text-base text-slate-600 leading-relaxed mb-5">
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: '0 0 20px', maxWidth: '560px' }}>
                 เลือกวันเวลา เช็คตารางห้องว่างแบบเรียลไทม์ หรือสร้างปาร์ตี้เพื่อเปิดห้องสืบคดีได้ทันที
               </p>
-
-              {/* Live Metric Badges */}
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium">
-                  <i className="fas fa-theater-masks text-[#c62419]" />
-                  <span><strong className="text-slate-900 font-bold">{allGames.length || '50+'}</strong> สคริปต์เกม</span>
-                </div>
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium">
-                  <i className="fas fa-door-open text-amber-600" />
-                  <span><strong className="text-slate-900 font-bold">12</strong> ห้องธีมเสมือนจริง</span>
-                </div>
-                <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 font-medium">
-                  <i className="fas fa-calendar-check text-emerald-600" />
-                  <span><strong className="text-slate-900 font-bold">{upcomingCount}</strong> รอบที่ยืนยันแล้ว</span>
-                </div>
+              {/* Stats row */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                {[
+                  { icon: 'fas fa-theater-masks', text: `${allGames.length || '50+'} สคริปต์` },
+                  { icon: 'fas fa-door-open', text: '12 ห้อง' },
+                  { icon: 'fas fa-calendar-check', text: `${upcomingCount} รอบยืนยัน` },
+                ].map(s => (
+                  <div key={s.text} style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '6px 14px', borderRadius: '10px', background: 'var(--surface-card)', border: '1px solid var(--border-default)', fontSize: '12px', color: 'var(--text-secondary)', fontWeight: 600 }}>
+                    <i className={s.icon} style={{ color: 'var(--crimson-500)', fontSize: '11px' }} />
+                    <span>{s.text}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* Header Primary Action */}
-            <div className="shrink-0 flex items-center">
+            {/* CTA */}
+            <div>
               {lineUser ? (
-                <button
-                  onClick={() => handleStartBooking()}
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-bold text-sm shadow-md shadow-red-900/15 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <i className="fas fa-plus text-xs" />
-                  <span>+ จองเกมใหม่</span>
+                <button onClick={() => handleStartBooking()} style={{ padding: '12px 28px', borderRadius: '12px', background: 'var(--crimson-500)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'background 0.15s, transform 0.1s' }}
+                  onMouseEnter={e => { e.currentTarget.style.background='var(--crimson-600)'; e.currentTarget.style.transform='translateY(-1px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.background='var(--crimson-500)'; e.currentTarget.style.transform='translateY(0)' }}>
+                  <i className="fas fa-plus" style={{ fontSize: '11px' }} />+ จองเกมใหม่
                 </button>
               ) : (
-                <button
-                  onClick={onLogin}
-                  className="w-full sm:w-auto px-6 py-3.5 rounded-xl bg-[#06c755] hover:bg-[#05a848] text-white font-bold text-sm shadow-md shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2.5 cursor-pointer"
-                >
-                  <i className="fab fa-line text-lg" />
-                  <span>เข้าสู่ระบบด้วย LINE</span>
+                <button onClick={onLogin} style={{ padding: '12px 28px', borderRadius: '12px', background: 'var(--line-green)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '10px', transition: 'opacity 0.15s, transform 0.1s' }}
+                  onMouseEnter={e => { e.currentTarget.style.opacity='0.88'; e.currentTarget.style.transform='translateY(-1px)' }}
+                  onMouseLeave={e => { e.currentTarget.style.opacity='1'; e.currentTarget.style.transform='translateY(0)' }}>
+                  <i className="fab fa-line" style={{ fontSize: '18px' }} />เข้าสู่ระบบด้วย LINE
                 </button>
               )}
             </div>
@@ -1773,35 +1869,28 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
       </section>
 
       {/* ── Main Two-Column Layout ─────────────────────────────────────────── */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: My Bookings or VIP Pass Card */}
-        <div className="lg:col-span-5 flex flex-col gap-4">
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '24px 20px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', alignItems: 'start' }}>
+        {/* Left Column: My Bookings or Guest Card */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
           {lineUser ? (
-            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-sm">
-              {/* Header & New Party Button */}
-              <div className="flex items-center justify-between mb-3.5">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                    การจองของฉัน
-                  </h3>
+            <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-default)', borderRadius: '20px', padding: '20px' }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <h3 style={{ fontSize: '13px', fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>การจองของฉัน</h3>
                   {activeMyBookings.length > 0 && (
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-[#c62419]">
-                      {activeMyBookings.length}
-                    </span>
+                    <span style={{ fontSize: '11px', fontWeight: 700, padding: '1px 8px', borderRadius: '20px', background: 'rgba(198,36,25,0.18)', color: 'var(--crimson-500)' }}>{activeMyBookings.length}</span>
                   )}
                 </div>
-
-                <button
-                  onClick={() => handleStartBooking()}
-                  className="text-xs font-bold text-[#c62419] hover:text-[#9a1c13] flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <i className="fas fa-plus text-[10px]" />
-                  <span>สร้างตี้</span>
+                <button onClick={() => handleStartBooking()} style={{ fontSize: '12px', fontWeight: 700, color: 'var(--crimson-500)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.color='var(--crimson-600)'}
+                  onMouseLeave={e => e.currentTarget.style.color='var(--crimson-500)'}>
+                  <i className="fas fa-plus" style={{ fontSize: '10px' }} />+ สร้างตี้
                 </button>
               </div>
 
-              {/* Segmented Tab Switcher */}
-              <div className="grid grid-cols-3 p-1 rounded-xl bg-slate-100 text-xs font-semibold mb-4">
+              {/* Segmented tabs */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', padding: '4px', borderRadius: '12px', background: 'var(--surface-sunken)', fontSize: '12px', marginBottom: '16px' }}>
                 {[
                   { key: 'active', label: 'รอดำเนินการ', count: activeMyBookings.length },
                   { key: 'all', label: 'ทั้งหมด', count: myBookings.length },
@@ -1812,11 +1901,7 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
                     <button
                       key={t.key}
                       onClick={() => setMyBookingsTab(t.key)}
-                      className={`py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                        isActive
-                          ? 'bg-white text-slate-900 shadow-xs'
-                          : 'text-slate-500 hover:text-slate-800'
-                      }`}
+                      style={{ padding: '7px 4px', borderRadius: '9px', border: 'none', fontSize: '12px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', transition: 'all 0.15s', background: isActive ? 'var(--surface-raised)' : 'transparent', color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)' }}
                     >
                       <span>{t.label}</span>
                       {t.count > 0 && (
@@ -1833,108 +1918,73 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
 
               {/* Booking List or Empty State */}
               {displayedMyBookings.length === 0 ? (
-                <div className="py-12 px-4 rounded-xl bg-slate-50/60 border border-dashed border-slate-200 text-center">
-                  <div className="w-12 h-12 rounded-2xl bg-white border border-slate-200 text-slate-400 flex items-center justify-center mx-auto mb-3 text-lg shadow-xs">
+                <div style={{ padding: '28px 16px', borderRadius: '12px', border: '1px dashed var(--border-default)', textAlign: 'center', background: 'var(--surface-card)' }}>
+                  <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: 'rgba(0,0,0,0.04)', border: '1px solid var(--border-default)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', color: 'var(--text-tertiary)', fontSize: '18px' }}>
                     <i className="fas fa-calendar-plus" />
                   </div>
-                  <h4 className="text-sm font-bold text-slate-800 mb-1">
-                    {myBookingsTab === 'active'
-                      ? 'ไม่มีการจองที่กำลังดำเนินอยู่'
-                      : myBookingsTab === 'closed'
-                        ? 'ไม่มีการจองที่ปิดหรือยกเลิก'
-                        : 'ยังไม่มีประวัติการจอง'}
+                  <h4 style={{ fontSize: '13px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 6px' }}>
+                    {myBookingsTab === 'active' ? 'ไม่มีการจองที่กำลังดำเนินอยู่' : myBookingsTab === 'closed' ? 'ไม่มีการจองที่ปิดหรือยกเลิก' : 'ยังไม่มีประวัติการจอง'}
                   </h4>
-                  <p className="text-xs text-slate-500 max-w-xs mx-auto mb-4 leading-relaxed">
-                    เลือกบทละครที่สนใจ แล้วกดจองเพื่อสร้างห้องและชวนเพื่อนร่วมตี้
-                  </p>
-                  <button
-                    onClick={() => handleStartBooking()}
-                    className="px-4 py-2 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
-                  >
+                  <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '0 0 16px', lineHeight: 1.6 }}>เลือกบทละครที่สนใจ แล้วกดจองเพื่อสร้างห้องและชวนเพื่อนร่วมตี้</p>
+                  <button onClick={() => handleStartBooking()} style={{ padding: '8px 20px', borderRadius: '10px', background: 'var(--crimson-500)', border: 'none', color: '#fff', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background='var(--crimson-600)'}
+                    onMouseLeave={e => e.currentTarget.style.background='var(--crimson-500)'}>
                     + สร้างการจองใหม่
                   </button>
                 </div>
               ) : (
-                <div className="flex flex-col gap-3">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                   {displayedMyBookings.map(b => (
-                    <BookingCard
-                      key={b.id}
-                      booking={b}
-                      lineUser={lineUser}
-                      onOpen={openDetail}
-                      onCloseBooking={handleCloseBookingFromList}
-                    />
+                    <BookingCard key={b.id} booking={b} lineUser={lineUser} onOpen={openDetail} onCloseBooking={handleCloseBookingFromList} />
                   ))}
                 </div>
               )}
             </div>
           ) : (
-            /* Guest / Not logged-in: VIP Lounge Access Pass Card */
-            <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-amber-50/30 to-red-50/20 border border-amber-200/80 p-6 sm:p-7 shadow-sm">
-              <div className="relative z-10 flex flex-col items-center text-center">
-                {/* Crown VIP Badge */}
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-200 text-xs font-black uppercase tracking-wider mb-3.5">
-                  <i className="fas fa-crown text-[10px] text-amber-600" />
-                  <span>SOFUN VIP MEMBER PASS</span>
+            /* Guest card — dark cinematic */
+            <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '20px', background: 'var(--surface-raised)', border: '1px solid var(--border-default)', padding: '28px 24px' }}>
+              <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 80% 60% at 50% 0%, rgba(6,199,85,0.06) 0%, transparent 65%)', pointerEvents: 'none' }} />
+              <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(6,199,85,0.1)', border: '1px solid rgba(6,199,85,0.2)', color: 'var(--line-green)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: '16px' }}>
+                  <i className="fas fa-crown" style={{ fontSize: '10px' }} />SOFUN VIP PASS
                 </div>
-
-                <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight mb-1.5">
-                  เข้าสู่ระบบเพื่อเริ่มจอง
-                </h3>
-                <p className="text-xs text-slate-600 max-w-xs mb-5 leading-relaxed">
-                  เชื่อมต่อด้วย LINE เพื่อจัดการรอบเล่น ชวนเพื่อน และรับสิทธิพิเศษสุด Exclusive
-                </p>
-
-                {/* VIP Benefits List */}
-                <div className="w-full flex flex-col gap-2 text-left mb-6">
+                <h3 style={{ fontSize: '18px', fontWeight: 900, color: 'var(--text-primary)', margin: '0 0 8px', letterSpacing: '-0.01em' }}>เข้าสู่ระบบเพื่อเริ่มจอง</h3>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 20px', lineHeight: 1.6, maxWidth: '280px' }}>เชื่อมต่อด้วย LINE เพื่อจัดการรอบเล่น ชวนเพื่อน และรับสิทธิพิเศษ Exclusive</p>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left', marginBottom: '20px' }}>
                   {[
-                    { icon: 'fas fa-door-closed', color: 'text-amber-700 bg-amber-50 border-amber-200', text: 'ล็อคห้องส่วนตัว & เลือกรอบเวลาที่ต้องการ' },
-                    { icon: 'fas fa-users', color: 'text-blue-700 bg-blue-50 border-blue-200', text: 'สร้างปาร์ตี้ ส่งลิงก์ชวนเพื่อนร่วมตี้' },
-                    { icon: 'fab fa-line', color: 'text-[#06c755] bg-emerald-50 border-emerald-200', text: 'แจ้งเตือนสถานะการจองผ่าน LINE ทันที' },
-                    { icon: 'fas fa-gem', color: 'text-[#c62419] bg-red-50 border-red-200', text: 'สะสมแต้มเล่นเกมเพื่อรับส่วนลดพิเศษ' },
+                    { icon: 'fas fa-door-closed', col: '#d97706', text: 'ล็อคห้องส่วนตัว & เลือกรอบเวลาที่ต้องการ' },
+                    { icon: 'fas fa-users', col: '#2563eb', text: 'สร้างปาร์ตี้ ส่งลิงก์ชวนเพื่อนร่วมตี้' },
+                    { icon: 'fab fa-line', col: 'var(--line-green)', text: 'แจ้งเตือนสถานะการจองผ่าน LINE ทันที' },
+                    { icon: 'fas fa-gem', col: 'var(--crimson-400)', text: 'สะสมแต้มเล่นเกมเพื่อรับส่วนลดพิเศษ' },
                   ].map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200/80 shadow-2xs"
-                    >
-                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${item.color}`}>
-                        <i className={`${item.icon} text-xs`} />
+                    <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '10px 12px', borderRadius: '12px', background: 'var(--surface-card)', border: '1px solid var(--border-default)' }}>
+                      <div style={{ width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${item.col}18`, border: `1px solid ${item.col}30`, color: item.col, fontSize: '12px' }}>
+                        <i className={item.icon} />
                       </div>
-                      <span className="text-xs font-semibold text-slate-700">
-                        {item.text}
-                      </span>
+                      <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>{item.text}</span>
                     </div>
                   ))}
                 </div>
-
-                {/* High-conversion LINE Login Button */}
-                <button
-                  onClick={onLogin}
-                  className="w-full py-3.5 px-6 rounded-xl bg-[#06c755] hover:bg-[#05a848] text-white font-bold text-sm shadow-md shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 transition-all flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <i className="fab fa-line text-lg" />
-                  <span>เข้าสู่ระบบด้วย LINE เพื่อจองห้อง</span>
+                <button onClick={onLogin} style={{ width: '100%', padding: '14px 24px', borderRadius: '12px', background: 'var(--line-green)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '10px', transition: 'opacity 0.15s' }}
+                  onMouseEnter={e => e.currentTarget.style.opacity='0.88'}
+                  onMouseLeave={e => e.currentTarget.style.opacity='1'}>
+                  <i className="fab fa-line" style={{ fontSize: '18px' }} />เข้าสู่ระบบด้วย LINE เพื่อจองห้อง
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        {/* Right Column: Interactive Schedule & Room Calendar */}
-        <div className="lg:col-span-7 flex flex-col gap-4">
-          <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-4 rounded-full bg-[#c62419]" />
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                  ตารางห้อง & ปฏิทินรอบเล่น
-                </h3>
+        {/* Right Column: Calendar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', minWidth: 0 }}>
+          <div style={{ background: 'var(--surface-raised)', border: '1px solid var(--border-default)', borderRadius: '20px', padding: '20px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '14px', borderBottom: '1px solid var(--border-default)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ width: '4px', height: '18px', borderRadius: '4px', background: 'var(--crimson-500)' }} />
+                <h3 style={{ fontSize: '13px', fontWeight: 900, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.06em', margin: 0 }}>ตารางห้อง & ปฏิทินรอบเล่น</h3>
               </div>
-              <span className="text-xs text-slate-400 hidden sm:inline">
-                คลิกวันที่เพื่อดูรายละเอียดรอบ
-              </span>
+              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>คลิกวันที่เพื่อดูรายละเอียด</span>
             </div>
-
             <BookingCalendar
               bookings={bookings}
               onDayClick={date => setCalendarDate(d => d === date ? '' : date)}

@@ -277,6 +277,7 @@ export default function GamesPage({ allGames, showDetail }) {
 
         @media(prefers-reduced-motion:reduce){ .gp-reveal,.gp-card,.gp-sidebar{transition:none;opacity:1;transform:none} }
         @media(max-width:767px){ .gp-layout-sidebar{display:none!important} }
+        @media(max-width:420px){ .gp-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important} }
       `}</style>
 
       {/* ── Page header ── */}
@@ -467,7 +468,7 @@ export default function GamesPage({ allGames, showDetail }) {
               <p style={{ color: INK_3, fontSize: 13, marginTop: 8 }}>ลองปรับตัวกรองหรือคำค้นหา</p>
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))', gap: 14 }}>
+            <div className="gp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))', gap: 14 }}>
               {filtered.map((game, i) => (
                 <div key={game.id} className={`gp-reveal gp-d${(i % 4) + 1}`}>
                   <ScriptCard game={game} showDetail={showDetail} />

@@ -16,14 +16,14 @@ const WIRE    = 'var(--border-dark-wire)'
 const WIRE_2  = 'var(--border-dark-wire-2)'
 const AMBER   = 'var(--case-amber)'
 
-/* ── Light catalog tokens ──────────────────────────────── */
-const INK      = 'var(--text-primary)'
-const INK_2    = 'var(--text-secondary)'
-const INK_3    = 'var(--text-tertiary)'
-const PAPER    = 'var(--surface-page)'
-const PAPER_2  = 'var(--surface-card)'
-const L_BORDER = 'var(--border-default)'
-const L_BORDER_2 = 'var(--border-strong)'
+/* ── Dark-only catalog tokens (page is always dark) ────── */
+const INK      = 'rgba(255,255,255,0.9)'
+const INK_2    = 'rgba(255,255,255,0.65)'
+const INK_3    = 'rgba(255,255,255,0.35)'
+const PAPER    = '#0d0d0d'
+const PAPER_2  = '#111111'
+const L_BORDER = 'rgba(255,255,255,0.07)'
+const L_BORDER_2 = 'rgba(255,255,255,0.15)'
 
 /* ── Image helpers ───────────────────────────────────── */
 const toWsrv = (id, w = 800) =>
@@ -65,7 +65,7 @@ function StarBar({ val, color }) {
   )
 }
 
-/* ── Related card (matches GamesPage card) ───────────── */
+/* ── Related card ────────────────────────────────────── */
 function RelatedCard({ game, showDetail }) {
   const imgSrc = game.image ? convertImageUrl(game.image, 400) : null
   const displayPrice = game.fullPrice ?? game.price
@@ -73,40 +73,41 @@ function RelatedCard({ game, showDetail }) {
   const diff   = diffConfig(game.difficulty)
   return (
     <div className="dp-rel-card" onClick={() => showDetail(game.id)} style={{
-      borderRadius: 10, overflow: 'hidden', background: PAPER_2,
-      border: `1px solid ${L_BORDER}`, cursor: 'pointer',
+      borderRadius: 12, overflow: 'hidden', background: '#161616',
+      border: '1px solid rgba(255,255,255,0.07)', cursor: 'pointer',
       display: 'flex', flexDirection: 'column',
     }}>
       <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden' }}>
         {imgSrc ? (
           <img src={imgSrc} alt={game.title} loading="lazy" decoding="async" className="dp-rel-img" style={{
             position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', filter: 'brightness(0.84) contrast(1.06)',
+            objectFit: 'cover', filter: 'brightness(0.78) contrast(1.08)',
           }} />
         ) : (
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg, var(--void-100) 0%, var(--void-200) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className="fas fa-theater-masks" style={{ fontSize: 32, color: INK_3 }} />
+          <div style={{ position: 'absolute', inset: 0, background: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className="fas fa-theater-masks" style={{ fontSize: 32, color: 'rgba(255,255,255,0.12)' }} />
           </div>
         )}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 60%)' }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, transparent 55%)' }} />
         {game.difficulty && (
           <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, color: diff.text, background: diff.bg }}>
             {game.difficulty}
           </span>
         )}
         {isFree && (
-          <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: AMBER, color: VOID }}>ฟรี</span>
+          <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 9, fontWeight: 800, textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: '#c8a050', color: '#0a0a0a' }}>ฟรี</span>
         )}
-      </div>
-      <div style={{ padding: '12px 12px 14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <p style={{ fontSize: 12.5, fontWeight: 700, color: INK, lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{game.title}</p>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'auto' }}>
-          {game.players && <span style={{ fontSize: 10, color: INK_3 }}>{game.players} คน</span>}
-          {displayPrice !== undefined && (
-            <span style={{ fontSize: 13, fontWeight: 800, color: isFree ? AMBER : C }}>
-              {isFree ? 'ฟรี' : `฿${displayPrice}`}
-            </span>
-          )}
+        {/* Title + price overlaid at bottom */}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '14px 12px 12px' }}>
+          <p style={{ fontSize: 12, fontWeight: 800, color: '#ffffff', lineHeight: 1.25, marginBottom: 5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{game.title}</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            {game.players && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{game.players} คน</span>}
+            {displayPrice !== undefined && (
+              <span style={{ fontSize: 13, fontWeight: 900, color: isFree ? '#c8a050' : '#c62419' }}>
+                {isFree ? 'ฟรี' : `฿${displayPrice}`}
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -291,7 +292,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
   const diff     = diffConfig(game?.difficulty)
 
   return (
-    <div style={{ fontFamily: "'Sarabun', sans-serif", background: PAPER, color: INK, minHeight: '100vh', paddingTop: 60 }}>
+    <div style={{ fontFamily: "'Sarabun', sans-serif", background: '#0a0a0a', color: INK, minHeight: '100vh', paddingTop: 60 }}>
 
       <style>{`
         @keyframes dpFadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:none} }
@@ -317,7 +318,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
 
         /* Share btn */
         .dp-share { transition: all 0.18s !important; }
-        .dp-share:hover { border-color: ${L_BORDER_2} !important; color: ${INK} !important; background: rgba(0,0,0,0.04) !important; }
+        .dp-share:hover { border-color: ${L_BORDER_2} !important; color: ${INK} !important; background: rgba(255,255,255,0.06) !important; }
         .dp-share:focus-visible { outline: 2px solid ${C}; outline-offset: 3px; }
 
         /* Poster */
@@ -334,7 +335,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
         /* Mobile CTA bar */
         .dp-mobile-cta { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; padding: 12px 16px 20px; background: rgba(9,9,15,0.94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid rgba(255,255,255,0.08); gap: 12px; align-items: center; }
         @media(min-width:768px) { .dp-mobile-cta { display: none; } }
-        .dp-mobile-cta-book { flex: 1; padding: 13px 16px; border-radius: 10px; background: ${C}; color: ${CHALK}; border: none; cursor: pointer; font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; font-family: 'Sarabun', sans-serif; transition: background 0.18s; }
+        .dp-mobile-cta-book { flex: 1; padding: 13px 16px; border-radius: 8px; background: ${C}; color: ${CHALK}; border: none; cursor: pointer; font-size: 14px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; font-family: 'Sarabun', sans-serif; transition: background 0.18s; }
         .dp-mobile-cta-book:hover { background: ${C_DEEP}; }
 
         /* Related card */
@@ -359,7 +360,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
         .dp-rel-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 
         /* Review */
-        .rv-star-btn:focus-visible { outline: 2px solid ${C}; outline-offset: 2px; border-radius: 4px; }
+        .rv-star-btn:focus-visible { outline: 2px solid ${C}; outline-offset: 2px; }
         .rv-textarea { width: 100%; resize: vertical; border: 1px solid ${L_BORDER}; border-radius: 8px; padding: 12px 14px; font-size: 14px; font-family: 'Sarabun', sans-serif; background: ${PAPER}; color: ${INK}; line-height: 1.7; transition: border-color 0.18s; outline: none; }
         .rv-textarea:focus { border-color: ${C}; }
         .rv-submit { padding: 10px 22px; border-radius: 8px; border: none; cursor: pointer; background: ${C}; color: ${CHALK}; font-size: 13px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; font-family: 'Sarabun', sans-serif; transition: background 0.18s, transform 0.18s; }
@@ -391,7 +392,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
           {/* Crimson accent glow top-right */}
           <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 60% 50% at 75% 30%, rgba(198,36,25,0.12) 0%, transparent 70%)' }} />
           {/* Vignette + bottom fade to page bg */}
-          <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(to bottom, rgba(9,9,15,0.5) 0%, rgba(9,9,15,0.35) 45%, rgba(9,9,15,0.85) 82%, var(--surface-page) 100%)` }} />
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, rgba(9,9,15,0.5) 0%, rgba(9,9,15,0.35) 45%, rgba(9,9,15,0.85) 82%, #0a0a0a 100%)' }} />
 
           {/* Content */}
           <div style={{ position: 'relative', zIndex: 2, maxWidth: 1280, margin: '0 auto', padding: 'clamp(32px,4vw,52px) clamp(20px,4vw,40px) clamp(40px,5vw,64px)', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
@@ -479,7 +480,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
 
                 {/* Price */}
                 <div className="dp-r4" style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                  <span style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontSize: 'clamp(32px,4vw,48px)', fontWeight: 900, color: isFree ? AMBER : C, lineHeight: 1, textShadow: isFree ? '0 0 28px rgba(217,163,52,0.4)' : '0 0 28px rgba(198,36,25,0.4)' }}>
+                  <span style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontSize: 'clamp(32px,4vw,48px)', fontWeight: 900, color: isFree ? AMBER : C, lineHeight: 1, textShadow: isFree ? '0 0 28px rgba(200,160,80,0.4)' : '0 0 28px rgba(198,36,25,0.4)' }}>
                     {isFree ? 'ฟรี' : `฿${displayPrice}`}
                   </span>
                   {!isFree && <span style={{ fontSize: 12, fontWeight: 500, color: CHALK_3 }}>/คน</span>}
@@ -557,25 +558,26 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 14 }}>
                       {game.characters.map((char, i) => (
                         <div key={i} className="dp-char" style={{
-                          borderRadius: 10, overflow: 'hidden', background: PAPER,
-                          border: `1px solid ${L_BORDER}`, textAlign: 'center',
+                          borderRadius: 12, overflow: 'hidden',
+                          border: `1px solid ${L_BORDER}`,
                         }}>
-                          <div style={{ aspectRatio: '1/1', overflow: 'hidden', position: 'relative', background: 'var(--void-200)' }}>
+                          <div style={{ aspectRatio: '2/3', overflow: 'hidden', position: 'relative', background: '#1a1a1a' }}>
                             {char.image ? (
                               <img src={convertImageUrl(char.image, 200)} alt={char.name} loading="lazy" decoding="async" className="dp-char-img" style={{
-                                width: '100%', height: '100%', objectFit: 'cover',
+                                position: 'absolute', inset: 0, width: '100%', height: '100%',
+                                objectFit: 'cover',
                                 filter: 'brightness(0.82) contrast(1.08) grayscale(0.25)',
                               }} />
                             ) : (
-                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK_3 }}>
-                                <i className="fas fa-user" style={{ fontSize: 28 }} />
+                              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <i className="fas fa-user" style={{ fontSize: 28, color: 'rgba(255,255,255,0.12)' }} />
                               </div>
                             )}
-                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.6) 0%, transparent 60%)' }} />
-                          </div>
-                          <div style={{ padding: '10px 8px 12px' }}>
-                            <p style={{ fontSize: 12, fontWeight: 700, color: INK, lineHeight: 1.3, marginBottom: char.role ? 4 : 0 }}>{char.name}</p>
-                            {char.role && <p style={{ fontSize: 10, color: INK_3, lineHeight: 1.4 }}>{char.role}</p>}
+                            <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 55%)' }} />
+                            <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 10px 10px' }}>
+                              <p style={{ fontSize: 11, fontWeight: 700, color: '#ffffff', lineHeight: 1.3, marginBottom: char.role ? 3 : 0, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>{char.name}</p>
+                              {char.role && <p style={{ fontSize: 9, color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>{char.role}</p>}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -705,26 +707,36 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
               <div style={{ position: 'sticky', top: 80, alignSelf: 'start' }}>
                 <div className="dp-r1" style={{ background: PAPER_2, border: `1px solid ${L_BORDER}`, borderRadius: 14, overflow: 'hidden' }}>
 
-                  {/* Cover art */}
+                  {/* Cover art — portrait with price overlay */}
                   {imgSrc && (
-                    <div style={{ position: 'relative', aspectRatio: '16/10', overflow: 'hidden' }}>
-                      <img src={imgSrc} alt={game.title} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.8) contrast(1.06)' }} />
-                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(14,14,26,1) 0%, transparent 55%)' }} />
+                    <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden' }}>
+                      <img src={imgSrc} alt={game.title} loading="lazy" decoding="async" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.72) contrast(1.08)' }} />
+                      <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.25) 50%, transparent 80%)' }} />
+                      <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px 22px 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                          <span style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontSize: 40, fontWeight: 900, color: isFree ? AMBER : C, lineHeight: 1, textShadow: isFree ? '0 0 28px rgba(200,160,80,0.45)' : '0 0 28px rgba(198,36,25,0.45)' }}>
+                            {isFree ? 'ฟรี' : `฿${displayPrice}`}
+                          </span>
+                          {!isFree && <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)' }}>/คน</span>}
+                        </div>
+                      </div>
                     </div>
                   )}
 
-                  <div style={{ padding: '20px 22px 24px' }}>
+                  <div style={{ padding: imgSrc ? '16px 22px 24px' : '20px 22px 24px' }}>
 
-                    {/* Price */}
+                    {/* Price (no-image fallback) */}
+                    {!imgSrc && (
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 16 }}>
                       <span style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontSize: 40, fontWeight: 900, color: isFree ? AMBER : C, lineHeight: 1 }}>
                         {isFree ? 'ฟรี' : `฿${displayPrice}`}
                       </span>
                       {!isFree && <span style={{ fontSize: 12, color: INK_3 }}>/คน</span>}
                     </div>
+                    )}
 
                     {/* CTA */}
-                    <button className="dp-book" style={{
+                    <button className="dp-book" onClick={() => showPage('booking')} style={{
                       width: '100%', padding: '14px', borderRadius: 8,
                       background: C, color: CHALK, border: 'none', cursor: 'pointer',
                       fontSize: 13, fontWeight: 800, letterSpacing: '0.16em',
@@ -777,7 +789,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
               {isFree ? 'ฟรี' : `฿${displayPrice}`}
             </span>
           </div>
-          <button className="dp-mobile-cta-book">
+          <button className="dp-mobile-cta-book" onClick={() => showPage('booking')}>
             จองเกมนี้ →
           </button>
         </div>

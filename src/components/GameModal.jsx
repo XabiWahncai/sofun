@@ -78,7 +78,16 @@ export default function GameModal({ editingGame, onClose, showToast }) {
       setMainRoom(editingGame.mainRoom || (editingGame.rooms?.[0] ?? ''))
       setCurrentImageUrl(editingGame.image || '')
       setCurrentVideoUrl(editingGame.videoUrl || '')
-      setCharacters((editingGame.characters || []).map(c => ({ ...c, imageFile: null, imagePreview: c.image ? convertImageUrl(c.image) : '' })))
+      setCharacters((editingGame.characters || []).map(c => {
+        const isDrive = c.image && (c.image.includes('drive.google.com') || c.image.includes('wsrv.nl') || c.image.includes('googleusercontent.com'))
+        return {
+          ...c,
+          imageFile: null,
+          imagePreview: c.image ? convertImageUrl(c.image) : '',
+          imageMode: isDrive ? 'url' : 'file',
+          imageDriveUrl: isDrive ? c.image : ''
+        }
+      }))
       // if existing image is a Google Drive URL, show in URL mode
       const img = editingGame.image || ''
       if (img.includes('drive.google.com') || img.includes('googleusercontent.com') || img.includes('wsrv.nl')) {
@@ -104,13 +113,19 @@ export default function GameModal({ editingGame, onClose, showToast }) {
   const removeTag = (t) => setTags(prev => prev.filter(x => x !== t))
 
   const addCharacter = () =>
-    setCharacters(prev => [...prev, { name: '', role: '', image: '', imageFile: null, imagePreview: '' }])
+    setCharacters(prev => [...prev, { name: '', role: '', image: '', imageFile: null, imagePreview: '', imageMode: 'file', imageDriveUrl: '' }])
 
   const removeCharacter = (idx) =>
     setCharacters(prev => prev.filter((_, i) => i !== idx))
 
   const updateCharacter = (idx, field, value) =>
     setCharacters(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c))
+
+  const handleCharacterDriveUrl = (idx, url) => {
+    setCharacters(prev => prev.map((c, i) => i === idx ? {
+      ...c, imageDriveUrl: url, imagePreview: convertImageUrl(url), imageFile: null
+    } : c))
+  }
 
   const handleCharacterImageChange = (idx, e) => {
     const file = e.target.files[0]
@@ -164,6 +179,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           const cRef = storageRef(storage, `scripts/characters/${Date.now()}_${char.imageFile.name}`)
           const cSnap = await uploadBytes(cRef, char.imageFile)
           imgUrl = await getDownloadURL(cSnap.ref)
+        } else if (char.imageMode === 'url' && char.imageDriveUrl?.trim()) {
+          imgUrl = char.imageDriveUrl.trim()
         }
         savedChars.push({ name: char.name || '', role: char.role || '', image: imgUrl })
       }
@@ -410,14 +427,41 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             {characters.map((char, idx) => (
               <div key={idx} className="char-item">
                 <div className="char-item-img-wrap">
-                  <label className="char-img-upload">
-                    <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleCharacterImageChange(idx, e)} />
-                    {char.imagePreview
-                      ? <img src={char.imagePreview} alt="" className="char-img-preview" />
-                      : <div className="char-img-placeholder"><i className="fas fa-user" /></div>
-                    }
-                    <div className="char-img-overlay"><i className="fas fa-camera" /></div>
-                  </label>
+                  {char.imageMode === 'url' ? (
+                    <div className="char-img-upload" style={{ cursor: 'default' }}>
+                      {char.imagePreview
+                        ? <img src={char.imagePreview} alt="" className="char-img-preview" onError={e => { e.currentTarget.style.display = 'none' }} />
+                        : <div className="char-img-placeholder"><i className="fab fa-google-drive" /></div>
+                      }
+                    </div>
+                  ) : (
+                    <label className="char-img-upload">
+                      <input type="file" accept="image/*" style={{ display: 'none' }} onChange={e => handleCharacterImageChange(idx, e)} />
+                      {char.imagePreview
+                        ? <img src={char.imagePreview} alt="" className="char-img-preview" />
+                        : <div className="char-img-placeholder"><i className="fas fa-user" /></div>
+                      }
+                      <div className="char-img-overlay"><i className="fas fa-camera" /></div>
+                    </label>
+                  )}
+                  <div className="char-img-mode-tabs">
+                    <button
+                      type="button"
+                      className={`char-img-mode-tab${char.imageMode !== 'url' ? ' active' : ''}`}
+                      onClick={() => updateCharacter(idx, 'imageMode', 'file')}
+                      title="อัปโหลดไฟล์"
+                    >
+                      <i className="fas fa-upload" />
+                    </button>
+                    <button
+                      type="button"
+                      className={`char-img-mode-tab${char.imageMode === 'url' ? ' active' : ''}`}
+                      onClick={() => updateCharacter(idx, 'imageMode', 'url')}
+                      title="Google Drive URL"
+                    >
+                      <i className="fab fa-google-drive" />
+                    </button>
+                  </div>
                 </div>
                 <div className="char-item-fields">
                   <input
@@ -433,6 +477,15 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                     value={char.role}
                     onChange={e => updateCharacter(idx, 'role', e.target.value)}
                   />
+                  {char.imageMode === 'url' && (
+                    <input
+                      className="form-input"
+                      placeholder="วาง Google Drive URL เช่น https://drive.google.com/file/d/..."
+                      value={char.imageDriveUrl || ''}
+                      onChange={e => handleCharacterDriveUrl(idx, e.target.value)}
+                      style={{ fontSize: 12 }}
+                    />
+                  )}
                 </div>
                 <button type="button" className="char-remove-btn" onClick={() => removeCharacter(idx)}>
                   <i className="fas fa-times" />
