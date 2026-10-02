@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useLang } from '../LangContext'
 import logoImg from '../assets/Logo.jpg'
 
-export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout, liffLoading, hasActiveOrder }) {
+export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout, liffLoading, hasActiveOrder, isAdmin }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { lang, toggle, t } = useLang()
+  const effectiveAdmin = isAdmin !== undefined ? isAdmin : lineUser?.role === 'admin'
 
   const handleNav = (page) => {
     showPage(page)
@@ -81,7 +82,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
             </button>
           )}
 
-          {lineUser?.role === 'admin' && (
+          {effectiveAdmin && (
             <>
               <button className="nav-pos-btn" onClick={() => handleNav('pos')}>
                 <i className="fas fa-cash-register" /> POS
@@ -118,7 +119,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
                   <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                     <i className="fas fa-users" /> {t('nav', 'myParty')}
                   </button>
-                  {lineUser?.role === 'admin' && (
+                  {effectiveAdmin && (
                     <>
                       <button className="nav-user-menu-item" onClick={() => handleNav('random')}>
                         <i className="fas fa-dharmachakra" /> วงล้อสุ่ม (Lucky Wheel)
@@ -175,7 +176,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
             <span>สั่งอาหาร</span>
           </button>
         )}
-        {lineUser?.role === 'admin' && (
+        {effectiveAdmin && (
           <button className={`bottom-nav-item${currentPage === 'pos' ? ' active' : ''}`} onClick={() => handleNav('pos')}>
             <i className="fas fa-cash-register" />
             <span>POS</span>

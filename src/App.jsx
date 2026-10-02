@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc } from 'firebase/firestore'
 import { getToken, onMessage } from 'firebase/messaging'
+import { onAuthStateChanged } from 'firebase/auth'
 
-import { db, getMessagingInstance, VAPID_KEY } from './firebase'
+import { db, auth, getMessagingInstance, VAPID_KEY } from './firebase'
 import liff from '@line/liff'
 import Nav from './components/Nav'
+import ErrorBoundary from './components/ErrorBoundary'
 import HomePage from './components/HomePage'
 import GamesPage from './components/GamesPage'
 import DetailPage from './components/DetailPage'
@@ -55,12 +57,24 @@ export default function App() {
   const [lineUser, setLineUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sofun_line_user')) } catch { return null }
   })
+  const [firebaseUser, setFirebaseUser] = useState(null)
+  useEffect(() => {
+    return onAuthStateChanged(auth, u => setFirebaseUser(u))
+  }, [])
+  const isEffectiveAdmin = lineUser?.role === 'admin' || !!firebaseUser
+
   const [liffReady, setLiffReady] = useState(false)
   const [liffProfile, setLiffProfile] = useState(null)
   const [showRegister, setShowRegister] = useState(false)
   const [liffLoading, setLiffLoading] = useState(false)
   const [scanUid, setScanUid] = useState(null)
-  const [posSessions, setPosSessions] = useState([])
+  const [posSessions, setPosSessions] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sofun_pos_sessions'))
+      if (Array.isArray(saved?.sessions) && saved.sessions.length > 0) return saved.sessions
+    } catch {}
+    return [newPOSSession()]
+  })
   const [posActiveId, setPosActiveId] = useState(() => {
     try { return localStorage.getItem('sofun_pos_active_id') || null } catch { return null }
   })
@@ -75,28 +89,38 @@ export default function App() {
     const unsub = onSnapshot(docRef, snap => {
       if (snap.exists()) {
         const data = snap.data()
-        setPosSessions(data.sessions || [])
+        if (Array.isArray(data.sessions) && data.sessions.length > 0) {
+          setPosSessions(data.sessions)
+        }
         posLoadedRef.current = true
       } else if (!posLoadedRef.current) {
         posLoadedRef.current = true
-        const first = newPOSSession()
-        setDoc(docRef, { sessions: [first] }).catch(e => console.warn('POS init failed:', e))
+        const first = posSessions.length > 0 ? posSessions : [newPOSSession()]
+        setDoc(docRef, { sessions: first }).catch(e => console.warn('POS init failed:', e))
       }
     }, err => console.warn('POS sync subscribe failed:', err))
     return unsub
   }, [])
 
-  // ── Persist active party id per-admin (local only) ────────────────
+  // ── Persist POS sessions and active party id across refresh ───────
   useEffect(() => {
     try {
+      if (Array.isArray(posSessions) && posSessions.length > 0) {
+        localStorage.setItem('sofun_pos_sessions', JSON.stringify({ sessions: posSessions, activeId: posActiveId }))
+      }
       if (posActiveId) localStorage.setItem('sofun_pos_active_id', String(posActiveId))
     } catch {}
-  }, [posActiveId])
+  }, [posSessions, posActiveId])
 
   // Setter wrapper: writes to Firestore (debounced) so other admins see updates
   const handlePosSessionsChange = useCallback((updater) => {
     setPosSessions(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater
+      try {
+        if (Array.isArray(next) && next.length > 0) {
+          localStorage.setItem('sofun_pos_sessions', JSON.stringify({ sessions: next, activeId: posActiveId }))
+        }
+      } catch {}
       clearTimeout(posWriteTimerRef.current)
       posWriteTimerRef.current = setTimeout(() => {
         setDoc(doc(db, 'pos_live', 'current'), { sessions: next })
@@ -104,7 +128,7 @@ export default function App() {
       }, 350)
       return next
     })
-  }, [])
+  }, [posActiveId])
 
   // ── Handle URL params ──────────────────────────────────────────────
   useEffect(() => {
@@ -292,18 +316,18 @@ export default function App() {
 
   // ── Block non-admin from admin-only pages ──────────────────────────
   useEffect(() => {
-    if (lineUser && lineUser.role !== 'admin') {
+    if (liffReady && lineUser && lineUser.role !== 'admin' && !firebaseUser) {
       if (['pos', 'admin', 'adminscan'].includes(currentPage)) {
         setCurrentPage('home')
         window.history.replaceState({ page: 'home' }, '', '/')
       }
     }
-  }, [currentPage, lineUser?.role])
+  }, [currentPage, lineUser, firebaseUser, liffReady])
 
   // ── Active order for current member (non-admin) ─────────────────────
   useEffect(() => {
     const uid = lineUser?.uid
-    if (!uid || lineUser?.role === 'admin') { setActiveMemberOrder(null); return }
+    if (!uid || isEffectiveAdmin) { setActiveMemberOrder(null); return }
     const q = query(collection(db, 'orders'), where('memberUids', 'array-contains', uid))
     return onSnapshot(q, snap => {
       const active = snap.docs
@@ -311,7 +335,7 @@ export default function App() {
         .find(o => o.status === 'active')
       setActiveMemberOrder(active || null)
     }, () => setActiveMemberOrder(null))
-  }, [lineUser?.uid, lineUser?.role])
+  }, [lineUser?.uid, isEffectiveAdmin])
 
   // ── Redirect to QR if order closes while on order page ─────────────
   useEffect(() => {
@@ -350,6 +374,7 @@ export default function App() {
         onLogout={handleLogout}
         liffLoading={liffLoading}
         hasActiveOrder={!!activeMemberOrder}
+        isAdmin={isEffectiveAdmin}
       />
 
       {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} lineUser={lineUser} />}
@@ -361,20 +386,95 @@ export default function App() {
       {currentPage === 'order' && activeMemberOrder && (
         <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} />
       )}
-      {currentPage === 'adminscan' && lineUser?.role === 'admin' && <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />}
-      {currentPage === 'pos' && lineUser?.role === 'admin' && (
-        <POSPage
-          initialUid={scanUid}
-          adminUser={lineUser}
-          allGames={allGames}
-          showToast={showToast}
-          sessions={posSessions}
-          activeId={posActiveId}
-          onSessionsChange={handlePosSessionsChange}
-          onActiveIdChange={setPosActiveId}
-          onScanConsumed={() => setScanUid(null)}
-          onClose={() => { setScanUid(null); showPage('adminscan') }}
-        />
+      {currentPage === 'adminscan' && isEffectiveAdmin && <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />}
+      {currentPage === 'pos' && (
+        <ErrorBoundary>
+          {isEffectiveAdmin ? (
+            <POSPage
+              initialUid={scanUid}
+              adminUser={lineUser || (firebaseUser ? { name: firebaseUser.email || 'Admin', role: 'admin', uid: firebaseUser.uid } : null)}
+              allGames={allGames}
+              showToast={showToast}
+              sessions={posSessions}
+              activeId={posActiveId}
+              onSessionsChange={handlePosSessionsChange}
+              onActiveIdChange={setPosActiveId}
+              onScanConsumed={() => setScanUid(null)}
+              onClose={() => { setScanUid(null); showPage('adminscan') }}
+            />
+          ) : (
+            <div style={{
+              minHeight: '65vh',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '40px 20px',
+              textAlign: 'center',
+              fontFamily: "'Sarabun', sans-serif",
+            }}>
+              <div style={{
+                width: '60px',
+                height: '60px',
+                borderRadius: '50%',
+                background: 'rgba(198,36,25,0.08)',
+                color: 'var(--crimson-500)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                marginBottom: '16px',
+              }}>
+                <i className="fas fa-lock" />
+              </div>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, color: 'var(--text-primary)', margin: '0 0 8px' }}>
+                ระบบ POS สำหรับผู้ดูแลร้าน (Admin)
+              </h2>
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', maxWidth: '380px', margin: '0 0 24px', lineHeight: 1.6 }}>
+                กรุณาเข้าสู่ระบบด้วย LINE ที่มีสิทธิ์ Admin หรือเข้าสู่ระบบจัดการ Admin ด้วยอีเมล/รหัสผ่าน
+              </p>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <button
+                  onClick={handleLineLogin}
+                  disabled={liffLoading}
+                  style={{
+                    background: '#06c755',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '10px',
+                    padding: '12px 20px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <i className="fab fa-line" style={{ fontSize: '18px' }} /> เข้าสู่ระบบด้วย LINE
+                </button>
+                <button
+                  onClick={() => showPage('admin')}
+                  style={{
+                    background: 'rgba(0,0,0,0.05)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: '10px',
+                    padding: '12px 20px',
+                    fontSize: '14px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                  }}
+                >
+                  <i className="fas fa-user-shield" /> เข้าสู่ระบบ Admin Panel
+                </button>
+              </div>
+            </div>
+          )}
+        </ErrorBoundary>
       )}
       {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} />}
       {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} />}
@@ -411,10 +511,10 @@ export default function App() {
         />
       )}
 
-      {scanUid && lineUser?.role === 'admin' && (
+      {scanUid && isEffectiveAdmin && (
         <ScanModal
           scannedUid={scanUid}
-          adminUser={lineUser}
+          adminUser={lineUser || (firebaseUser ? { name: firebaseUser.email || 'Admin', role: 'admin', uid: firebaseUser.uid } : null)}
           allGames={allGames}
           onClose={() => setScanUid(null)}
           showToast={showToast}

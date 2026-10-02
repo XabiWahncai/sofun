@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, onSnapshot,
@@ -284,23 +284,25 @@ export default function POSPage({
   const setSessions = onSessionsChange
   const setActiveId = onActiveIdChange
 
+  const fallbackSession = useMemo(() => newPOSSession(), [])
+  const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
+  const activeSession = safeSessions.find(s => s.id === activeId) || safeSessions[0]
+
   // initialise with 1 session if empty
   useEffect(() => {
-    if (sessions.length === 0) {
+    if (!sessions || sessions.length === 0) {
       const s = newPOSSession()
       setSessions([s])
       setActiveId(s.id)
     } else if (!activeId || !sessions.find(s => s.id === activeId)) {
       setActiveId(sessions[sessions.length - 1].id)
     }
-  }, [])
-
-  const activeSession = sessions.find(s => s.id === activeId) || sessions[0]
+  }, [sessions, activeId])
 
   const updateSession = (id, patch) =>
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s))
+    setSessions(prev => (Array.isArray(prev) ? prev : [fallbackSession]).map(s => s.id === id ? { ...s, ...patch } : s))
 
-  const updateActive = (patch) => updateSession(activeId || sessions[0]?.id, patch)
+  const updateActive = (patch) => updateSession(activeSession.id, patch)
 
   // ── load initialUid into active session once ──────────────────────
   const handledUid = useState(null)
@@ -609,22 +611,23 @@ export default function POSPage({
   }
 
   // ── derived values ───────────────────────────────────────────────
-  const selectedGame = allGames.find(g => g.id === activeSession.scriptId)
-  const orderArr = Array.isArray(activeSession.order) ? activeSession.order : []
+  const selectedGame = allGames.find(g => g.id === activeSession?.scriptId)
+  const orderArr = Array.isArray(activeSession?.order) ? activeSession.order : []
   const foodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-  const gameUnitPay = activeSession.customPrice !== ''
+  const gameUnitPay = (activeSession?.customPrice !== '' && activeSession?.customPrice !== undefined)
     ? Number(activeSession.customPrice) || 0
     : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
-  const gamePrice = activeSession.members.length * gameUnitPay
-  const discount = Number(activeSession.discount) || 0          // per person (group promo)
-  const totalDiscount = discount * activeSession.members.length
-  const totalPersonalDiscounts = activeSession.members.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+  const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
+  const gamePrice = sessionMembers.length * gameUnitPay
+  const discount = Number(activeSession?.discount) || 0          // per person (group promo)
+  const totalDiscount = discount * sessionMembers.length
+  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
 
   // ── payment status helpers ───────────────────────────────────────
-  const allMembersPaid = activeSession.confirmedOrderId &&
-    activeSession.members.length > 0 &&
-    activeSession.members.every(m => memberPayments[m.uid]?.verified)
+  const allMembersPaid = activeSession?.confirmedOrderId &&
+    sessionMembers.length > 0 &&
+    sessionMembers.every(m => memberPayments[m.uid]?.verified)
   const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
   const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
 
@@ -800,10 +803,10 @@ export default function POSPage({
       {/* ── SESSION TABS ── */}
       <div className="pos-tabs-wrap">
         <div className="pos-tabs">
-          {sessions.map(s => (
+          {safeSessions.map(s => (
             <div
               key={s.id}
-              className={`pos-tab${s.id === activeId ? ' active' : ''}${s.confirmedOrderId ? ' confirmed' : ''}`}
+              className={`pos-tab${s.id === activeSession.id ? ' active' : ''}${s.confirmedOrderId ? ' confirmed' : ''}`}
               onClick={() => setActiveId(s.id)}
             >
               <span className="pos-tab-label">
@@ -813,9 +816,9 @@ export default function POSPage({
                   const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
                   return game ? `${game.title} ${date}` : s.label
                 })()}
-                {s.members.length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
+                {(s.members || []).length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
               </span>
-              {sessions.length > 1 && (
+              {safeSessions.length > 1 && (
                 <button className="pos-tab-close" onClick={e => { e.stopPropagation(); removeSession(s.id) }}>
                   <i className="fas fa-times" />
                 </button>
@@ -849,7 +852,7 @@ export default function POSPage({
                   <span className="pos-queue-item-name">
                     {qi.name}{qi.addons?.length ? ` (${qi.addons.map(a => a.name).join(',')})` : ''}
                   </span>
-                  {qi.orderedBy && <span className="pos-queue-item-by"><i className="fas fa-user" /> {qi.orderedBy.name.split(' ')[0]}</span>}
+                  {qi.orderedBy && <span className="pos-queue-item-by"><i className="fas fa-user" /> {(qi.orderedBy.name || '').split(' ')[0]}</span>}
                   <span className="pos-queue-item-price">฿{qi.totalPrice}</span>
                 </div>
               ))}
@@ -866,14 +869,14 @@ export default function POSPage({
           <div className="pos-section-title"><i className="fas fa-users" /> สมาชิก — {activeSession.label}</div>
 
           <div className="pos-members-list">
-            {activeSession.members.length === 0 && <div className="pos-empty">ยังไม่มีสมาชิก</div>}
+            {(activeSession.members || []).length === 0 && <div className="pos-empty">ยังไม่มีสมาชิก</div>}
 
             {/* Unpaid members */}
-            {activeSession.members.filter(m => !memberPayments[m.uid]?.verified).map(m => (
+            {(activeSession.members || []).filter(m => !memberPayments[m.uid]?.verified).map(m => (
               <div key={m.uid} className="pos-member-row">
                 {m.avatar
                   ? <img src={m.avatar} alt="" className="pos-member-avatar" />
-                  : <div className="pos-member-avatar-ph">{m.name[0]}</div>
+                  : <div className="pos-member-avatar-ph">{(m.name || '?')[0]}</div>
                 }
                 <div className="pos-member-info">
                   <div className="pos-member-name">
@@ -1270,7 +1273,7 @@ export default function POSPage({
                             border: `1px solid ${x.orderedBy?.uid === m.uid ? 'var(--crimson-500)' : 'var(--border-default)'}`,
                             cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
                           }}>
-                            {m.name.split(' ')[0]}
+                            {(m.name || '').split(' ')[0]}
                           </button>
                         ))}
                         {x.orderedBy && (
@@ -1378,7 +1381,7 @@ export default function POSPage({
                           }}>
                             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <i className={`fas fa-${sel ? 'check-square' : 'square'}`} style={{ color: sel ? 'var(--crimson-500)' : 'var(--border-strong)', fontSize: 13 }} />
-                              <span style={{ fontSize: 13, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>{m.name.split(' ')[0]}</span>
+                              <span style={{ fontSize: 13, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>{(m.name || '').split(' ')[0]}</span>
                             </span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>
                               ฿{bill.toLocaleString()}
@@ -1393,7 +1396,7 @@ export default function POSPage({
                         </span>
                         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--crimson-500)' }}>
                           ฿{[...groupPaySelected].reduce((s, uid) => {
-                            const m = activeSession.members.find(x => x.uid === uid)
+                            const m = (activeSession.members || []).find(x => x.uid === uid)
                             return s + (m ? getMemberBill(m) : 0)
                           }, 0).toLocaleString()}
                         </span>
