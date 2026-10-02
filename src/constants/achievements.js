@@ -91,6 +91,18 @@ export const ACHIEVEMENTS = {
     bg: 'rgba(167,139,250,0.12)',
     border: 'rgba(167,139,250,0.30)',
   },
+  manager: {
+    id: 'manager',
+    rarity: 'epic',
+    icon: 'fa-user-tie',
+    label: 'Manager',
+    labelTH: 'คุณผู้จัดการร้าน',
+    desc: 'Oversees every detail, keeps the vibes flawless, and ensures every session runs like clockwork.',
+    descTH: 'คอยดูแลทุกรายละเอียด บริหารความสนุก และทำให้ทุกปาร์ตี้ราบรื่นสมบูรณ์แบบ',
+    color: '#10b981',
+    bg: 'rgba(16,185,129,0.14)',
+    border: 'rgba(16,185,129,0.35)',
+  },
   golden: {
     id: 'golden',
     rarity: 'rare',
