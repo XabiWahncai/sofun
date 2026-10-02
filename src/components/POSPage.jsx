@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, onSnapshot,
@@ -193,11 +193,60 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
   )
 }
 
-const ROOMS = ['1st Floor', 'Japan Room', 'China Room']
+const ROOMS = ['1st Floor', '3rd Floor', 'Waiting Area 1', 'Waiting Area 2', '404 Bar', 'Japanese Room', 'Chinese Room', 'Europe Room', 'Ghost Room', 'Projector Room', '5 Floor', 'Yang', 'Chinese DM', 'Thai DM']
 
 let sessionCounter = 1
 const fmtDate = (d = new Date()) =>
   `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+
+// ── Kitchen / Dine-In Ticket — auto-printed when admin taps รับทั้งหมด ────────
+function buildKitchenTicketHTML(items, session, now, isPaid) {
+  const p2 = n => String(Math.round(n)).padStart(2, '0')
+  const fmtDT = d => {
+    const dt = d instanceof Date ? d : new Date(d)
+    return `${dt.getFullYear()}-${p2(dt.getMonth()+1)}-${p2(dt.getDate())} ${p2(dt.getHours())}:${p2(dt.getMinutes())}:${p2(dt.getSeconds())}`
+  }
+  const SEP = '=============================='
+
+  const row = (label, price, indent) =>
+    `<tr><td style="word-break:break-word;padding-left:${indent ? 14 : 0}px">${label}</td><td class="p">${price}</td></tr>`
+
+  const rows = `<table>${items.flatMap(qi => {
+    const addonSum = (qi.addons || []).reduce((s, a) => s + (a.price || 0), 0)
+    const baseTotal = (qi.totalPrice - addonSum) * qi.qty
+    const byName = qi.orderedBy?.name ? qi.orderedBy.name.split(' ')[0] : ''
+    const label = qi.name + (qi.qty > 1 ? ` ×${qi.qty}` : '') + (byName ? `(${byName})` : '')
+    const addonLines = (qi.addons || []).map(a =>
+      row(`${a.name}${qi.qty > 1 ? ` ×${qi.qty}` : ''}`, ((a.price || 0) * qi.qty).toFixed(2), true)
+    )
+    return [row(label, baseTotal.toFixed(2), false), ...addonLines]
+  }).join('')}</table>`
+
+  return `<!DOCTYPE html><html lang="th"><head>
+<meta charset="utf-8"><title>Kitchen Dine-In</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+/* ds-allow-hardcode: thermal receipt print CSS */
+body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;width:302px;margin:0 auto;padding:10px 8px}
+.c{text-align:center}.b{font-weight:bold}
+table{width:100%;border-collapse:collapse}
+td{padding:1px 0;vertical-align:top}
+td.p{white-space:nowrap;text-align:right;padding-left:8px;width:1%}
+@media print{@page{margin:0;size:80mm auto}body{width:80mm}}
+</style></head><body>
+<div class="c b">บริษัท โซฟัน จำกัด</div>
+<div class="c">สาขาอาร์ซีเอ (RCA)</div>
+<div>${SEP}</div>
+<div>ROOM: ${session.room || '-'} GST: ${session.members?.length || 0}</div>
+<div>${SEP}</div>
+<div class="b">ORDER</div>
+${rows}
+<div>${SEP}</div>
+<div>[${isPaid ? 'PAID' : 'OPEN'}]</div>
+<div>Print at: ${fmtDT(now)}</div>
+<div>Times of Printing: 1</div>
+</body></html>`
+}
 
 export const newPOSSession = () => ({
   id: Date.now() + Math.random(),
@@ -205,6 +254,8 @@ export const newPOSSession = () => ({
   createdAt: new Date().toISOString(),
   members: [],
   scriptId: '',
+  eventName: '',
+  customPrice: '',
   dm: '',
   npc: '',
   room: '',
@@ -227,27 +278,33 @@ export default function POSPage({
   const [saving, setSaving] = useState(false)
   const [easySlipApiKey, setEasySlipApiKey] = useState('')
   const [slipVerifyMember, setSlipVerifyMember] = useState(null)
+  const [gameSearch, setGameSearch] = useState('')
+  const [gameDropOpen, setGameDropOpen] = useState(false)
 
   const setSessions = onSessionsChange
   const setActiveId = onActiveIdChange
 
+  const fallbackSession = useMemo(() => newPOSSession(), [])
+  const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : null
+  const activeSession = safeSessions
+    ? (safeSessions.find(s => s.id === activeId) || safeSessions[0])
+    : fallbackSession
+
   // initialise with 1 session if empty
   useEffect(() => {
-    if (sessions.length === 0) {
+    if (!sessions || sessions.length === 0) {
       const s = newPOSSession()
       setSessions([s])
       setActiveId(s.id)
     } else if (!activeId || !sessions.find(s => s.id === activeId)) {
       setActiveId(sessions[sessions.length - 1].id)
     }
-  }, [])
-
-  const activeSession = sessions.find(s => s.id === activeId) || sessions[0]
+  }, [sessions, activeId])
 
   const updateSession = (id, patch) =>
-    setSessions(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s))
+    setSessions(prev => (Array.isArray(prev) ? prev : [fallbackSession]).map(s => s.id === id ? { ...s, ...patch } : s))
 
-  const updateActive = (patch) => updateSession(activeId || sessions[0]?.id, patch)
+  const updateActive = (patch) => updateSession(activeSession.id, patch)
 
   // ── load initialUid into active session once ──────────────────────
   const handledUid = useState(null)
@@ -351,6 +408,7 @@ export default function POSPage({
   const acceptQueue = async () => {
     const orderId = activeSession?.confirmedOrderId
     if (!orderId || memberQueue.length === 0) return
+
     const cur = activeSession.order || []
     const updated = [...cur]
     for (const qi of memberQueue) {
@@ -378,6 +436,22 @@ export default function POSPage({
     })
     setShowQueue(false)
     showToast(`รับ ${memberQueue.length} รายการจากลูกค้าแล้ว ✓`)
+
+    // Print via hidden iframe — srcdoc always renders as HTML, no popup/encoding issues
+    const now = new Date()
+    const isPaid = activeSession.members.length > 0 &&
+      activeSession.members.every(m => memberPayments[m.uid]?.verified)
+    const html = buildKitchenTicketHTML(memberQueue, activeSession, now, isPaid)
+    const frame = document.createElement('iframe')
+    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:80mm;height:297mm;border:0;visibility:hidden;pointer-events:none'
+    document.body.appendChild(frame)
+    frame.srcdoc = html
+    frame.onload = () => {
+      setTimeout(() => {
+        try { frame.contentWindow.focus(); frame.contentWindow.print() } catch (e) { console.warn('print error', e) }
+        setTimeout(() => { try { document.body.removeChild(frame) } catch {} }, 5000)
+      }, 300)
+    }
   }
 
   const handleScan = (uid) => {
@@ -539,20 +613,23 @@ export default function POSPage({
   }
 
   // ── derived values ───────────────────────────────────────────────
-  const selectedGame = allGames.find(g => g.id === activeSession.scriptId)
-  const orderArr = Array.isArray(activeSession.order) ? activeSession.order : []
+  const selectedGame = allGames.find(g => g.id === activeSession?.scriptId)
+  const orderArr = Array.isArray(activeSession?.order) ? activeSession.order : []
   const foodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-  const gameUnitPay = selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
-  const gamePrice = activeSession.members.length * gameUnitPay
-  const discount = Number(activeSession.discount) || 0          // per person (group promo)
-  const totalDiscount = discount * activeSession.members.length
-  const totalPersonalDiscounts = activeSession.members.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+  const gameUnitPay = (activeSession?.customPrice !== '' && activeSession?.customPrice !== undefined)
+    ? Number(activeSession.customPrice) || 0
+    : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
+  const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
+  const gamePrice = sessionMembers.length * gameUnitPay
+  const discount = Number(activeSession?.discount) || 0          // per person (group promo)
+  const totalDiscount = discount * sessionMembers.length
+  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
 
   // ── payment status helpers ───────────────────────────────────────
-  const allMembersPaid = activeSession.confirmedOrderId &&
-    activeSession.members.length > 0 &&
-    activeSession.members.every(m => memberPayments[m.uid]?.verified)
+  const allMembersPaid = activeSession?.confirmedOrderId &&
+    sessionMembers.length > 0 &&
+    sessionMembers.every(m => memberPayments[m.uid]?.verified)
   const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
   const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
 
@@ -892,12 +969,100 @@ export default function POSPage({
           <div className="pos-divider" />
 
           <div className="pos-section-title"><i className="fas fa-scroll" /> เกม</div>
-          <select className="form-select" value={activeSession.scriptId} onChange={e => updateActive({ scriptId: e.target.value })}>
-            <option value="">— เลือกเกม —</option>
-            {allGames.map(g => (
-              <option key={g.id} value={g.id}>{g.title}{(g.payPrice ?? g.price) ? ` (฿${g.payPrice ?? g.price}/คน)` : ''}</option>
-            ))}
-          </select>
+
+          {/* Searchable game picker */}
+          <div style={{ position: 'relative', margin: '0 18px' }}>
+            <div
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: '#fff', border: '1px solid rgba(0,0,0,0.15)',
+                borderRadius: 8, padding: '0 10px', height: 38, cursor: 'text',
+              }}
+              onClick={() => { setGameDropOpen(true); setTimeout(() => document.getElementById('pos-game-search')?.focus(), 0) }}
+            >
+              <i className="fas fa-search" style={{ color: 'rgba(0,0,0,0.35)', fontSize: 11, flexShrink: 0 }} />
+              <input
+                id="pos-game-search"
+                type="text"
+                placeholder={selectedGame ? selectedGame.title : '— เลือกเกม —'}
+                value={gameSearch}
+                onChange={e => { setGameSearch(e.target.value); setGameDropOpen(true) }}
+                onFocus={() => setGameDropOpen(true)}
+                onBlur={() => setTimeout(() => setGameDropOpen(false), 200)}
+                style={{
+                  flex: 1, background: 'none', border: 'none', outline: 'none',
+                  color: gameSearch ? '#000' : (selectedGame ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)'),
+                  fontSize: 13, fontWeight: 600,
+                }}
+              />
+              {(activeSession.scriptId || gameSearch) && (
+                <button
+                  onMouseDown={e => { e.preventDefault(); updateActive({ scriptId: '', eventName: '', customPrice: '' }); setGameSearch(''); setGameDropOpen(false) }}
+                  style={{ background: 'none', border: 'none', color: 'rgba(0,0,0,0.35)', cursor: 'pointer', padding: 0, fontSize: 11 }}
+                ><i className="fas fa-times" /></button>
+              )}
+            </div>
+            {gameDropOpen && (
+              <div style={{
+                position: 'absolute', top: 42, left: 0, right: 0, zIndex: 200,
+                background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: 8, maxHeight: 220, overflowY: 'auto',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
+              }}>
+                {allGames
+                  .filter(g => !gameSearch || g.title?.toLowerCase().includes(gameSearch.toLowerCase()))
+                  .map(g => {
+                    const price = g.payPrice ?? g.price
+                    const isSel = activeSession.scriptId === g.id
+                    return (
+                      <div
+                        key={g.id}
+                        onMouseDown={e => { e.preventDefault(); updateActive({ scriptId: g.id, customPrice: '' }); setGameSearch(''); setGameDropOpen(false) }}
+                        style={{
+                          padding: '9px 12px', cursor: 'pointer', fontSize: 13,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                          background: isSel ? 'rgba(198,36,25,0.15)' : 'transparent',
+                          borderLeft: isSel ? '2px solid #c62419' : '2px solid transparent',
+                          color: isSel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)',
+                        }}
+                        onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                        onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <span style={{ fontWeight: isSel ? 700 : 500 }}>{g.title}</span>
+                        {price ? <span style={{ fontSize: 11, color: '#c8a050', flexShrink: 0 }}>฿{price}/คน</span> : null}
+                      </div>
+                    )
+                  })}
+                {allGames.filter(g => !gameSearch || g.title?.toLowerCase().includes(gameSearch.toLowerCase())).length === 0 && (
+                  <div style={{ padding: '12px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>ไม่พบสคริปต์</div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Event name + custom price */}
+          <div style={{ margin: '6px 18px 0', display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1 }}>
+              <label className="form-label">Event พิเศษ</label>
+              <input
+                className="form-input"
+                placeholder="เช่น วันเกิด, บริษัท A..."
+                value={activeSession.eventName || ''}
+                onChange={e => updateActive({ eventName: e.target.value })}
+              />
+            </div>
+            <div style={{ width: 110 }}>
+              <label className="form-label">ราคา/คน (฿)</label>
+              <input
+                className="form-input"
+                type="number"
+                min="0"
+                placeholder={selectedGame ? `${selectedGame.payPrice ?? selectedGame.price ?? 0}` : '0'}
+                value={activeSession.customPrice}
+                onChange={e => updateActive({ customPrice: e.target.value })}
+              />
+            </div>
+          </div>
 
           <div className="form-row" style={{ marginTop: 4 }}>
             <div className="form-group">

@@ -89,6 +89,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // POS live — shared session state across admins
+    match /pos_live/{docId} {
+      allow read, write: if true;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;
