@@ -1,4 +1,5 @@
 export const RARITY = {
+  event:     { id: 'event',     label: 'Event',     color: '#e11d48', glow: 'rgba(225,29,72,0.45)' },
   legendary: { id: 'legendary', label: 'Legendary', color: '#fbbf24', glow: 'rgba(251,191,36,0.45)' },
   epic:      { id: 'epic',      label: 'Epic',      color: '#a78bfa', glow: 'rgba(167,139,250,0.40)' },
   rare:      { id: 'rare',      label: 'Rare',      color: '#60a5fa', glow: 'rgba(96,165,250,0.35)'  },
@@ -6,6 +7,18 @@ export const RARITY = {
 }
 
 export const ACHIEVEMENTS = {
+  potterhead: {
+    id: 'potterhead',
+    rarity: 'event',
+    icon: 'fa-wand-magic-sparkles',
+    label: 'PotterHead',
+    labelTH: 'สาวกเวทมนตร์',
+    desc: 'Passionate devotee of the magical realm. Wields the wand to unravel every mystery.',
+    descTH: 'ผู้หลงใหลในโลกเวทมนตร์ ถือไม้กายสิทธิ์ร่ายมนตร์คลี่คลายทุกปริศนา',
+    color: '#e11d48',
+    bg: 'rgba(225,29,72,0.14)',
+    border: 'rgba(225,29,72,0.35)',
+  },
   godfather: {
     id: 'godfather',
     rarity: 'legendary',
@@ -176,7 +189,7 @@ export const ACHIEVEMENTS = {
   },
 }
 
-const RARITY_ORDER = ['legendary', 'epic', 'rare', 'common']
+const RARITY_ORDER = ['event', 'legendary', 'epic', 'rare', 'common']
 
 export const ACHIEVEMENT_LIST = Object.values(ACHIEVEMENTS).sort(
   (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
