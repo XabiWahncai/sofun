@@ -164,7 +164,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
           <i className="fas fa-calendar-check" />
           <span>จอง</span>
         </button>
-        {lineUser && !hasActiveOrder && (
+        {lineUser && !hasActiveOrder && !effectiveAdmin && (
           <button className={`bottom-nav-item${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
             <i className="fas fa-qrcode" />
             <span>QR</span>

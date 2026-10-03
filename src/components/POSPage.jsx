@@ -7,6 +7,7 @@ import {
 import { Html5Qrcode } from 'html5-qrcode'
 import QRScanner from './QRScanner'
 import PaymentModal from './PaymentModal'
+import { buildKitchenTicketHTML } from '../constants/receipt'
 
 // ── Admin slip verifier (camera scan QR → EasySlip v2) ──────────────────────
 function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, onClose, onVerified }) {
@@ -199,55 +200,6 @@ let sessionCounter = 1
 const fmtDate = (d = new Date()) =>
   `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
 
-// ── Kitchen / Dine-In Ticket — auto-printed when admin taps รับทั้งหมด ────────
-function buildKitchenTicketHTML(items, session, now, isPaid) {
-  const p2 = n => String(Math.round(n)).padStart(2, '0')
-  const fmtDT = d => {
-    const dt = d instanceof Date ? d : new Date(d)
-    return `${dt.getFullYear()}-${p2(dt.getMonth()+1)}-${p2(dt.getDate())} ${p2(dt.getHours())}:${p2(dt.getMinutes())}:${p2(dt.getSeconds())}`
-  }
-  const SEP = '=============================='
-
-  const row = (label, price, indent) =>
-    `<tr><td style="word-break:break-word;padding-left:${indent ? 14 : 0}px">${label}</td><td class="p">${price}</td></tr>`
-
-  const rows = `<table>${items.flatMap(qi => {
-    const addonSum = (qi.addons || []).reduce((s, a) => s + (a.price || 0), 0)
-    const baseTotal = (qi.totalPrice - addonSum) * qi.qty
-    const byName = qi.orderedBy?.name ? qi.orderedBy.name.split(' ')[0] : ''
-    const label = qi.name + (qi.qty > 1 ? ` ×${qi.qty}` : '') + (byName ? `(${byName})` : '')
-    const addonLines = (qi.addons || []).map(a =>
-      row(`${a.name}${qi.qty > 1 ? ` ×${qi.qty}` : ''}`, ((a.price || 0) * qi.qty).toFixed(2), true)
-    )
-    return [row(label, baseTotal.toFixed(2), false), ...addonLines]
-  }).join('')}</table>`
-
-  return `<!DOCTYPE html><html lang="th"><head>
-<meta charset="utf-8"><title>Kitchen Dine-In</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-/* ds-allow-hardcode: thermal receipt print CSS */
-body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;width:302px;margin:0 auto;padding:10px 8px}
-.c{text-align:center}.b{font-weight:bold}
-table{width:100%;border-collapse:collapse}
-td{padding:1px 0;vertical-align:top}
-td.p{white-space:nowrap;text-align:right;padding-left:8px;width:1%}
-@media print{@page{margin:0;size:80mm auto}body{width:80mm}}
-</style></head><body>
-<div class="c b">บริษัท โซฟัน จำกัด</div>
-<div class="c">สาขาอาร์ซีเอ (RCA)</div>
-<div>${SEP}</div>
-<div>ROOM: ${session.room || '-'} GST: ${session.members?.length || 0}</div>
-<div>${SEP}</div>
-<div class="b">ORDER</div>
-${rows}
-<div>${SEP}</div>
-<div>[${isPaid ? 'PAID' : 'OPEN'}]</div>
-<div>Print at: ${fmtDT(now)}</div>
-<div>Times of Printing: 1</div>
-</body></html>`
-}
-
 export const newPOSSession = () => ({
   id: Date.now() + Math.random(),
   label: `ปาร์ตี้ ${sessionCounter++}`,
@@ -323,6 +275,16 @@ export default function POSPage({
   const [slipVerifyMember, setSlipVerifyMember] = useState(null)
   const [gameSearch, setGameSearch] = useState('')
   const [gameDropOpen, setGameDropOpen] = useState(false)
+  const [mobilePanel, setMobilePanel] = useState('members') // 'members' | 'menu' | 'order' — mobile only
+  const [expandedMembers, setExpandedMembers] = useState(() => new Set())
+  const [editingUnlocked, setEditingUnlocked] = useState(false)
+  const [receiptSettings, setReceiptSettings] = useState(null)
+
+  useEffect(() => {
+    return onSnapshot(doc(db, 'settings', 'receipt'), snap => {
+      if (snap.exists()) setReceiptSettings(snap.data())
+    }, () => {})
+  }, [])
 
   const setSessions = onSessionsChange
   const setActiveId = onActiveIdChange
@@ -330,6 +292,8 @@ export default function POSPage({
   const fallbackSession = useMemo(() => newPOSSession(), [])
   const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
   const activeSession = safeSessions.find(s => s.id === activeId) || safeSessions[0]
+  const isLocked = !!activeSession?.confirmedOrderId && !editingUnlocked
+  useEffect(() => { setEditingUnlocked(false) }, [activeId])
 
   // initialise with 1 session if empty
   useEffect(() => {
@@ -556,6 +520,8 @@ export default function POSPage({
     const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
     const newGamePrice = activeSession.members.length * (selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0)
     const d = Number(activeSession.discount) || 0
+    const mode = activeSession.discountMode || 'perPerson'
+    const totalD = mode === 'split' ? d : d * activeSession.members.length
     await updateDoc(doc(db, 'orders', orderId), {
       memberFoodQueue: [],
       memberFoodHistory: arrayUnion(...queuedItems),
@@ -563,8 +529,9 @@ export default function POSPage({
       foodTotal: newFoodTotal,
       gameTotal: newGamePrice,
       discount: d,
+      discountMode: mode,
       promoName: activeSession.promoName || '',
-      grandTotal: Math.max(0, newFoodTotal + newGamePrice - d * activeSession.members.length),
+      grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
     })
     setShowQueue(false)
     showToast(`รับ ${queuedItems.length} รายการจากลูกค้าแล้ว ✓`)
@@ -573,9 +540,10 @@ export default function POSPage({
     const now = new Date()
     const isPaid = activeSession.members.length > 0 &&
       activeSession.members.every(m => memberPayments[m.uid]?.verified)
-    const html = buildKitchenTicketHTML(memberQueue, activeSession, now, isPaid)
+    const html = buildKitchenTicketHTML(memberQueue, activeSession, now, isPaid, receiptSettings)
+    const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
     const frame = document.createElement('iframe')
-    frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:80mm;height:297mm;border:0;visibility:hidden;pointer-events:none'
+    frame.style.cssText = `position:fixed;left:-9999px;top:0;width:${printWidth};height:297mm;border:0;visibility:hidden;pointer-events:none`
     document.body.appendChild(frame)
     frame.srcdoc = html
     frame.onload = () => {
@@ -660,7 +628,10 @@ export default function POSPage({
     const myFood = orderArr
       .filter(x => x.orderedBy?.uid === m.uid)
       .reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const discountPerPerson = Number(activeSession.discount) || 0
+    const n = Array.isArray(activeSession?.members) ? activeSession.members.length : 0
+    const rawD = Number(activeSession?.discount) || 0
+    const mode = activeSession?.discountMode || 'perPerson'
+    const discountPerPerson = mode === 'split' ? (n > 0 ? rawD / n : 0) : rawD
     return Math.max(0, gameUnitPay + myFood - (Number(m.personalDiscount) || 0) - discountPerPerson)
   }
 
@@ -712,14 +683,17 @@ export default function POSPage({
     const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
     const newGamePrice = activeSession.members.length * (selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0)
     const d = Number(activeSession.discount) || 0
+    const mode = activeSession.discountMode || 'perPerson'
+    const totalD = mode === 'split' ? d : d * activeSession.members.length
     await updateDoc(doc(db, 'orders', orderId), {
       foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
       memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
       foodTotal: newFoodTotal,
       gameTotal: newGamePrice,
       discount: d,
+      discountMode: mode,
       promoName: activeSession.promoName || '',
-      grandTotal: Math.max(0, newFoodTotal + newGamePrice - d * activeSession.members.length),
+      grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
     })
   }
 
@@ -753,8 +727,10 @@ export default function POSPage({
     : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
   const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
   const gamePrice = sessionMembers.length * gameUnitPay
-  const discount = Number(activeSession?.discount) || 0          // per person (group promo)
-  const totalDiscount = discount * sessionMembers.length
+  const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
+  const discountRaw = Number(activeSession?.discount) || 0
+  const totalDiscount = discountMode === 'split' ? discountRaw : discountRaw * sessionMembers.length
+  const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person
   const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
 
@@ -807,9 +783,10 @@ export default function POSPage({
       const now = new Date()
       const isPaid = (order.members || []).length > 0 &&
         order.members.every(m => order.memberPayments?.[m.uid]?.verified)
-      const html = buildKitchenTicketHTML(queue, order, now, isPaid)
+      const html = buildKitchenTicketHTML(queue, order, now, isPaid, receiptSettings)
+      const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
       const frame = document.createElement('iframe')
-      frame.style.cssText = 'position:fixed;left:-9999px;top:0;width:80mm;height:297mm;border:0;visibility:hidden;pointer-events:none'
+      frame.style.cssText = `position:fixed;left:-9999px;top:0;width:${printWidth};height:297mm;border:0;visibility:hidden;pointer-events:none`
       document.body.appendChild(frame)
       frame.srcdoc = html
       frame.onload = () => {
@@ -962,7 +939,8 @@ export default function POSPage({
         memberFoodHistory: orderArr.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
         foodTotal,
         gameTotal: gamePrice,
-        discount,           // per-person discount
+        discount: discountRaw,  // raw input value (per-person or lump sum)
+        discountMode,           // 'perPerson' | 'split'
         promoName: s.promoName || '',
         grandTotal,
         createdBy: adminUser?.name || 'admin',
@@ -975,6 +953,7 @@ export default function POSPage({
           ...payload, updatedAt: serverTimestamp()
         })
         showToast('อัปเดตออเดอร์สำเร็จ ✓')
+        setEditingUnlocked(false)
       } else {
         // ── create new order ──────────────────────────────────────
         for (const m of s.members) {
@@ -997,7 +976,390 @@ export default function POSPage({
   }
 
   return (
-    <div id="pos-page" className="page active">
+    <div id="pos-page" className="page active" data-mobile-panel={mobilePanel}>
+
+      {/* ─── POS redesign overrides — white-red, cleaner, less chrome ─── */}
+      <style>{`
+        /* Shell */
+        #pos-page { background: #faf7f5 !important; min-height: 100vh; padding-top: 60px; }
+
+        /* ── Today bar — flatter, calmer ── */
+        .pos-today-bar { background: #ffffff !important; border-bottom: 1px solid rgba(26,26,26,0.06) !important; box-shadow: none !important; padding: 10px 0 !important; }
+        .pos-today-bar-inner { max-width: 1340px !important; padding: 0 20px !important; }
+        .pos-today-info { color: #1a1a1a !important; font-weight: 700 !important; font-size: 13px !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+        .pos-today-info i { color: #c62419 !important; }
+        .pos-today-count { padding: 2px 10px !important; background: rgba(198,36,25,0.08) !important; color: #c62419 !important; border-radius: 999px !important; font-size: 11px !important; font-weight: 800 !important; border: 1px solid rgba(198,36,25,0.2) !important; margin-left: 4px !important; }
+        .pos-today-sum { color: rgba(26,26,26,0.6) !important; font-size: 12.5px !important; font-weight: 600 !important; }
+        .pos-today-list { background: #ffffff !important; border-radius: 14px !important; border: 1px solid rgba(26,26,26,0.06) !important; margin-top: 8px !important; }
+
+        /* ── Session tabs — card-like, modern ── */
+        .pos-tabs-wrap { background: transparent !important; border: none !important; padding: 14px 20px 6px !important; max-width: 1340px !important; margin: 0 auto !important; }
+        .pos-tabs { gap: 6px !important; }
+        .pos-tab {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.08) !important;
+          color: rgba(26,26,26,0.55) !important;
+          padding: 8px 14px !important;
+          border-radius: 10px !important;
+          font-weight: 700 !important;
+          font-size: 12.5px !important;
+          transition: all 0.14s !important;
+          box-shadow: 0 1px 2px rgba(26,26,26,0.03) !important;
+        }
+        .pos-tab:hover { color: #1a1a1a !important; border-color: rgba(26,26,26,0.18) !important; }
+        .pos-tab.active {
+          background: #c62419 !important;
+          border-color: #c62419 !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 14px rgba(198,36,25,0.3) !important;
+          transform: translateY(-1px);
+        }
+        .pos-tab.active .pos-tab-count { background: rgba(255,255,255,0.22) !important; color: #ffffff !important; }
+        .pos-tab-count { background: rgba(198,36,25,0.1) !important; color: #c62419 !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10.5px !important; font-weight: 800 !important; margin-left: 6px !important; border: none !important; }
+        .pos-tab-close { color: rgba(255,255,255,0.6) !important; opacity: 0; margin-left: 2px !important; }
+        .pos-tab.active .pos-tab-close { opacity: 0.75 !important; }
+        .pos-tab.active .pos-tab-close:hover { color: #ffffff !important; opacity: 1 !important; }
+        .pos-tab-add {
+          background: transparent !important;
+          color: #c62419 !important;
+          border: 1.5px dashed rgba(198,36,25,0.4) !important;
+          padding: 7px 14px !important;
+          border-radius: 10px !important;
+          font-weight: 700 !important;
+          font-size: 12.5px !important;
+        }
+        .pos-tab-add:hover { background: rgba(198,36,25,0.06) !important; border-color: #c62419 !important; }
+        .pos-tab-alert-badge { background: #c62419 !important; color: #fff !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 800 !important; margin-left: 6px !important; }
+
+        /* ── Main layout proportions ── */
+        .pos-layout { padding: 10px 20px 60px !important; gap: 12px !important; grid-template-columns: 340px 1fr 320px !important; }
+        .pos-left, .pos-middle, .pos-right {
+          background: #ffffff !important;
+          border-radius: 18px !important;
+          border: 1px solid rgba(26,26,26,0.06) !important;
+          box-shadow: 0 2px 8px rgba(26,26,26,0.04) !important;
+        }
+
+        /* ── Section titles — quieter, no shouting ── */
+        .pos-section-title {
+          font-size: 11px !important;
+          letter-spacing: 0.14em !important;
+          color: rgba(26,26,26,0.42) !important;
+          font-weight: 800 !important;
+          padding: 14px 18px 12px !important;
+          border-bottom: 1px solid rgba(26,26,26,0.05) !important;
+        }
+        .pos-section-title i { color: #c62419 !important; font-size: 11px !important; }
+        .pos-divider { margin: 8px 18px !important; background: rgba(26,26,26,0.05) !important; }
+
+        /* ── Member row — cleaner ── */
+        .pos-members-list { padding: 10px 14px !important; gap: 6px !important; }
+        .pos-member-row {
+          background: #faf7f5 !important;
+          border: 1px solid rgba(26,26,26,0.05) !important;
+          border-radius: 12px !important;
+          padding: 10px 12px !important;
+          gap: 10px !important;
+        }
+        .pos-member-row.pos-member-collapsible {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0 !important;
+          padding: 10px 12px !important;
+          transition: background 0.14s, border-color 0.14s;
+        }
+        .pos-member-row.pos-member-collapsible.is-expanded {
+          background: #ffffff !important;
+          border-color: rgba(198,36,25,0.18) !important;
+          box-shadow: 0 4px 14px rgba(198,36,25,0.08);
+        }
+        .pos-member-row.pos-member-collapsible .pos-member-head:hover {
+          opacity: 0.92;
+        }
+
+        /* ── Locked state — hide inputs/edit controls, keep view interactions ── */
+        .pos-left.is-locked .pos-remove-btn,
+        .pos-left.is-locked .pos-scan-more-btn,
+        .pos-left.is-locked .pos-lock-hide-when-locked { display: none !important; }
+
+        /* Editing mode — subtle crimson ring to show "unlocked" */
+        .pos-left.is-editing {
+          box-shadow: 0 0 0 2px rgba(198,36,25,0.18), 0 2px 8px rgba(26,26,26,0.04) !important;
+        }
+
+        /* Menu picker — locked (can scroll/view, can't add) */
+        .pos-middle.is-locked .pos-menu-item { pointer-events: none; }
+        .pos-member-avatar, .pos-member-avatar-ph { width: 36px !important; height: 36px !important; }
+        .pos-member-avatar-ph { background: #ebe4e1 !important; color: #1a1a1a !important; font-weight: 800 !important; font-size: 13px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .pos-member-name { color: #1a1a1a !important; font-weight: 700 !important; font-size: 13.5px !important; gap: 6px !important; }
+        .pos-member-paid-badge { background: #c62419 !important; color: #fff !important; border: none !important; padding: 2px 8px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 800 !important; }
+        .pos-member-slip-badge { background: rgba(198,36,25,0.08) !important; color: #c62419 !important; border: 1px solid rgba(198,36,25,0.25) !important; padding: 3px 8px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 700 !important; }
+        .pos-member-slip-badge:hover { background: rgba(198,36,25,0.14) !important; }
+        .pos-member-pending-badge { background: rgba(26,26,26,0.06) !important; color: rgba(26,26,26,0.6) !important; padding: 2px 7px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 700 !important; }
+        .pos-paid-collapse-btn { background: transparent !important; color: rgba(26,26,26,0.55) !important; font-size: 12px !important; font-weight: 700 !important; padding: 10px 14px !important; border-top: 1px solid rgba(26,26,26,0.05) !important; }
+        .pos-paid-collapse-btn:hover { background: #faf7f5 !important; }
+        .pos-char-select, .pos-char-input {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          color: #1a1a1a !important;
+          font-size: 12px !important;
+          padding: 6px 10px !important;
+          border-radius: 8px !important;
+        }
+        .pos-char-select:focus, .pos-char-input:focus { border-color: #c62419 !important; box-shadow: 0 0 0 3px rgba(198,36,25,0.08) !important; outline: none !important; }
+        .pos-remove-btn { color: rgba(26,26,26,0.3) !important; }
+        .pos-remove-btn:hover { color: #c62419 !important; }
+
+        /* ── Discount row ── */
+        .pos-personal-disc-amt, .pos-personal-disc-note {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          font-size: 11.5px !important;
+          padding: 6px 9px !important;
+          border-radius: 8px !important;
+        }
+        .pos-personal-disc-amt:focus, .pos-personal-disc-note:focus { border-color: #c62419 !important; box-shadow: 0 0 0 3px rgba(198,36,25,0.08) !important; outline: none !important; }
+
+        /* ── Scan button, Sync button ── */
+        .pos-scan-more-btn {
+          background: #1a1a1a !important;
+          color: #ffffff !important;
+          font-weight: 800 !important;
+          font-size: 13px !important;
+          padding: 10px 14px !important;
+          border-radius: 10px !important;
+        }
+        .pos-scan-more-btn:hover { background: #000000 !important; }
+        .pos-sync-disc-btn {
+          background: #ffffff !important;
+          color: #1a1a1a !important;
+          border: 1px solid rgba(26,26,26,0.14) !important;
+          font-weight: 700 !important;
+          font-size: 12px !important;
+          padding: 8px 12px !important;
+          border-radius: 10px !important;
+        }
+        .pos-sync-disc-btn:hover { background: #faf7f5 !important; }
+
+        /* ── Form inputs ── */
+        .form-input, .form-select, .form-textarea {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          color: #1a1a1a !important;
+          border-radius: 8px !important;
+          padding: 8px 12px !important;
+          font-size: 13px !important;
+          transition: all 0.14s !important;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #c62419 !important; box-shadow: 0 0 0 3px rgba(198,36,25,0.08) !important; outline: none !important; }
+        .form-label { color: rgba(26,26,26,0.5) !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.03em !important; margin-bottom: 4px !important; }
+
+        /* ── Promo / discount section ── */
+        .pos-promo-wrap { padding: 10px 14px 14px !important; display: flex !important; flex-direction: column !important; gap: 8px !important; }
+        .pos-promo-name-input {
+          background: #faf7f5 !important;
+          border: 1px solid rgba(26,26,26,0.08) !important;
+          color: #1a1a1a !important;
+          padding: 9px 12px !important;
+          border-radius: 10px !important;
+          font-size: 12.5px !important;
+        }
+        .pos-promo-name-input:focus { border-color: #c62419 !important; background: #ffffff !important; outline: none !important; }
+        .pos-promo-amount-input {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          color: #c62419 !important;
+          font-weight: 800 !important;
+          font-size: 14px !important;
+          padding: 7px 10px !important;
+          border-radius: 8px !important;
+          text-align: right !important;
+        }
+        .pos-promo-amount-input:focus { border-color: #c62419 !important; outline: none !important; }
+        .pos-promo-label { color: rgba(26,26,26,0.5) !important; font-size: 11.5px !important; font-weight: 700 !important; }
+        .pos-promo-unit { color: rgba(26,26,26,0.4) !important; font-size: 11px !important; }
+
+        /* ── Pay/CTA buttons ── */
+        .pos-pay-btn {
+          background: #c62419 !important;
+          color: #ffffff !important;
+          font-weight: 800 !important;
+          font-size: 14px !important;
+          padding: 12px 18px !important;
+          border-radius: 12px !important;
+          box-shadow: 0 6px 18px rgba(198,36,25,0.3) !important;
+        }
+        .pos-pay-btn:hover { background: #9a1c13 !important; }
+
+        /* ── Right summary panel padding ── */
+        .pos-right-content { padding: 12px 14px !important; }
+        .pos-right-footer { background: #fdfbfa !important; }
+
+        /* ── Empty state ── */
+        .pos-empty { color: rgba(26,26,26,0.3) !important; font-size: 12.5px !important; padding: 24px 18px !important; }
+
+        /* ── Queue bar (incoming orders) — more prominent ── */
+        .pos-queue-bar { background: linear-gradient(135deg, #c62419 0%, #9a1c13 100%) !important; border: none !important; border-radius: 14px !important; box-shadow: 0 8px 24px rgba(198,36,25,0.3) !important; margin: 10px 20px 0 !important; max-width: calc(1340px - 40px) !important; margin-left: auto !important; margin-right: auto !important; }
+        .pos-queue-bar.other-table { background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%) !important; box-shadow: 0 8px 24px rgba(26,26,26,0.2) !important; }
+        .pos-queue-badge { background: rgba(255,255,255,0.2) !important; color: #ffffff !important; backdrop-filter: blur(4px); }
+
+        /* ─── RESPONSIVE ─── */
+
+        /* Tablet: 2-col — left sidebar + merged middle+right */
+        @media (max-width: 1200px) {
+          .pos-layout { grid-template-columns: 320px 1fr !important; }
+          .pos-right { grid-column: 2 !important; }
+          .pos-middle, .pos-right { position: static !important; max-height: none !important; }
+        }
+
+        /* Mobile — segmented view: 1 panel at a time, top shortcut tabs */
+        @media (max-width: 820px) {
+          html, body { overflow-x: hidden !important; }
+          #pos-page {
+            padding-top: 60px; padding-bottom: 20px !important;
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+          }
+          .pos-today-bar, .pos-tabs-wrap, .pos-queue-bar, .pos-today-list { max-width: 100% !important; box-sizing: border-box !important; }
+          .pos-today-bar-inner { padding: 0 14px !important; flex-wrap: wrap !important; gap: 8px !important; }
+          .pos-today-info { font-size: 12.5px !important; }
+
+          .pos-tabs-wrap { padding: 12px 14px 4px !important; overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; width: 100% !important; box-sizing: border-box !important; margin: 0 !important; }
+          .pos-tabs-wrap::-webkit-scrollbar { height: 0 !important; }
+          .pos-tabs { flex-wrap: nowrap !important; min-width: min-content !important; }
+          .pos-tab { flex-shrink: 0 !important; white-space: nowrap !important; max-width: 65vw !important; overflow: hidden !important; text-overflow: ellipsis !important; }
+          .pos-tab-label { overflow: hidden !important; text-overflow: ellipsis !important; }
+          .pos-tab-add { flex-shrink: 0 !important; white-space: nowrap !important; }
+
+          .pos-queue-bar { margin: 8px 14px 0 !important; width: calc(100% - 28px) !important; max-width: calc(100% - 28px) !important; }
+          .pos-today-list { margin: 6px 14px 0 !important; width: calc(100% - 28px) !important; max-width: calc(100% - 28px) !important; }
+
+          .pos-layout {
+            grid-template-columns: 1fr !important;
+            padding: 8px 14px 20px !important;
+            gap: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .pos-left, .pos-middle, .pos-right {
+            position: static !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-radius: 16px !important;
+            grid-column: 1 / -1 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+          }
+
+          /* Show only the active mobile panel */
+          #pos-page[data-mobile-panel="members"] .pos-middle,
+          #pos-page[data-mobile-panel="members"] .pos-right { display: none !important; }
+          #pos-page[data-mobile-panel="menu"] .pos-left,
+          #pos-page[data-mobile-panel="menu"] .pos-right { display: none !important; }
+          #pos-page[data-mobile-panel="order"] .pos-left,
+          #pos-page[data-mobile-panel="order"] .pos-middle { display: none !important; }
+
+          .pos-section-title { padding: 12px 14px 10px !important; font-size: 10.5px !important; }
+          .pos-members-list { padding: 8px 10px !important; }
+          .pos-member-row { padding: 9px 10px !important; }
+          .pos-member-avatar, .pos-member-avatar-ph { width: 34px !important; height: 34px !important; }
+          .pos-member-name { font-size: 13px !important; }
+          .pos-personal-disc-row { flex-wrap: wrap !important; }
+          .pos-personal-disc-amt { flex: 0 0 90px !important; min-width: 0 !important; }
+          .pos-personal-disc-note { flex: 1 1 120px !important; min-width: 0 !important; }
+
+          .pos-member-actions { padding: 0 10px 12px !important; }
+          .pos-divider { margin: 6px 14px !important; }
+          .pos-promo-wrap { padding: 8px 10px 12px !important; }
+
+          .pos-queue-bar { margin: 8px 14px 0 !important; max-width: calc(100% - 28px) !important; }
+          .pos-queue-bar-top { flex-wrap: wrap !important; gap: 8px !important; }
+
+          .pos-today-list { margin: 6px 14px 0 !important; max-width: calc(100% - 28px) !important; }
+          .pos-today-item-left { min-width: 0 !important; }
+          .pos-today-game { font-size: 13px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+
+          .pos-pay-btn { font-size: 13.5px !important; padding: 11px 14px !important; }
+
+          /* Mobile top shortcut tabs */
+          .pos-mobile-shortcut { display: flex !important; }
+          #pos-page { padding-bottom: 20px !important; }
+        }
+
+        /* Desktop: hide mobile shortcut */
+        .pos-mobile-shortcut { display: none; }
+        @media (min-width: 821px) {
+          .pos-mobile-shortcut { display: none !important; }
+        }
+
+        /* ── Mobile top shortcut tabs (sticky under party tabs) ── */
+        .pos-mobile-shortcut {
+          position: sticky; top: 60px; z-index: 30;
+          display: none;
+          gap: 6px;
+          padding: 10px 14px;
+          background: rgba(250,247,245,0.92);
+          backdrop-filter: blur(14px);
+          border-bottom: 1px solid rgba(26,26,26,0.06);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .pos-mobile-shortcut-btn {
+          flex: 1; display: flex; align-items: center; justify-content: center;
+          gap: 6px; padding: 9px 8px;
+          background: #ffffff;
+          border: 1px solid rgba(26,26,26,0.08);
+          border-radius: 10px;
+          color: rgba(26,26,26,0.6);
+          font-size: 12px; font-weight: 800;
+          font-family: 'Sarabun', sans-serif;
+          cursor: pointer; transition: all 0.14s;
+          position: relative;
+          letter-spacing: 0.01em;
+        }
+        .pos-mobile-shortcut-btn.active {
+          background: #c62419;
+          border-color: #c62419;
+          color: #ffffff;
+          box-shadow: 0 4px 14px rgba(198,36,25,0.3);
+          transform: translateY(-1px);
+        }
+        .pos-mobile-shortcut-badge {
+          display: inline-flex; align-items: center; justify-content: center;
+          min-width: 18px; height: 18px; padding: 0 5px;
+          border-radius: 999px;
+          background: rgba(198,36,25,0.1); color: #c62419;
+          font-size: 10px; font-weight: 900;
+          margin-left: 2px;
+        }
+        .pos-mobile-shortcut-btn.active .pos-mobile-shortcut-badge {
+          background: rgba(255,255,255,0.22); color: #ffffff;
+        }
+
+        /* Very small (iPhone SE etc.) */
+        @media (max-width: 400px) {
+          .pos-today-bar-inner { padding: 0 10px !important; }
+          .pos-tabs-wrap { padding: 10px 10px 4px !important; }
+          .pos-layout { padding: 6px 10px 100px !important; gap: 8px !important; }
+          .pos-section-title { padding: 10px 12px 8px !important; }
+          .pos-members-list { padding: 6px 8px !important; }
+          .pos-member-row { padding: 8px 9px !important; gap: 8px !important; }
+          .pos-member-avatar, .pos-member-avatar-ph { width: 32px !important; height: 32px !important; }
+          .pos-member-name { font-size: 12.5px !important; gap: 4px !important; flex-wrap: wrap !important; }
+          .pos-char-select, .pos-char-input { font-size: 11.5px !important; padding: 5px 8px !important; }
+          .pos-personal-disc-amt, .pos-personal-disc-note { font-size: 11px !important; padding: 5px 8px !important; }
+
+          .pos-tab { padding: 7px 11px !important; font-size: 11.5px !important; }
+          .pos-tab-add { padding: 6px 11px !important; font-size: 11.5px !important; }
+          .pos-queue-bar { margin: 6px 10px 0 !important; max-width: calc(100% - 20px) !important; }
+          .pos-today-list { margin: 4px 10px 0 !important; max-width: calc(100% - 20px) !important; }
+        }
+      `}</style>
 
       {/* ── TODAY BAR ── */}
       <div className="pos-today-bar">
@@ -1079,6 +1441,35 @@ export default function POSPage({
         </div>
       </div>
 
+      {/* ── MOBILE TOP SHORTCUT TABS (visible <820px) ── */}
+      <div className="pos-mobile-shortcut">
+        {[
+          { key: 'members', icon: 'fa-users', label: 'สมาชิก', badge: (activeSession.members || []).length },
+          { key: 'menu', icon: 'fa-utensils', label: 'เมนู', badge: 0 },
+          { key: 'order', icon: 'fa-receipt', label: 'สรุปออเดอร์', badge: orderArr.length },
+        ].map(t => {
+          const active = mobilePanel === t.key
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => {
+                setMobilePanel(t.key)
+                // Scroll to top so user sees the panel from start
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className={`pos-mobile-shortcut-btn${active ? ' active' : ''}`}
+            >
+              <i className={`fas ${t.icon}`} style={{ fontSize: 12 }} />
+              <span>{t.label}</span>
+              {t.badge > 0 && (
+                <span className="pos-mobile-shortcut-badge">{t.badge}</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
       {/* ── OTHER TABLES QUEUE ALERTS ── */}
       {otherPendingOrders.map(o => (
         <div key={o.id} className="pos-queue-bar other-table">
@@ -1149,62 +1540,250 @@ export default function POSPage({
       <div className="pos-layout">
 
         {/* LEFT */}
-        <div className="pos-left">
-          <div className="pos-section-title"><i className="fas fa-users" /> สมาชิก — {activeSession.label}</div>
+        <div className={`pos-left${isLocked ? ' is-locked' : ''}${editingUnlocked ? ' is-editing' : ''}`}>
+          {/* Lock / edit banner — only visible after order is confirmed */}
+          {activeSession?.confirmedOrderId && (
+            <div className="pos-lock-banner" style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 16px',
+              background: isLocked ? '#faf7f5' : 'rgba(198,36,25,0.08)',
+              borderBottom: `1px solid ${isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.2)'}`,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10,
+                background: isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.15)',
+                color: isLocked ? 'rgba(26,26,26,0.55)' : '#c62419',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <i className={`fas fa-${isLocked ? 'lock' : 'pen'}`} style={{ fontSize: 13 }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                  {isLocked ? 'ยืนยันออเดอร์แล้ว' : 'โหมดแก้ไข'}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
+                  {isLocked ? 'กด "แก้ไข" เพื่อปรับข้อมูล' : 'กดอัปเดตเมื่อเสร็จ หรือยกเลิก'}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingUnlocked(v => !v)}
+                style={{
+                  padding: '7px 14px', borderRadius: 10,
+                  background: isLocked ? '#1a1a1a' : '#ffffff',
+                  color: isLocked ? '#ffffff' : '#1a1a1a',
+                  border: isLocked ? 'none' : '1px solid rgba(26,26,26,0.14)',
+                  fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  fontFamily: "'Sarabun', sans-serif",
+                  flexShrink: 0,
+                }}
+              >
+                <i className={`fas fa-${isLocked ? 'pen' : 'times'}`} style={{ fontSize: 10 }} />
+                {isLocked ? 'แก้ไข' : 'ยกเลิก'}
+              </button>
+            </div>
+          )}
+
+          <div className="pos-section-title"><i className="fas fa-users" /> สมาชิก <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'rgba(26,26,26,0.4)', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>{(activeSession.members || []).length} คน</span></div>
 
           <div className="pos-members-list">
             {(activeSession.members || []).length === 0 && <div className="pos-empty">ยังไม่มีสมาชิก</div>}
 
             {/* Unpaid members */}
-            {(activeSession.members || []).filter(m => !memberPayments[m.uid]?.verified).map(m => (
-              <div key={m.uid} className="pos-member-row">
-                {m.avatar
-                  ? <img src={m.avatar} alt="" className="pos-member-avatar" />
-                  : <div className="pos-member-avatar-ph">{(m.name || '?')[0]}</div>
-                }
-                <div className="pos-member-info">
-                  <div className="pos-member-name">
-                    {m.name}
-                    {memberPayments[m.uid]?.easyslipPending && (
-                      <span className="pos-member-pending-badge" title="รอ Bangkok Bank ยืนยันอัตโนมัติ">
-                        <i className="fas fa-hourglass-half" /> รอ BK
-                      </span>
-                    )}
-                    {memberPayments[m.uid]?.pendingAdminReview && (
-                      <button className="pos-member-slip-badge" onClick={() => setSlipVerifyMember(m)} title="คลิกตรวจสลิป EasySlip">
-                        <i className="fas fa-camera" /> ตรวจสลิป
-                      </button>
-                    )}
-                  </div>
-                  {selectedGame?.characters?.length > 0 ? (
-                    <select className="pos-char-select" value={m.character} onChange={e => setCharacter(m.uid, e.target.value)}>
-                      <option value="">— เลือกตัวละคร —</option>
-                      {selectedGame.characters.map((c, i) => (
-                        <option key={i} value={c.name}>{c.name}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input className="pos-char-input" placeholder="ตัวละคร..." value={m.character} onChange={e => setCharacter(m.uid, e.target.value)} />
+            {(activeSession.members || []).filter(m => !memberPayments[m.uid]?.verified).map(m => {
+              const expanded = expandedMembers.has(m.uid)
+              const myItems = orderArr.filter(x => x.orderedBy?.uid === m.uid)
+              const bill = getMemberBill(m)
+              const myFoodTotal = myItems.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+              const discountPerPerson = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0
+              const toggleMember = () => setExpandedMembers(prev => {
+                const next = new Set(prev)
+                if (next.has(m.uid)) next.delete(m.uid); else next.add(m.uid)
+                return next
+              })
+              return (
+                <div key={m.uid} className={`pos-member-row pos-member-collapsible${expanded ? ' is-expanded' : ''}`}>
+                  {/* ── Collapsed head ── */}
+                  <button
+                    type="button"
+                    onClick={toggleMember}
+                    className="pos-member-head"
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'inherit',
+                    }}
+                  >
+                    {m.avatar
+                      ? <img src={m.avatar} alt="" className="pos-member-avatar" />
+                      : <div className="pos-member-avatar-ph">{(m.name || '?')[0]}</div>
+                    }
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div className="pos-member-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                        {memberPayments[m.uid]?.easyslipPending && (
+                          <span className="pos-member-pending-badge" title="รอ Bangkok Bank ยืนยันอัตโนมัติ">
+                            <i className="fas fa-hourglass-half" /> รอ BK
+                          </span>
+                        )}
+                        {memberPayments[m.uid]?.pendingAdminReview && (
+                          <span
+                            className="pos-member-slip-badge"
+                            onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
+                            title="คลิกตรวจสลิป EasySlip"
+                            role="button"
+                          >
+                            <i className="fas fa-camera" /> ตรวจสลิป
+                          </span>
+                        )}
+                      </div>
+                      {m.character && (
+                        <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <i className="fas fa-user-tag" style={{ marginRight: 4, color: '#c62419', fontSize: 9 }} />{m.character}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 900, color: '#c62419', lineHeight: 1 }}>฿{bill.toLocaleString()}</div>
+                      <div style={{ fontSize: 9.5, color: 'rgba(26,26,26,0.4)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ต้องจ่าย</div>
+                    </div>
+                    <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} style={{ color: 'rgba(26,26,26,0.35)', fontSize: 11, marginLeft: 2 }} />
+                  </button>
+
+                  {/* ── Expanded detail ── */}
+                  {expanded && (
+                    <div style={{
+                      marginTop: 10, paddingTop: 10,
+                      borderTop: '1px dashed rgba(26,26,26,0.1)',
+                      display: 'flex', flexDirection: 'column', gap: 12,
+                    }}>
+                      {/* Character */}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>ตัวละคร</div>
+                        {isLocked ? (
+                          <div style={{ fontSize: 13, fontWeight: 700, color: m.character ? '#1a1a1a' : 'rgba(26,26,26,0.35)', padding: '6px 0' }}>
+                            {m.character || '— ยังไม่กำหนด —'}
+                          </div>
+                        ) : selectedGame?.characters?.length > 0 ? (
+                          <select className="pos-char-select" value={m.character} onChange={e => setCharacter(m.uid, e.target.value)}>
+                            <option value="">— เลือกตัวละคร —</option>
+                            {selectedGame.characters.map((c, i) => (
+                              <option key={i} value={c.name}>{c.name}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input className="pos-char-input" placeholder="ตัวละคร..." value={m.character} onChange={e => setCharacter(m.uid, e.target.value)} />
+                        )}
+                      </div>
+
+                      {/* Items ordered by this member */}
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>รายการที่สั่ง{myItems.length > 0 ? ` · ${myItems.length}` : ''}</span>
+                          {myFoodTotal > 0 && <span style={{ color: '#1a1a1a', fontSize: 10.5 }}>฿{myFoodTotal.toLocaleString()}</span>}
+                        </div>
+                        {myItems.length === 0 ? (
+                          <div style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.3)', padding: '6px 2px' }}>ยังไม่มีรายการ</div>
+                        ) : (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, background: '#fff', borderRadius: 8, padding: '6px 10px', border: '1px solid rgba(26,26,26,0.06)' }}>
+                            {myItems.map((it, i) => (
+                              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#1a1a1a', padding: '2px 0' }}>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {it.name}
+                                  {it.qty > 1 && <span style={{ color: 'rgba(26,26,26,0.5)' }}> ×{it.qty}</span>}
+                                  {it.addons?.length > 0 && <span style={{ color: 'rgba(26,26,26,0.4)', fontSize: 11 }}> ({it.addons.map(a => a.name).join(', ')})</span>}
+                                </span>
+                                <span style={{ fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>฿{(it.totalPrice * it.qty).toLocaleString()}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Breakdown summary */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'rgba(26,26,26,0.6)', background: '#faf7f5', padding: '8px 12px', borderRadius: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                          <span>ค่าเกม / คน</span>
+                          <span>฿{gameUnitPay.toLocaleString()}</span>
+                        </div>
+                        {myFoodTotal > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>อาหาร / เครื่องดื่ม</span>
+                            <span>฿{myFoodTotal.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {discountPerPerson > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
+                            <span>− โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
+                            <span>−฿{discountPerPerson.toLocaleString()}</span>
+                          </div>
+                        )}
+                        {Number(m.personalDiscount) > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
+                            <span>− {m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
+                            <span>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Topup / personal discount */}
+                      {isLocked ? (
+                        Number(m.personalDiscount) > 0 && (
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>ส่วนลดเพิ่มเติม / Topup</div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1a1a1a' }}>
+                              <span style={{ fontWeight: 600 }}>{m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
+                              <span style={{ fontWeight: 800, color: '#c62419' }}>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>ส่วนลดเพิ่มเติม / Topup</div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input
+                              className="pos-personal-disc-note"
+                              placeholder="ชื่อ (เช่น Topup, คูปอง)"
+                              value={m.personalDiscountNote || ''}
+                              onChange={e => setPersonalDiscountNote(m.uid, e.target.value)}
+                              style={{ flex: 1 }}
+                            />
+                            <input
+                              className="pos-personal-disc-amt"
+                              type="number" min="0"
+                              placeholder="฿"
+                              value={m.personalDiscount || ''}
+                              onChange={e => setPersonalDiscount(m.uid, e.target.value)}
+                              style={{ width: 90 }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Remove member */}
+                      {!isLocked && (
+                        <button
+                          type="button"
+                          onClick={() => removeMember(m.uid)}
+                          style={{
+                            padding: '8px 12px', borderRadius: 10,
+                            background: 'rgba(26,26,26,0.04)', border: '1px solid rgba(26,26,26,0.08)',
+                            color: 'rgba(26,26,26,0.6)', cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            fontFamily: "'Sarabun', sans-serif", transition: 'all 0.14s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(198,36,25,0.08)'; e.currentTarget.style.color = '#c62419'; e.currentTarget.style.borderColor = 'rgba(198,36,25,0.3)' }}
+                          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(26,26,26,0.04)'; e.currentTarget.style.color = 'rgba(26,26,26,0.6)'; e.currentTarget.style.borderColor = 'rgba(26,26,26,0.08)' }}
+                        >
+                          <i className="fas fa-user-minus" style={{ fontSize: 10 }} /> ลบสมาชิกออก
+                        </button>
+                      )}
+                    </div>
                   )}
-                  <div className="pos-personal-disc-row">
-                    <input
-                      className="pos-personal-disc-amt"
-                      type="number" min="0"
-                      placeholder="ส่วนลด ฿"
-                      value={m.personalDiscount || ''}
-                      onChange={e => setPersonalDiscount(m.uid, e.target.value)}
-                    />
-                    <input
-                      className="pos-personal-disc-note"
-                      placeholder="เหตุผล เช่น คูปอง"
-                      value={m.personalDiscountNote || ''}
-                      onChange={e => setPersonalDiscountNote(m.uid, e.target.value)}
-                    />
-                  </div>
                 </div>
-                <button className="pos-remove-btn" onClick={() => removeMember(m.uid)}><i className="fas fa-times" /></button>
-              </div>
-            ))}
+              )
+            })}
 
             {/* Paid members — collapsible */}
             {activeSession.members.filter(m => memberPayments[m.uid]?.verified).length > 0 && (
@@ -1252,7 +1831,14 @@ export default function POSPage({
 
           <div className="pos-section-title"><i className="fas fa-scroll" /> เกม</div>
 
-          {/* Searchable game picker */}
+          {/* Searchable game picker — read-only when locked */}
+          {isLocked ? (
+            <div style={{ margin: '0 18px', padding: '10px 12px', background: '#faf7f5', border: '1px solid rgba(26,26,26,0.06)', borderRadius: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: selectedGame ? '#1a1a1a' : 'rgba(26,26,26,0.35)' }}>
+                {selectedGame ? selectedGame.title : '— ไม่ได้เลือกเกม —'}
+              </div>
+            </div>
+          ) : (
           <div style={{ position: 'relative', margin: '0 18px' }}>
             <div
               style={{
@@ -1321,99 +1907,172 @@ export default function POSPage({
               </div>
             )}
           </div>
+          )}
 
-          {/* Event name + custom price */}
-          <div style={{ margin: '6px 18px 0', display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1 }}>
-              <label className="form-label">Event พิเศษ</label>
-              <input
-                className="form-input"
-                placeholder="เช่น วันเกิด, บริษัท A..."
-                value={activeSession.eventName || ''}
-                onChange={e => updateActive({ eventName: e.target.value })}
-              />
-            </div>
-            <div style={{ width: 110 }}>
-              <label className="form-label">ราคา/คน (฿)</label>
-              <input
-                className="form-input"
-                type="number"
-                min="0"
-                placeholder={selectedGame ? `${selectedGame.payPrice ?? selectedGame.price ?? 0}` : '0'}
-                value={activeSession.customPrice}
-                onChange={e => updateActive({ customPrice: e.target.value })}
-              />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: 4 }}>
-            <div className="form-group">
-              <label className="form-label">DM</label>
-              <select className="form-select" value={activeSession.dmUid || ''} onChange={e => {
-                const member = adminMembers.find(a => a.id === e.target.value)
-                updateActive({
-                  dmUid: e.target.value || null,
-                  dm: member ? (member.nickname || member.firstname || '') : '',
-                })
-              }}>
-                <option value="">— เลือก DM —</option>
-                {adminMembers.map(a => (
-                  <option key={a.id} value={a.id}>
-                    {a.nickname || a.firstname} {a.lastname || ''}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">NPC</label>
-              <input
-                className="form-input"
-                placeholder="ชื่อ NPC..."
-                value={activeSession.npc || ''}
-                onChange={e => updateActive({ npc: e.target.value })}
-              />
-            </div>
-          </div>
-          <div className="form-group" style={{ marginTop: 4 }}>
-            <label className="form-label">ห้อง</label>
-            <select className="form-select" value={activeSession.room} onChange={e => updateActive({ room: e.target.value })}>
-              <option value="">— เลือกห้อง —</option>
-              {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
-            </select>
-          </div>
-
-          <div className="pos-divider" />
-
-          <div className="pos-section-title"><i className="fas fa-tag" /> โปรโมชัน / ส่วนลด</div>
-          <div className="pos-promo-wrap">
-            <input
-              className="pos-promo-name-input"
-              placeholder="ชื่อโปร เช่น วันเกิด, สมาชิก..."
-              value={activeSession.promoName || ''}
-              onChange={e => updateActive({ promoName: e.target.value })}
-            />
-            <div className="pos-promo-amount-row">
-              <span className="pos-promo-label">ลดราคา</span>
-              <input
-                className="pos-promo-amount-input"
-                type="number"
-                min="0"
-                placeholder="0"
-                value={activeSession.discount || ''}
-                onChange={e => updateActive({ discount: Number(e.target.value) || 0 })}
-              />
-              <span className="pos-promo-unit">บาท</span>
-            </div>
-            {discount > 0 && (
-              <div className="pos-promo-preview">
-                <i className="fas fa-check-circle" /> {activeSession.promoName || 'ส่วนลด'} −฿{discount.toLocaleString()}
+          {isLocked ? (
+            ((activeSession.dm || activeSession.npc || activeSession.room) && (
+              <div style={{ margin: '8px 18px 20px', padding: '8px 12px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {activeSession.dm && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>DM</span>
+                    <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{activeSession.dm}</span>
+                  </div>
+                )}
+                {activeSession.npc && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>NPC</span>
+                    <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{activeSession.npc}</span>
+                  </div>
+                )}
+                {activeSession.room && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>ห้อง</span>
+                    <span style={{ fontWeight: 700, color: '#c62419' }}>{activeSession.room}</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+            )) || null
+          ) : (
+            <>
+              <div className="form-row" style={{ marginTop: 4 }}>
+                <div className="form-group">
+                  <label className="form-label">DM</label>
+                  <select className="form-select" value={activeSession.dmUid || ''} onChange={e => {
+                    const member = adminMembers.find(a => a.id === e.target.value)
+                    updateActive({
+                      dmUid: e.target.value || null,
+                      dm: member ? (member.nickname || member.firstname || '') : '',
+                    })
+                  }}>
+                    <option value="">— เลือก DM —</option>
+                    {adminMembers.map(a => (
+                      <option key={a.id} value={a.id}>
+                        {a.nickname || a.firstname} {a.lastname || ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">NPC</label>
+                  <input
+                    className="form-input"
+                    placeholder="ชื่อ NPC..."
+                    value={activeSession.npc || ''}
+                    onChange={e => updateActive({ npc: e.target.value })}
+                  />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: 4 }}>
+                <label className="form-label">ห้อง</label>
+                <select className="form-select" value={activeSession.room} onChange={e => updateActive({ room: e.target.value })}>
+                  <option value="">— เลือกห้อง —</option>
+                  {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+            </>
+          )}
+
+          {/* Promo + mode toggle — show locked summary or full editor */}
+          {isLocked ? (
+            (totalDiscount > 0 || activeSession.promoName) && (
+              <>
+                <div className="pos-divider" />
+                <div className="pos-section-title"><i className="fas fa-tag" /> โปรโมชัน / ส่วนลด</div>
+                <div style={{ margin: '0 18px 14px', padding: '12px 14px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {activeSession.promoName || 'ส่วนลด'}
+                    </span>
+                    <span style={{ fontSize: 15, fontWeight: 900, color: '#c62419', flexShrink: 0 }}>
+                      −฿{totalDiscount.toLocaleString()}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', display: 'flex', justifyContent: 'space-between' }}>
+                    <span>{discountMode === 'split' ? 'เฉลี่ยทั้งตี้' : 'คนต่อคน'}</span>
+                    <span>คนละ ฿{discount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+              </>
+            )
+          ) : (
+            <>
+              <div className="pos-divider" />
+              <div className="pos-section-title"><i className="fas fa-tag" /> โปรโมชัน / ส่วนลด</div>
+              <div className="pos-promo-wrap">
+                <input
+                  className="pos-promo-name-input"
+                  placeholder="ชื่อโปร เช่น วันเกิด, สมาชิก..."
+                  value={activeSession.promoName || ''}
+                  onChange={e => updateActive({ promoName: e.target.value })}
+                />
+
+                {/* Mode toggle */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 4,
+                  padding: 3, background: '#f0ebe9', borderRadius: 10,
+                }}>
+                  {[
+                    { key: 'perPerson', label: 'คนต่อคน', hint: 'ลดคนละเท่ากัน' },
+                    { key: 'split', label: 'เฉลี่ยทั้งตี้', hint: 'หารเฉลี่ย' },
+                  ].map(opt => {
+                    const active = discountMode === opt.key
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => updateActive({ discountMode: opt.key })}
+                        style={{
+                          padding: '7px 8px', borderRadius: 8,
+                          background: active ? '#ffffff' : 'transparent',
+                          color: active ? '#1a1a1a' : 'rgba(26,26,26,0.55)',
+                          border: 'none', cursor: 'pointer',
+                          fontSize: 12, fontWeight: 800,
+                          boxShadow: active ? '0 2px 6px rgba(26,26,26,0.08)' : 'none',
+                          fontFamily: "'Sarabun', sans-serif",
+                          display: 'flex', flexDirection: 'column', gap: 1, lineHeight: 1.1,
+                        }}
+                      >
+                        <span>{opt.label}</span>
+                        <span style={{ fontSize: 9.5, fontWeight: 600, color: active ? 'rgba(26,26,26,0.5)' : 'rgba(26,26,26,0.4)', letterSpacing: 0 }}>{opt.hint}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <div className="pos-promo-amount-row">
+                  <span className="pos-promo-label">{discountMode === 'split' ? 'ลดรวม' : 'ลดคนละ'}</span>
+                  <input
+                    className="pos-promo-amount-input"
+                    type="number"
+                    min="0"
+                    placeholder="0"
+                    value={activeSession.discount || ''}
+                    onChange={e => updateActive({ discount: Number(e.target.value) || 0 })}
+                  />
+                  <span className="pos-promo-unit">บาท</span>
+                </div>
+
+                {discountRaw > 0 && (
+                  <div className="pos-promo-preview" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <div>
+                      <i className="fas fa-check-circle" /> {activeSession.promoName || 'ส่วนลด'} · รวม <strong>−฿{totalDiscount.toLocaleString()}</strong>
+                    </div>
+                    {sessionMembers.length > 0 && (
+                      <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.55)', paddingLeft: 18 }}>
+                        {discountMode === 'split'
+                          ? `หารเฉลี่ย ${sessionMembers.length} คน = คนละ ฿${discount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                          : `${sessionMembers.length} คน × ฿${discountRaw.toLocaleString()}`}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
 
         {/* MIDDLE — menu */}
-        <div className="pos-middle">
+        <div className={`pos-middle${isLocked ? ' is-locked' : ''}`}>
           <div className="pos-section-title"><i className="fas fa-utensils" /> เมนูอาหาร</div>
 
           {menuItems.length > 0 && (
@@ -1434,11 +2093,11 @@ export default function POSPage({
                 )}
               </div>
               <div className="pos-menu-cat-chips">
-                {menuCategories.map(cat => (
+                {menuCategories.filter(c => c !== 'ทั้งหมด').map(cat => (
                   <button
                     key={cat}
                     className={`pos-menu-cat-chip${menuCategory === cat ? ' active' : ''}`}
-                    onClick={() => setMenuCategory(cat)}
+                    onClick={() => setMenuCategory(menuCategory === cat ? 'ทั้งหมด' : cat)}
                   >
                     {cat}
                   </button>
@@ -1498,120 +2157,196 @@ export default function POSPage({
 
         {/* RIGHT — order summary */}
         <div className="pos-right">
-          <div className="pos-section-title"><i className="fas fa-receipt" /> สรุปออเดอร์</div>
+          <div className="pos-section-title">
+            <i className="fas fa-receipt" /> สรุปออเดอร์
+            {orderArr.length > 0 && (
+              <span style={{ marginLeft: 'auto', fontWeight: 800, color: 'rgba(26,26,26,0.5)', textTransform: 'none', letterSpacing: 0, fontSize: 11, padding: '2px 9px', borderRadius: 999, background: 'rgba(26,26,26,0.05)' }}>
+                {orderArr.length} รายการ
+              </span>
+            )}
+          </div>
 
           <div className="pos-right-content">
             <div className="pos-summary">
+              {/* Game card */}
               {selectedGame && (
-                <div className="pos-summary-game-card">
-                  <div className="pos-summary-game-title">
-                    <i className="fas fa-scroll" /> {selectedGame.title}
-                  </div>
-                  <div className="pos-summary-game-meta">
-                    {selectedGame.players && (
-                      <span><i className="fas fa-users" /> รองรับ {selectedGame.players} คน</span>
-                    )}
-                    {selectedGame.time && (
-                      <span><i className="fas fa-clock" /> {selectedGame.time}</span>
-                    )}
-                  </div>
-                  {gameUnitPay > 0 && (
-                    <div className="pos-summary-game-calc">
-                      <span className="pos-calc-label">ราคาเกม</span>
-                      <span className="pos-calc-formula">
-                        ฿{gameUnitPay} × {activeSession.members.length} คน
-                      </span>
-                      <span className="pos-calc-result">฿{gamePrice.toLocaleString()}</span>
+                <div style={{
+                  padding: '14px 14px', borderRadius: 14,
+                  background: 'linear-gradient(135deg, #faf7f5 0%, #ffffff 100%)',
+                  border: '1px solid rgba(26,26,26,0.06)',
+                  display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <i className="fas fa-scroll" style={{ color: '#c62419', fontSize: 13 }} />
                     </div>
-                  )}
-                  {gameUnitPay === 0 && (
-                    <div className="pos-summary-game-free">ฟรี</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedGame.title}</div>
+                      <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 1, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        {selectedGame.players && <span><i className="fas fa-users" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.players} คน</span>}
+                        {selectedGame.time && <span><i className="fas fa-clock" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.time}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  {gameUnitPay > 0 ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
+                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>฿{gameUnitPay.toLocaleString()} × {activeSession.members.length} คน</span>
+                      <span style={{ fontSize: 16, fontWeight: 900, color: '#c62419' }}>฿{gamePrice.toLocaleString()}</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
+                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>ค่าเกม</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#c8a050' }}>ฟรี</span>
+                    </div>
                   )}
                 </div>
               )}
-              {orderArr.map(x => (
-                <div key={x.key} className="pos-summary-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                    <div className="pos-summary-row-left">
-                      <span>{x.name} × {x.qty}</span>
-                      {x.addons?.length > 0 && (
-                        <div className="pos-summary-addons">{x.addons.map(a => a.name).join(', ')}</div>
-                      )}
-                    </div>
-                    <div className="pos-summary-row-right">
-                      <span>฿{(x.totalPrice * x.qty).toLocaleString()}</span>
-                      <button className="pos-summary-void" onClick={() => voidItem(x.key)} title="ยกเลิกรายการนี้">
-                        <i className="fas fa-trash-alt" />
-                      </button>
-                    </div>
+
+              {/* Food/drink items */}
+              {orderArr.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 2px 6px' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                      <i className="fas fa-utensils" style={{ color: '#c62419', marginRight: 5, fontSize: 10 }} />
+                      อาหาร / เครื่องดื่ม
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#1a1a1a' }}>฿{foodTotal.toLocaleString()}</span>
                   </div>
-                  {/* Bill owner row */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    {editingBillKey === x.key ? (
-                      <>
-                        {activeSession.members.map(m => (
-                          <button key={m.uid} onClick={() => assignBillOwner(x.key, { uid: m.uid, name: m.name, avatar: m.avatar || '' })} style={{
-                            fontSize: 10, padding: '3px 8px', borderRadius: 12,
-                            background: x.orderedBy?.uid === m.uid ? 'var(--crimson-500)' : 'rgba(0,0,0,0.06)',
-                            color: x.orderedBy?.uid === m.uid ? '#fff' : 'var(--text-secondary)',
-                            border: `1px solid ${x.orderedBy?.uid === m.uid ? 'var(--crimson-500)' : 'var(--border-default)'}`,
-                            cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
-                          }}>
-                            {(m.name || '').split(' ')[0]}
-                          </button>
-                        ))}
-                        {x.orderedBy && (
-                          <button onClick={() => assignBillOwner(x.key, null)} style={{
-                            fontSize: 10, padding: '3px 8px', borderRadius: 12,
-                            background: 'rgba(198,36,25,0.08)', color: 'var(--crimson-500)',
-                            border: '1px solid rgba(198,36,25,0.25)', cursor: 'pointer',
-                            fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
-                          }}>
-                            <i className="fas fa-times" /> ล้าง
-                          </button>
-                        )}
-                        <button onClick={() => setEditingBillKey(null)} style={{
-                          fontSize: 10, padding: '3px 6px', borderRadius: 12,
-                          background: 'transparent', color: 'var(--text-tertiary)',
-                          border: '1px solid var(--border-default)', cursor: 'pointer',
-                        }}>
-                          <i className="fas fa-check" />
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => setEditingBillKey(x.key)} style={{
-                        fontSize: 10, padding: '3px 8px', borderRadius: 12,
-                        background: x.orderedBy ? 'rgba(198,36,25,0.08)' : 'rgba(0,0,0,0.04)',
-                        color: x.orderedBy ? 'var(--crimson-500)' : 'var(--text-tertiary)',
-                        border: `1px solid ${x.orderedBy ? 'rgba(198,36,25,0.25)' : 'var(--border-default)'}`,
-                        cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
+                  <div style={{ display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: 12, border: '1px solid rgba(26,26,26,0.06)', overflow: 'hidden' }}>
+                    {orderArr.map((x, i) => (
+                      <div key={x.key} style={{
+                        padding: '10px 12px',
+                        borderTop: i > 0 ? '1px solid rgba(26,26,26,0.05)' : 'none',
+                        display: 'flex', flexDirection: 'column', gap: 6,
                       }}>
-                        <i className="fas fa-user-tag" style={{ marginRight: 4 }} />
-                        {x.orderedBy ? x.orderedBy.name.split(' ')[0] : 'ระบุเจ้าบิล'}
-                      </button>
-                    )}
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', lineHeight: 1.3 }}>
+                              {x.name} <span style={{ color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>× {x.qty}</span>
+                            </div>
+                            {x.addons?.length > 0 && (
+                              <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
+                                {x.addons.map(a => a.name).join(', ')}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a' }}>฿{(x.totalPrice * x.qty).toLocaleString()}</span>
+                            {!isLocked && (
+                              <button onClick={() => voidItem(x.key)} title="ยกเลิกรายการนี้" style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(26,26,26,0.04)', border: 'none', color: 'rgba(26,26,26,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(198,36,25,0.1)'; e.currentTarget.style.color = '#c62419' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(26,26,26,0.04)'; e.currentTarget.style.color = 'rgba(26,26,26,0.4)' }}
+                              >
+                                <i className="fas fa-trash-alt" style={{ fontSize: 10 }} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bill owner — compact chip row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                          {editingBillKey === x.key ? (
+                            <>
+                              {activeSession.members.map(m => (
+                                <button key={m.uid} onClick={() => assignBillOwner(x.key, { uid: m.uid, name: m.name, avatar: m.avatar || '' })} style={{
+                                  fontSize: 10.5, padding: '3px 8px', borderRadius: 999,
+                                  background: x.orderedBy?.uid === m.uid ? '#c62419' : '#faf7f5',
+                                  color: x.orderedBy?.uid === m.uid ? '#fff' : '#1a1a1a',
+                                  border: `1px solid ${x.orderedBy?.uid === m.uid ? '#c62419' : 'rgba(26,26,26,0.1)'}`,
+                                  cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 700,
+                                }}>
+                                  {(m.name || '').split(' ')[0]}
+                                </button>
+                              ))}
+                              {x.orderedBy && (
+                                <button onClick={() => assignBillOwner(x.key, null)} style={{
+                                  fontSize: 10.5, padding: '3px 8px', borderRadius: 999,
+                                  background: 'transparent', color: 'rgba(26,26,26,0.5)',
+                                  border: '1px solid rgba(26,26,26,0.14)', cursor: 'pointer',
+                                  fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
+                                }}>ล้าง</button>
+                              )}
+                              <button onClick={() => setEditingBillKey(null)} style={{
+                                fontSize: 10, padding: '3px 7px', borderRadius: 999,
+                                background: '#1a1a1a', color: '#fff', border: 'none', cursor: 'pointer',
+                                fontWeight: 700,
+                              }}>
+                                <i className="fas fa-check" /> เสร็จ
+                              </button>
+                            </>
+                          ) : isLocked ? (
+                            x.orderedBy && (
+                              <span style={{
+                                fontSize: 10.5, padding: '2px 8px', borderRadius: 999,
+                                background: 'rgba(198,36,25,0.07)', color: '#c62419',
+                                border: '1px solid rgba(198,36,25,0.2)', fontWeight: 700,
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}>
+                                <i className="fas fa-user" style={{ fontSize: 8 }} />{x.orderedBy.name.split(' ')[0]}
+                              </span>
+                            )
+                          ) : (
+                            <button onClick={() => setEditingBillKey(x.key)} style={{
+                              fontSize: 10.5, padding: '3px 9px', borderRadius: 999,
+                              background: x.orderedBy ? 'rgba(198,36,25,0.08)' : 'transparent',
+                              color: x.orderedBy ? '#c62419' : 'rgba(26,26,26,0.45)',
+                              border: `1px dashed ${x.orderedBy ? 'rgba(198,36,25,0.3)' : 'rgba(26,26,26,0.15)'}`,
+                              cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 700,
+                            }}>
+                              <i className="fas fa-user-tag" style={{ marginRight: 4, fontSize: 9 }} />
+                              {x.orderedBy ? x.orderedBy.name.split(' ')[0] : 'ระบุเจ้าบิล'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              ))}
-              {totalDiscount > 0 && (
-                <div className="pos-summary-discount">
-                  <span><i className="fas fa-tag" /> {activeSession.promoName || 'ส่วนลด'}{activeSession.members.length > 0 && ` (฿${discount}×${activeSession.members.length}คน)`}</span>
-                  <span>−฿{totalDiscount.toLocaleString()}</span>
+                </>
+              )}
+
+              {/* Discounts */}
+              {(totalDiscount > 0 || activeSession.members.some(m => Number(m.personalDiscount) > 0)) && (
+                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(198,36,25,0.04)', border: '1px solid rgba(198,36,25,0.15)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {totalDiscount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.75)' }}>
+                        <i className="fas fa-tag" style={{ color: '#c62419', fontSize: 10, marginRight: 5 }} />
+                        {activeSession.promoName || 'ส่วนลด'}
+                        <span style={{ color: 'rgba(26,26,26,0.4)', fontSize: 10, marginLeft: 4 }}>
+                          ({discountMode === 'split' ? 'เฉลี่ย' : `฿${discountRaw}×${activeSession.members.length}`})
+                        </span>
+                      </span>
+                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{totalDiscount.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {activeSession.members.filter(m => Number(m.personalDiscount) > 0).map(m => (
+                    <div key={m.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.65)' }}>
+                        <i className="fas fa-user-tag" style={{ color: '#c62419', fontSize: 9, marginRight: 5 }} />
+                        {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}
+                      </span>
+                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                    </div>
+                  ))}
                 </div>
               )}
-              {activeSession.members.filter(m => Number(m.personalDiscount) > 0).map(m => (
-                <div key={m.uid} className="pos-summary-discount personal">
-                  <span><i className="fas fa-user-tag" /> {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}</span>
-                  <span>−฿{Number(m.personalDiscount).toLocaleString()}</span>
-                </div>
-              ))}
+
+              {/* Grand total hero */}
               {(selectedGame || orderArr.length > 0) ? (
-                <div className="pos-summary-total">
-                  <span>ยอดรวม</span>
-                  <span>฿{grandTotal.toLocaleString()}</span>
+                <div style={{
+                  marginTop: 12, padding: '14px 16px', borderRadius: 14,
+                  background: 'linear-gradient(135deg, #c62419 0%, #9a1c13 100%)',
+                  color: '#fff', boxShadow: '0 6px 20px rgba(198,36,25,0.3)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.85 }}>ยอดรวม</span>
+                  <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>฿{grandTotal.toLocaleString()}</span>
                 </div>
               ) : (
-                <div className="pos-empty">ยังไม่มีรายการ</div>
+                <div style={{ padding: '28px 18px', textAlign: 'center', color: 'rgba(26,26,26,0.3)', fontSize: 13 }}>
+                  <i className="fas fa-receipt" style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
+                  ยังไม่มีรายการ
+                </div>
               )}
             </div>
 
@@ -1708,41 +2443,116 @@ export default function POSPage({
             )}
           </div>
 
-          <div className="pos-right-footer">
-            <button className="pos-confirm-btn" onClick={handleConfirm} disabled={saving}>
-              {saving
-                ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-                : activeSession.confirmedOrderId
-                  ? <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
-                  : <><i className="fas fa-check-circle" /> ยืนยันออเดอร์</>
-              }
-            </button>
-            {activeSession.confirmedOrderId && !allMembersPaid && (
-              <button className="pos-pay-btn" onClick={() => setShowPayment(true)}>
-                <i className="fas fa-qrcode" /> ชำระเงิน{remainingAmount < grandTotal && grandTotal > 0 ? ` ฿${remainingAmount.toLocaleString()}` : ''}
+          <div className="pos-right-footer" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px 14px', borderTop: '1px solid rgba(26,26,26,0.06)' }}>
+            {/* Primary action — Pay if confirmed+unpaid, else Confirm/Update */}
+            {activeSession.confirmedOrderId && !allMembersPaid ? (
+              <button
+                onClick={() => setShowPayment(true)}
+                style={{
+                  width: '100%', padding: '14px 16px', borderRadius: 12,
+                  background: '#c62419', color: '#fff', border: 'none',
+                  fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  fontFamily: "'Sarabun', sans-serif",
+                  boxShadow: '0 6px 18px rgba(198,36,25,0.3)',
+                  transition: 'all 0.14s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#9a1c13'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#c62419'; e.currentTarget.style.transform = 'translateY(0)' }}
+              >
+                <i className="fas fa-qrcode" />
+                ชำระเงิน{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
+              </button>
+            ) : (
+              <button
+                onClick={handleConfirm}
+                disabled={saving}
+                style={{
+                  width: '100%', padding: '14px 16px', borderRadius: 12,
+                  background: saving ? '#f0ebe9' : (activeSession.confirmedOrderId ? '#1a1a1a' : '#c62419'),
+                  color: saving ? 'rgba(26,26,26,0.4)' : '#fff', border: 'none',
+                  fontSize: 14.5, fontWeight: 800, cursor: saving ? 'wait' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  fontFamily: "'Sarabun', sans-serif",
+                  boxShadow: saving ? 'none' : (activeSession.confirmedOrderId ? '0 6px 18px rgba(26,26,26,0.2)' : '0 6px 18px rgba(198,36,25,0.3)'),
+                }}
+              >
+                {saving
+                  ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                  : activeSession.confirmedOrderId
+                    ? <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                    : <><i className="fas fa-check-circle" /> ยืนยันออเดอร์</>
+                }
               </button>
             )}
-            {activeSession.confirmedOrderId && (
-              <button className="pos-void-btn" onClick={async () => {
-                if (!window.confirm('ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR')) return
-                try {
-                  await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
-                    status: 'closed', closedAt: serverTimestamp()
-                  })
-                  const remaining = sessions.filter(s => s.id !== activeId)
-                  if (remaining.length === 0) {
-                    const fresh = newPOSSession()
-                    setSessions([fresh]); setActiveId(fresh.id)
-                  } else {
-                    setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
-                  }
-                  showToast('ยกเลิกตี้แล้ว')
-                } catch (e) { showToast('ยกเลิกล้มเหลว', 'error') }
-              }}>
-                <i className="fas fa-ban" /> ยกเลิกตี้
+
+            {/* When already confirmed+unpaid: show secondary Update option */}
+            {activeSession.confirmedOrderId && !allMembersPaid && editingUnlocked && (
+              <button
+                onClick={handleConfirm}
+                disabled={saving}
+                style={{
+                  width: '100%', padding: '10px 14px', borderRadius: 10,
+                  background: '#ffffff', color: '#1a1a1a',
+                  border: '1px solid rgba(26,26,26,0.14)',
+                  fontSize: 12.5, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                {saving
+                  ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                  : <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                }
               </button>
             )}
-            <button className="pos-cancel-btn" onClick={onClose}>ปิดหน้า POS</button>
+
+            {/* Secondary ghost actions row */}
+            <div style={{ display: 'flex', gap: 6 }}>
+              {activeSession.confirmedOrderId && (
+                <button
+                  onClick={async () => {
+                    if (!window.confirm('ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR')) return
+                    try {
+                      await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+                        status: 'closed', closedAt: serverTimestamp()
+                      })
+                      const remaining = sessions.filter(s => s.id !== activeId)
+                      if (remaining.length === 0) {
+                        const fresh = newPOSSession()
+                        setSessions([fresh]); setActiveId(fresh.id)
+                      } else {
+                        setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
+                      }
+                      showToast('ยกเลิกตี้แล้ว')
+                    } catch (e) { showToast('ยกเลิกล้มเหลว', 'error') }
+                  }}
+                  style={{
+                    flex: 1, padding: '9px 10px', borderRadius: 10,
+                    background: 'rgba(198,36,25,0.06)', color: '#c62419',
+                    border: '1px solid rgba(198,36,25,0.22)',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    fontFamily: "'Sarabun', sans-serif",
+                  }}
+                >
+                  <i className="fas fa-ban" style={{ fontSize: 10 }} /> ยกเลิกตี้
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                style={{
+                  flex: 1, padding: '9px 10px', borderRadius: 10,
+                  background: 'transparent', color: 'rgba(26,26,26,0.55)',
+                  border: '1px solid rgba(26,26,26,0.12)',
+                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                <i className="fas fa-times" style={{ fontSize: 10 }} /> ปิดหน้า POS
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -1877,6 +2687,7 @@ export default function POSPage({
           </div>
         </div>
       )}
+
     </div>
   )
 }

@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
+import {
+  DEFAULT_RECEIPT_SETTINGS, AVAILABLE_FONTS, SEPARATOR_STYLES,
+  PAPER_WIDTHS, FONT_WEIGHTS, buildSlipHTML, buildKitchenTicketHTML, fmtSlipDT
+} from '../constants/receipt'
 import { auth, db } from '../firebase'
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'firebase/auth'
 import { collection, onSnapshot, doc, getDoc, deleteDoc, updateDoc, setDoc, serverTimestamp, addDoc, query, orderBy, limit, getDocs, where, Timestamp, writeBatch } from 'firebase/firestore'
@@ -1053,6 +1057,939 @@ function PaymentTab({ showToast }) {
       <button className="adm-btn-red" style={{ marginTop: 20, width: '100%', padding: 14 }} onClick={save} disabled={saving}>
         {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึก</>}
       </button>
+    </div>
+  )
+}
+
+// ─── Receipt & Slip Settings Tab ("แก้ไขบิล") ──────────────────────────────────
+function ReceiptSettingsTab({ showToast }) {
+  const [settings, setSettings] = useState(DEFAULT_RECEIPT_SETTINGS)
+  const [activeSubTab, setActiveSubTab] = useState('payment') // 'payment' | 'orderIn' | 'company'
+  const [previewMode, setPreviewMode] = useState('payment')   // 'payment' | 'orderIn'
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'receipt'))
+      .then(snap => {
+        if (snap.exists()) {
+          const data = snap.data()
+          setSettings({
+            ...DEFAULT_RECEIPT_SETTINGS,
+            ...data,
+            paymentSlip: { ...DEFAULT_RECEIPT_SETTINGS.paymentSlip, ...(data.paymentSlip || {}) },
+            orderIn: { ...DEFAULT_RECEIPT_SETTINGS.orderIn, ...(data.orderIn || {}) },
+          })
+        }
+      })
+      .catch(e => console.warn('Load receipt settings error:', e))
+      .finally(() => setLoading(false))
+  }, [])
+
+  const updatePayment = (k, v) => {
+    setSettings(prev => ({
+      ...prev,
+      paymentSlip: { ...prev.paymentSlip, [k]: v }
+    }))
+  }
+
+  const updateOrderIn = (k, v) => {
+    setSettings(prev => ({
+      ...prev,
+      orderIn: { ...prev.orderIn, [k]: v }
+    }))
+  }
+
+  const updateCompany = (k, v) => {
+    setSettings(prev => ({
+      ...prev,
+      [k]: v
+    }))
+  }
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      await setDoc(doc(db, 'settings', 'receipt'), {
+        ...settings,
+        updatedAt: serverTimestamp(),
+      })
+      showToast('บันทึกการตั้งค่าบิลสำเร็จ ✓')
+    } catch (err) {
+      console.error('Save receipt settings error:', err)
+      showToast('บันทึกล้มเหลว: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleReset = () => {
+    if (!window.confirm('คุณต้องการรีเซ็ตการตั้งค่าบิลและสลีปทั้งหมดกลับเป็นค่าเริ่มต้นใช่หรือไม่?')) return
+    setSettings(DEFAULT_RECEIPT_SETTINGS)
+    showToast('รีเซ็ตเป็นค่าเริ่มต้นแล้ว (อย่าลืมกดบันทึก)')
+  }
+
+  const handlePrintTest = () => {
+    const now = new Date()
+    let html = ''
+    if (previewMode === 'payment') {
+      html = buildSlipHTML({
+        serial: 42,
+        members: [{ name: 'คุณวิน' }, { name: 'คุณเต้ย' }, { name: 'คุณพลอย' }, { name: 'คุณนก' }],
+        room: 'VIP 2',
+        scriptTitle: 'พันธสัญญาปีศาจ',
+        gameUnitPrice: 400,
+        gameTotal: 1600,
+        foodItems: [
+          { name: 'เกี๊ยวซ่าทอด', qty: 2, price: 99, addons: [{ name: 'ชีส' }] },
+          { name: 'โค้กซีโร่', qty: 4, price: 35 },
+          { name: 'เฟรนช์ฟรายส์', qty: 1, price: 89, addons: [{ name: 'ซอสทรัฟเฟิล' }] },
+        ],
+        discount: { applied: 100, type: 'baht', value: 100 },
+        grandTotal: 1827,
+        openAt: new Date(now.getTime() - 7200000),
+        printAt: now,
+        printCount: 1,
+      }, settings)
+    } else {
+      html = buildKitchenTicketHTML([
+        { name: 'เกี๊ยวซ่าทอด', qty: 2, price: 99, totalPrice: 198, orderedBy: { name: 'คุณวิน' }, addons: [{ name: 'ชีส', price: 20 }] },
+        { name: 'เฟรนช์ฟรายส์', qty: 1, price: 89, totalPrice: 89, orderedBy: { name: 'คุณเต้ย' }, addons: [{ name: 'ซอสทรัฟเฟิล', price: 25 }] },
+        { name: 'โค้กซีโร่', qty: 4, price: 35, totalPrice: 140, orderedBy: { name: 'คุณพลอย' } },
+      ], {
+        room: 'VIP 2',
+        members: [1, 2, 3, 4],
+      }, now, false, settings)
+    }
+
+    const win = window.open('', '_blank', 'width=420,height=800,scrollbars=yes')
+    if (win) {
+      win.document.write(html)
+      win.document.close()
+      setTimeout(() => { win.focus(); win.print() }, 300)
+    }
+  }
+
+  if (loading) return <div className="adm-loading"><div className="spinner" /></div>
+
+  const ps = settings.paymentSlip || DEFAULT_RECEIPT_SETTINGS.paymentSlip
+  const oi = settings.orderIn || DEFAULT_RECEIPT_SETTINGS.orderIn
+
+  return (
+    <div className="adm-bill-editor-root">
+      {/* ── Top Bar with Actions ── */}
+      <div className="adm-bill-topbar">
+        <div>
+          <h3 className="adm-bill-top-title">
+            <i className="fas fa-file-invoice-dollar" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
+            ตั้งค่าแก้ไขบิล & สลีป (Receipt & Slip Editor)
+          </h3>
+          <p className="adm-bill-top-sub">
+            ปรับแต่งฟอนต์ ขนาดตัวอักษร ความหนา รูปแบบกระดาษ และรายละเอียดในบิลชำระเงิน หรือ Order In เข้าครัว
+          </p>
+        </div>
+        <div className="adm-bill-top-actions">
+          <button className="adm-btn-outline" onClick={handlePrintTest} title="ทดสอบพิมพ์ออกทางเครื่องพิมพ์จริง">
+            <i className="fas fa-print" /> ทดสอบพิมพ์
+          </button>
+          <button className="adm-btn-outline" onClick={handleReset} title="คืนค่าเริ่มต้น">
+            <i className="fas fa-undo" /> ค่าเริ่มต้น
+          </button>
+          <button className="adm-btn-red" onClick={handleSave} disabled={saving}>
+            {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกการตั้งค่า</>}
+          </button>
+        </div>
+      </div>
+
+      {/* ── Main Two-Column Layout ── */}
+      <div className="adm-bill-layout">
+
+        {/* ── LEFT COLUMN: Configuration Controls ── */}
+        <div className="adm-bill-controls-col">
+          {/* Sub Tab Switcher */}
+          <div className="adm-bill-tabs">
+            <button
+              className={`adm-bill-tab${activeSubTab === 'payment' ? ' active' : ''}`}
+              onClick={() => { setActiveSubTab('payment'); setPreviewMode('payment') }}
+            >
+              <i className="fas fa-receipt" /> ใบสลีปชำระเงิน
+            </button>
+            <button
+              className={`adm-bill-tab${activeSubTab === 'orderIn' ? ' active' : ''}`}
+              onClick={() => { setActiveSubTab('orderIn'); setPreviewMode('orderIn') }}
+            >
+              <i className="fas fa-utensils" /> Order In (ครัว/บาร์)
+            </button>
+            <button
+              className={`adm-bill-tab${activeSubTab === 'company' ? ' active' : ''}`}
+              onClick={() => setActiveSubTab('company')}
+            >
+              <i className="fas fa-store" /> ข้อมูลร้าน & ท้ายบิล
+            </button>
+          </div>
+
+          {/* TAB 1: Payment Slip Settings */}
+          {activeSubTab === 'payment' && (
+            <div className="adm-card">
+              <div className="adm-card-header">
+                <div className="adm-card-title"><i className="fas fa-font" style={{ color: '#f59e0b' }} /> รูปแบบตัวอักษร & กระดาษ (Payment Slip)</div>
+              </div>
+
+              {/* Paper Width */}
+              <div className="adm-field">
+                <label className="adm-label">ขนาดหน้ากระดาษ (Paper Width)</label>
+                <div className="adm-pills-row">
+                  {PAPER_WIDTHS.map(pw => (
+                    <button
+                      key={pw.id}
+                      type="button"
+                      className={`adm-pill-btn${ps.paperWidth === pw.id ? ' active' : ''}`}
+                      onClick={() => updatePayment('paperWidth', pw.id)}
+                    >
+                      {pw.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Font Family */}
+              <div className="adm-field">
+                <label className="adm-label">ฟอนต์ตัวอักษร (Font Family)</label>
+                <select
+                  className="adm-input"
+                  value={ps.fontFamily}
+                  onChange={e => updatePayment('fontFamily', e.target.value)}
+                >
+                  {AVAILABLE_FONTS.map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Font Sizes */}
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label className="adm-label">ขนาดตัวอักษรทั่วไป</label>
+                    <span className="adm-badge-num">{ps.fontSize} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="18"
+                    step="1"
+                    className="adm-range-slider"
+                    value={ps.fontSize}
+                    onChange={e => updatePayment('fontSize', Number(e.target.value))}
+                  />
+                  <div className="adm-slider-hints"><span>10px</span><span>14px</span><span>18px</span></div>
+                </div>
+
+                <div className="adm-field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label className="adm-label">ขนาดตัวอักษรหัวบิล</label>
+                    <span className="adm-badge-num">{ps.headerFontSize} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="12"
+                    max="24"
+                    step="1"
+                    className="adm-range-slider"
+                    value={ps.headerFontSize}
+                    onChange={e => updatePayment('headerFontSize', Number(e.target.value))}
+                  />
+                  <div className="adm-slider-hints"><span>12px</span><span>18px</span><span>24px</span></div>
+                </div>
+              </div>
+
+              {/* Font Weight */}
+              <div className="adm-field">
+                <label className="adm-label">ความหนาตัวอักษร (Font Weight)</label>
+                <div className="adm-pills-row">
+                  {FONT_WEIGHTS.map(fw => (
+                    <button
+                      key={fw.id}
+                      type="button"
+                      className={`adm-pill-btn${ps.fontWeight === fw.id ? ' active' : ''}`}
+                      onClick={() => updatePayment('fontWeight', fw.id)}
+                    >
+                      {fw.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Line Spacing & Header Alignment */}
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <label className="adm-label">ระยะห่างบรรทัด (Line Height)</label>
+                  <div className="adm-pills-row">
+                    {[
+                      { id: 1.15, label: 'กระชับ (1.15)' },
+                      { id: 1.3, label: 'ปกติ (1.3)' },
+                      { id: 1.5, label: 'โปร่ง (1.5)' },
+                    ].map(lh => (
+                      <button
+                        key={lh.id}
+                        type="button"
+                        className={`adm-pill-btn${ps.lineHeight === lh.id ? ' active' : ''}`}
+                        onClick={() => updatePayment('lineHeight', lh.id)}
+                      >
+                        {lh.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="adm-field">
+                  <label className="adm-label">จัดกึ่งกลางหัวบิล (Header Align)</label>
+                  <div className="adm-pills-row">
+                    <button
+                      type="button"
+                      className={`adm-pill-btn${ps.headerAlign === 'center' ? ' active' : ''}`}
+                      onClick={() => updatePayment('headerAlign', 'center')}
+                    >
+                      <i className="fas fa-align-center" /> กึ่งกลาง
+                    </button>
+                    <button
+                      type="button"
+                      className={`adm-pill-btn${ps.headerAlign === 'left' ? ' active' : ''}`}
+                      onClick={() => updatePayment('headerAlign', 'left')}
+                    >
+                      <i className="fas fa-align-left" /> ชิดซ้าย
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Separator Style */}
+              <div className="adm-field">
+                <label className="adm-label">รูปแบบเส้นคั่น (Separator Style)</label>
+                <select
+                  className="adm-input"
+                  value={ps.separatorStyle}
+                  onChange={e => updatePayment('separatorStyle', e.target.value)}
+                >
+                  {SEPARATOR_STYLES.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Header Title */}
+              <div className="adm-field">
+                <label className="adm-label">หัวข้อรายการ (Section Title)</label>
+                <input
+                  type="text"
+                  className="adm-input"
+                  value={ps.title || 'ORDER'}
+                  onChange={e => updatePayment('title', e.target.value)}
+                  placeholder="เช่น ORDER หรือ รายการออเดอร์"
+                />
+              </div>
+
+              {/* Section: Elements Toggle */}
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-default)' }}>
+                <div className="adm-card-title" style={{ fontSize: 14, marginBottom: 12 }}>
+                  <i className="fas fa-toggle-on" style={{ color: '#3b82f6' }} /> แสดง / ซ่อน รายละเอียดในใบสลีป
+                </div>
+
+                <div className="adm-toggles-grid">
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showCompanyEn} onChange={e => updatePayment('showCompanyEn', e.target.checked)} />
+                    <span>ชื่อร้านภาษาอังกฤษ</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showCompanyTh} onChange={e => updatePayment('showCompanyTh', e.target.checked)} />
+                    <span>ชื่อร้านภาษาไทย</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showBranch} onChange={e => updatePayment('showBranch', e.target.checked)} />
+                    <span>ชื่อสาขา</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showTaxId} onChange={e => updatePayment('showTaxId', e.target.checked)} />
+                    <span>เลขประจำตัวผู้เสียภาษี (Tax ID)</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showAddress} onChange={e => updatePayment('showAddress', e.target.checked)} />
+                    <span>ที่อยู่ร้าน</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showPhone} onChange={e => updatePayment('showPhone', e.target.checked)} />
+                    <span>เบอร์โทรศัพท์</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showWebsite} onChange={e => updatePayment('showWebsite', e.target.checked)} />
+                    <span>เว็บไซต์</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showSlogan} onChange={e => updatePayment('showSlogan', e.target.checked)} />
+                    <span>สโลแกน & คำขอบคุณท้ายบิล</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showVat} onChange={e => updatePayment('showVat', e.target.checked)} />
+                    <span>แสดงคำนวณภาษี VAT ({ps.vatRate}%)</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showRoomGst} onChange={e => updatePayment('showRoomGst', e.target.checked)} />
+                    <span>แสดง ROOM & GST</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showPaidBadge} onChange={e => updatePayment('showPaidBadge', e.target.checked)} />
+                    <span>แสดงป้าย [PAID]</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showSerialChk} onChange={e => updatePayment('showSerialChk', e.target.checked)} />
+                    <span>แสดง Serial และ CHK</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={ps.showPrintTimes} onChange={e => updatePayment('showPrintTimes', e.target.checked)} />
+                    <span>แสดงจำนวนครั้งที่พิมพ์ (Times of Printing)</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: Order In (Kitchen / Bar) Settings */}
+          {activeSubTab === 'orderIn' && (
+            <div className="adm-card">
+              <div className="adm-card-header">
+                <div className="adm-card-title"><i className="fas fa-utensils" style={{ color: '#ef4444' }} /> ตั้งค่าใบแจ้งออเดอร์เข้าครัว/บาร์ (Order In)</div>
+              </div>
+
+              {/* Header Title Inputs */}
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <label className="adm-label">ข้อความหัวบิล (Header Title)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={oi.headerTitle || 'ORDER IN'}
+                    onChange={e => updateOrderIn('headerTitle', e.target.value)}
+                    placeholder="เช่น ORDER IN หรือ ใบสั่งอาหาร"
+                  />
+                </div>
+
+                <div className="adm-field">
+                  <label className="adm-label">ข้อความบรรทัดย่อย (Sub Header)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={oi.subHeader || ''}
+                    onChange={e => updateOrderIn('subHeader', e.target.value)}
+                    placeholder="เช่น ครัว & บาร์ หรือ สาขา RCA"
+                  />
+                </div>
+              </div>
+
+              {/* Kitchen Note */}
+              <div className="adm-field">
+                <label className="adm-label">หมายเหตุพิเศษท้ายบิลครัว (Kitchen Note)</label>
+                <input
+                  type="text"
+                  className="adm-input"
+                  value={oi.kitchenNote || ''}
+                  onChange={e => updateOrderIn('kitchenNote', e.target.value)}
+                  placeholder="เช่น กรุณาทำตามคิว / เสิร์ฟพร้อมกัน"
+                />
+              </div>
+
+              {/* Paper Width */}
+              <div className="adm-field">
+                <label className="adm-label">ขนาดหน้ากระดาษ (Paper Width)</label>
+                <div className="adm-pills-row">
+                  {PAPER_WIDTHS.map(pw => (
+                    <button
+                      key={pw.id}
+                      type="button"
+                      className={`adm-pill-btn${oi.paperWidth === pw.id ? ' active' : ''}`}
+                      onClick={() => updateOrderIn('paperWidth', pw.id)}
+                    >
+                      {pw.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Font Family */}
+              <div className="adm-field">
+                <label className="adm-label">ฟอนต์ตัวอักษร (Font Family)</label>
+                <select
+                  className="adm-input"
+                  value={oi.fontFamily}
+                  onChange={e => updateOrderIn('fontFamily', e.target.value)}
+                >
+                  {AVAILABLE_FONTS.map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Font Sizes: Base, Header, and Item (Big for kitchen!) */}
+              <div className="adm-grid-3">
+                <div className="adm-field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label className="adm-label">ขนาดเนื้อหา</label>
+                    <span className="adm-badge-num">{oi.fontSize} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="10"
+                    max="18"
+                    step="1"
+                    className="adm-range-slider"
+                    value={oi.fontSize}
+                    onChange={e => updateOrderIn('fontSize', Number(e.target.value))}
+                  />
+                  <div className="adm-slider-hints"><span>10px</span><span>18px</span></div>
+                </div>
+
+                <div className="adm-field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label className="adm-label">ขนาดหัวบิล</label>
+                    <span className="adm-badge-num">{oi.headerFontSize} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="14"
+                    max="26"
+                    step="1"
+                    className="adm-range-slider"
+                    value={oi.headerFontSize}
+                    onChange={e => updateOrderIn('headerFontSize', Number(e.target.value))}
+                  />
+                  <div className="adm-slider-hints"><span>14px</span><span>26px</span></div>
+                </div>
+
+                <div className="adm-field">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                    <label className="adm-label" style={{ color: 'var(--crimson-500)', fontWeight: 800 }}>ขนาดชื่อเมนู (ครัว)</label>
+                    <span className="adm-badge-num" style={{ background: 'var(--crimson-500)', color: '#fff' }}>{oi.itemFontSize} px</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="12"
+                    max="22"
+                    step="1"
+                    className="adm-range-slider"
+                    value={oi.itemFontSize}
+                    onChange={e => updateOrderIn('itemFontSize', Number(e.target.value))}
+                  />
+                  <div className="adm-slider-hints"><span>12px</span><span>22px</span></div>
+                </div>
+              </div>
+
+              {/* Font Weight */}
+              <div className="adm-field">
+                <label className="adm-label">ความหนาตัวอักษร (Font Weight)</label>
+                <div className="adm-pills-row">
+                  {FONT_WEIGHTS.map(fw => (
+                    <button
+                      key={fw.id}
+                      type="button"
+                      className={`adm-pill-btn${oi.fontWeight === fw.id ? ' active' : ''}`}
+                      onClick={() => updateOrderIn('fontWeight', fw.id)}
+                    >
+                      {fw.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Separator Style */}
+              <div className="adm-field">
+                <label className="adm-label">รูปแบบเส้นคั่น (Separator Style)</label>
+                <select
+                  className="adm-input"
+                  value={oi.separatorStyle}
+                  onChange={e => updateOrderIn('separatorStyle', e.target.value)}
+                >
+                  {SEPARATOR_STYLES.map(s => (
+                    <option key={s.id} value={s.id}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Toggles for Order In */}
+              <div style={{ marginTop: 24, paddingTop: 16, borderTop: '1px solid var(--border-default)' }}>
+                <div className="adm-card-title" style={{ fontSize: 14, marginBottom: 12 }}>
+                  <i className="fas fa-toggle-on" style={{ color: '#3b82f6' }} /> แสดง / ซ่อน รายละเอียดใน Order In
+                </div>
+
+                <div className="adm-toggles-grid">
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showCompanyHeader} onChange={e => updateOrderIn('showCompanyHeader', e.target.checked)} />
+                    <span>แสดงชื่อร้านด้านบน</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showRoomGst} onChange={e => updateOrderIn('showRoomGst', e.target.checked)} />
+                    <span>แสดง ROOM & GST</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showTime} onChange={e => updateOrderIn('showTime', e.target.checked)} />
+                    <span>แสดงวันเวลาที่สั่ง</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showOrderedBy} onChange={e => updateOrderIn('showOrderedBy', e.target.checked)} />
+                    <span>แสดงชื่อผู้สั่งแต่ละเมนู (เช่น วิน, เต้ย)</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showItemPrice} onChange={e => updateOrderIn('showItemPrice', e.target.checked)} />
+                    <span>แสดงราคาอาหาร</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showAddons} onChange={e => updateOrderIn('showAddons', e.target.checked)} />
+                    <span>แสดงรายการ Add-on แยกบรรทัด</span>
+                  </label>
+
+                  <label className="adm-toggle-label">
+                    <input type="checkbox" checked={oi.showStatusBadge} onChange={e => updateOrderIn('showStatusBadge', e.target.checked)} />
+                    <span>แสดงสถานะโต๊ะ [OPEN] / [PAID]</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 3: Store & Contact Info */}
+          {activeSubTab === 'company' && (
+            <div className="adm-card">
+              <div className="adm-card-header">
+                <div className="adm-card-title"><i className="fas fa-store" style={{ color: '#10b981' }} /> ข้อมูลร้าน / บริษัท & ท้ายบิล</div>
+              </div>
+
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <label className="adm-label">ชื่อบริษัท / ร้าน (ภาษาอังกฤษ)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.companyNameEn || ''}
+                    onChange={e => updateCompany('companyNameEn', e.target.value)}
+                    placeholder="เช่น Sofun Club Co., Ltd."
+                  />
+                </div>
+
+                <div className="adm-field">
+                  <label className="adm-label">ชื่อบริษัท / ร้าน (ภาษาไทย)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.companyNameTh || ''}
+                    onChange={e => updateCompany('companyNameTh', e.target.value)}
+                    placeholder="เช่น บริษัท โซฟัน จำกัด"
+                  />
+                </div>
+              </div>
+
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <label className="adm-label">สาขา (Branch)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.branch || ''}
+                    onChange={e => updateCompany('branch', e.target.value)}
+                    placeholder="เช่น สาขาอาร์ซีเอ (RCA)"
+                  />
+                </div>
+
+                <div className="adm-field">
+                  <label className="adm-label">เลขประจำตัวผู้เสียภาษี (Tax ID No.)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.taxId || ''}
+                    onChange={e => updateCompany('taxId', e.target.value)}
+                    placeholder="เช่น 0105565117207"
+                  />
+                </div>
+              </div>
+
+              <div className="adm-field">
+                <label className="adm-label">ที่อยู่บรรทัดที่ 1</label>
+                <input
+                  type="text"
+                  className="adm-input"
+                  value={settings.addressLine1 || ''}
+                  onChange={e => updateCompany('addressLine1', e.target.value)}
+                  placeholder="เช่น 21/81 ซอยศูนย์วิจัย แขวงบางกะปิ เขตห้วยขวาง"
+                />
+              </div>
+
+              <div className="adm-field">
+                <label className="adm-label">ที่อยู่บรรทัดที่ 2 (แขวง/เขต/จังหวัด/รหัสไปรษณีย์)</label>
+                <input
+                  type="text"
+                  className="adm-input"
+                  value={settings.addressLine2 || ''}
+                  onChange={e => updateCompany('addressLine2', e.target.value)}
+                  placeholder="เช่น กรุงเทพ 10310"
+                />
+              </div>
+
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <label className="adm-label">เบอร์โทรศัพท์ (Phone)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.phone || ''}
+                    onChange={e => updateCompany('phone', e.target.value)}
+                    placeholder="เช่น +66 0814661166"
+                  />
+                </div>
+
+                <div className="adm-field">
+                  <label className="adm-label">เว็บไซต์ (Website URL)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.website || ''}
+                    onChange={e => updateCompany('website', e.target.value)}
+                    placeholder="เช่น www.sofunclub.com"
+                  />
+                </div>
+              </div>
+
+              <div className="adm-grid-2">
+                <div className="adm-field">
+                  <label className="adm-label">สโลแกนท้ายบิล (Footer Slogan 1)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.footerSlogan || ''}
+                    onChange={e => updateCompany('footerSlogan', e.target.value)}
+                    placeholder="เช่น Just so fun!"
+                  />
+                </div>
+
+                <div className="adm-field">
+                  <label className="adm-label">คำขอบคุณท้ายบิล (Footer Slogan 2)</label>
+                  <input
+                    type="text"
+                    className="adm-input"
+                    value={settings.footerThankYou || ''}
+                    onChange={e => updateCompany('footerThankYou', e.target.value)}
+                    placeholder="เช่น Thank you very much"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── RIGHT COLUMN: Interactive Live Thermal Slip Preview ── */}
+        <div className="adm-bill-preview-col">
+          <div className="adm-card adm-bill-preview-card">
+            <div className="adm-bill-preview-header">
+              <span className="adm-bill-preview-title">
+                <i className="fas fa-eye" /> ตัวอย่างสลีปแบบเรียลไทม์
+              </span>
+              <div className="adm-bill-preview-mode-btns">
+                <button
+                  type="button"
+                  className={`adm-pill-btn sm${previewMode === 'payment' ? ' active' : ''}`}
+                  onClick={() => setPreviewMode('payment')}
+                >
+                  สลีปชำระเงิน
+                </button>
+                <button
+                  type="button"
+                  className={`adm-pill-btn sm${previewMode === 'orderIn' ? ' active' : ''}`}
+                  onClick={() => setPreviewMode('orderIn')}
+                >
+                  Order In
+                </button>
+              </div>
+            </div>
+
+            <div className="adm-bill-paper-wrap">
+              {/* Paper display matching exact thermal style */}
+              <div
+                className="adm-slip-paper"
+                style={{
+                  width: (previewMode === 'payment' ? ps.paperWidth : oi.paperWidth) === '58mm' ? '215px' : '302px',
+                  fontFamily: previewMode === 'payment' ? ps.fontFamily : oi.fontFamily,
+                  fontSize: `${previewMode === 'payment' ? ps.fontSize : oi.fontSize}px`,
+                  fontWeight: previewMode === 'payment' ? ps.fontWeight : oi.fontWeight,
+                  lineHeight: previewMode === 'payment' ? ps.lineHeight : oi.lineHeight,
+                }}
+              >
+                {/* ── PREVIEW: PAYMENT SLIP ── */}
+                {previewMode === 'payment' ? (
+                  <>
+                    {ps.showCompanyEn && settings.companyNameEn && (
+                      <div className="c b" style={{ fontSize: `${ps.headerFontSize}px`, textAlign: ps.headerAlign }}>
+                        {settings.companyNameEn}
+                      </div>
+                    )}
+                    {ps.showCompanyTh && settings.companyNameTh && (
+                      <div className="c" style={{ textAlign: ps.headerAlign }}>{settings.companyNameTh}</div>
+                    )}
+                    {ps.showBranch && settings.branch && (
+                      <div className="c" style={{ textAlign: ps.headerAlign }}>{settings.branch}</div>
+                    )}
+
+                    {ps.showSerialChk && (
+                      <>
+                        <div>Serial: 0000000042</div>
+                        <div>CHK: 00042/4</div>
+                      </>
+                    )}
+                    <div>Open at: {fmtSlipDT(new Date(Date.now() - 7200000))}</div>
+
+                    <div className={`adm-slip-sep ${ps.separatorStyle}`} />
+
+                    {ps.showRoomGst && (
+                      <>
+                        <div className="c">ROOM: VIP 2 | GST: 4</div>
+                        <div className={`adm-slip-sep ${ps.separatorStyle}`} />
+                      </>
+                    )}
+
+                    <div className="c b" style={{ textAlign: ps.headerAlign }}>{ps.title || 'ORDER'}</div>
+
+                    <table className="adm-slip-table">
+                      <tbody>
+                        <tr><td>พันธสัญญาปีศาจ ×4</td><td className="r">1,600.00</td></tr>
+                        <tr><td>เกี๊ยวซ่าทอด (ชีส) ×2</td><td className="r">198.00</td></tr>
+                        <tr><td>โค้กซีโร่ ×4</td><td className="r">140.00</td></tr>
+                        <tr><td>Discount (฿100)</td><td className="r">-100.00</td></tr>
+                      </tbody>
+                    </table>
+
+                    <div className={`adm-slip-sep ${ps.separatorStyle}`} />
+
+                    <table className="adm-slip-table">
+                      <tbody>
+                        <tr><td>Subtotal:</td><td className="r">1,717.76</td></tr>
+                        {ps.showVat && <tr><td>Tax ({ps.vatRate}%):</td><td className="r">120.24</td></tr>}
+                        <tr className="b"><td>Total:</td><td className="r">1,838.00</td></tr>
+                        <tr><td>Cash:</td><td className="r">1,838.00</td></tr>
+                      </tbody>
+                    </table>
+
+                    <div className={`adm-slip-sep ${ps.separatorStyle}`} />
+
+                    {ps.showPaidBadge && <div className="b">[PAID]</div>}
+                    <div>Print at: {fmtSlipDT(new Date())}</div>
+                    {ps.showPrintTimes && <div>Times of Printing: 1</div>}
+
+                    <div className="adm-slip-foot">
+                      {ps.showAddress && settings.addressLine1 && <div>{settings.addressLine1}</div>}
+                      {ps.showAddress && settings.addressLine2 && <div>{settings.addressLine2}</div>}
+                      {ps.showTaxId && settings.taxId && <div>Tax ID No.{settings.taxId}</div>}
+                      {ps.showWebsite && settings.website && <div>{settings.website}</div>}
+                      {ps.showPhone && settings.phone && <div>Tell {settings.phone}</div>}
+                      {ps.showSlogan && settings.footerSlogan && <div>{settings.footerSlogan}</div>}
+                      {ps.showSlogan && settings.footerThankYou && <div>{settings.footerThankYou}</div>}
+                    </div>
+                  </>
+                ) : (
+                  /* ── PREVIEW: ORDER IN ── */
+                  <>
+                    <div className="c b" style={{ fontSize: `${oi.headerFontSize}px`, textAlign: oi.headerAlign }}>
+                      {oi.headerTitle || 'ORDER IN'}
+                    </div>
+                    {oi.showCompanyHeader && settings.companyNameTh && (
+                      <div className="c">{settings.companyNameTh}</div>
+                    )}
+                    {oi.subHeader && (
+                      <div className="c">{oi.subHeader}</div>
+                    )}
+
+                    <div className={`adm-slip-sep ${oi.separatorStyle}`} />
+
+                    {oi.showRoomGst && (
+                      <>
+                        <div>ROOM: VIP 2 GST: 4</div>
+                        <div className={`adm-slip-sep ${oi.separatorStyle}`} />
+                      </>
+                    )}
+
+                    <table className="adm-slip-table">
+                      <tbody>
+                        <tr>
+                          <td style={{ fontSize: `${oi.itemFontSize}px` }}>เกี๊ยวซ่าทอด ×2 {oi.showOrderedBy ? '(วิน)' : ''}</td>
+                          {oi.showItemPrice && <td className="r" style={{ fontSize: `${oi.itemFontSize}px` }}>198.00</td>}
+                        </tr>
+                        {oi.showAddons && (
+                          <tr>
+                            <td style={{ paddingLeft: 12, fontSize: `${oi.fontSize}px` }}>+ ชีส ×2</td>
+                            {oi.showItemPrice && <td className="r" style={{ fontSize: `${oi.fontSize}px` }}>40.00</td>}
+                          </tr>
+                        )}
+                        <tr>
+                          <td style={{ fontSize: `${oi.itemFontSize}px` }}>เฟรนช์ฟรายส์ ×1 {oi.showOrderedBy ? '(เต้ย)' : ''}</td>
+                          {oi.showItemPrice && <td className="r" style={{ fontSize: `${oi.itemFontSize}px` }}>89.00</td>}
+                        </tr>
+                        {oi.showAddons && (
+                          <tr>
+                            <td style={{ paddingLeft: 12, fontSize: `${oi.fontSize}px` }}>+ ซอสทรัฟเฟิล ×1</td>
+                            {oi.showItemPrice && <td className="r" style={{ fontSize: `${oi.fontSize}px` }}>25.00</td>}
+                          </tr>
+                        )}
+                        <tr>
+                          <td style={{ fontSize: `${oi.itemFontSize}px` }}>โค้กซีโร่ ×4 {oi.showOrderedBy ? '(พลอย)' : ''}</td>
+                          {oi.showItemPrice && <td className="r" style={{ fontSize: `${oi.itemFontSize}px` }}>140.00</td>}
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <div className={`adm-slip-sep ${oi.separatorStyle}`} />
+
+                    {oi.showStatusBadge && <div>[OPEN]</div>}
+                    {oi.showTime && (
+                      <>
+                        <div>Print at: {fmtSlipDT(new Date())}</div>
+                        <div>Times of Printing: 1</div>
+                      </>
+                    )}
+                    {oi.kitchenNote && (
+                      <div style={{ marginTop: 8, fontStyle: 'italic', fontSize: `${oi.fontSize}px` }}>
+                        * {oi.kitchenNote}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div style={{ padding: '12px 16px', background: 'var(--surface-page)', borderTop: '1px solid var(--border-default)', display: 'flex', justifyContent: 'center' }}>
+              <button
+                type="button"
+                className="adm-btn-red"
+                style={{ width: '100%', padding: '10px 16px', fontSize: 13 }}
+                onClick={handlePrintTest}
+              >
+                <i className="fas fa-print" /> ทดสอบพิมพ์บิลนี้ ({previewMode === 'payment' ? 'สลีปชำระ' : 'Order In'})
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
     </div>
   )
 }
@@ -3385,6 +4322,7 @@ const NAV_SECTIONS = [
     label: 'ระบบ',
     items: [
       { key: 'payment',   icon: 'fa-mobile-alt',          label: 'การชำระเงิน' },
+      { key: 'receipt',   icon: 'fa-file-invoice-dollar', label: 'แก้ไขบิล' },
       { key: 'promotion', icon: 'fa-bullhorn',             label: 'โปรโมชั่น' },
       { key: 'data',      icon: 'fa-exclamation-triangle', label: 'จัดการข้อมูล' },
     ],
@@ -3524,6 +4462,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
               {tab === 'bookings'  && <BookingsTab showToast={showToast} adminUser={isAdmin} />}
               {tab === 'random'    && <RandomWheelTab showToast={showToast} members={members} />}
               {tab === 'payment'   && <PaymentTab showToast={showToast} />}
+              {tab === 'receipt'   && <ReceiptSettingsTab showToast={showToast} />}
               {tab === 'promotion' && <PromotionTab showToast={showToast} />}
               {tab === 'data'      && <DataTab showToast={showToast} />}
             </div>

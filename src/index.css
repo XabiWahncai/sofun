@@ -10918,3 +10918,369 @@ body { background: var(--cream) !important; }
   padding-left: 4px;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   RECEIPT & SLIP SETTINGS ("แก้ไขบิล")
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.adm-bill-editor-root {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.25s ease-out;
+}
+
+.adm-bill-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--border-default, rgba(0, 0, 0, 0.08));
+  border-radius: 16px;
+  padding: 18px 24px;
+  flex-wrap: wrap;
+}
+
+.adm-bill-top-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-primary, #111827);
+  display: flex;
+  align-items: center;
+}
+
+.adm-bill-top-sub {
+  margin: 6px 0 0 0;
+  font-size: 13px;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.5;
+}
+
+.adm-bill-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.adm-btn-outline {
+  background: var(--surface-card, #ffffff);
+  color: var(--text-primary, #374151);
+  border: 1.5px solid var(--border-default, rgba(0, 0, 0, 0.15));
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: all 0.15s ease;
+}
+
+.adm-btn-outline:hover {
+  background: var(--surface-page, #f3f4f6);
+  border-color: rgba(0, 0, 0, 0.3);
+  color: var(--text-primary, #111827);
+}
+
+.adm-btn-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.adm-bill-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 1024px) {
+  .adm-bill-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.adm-bill-controls-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.adm-bill-tabs {
+  display: flex;
+  gap: 8px;
+  background: var(--surface-card, #ffffff);
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--border-default, rgba(0, 0, 0, 0.08));
+  overflow-x: auto;
+}
+
+.adm-bill-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.adm-bill-tab:hover {
+  color: var(--text-primary, #111827);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.adm-bill-tab.active {
+  background: var(--crimson-500, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.35);
+}
+
+.adm-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.adm-grid-3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .adm-grid-2,
+  .adm-grid-3 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.adm-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.adm-pill-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-default, rgba(0, 0, 0, 0.12));
+  background: var(--surface-card, #ffffff);
+  color: var(--text-primary, #374151);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adm-pill-btn:hover {
+  border-color: var(--crimson-500, #dc2626);
+  color: var(--crimson-500, #dc2626);
+}
+
+.adm-pill-btn.active {
+  background: var(--crimson-500, #dc2626);
+  border-color: var(--crimson-500, #dc2626);
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+}
+
+.adm-pill-btn.sm {
+  padding: 5px 10px;
+  font-size: 12px;
+}
+
+.adm-badge-num {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  background: var(--surface-page, #f3f4f6);
+  color: var(--text-secondary, #4b5563);
+  border-radius: 6px;
+  border: 1px solid var(--border-default, rgba(0, 0, 0, 0.08));
+}
+
+.adm-range-slider {
+  width: 100%;
+  accent-color: var(--crimson-500, #dc2626);
+  cursor: pointer;
+  height: 6px;
+  border-radius: 3px;
+}
+
+.adm-slider-hints {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--text-tertiary, #9ca3af);
+  margin-top: 4px;
+  font-weight: 600;
+}
+
+.adm-toggles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.adm-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--surface-page, #f9fafb);
+  border: 1px solid var(--border-default, rgba(0, 0, 0, 0.06));
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #374151);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.adm-toggle-label:hover {
+  background: #ffffff;
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.adm-toggle-label input[type="checkbox"] {
+  accent-color: var(--crimson-500, #dc2626);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* ── Live Thermal Preview Panel ── */
+.adm-bill-preview-col {
+  position: sticky;
+  top: 80px;
+}
+
+.adm-bill-preview-card {
+  padding: 0 !important;
+  overflow: hidden;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  border: 1px solid var(--border-default, rgba(0, 0, 0, 0.1));
+}
+
+.adm-bill-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--surface-page, #f9fafb);
+  border-bottom: 1px solid var(--border-default, rgba(0, 0, 0, 0.08));
+}
+
+.adm-bill-preview-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.adm-bill-preview-mode-btns {
+  display: flex;
+  gap: 6px;
+}
+
+.adm-bill-paper-wrap {
+  padding: 24px;
+  background: #374151; /* Dark contrasting background */
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  min-height: 480px;
+  max-height: 700px;
+  overflow-y: auto;
+}
+
+/* Authentic Thermal Paper look */
+.adm-slip-paper {
+  background: #ffffff;
+  color: #000000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  padding: 16px 14px;
+  border-radius: 4px;
+  box-sizing: border-box;
+  text-align: left;
+  transition: width 0.2s ease;
+  user-select: text;
+}
+
+.adm-slip-paper .c { text-align: center; }
+.adm-slip-paper .r { text-align: right; }
+.adm-slip-paper .b { font-weight: 800; }
+
+.adm-slip-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0;
+  color: #000000;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.adm-slip-table td {
+  padding: 2px 0;
+  vertical-align: top;
+  color: #000000;
+}
+
+/* Separator variants */
+.adm-slip-sep {
+  margin: 6px 0;
+  border: 0;
+}
+.adm-slip-sep.dashed {
+  border-top: 1px dashed #000000;
+}
+.adm-slip-sep.solid {
+  border-top: 1px solid #000000;
+}
+.adm-slip-sep.double {
+  border-top: 3px double #000000;
+}
+.adm-slip-sep.dots {
+  border-top: 1px dotted #000000;
+}
+.adm-slip-sep.equal {
+  border-top: 2px solid #000000;
+  margin: 6px 0;
+  position: relative;
+}
+.adm-slip-sep.equal::after {
+  content: '';
+  display: block;
+  border-top: 2px solid #000000;
+  margin-top: 2px;
+}
+
+.adm-slip-foot {
+  margin-top: 10px;
+  font-size: 0.9em;
+  text-align: center;
+  line-height: 1.35;
+}
+
+

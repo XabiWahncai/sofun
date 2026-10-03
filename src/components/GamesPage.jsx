@@ -1,4 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
+import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { db } from '../firebase'
 import { useLang } from '../LangContext'
 
 /* ── Design tokens — resolved via theme.css CSS variables ─ */
@@ -94,7 +96,7 @@ function StarRow({ label, value, onChange, color }) {
   )
 }
 
-function ScriptCard({ game, showDetail }) {
+function ScriptCard({ game, showDetail, played }) {
   const imgSrc = game.image ? convertImageUrl(game.image) : null
   const displayPrice = game.fullPrice ?? game.price
   const isFree = displayPrice === 0
@@ -130,6 +132,21 @@ function ScriptCard({ game, showDetail }) {
         {/* Free badge */}
         {isFree && (
           <span style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: AMBER, color: VOID }}>ฟรี</span>
+        )}
+        {/* Played badge */}
+        {played && (
+          <span style={{
+            position: 'absolute', zIndex: 2,
+            top: isFree ? 32 : 8, right: 8,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+            padding: '3px 8px', borderRadius: 999,
+            fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+            background: 'rgba(0,0,0,0.72)', color: '#fff',
+            backdropFilter: 'blur(6px)',
+            border: '1px solid rgba(255,255,255,0.18)',
+          }}>
+            <i className="fas fa-check-circle" style={{ fontSize: 9, color: '#06c755' }} />เล่นแล้ว
+          </span>
         )}
         {/* Synopsis hover overlay */}
         {(game.synopsis || game.description) && (
@@ -190,7 +207,19 @@ function ScriptCard({ game, showDetail }) {
 }
 
 /* ── Main component ──────────────────────────────────── */
-export default function GamesPage({ allGames, showDetail }) {
+export default function GamesPage({ allGames, showDetail, lineUser }) {
+  const [playedIds, setPlayedIds] = useState(() => new Set())
+
+  useEffect(() => {
+    if (!lineUser?.uid) { setPlayedIds(new Set()); return }
+    const q = query(collection(db, 'playHistory'), where('userId', '==', lineUser.uid))
+    return onSnapshot(q, snap => {
+      const ids = new Set()
+      snap.docs.forEach(d => { const sid = d.data().scriptId; if (sid) ids.add(sid) })
+      setPlayedIds(ids)
+    }, () => {})
+  }, [lineUser?.uid])
+
   const { t } = useLang()
   const [search,           setSearch]           = useState('')
   const [selectedTags,     setSelectedTags]     = useState([])
@@ -471,7 +500,7 @@ export default function GamesPage({ allGames, showDetail }) {
             <div className="gp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))', gap: 14 }}>
               {filtered.map((game, i) => (
                 <div key={game.id} className={`gp-reveal gp-d${(i % 4) + 1}`}>
-                  <ScriptCard game={game} showDetail={showDetail} />
+                  <ScriptCard game={game} showDetail={showDetail} played={playedIds.has(game.id)} />
                 </div>
               ))}
             </div>

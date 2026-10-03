@@ -1,9 +1,10 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
-    // Slip uploads: any signed-in user (including anonymous) can write,
-    // only authenticated users can read (admins open the URL directly)
-    match /slips/{orderId}/{filename} {
+    // Slip uploads: any user can write (LINE-authed, no Firebase Auth),
+    // public read so admins can open the URL directly.
+    // Matches both slips/{orderId}/{filename} and slips/deposits/{bookingId}/{filename}
+    match /slips/{path=**} {
       allow write: if request.resource.size < 10 * 1024 * 1024  // 10 MB
                    && request.resource.contentType.matches('image/.*');
       allow read: if true;

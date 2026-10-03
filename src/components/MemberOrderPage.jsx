@@ -4,6 +4,7 @@ import { db, storage, appFunctions } from '../firebase'
 import { httpsCallable } from 'firebase/functions'
 import { doc, collection, onSnapshot, query, orderBy, updateDoc, arrayUnion, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
+import { DEFAULT_RECEIPT_SETTINGS } from '../constants/receipt'
 
 const ALL = 'ทั้งหมด'
 
@@ -256,28 +257,58 @@ function EvaluationCard({ order, lineUser, showToast, isCompact = false }) {
 }
 
 function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, forAll, onClose, activeOrder, lineUser, showToast }) {
+  const [cfg, setCfg] = useState(DEFAULT_RECEIPT_SETTINGS)
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'receipt')).then(snap => {
+      if (snap.exists()) {
+        setCfg(prev => ({
+          ...prev,
+          ...snap.data(),
+          paymentSlip: { ...prev.paymentSlip, ...snap.data().paymentSlip },
+        }))
+      }
+    }).catch(() => {})
+  }, [])
+
   const total = Number(payment?.amount || amount)
-  const tax   = total * 7 / 107
+  const ps = cfg.paymentSlip || DEFAULT_RECEIPT_SETTINGS.paymentSlip
+  const vatRate = Number(ps.vatRate) || 7
+  const tax   = ps.showVat ? (total * vatRate / (100 + vatRate)) : 0
   const sub   = total - tax
 
   return (
     <div className="member-receipt-wrap">
-      <div className="member-receipt">
-        <div className="rcpt-company">Sofun Club Co., Ltd.</div>
-        <div className="rcpt-sub">บริษัท โซฟัน จำกัด</div>
-        <div className="rcpt-sub">สาขาอาร์ซีเอ (RCA)</div>
+      <div className="member-receipt" style={{
+        fontFamily: ps.fontFamily,
+        fontSize: `${ps.fontSize}px`,
+        fontWeight: ps.fontWeight,
+        lineHeight: ps.lineHeight,
+      }}>
+        {ps.showCompanyEn && cfg.companyNameEn && (
+          <div className="rcpt-company" style={{ textAlign: ps.headerAlign, fontSize: `${ps.headerFontSize}px` }}>{cfg.companyNameEn}</div>
+        )}
+        {ps.showCompanyTh && cfg.companyNameTh && (
+          <div className="rcpt-sub" style={{ textAlign: ps.headerAlign }}>{cfg.companyNameTh}</div>
+        )}
+        {ps.showBranch && cfg.branch && (
+          <div className="rcpt-sub" style={{ textAlign: ps.headerAlign }}>{cfg.branch}</div>
+        )}
 
         <div className="rcpt-info-block">
           <div>Open at: {fmtDT(createdAt)}</div>
         </div>
 
         <div className="rcpt-sep">{SEP}</div>
-        <div className="rcpt-table-line">
-          ROOM: {room || '—'} | GST: {numMembers}
-        </div>
-        <div className="rcpt-sep">{SEP}</div>
+        {ps.showRoomGst && (
+          <>
+            <div className="rcpt-table-line">
+              ROOM: {room || '—'} | GST: {numMembers}
+            </div>
+            <div className="rcpt-sep">{SEP}</div>
+          </>
+        )}
 
-        <div className="rcpt-section-title">ORDER</div>
+        <div className="rcpt-section-title" style={{ textAlign: ps.headerAlign }}>{ps.title || 'ORDER'}</div>
         {myGameFee > 0 && (
           <div className="rcpt-item-row">
             <span className="rcpt-item-name">{scriptTitle || 'ค่าเกม'}</span>
@@ -298,24 +329,24 @@ function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembe
 
         <div className="rcpt-sep">{SEP}</div>
         <div className="rcpt-total-row"><span>Subtotal:</span><span>{sub.toFixed(2)}</span></div>
-        <div className="rcpt-total-row"><span>Tax (7%):</span><span>{tax.toFixed(2)}</span></div>
+        {ps.showVat && <div className="rcpt-total-row"><span>Tax ({vatRate}%):</span><span>{tax.toFixed(2)}</span></div>}
         <div className="rcpt-total-row bold"><span>Total:</span><span>{total.toFixed(2)}</span></div>
         <div className="rcpt-total-row"><span>Cash:</span><span>{total.toFixed(2)}</span></div>
         <div className="rcpt-sep">{SEP}</div>
 
-        <div className="rcpt-paid">[PAID]</div>
+        {ps.showPaidBadge && <div className="rcpt-paid">[PAID]</div>}
         <div className="rcpt-print-info">Print at: {fmtDT(new Date())}</div>
-        <div className="rcpt-print-info">Times of Printing: 1</div>
+        {ps.showPrintTimes && <div className="rcpt-print-info">Times of Printing: 1</div>}
 
         <div className="rcpt-sep">{SEP}</div>
         <div className="rcpt-footer">
-          <div>21/81 ซอยศูนย์วิจัย แขวงบางกะปิ เขตห้วยขวาง</div>
-          <div>กรุงเทพ 10310</div>
-          <div>Tax ID No.0105565117207</div>
-          <div>www.sofunclub.com</div>
-          <div>Tell +66 0814661166</div>
-          <div>Just so fun!</div>
-          <div>Thank you very much</div>
+          {ps.showAddress && cfg.addressLine1 && <div>{cfg.addressLine1}</div>}
+          {ps.showAddress && cfg.addressLine2 && <div>{cfg.addressLine2}</div>}
+          {ps.showTaxId && cfg.taxId && <div>Tax ID No.{cfg.taxId}</div>}
+          {ps.showWebsite && cfg.website && <div>{cfg.website}</div>}
+          {ps.showPhone && cfg.phone && <div>Tell {cfg.phone}</div>}
+          {ps.showSlogan && cfg.footerSlogan && <div>{cfg.footerSlogan}</div>}
+          {ps.showSlogan && cfg.footerThankYou && <div>{cfg.footerThankYou}</div>}
         </div>
       </div>
 

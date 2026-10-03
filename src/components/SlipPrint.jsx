@@ -1,89 +1,34 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { db } from '../firebase'
-import { doc, updateDoc, increment } from 'firebase/firestore'
-
-const p2 = n => String(Math.round(n)).padStart(2, '0')
-const fmtDT = d => {
-  if (!d) return 'N/A'
-  const dt = d instanceof Date ? d : new Date(d)
-  return `${dt.getFullYear()}-${p2(dt.getMonth()+1)}-${p2(dt.getDate())} ${p2(dt.getHours())}:${p2(dt.getMinutes())}:${p2(dt.getSeconds())}`
-}
-
-function buildSlipHTML({ serial, members, room, scriptTitle, gameUnitPrice, gameTotal,
-  foodItems, discount, grandTotal, openAt, printAt, printCount }) {
-  const serialStr = String(serial).padStart(10, '0')
-  const chkStr = String(serial).padStart(5, '0') + '/' + members.length
-  const tax = grandTotal * 7 / 107
-  const subtotal = grandTotal - tax
-  const discAmt = discount?.applied || 0
-  const rawTotal = grandTotal + discAmt
-
-  const itemRows = []
-  if (gameUnitPrice > 0) {
-    itemRows.push(`<tr><td>${scriptTitle || 'เกม'} ×${members.length}</td><td class="r">${gameTotal.toFixed(2)}</td></tr>`)
-  }
-  ;(foodItems || []).forEach(fi => {
-    const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name).join(',')})` : ''
-    itemRows.push(`<tr><td>${fi.name}${addStr} ×${fi.qty}</td><td class="r">${(fi.price * fi.qty).toFixed(2)}</td></tr>`)
-  })
-
-  return `<!DOCTYPE html><html lang="th"><head>
-<meta charset="utf-8"><title>Receipt #${serialStr}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-/* ds-allow-hardcode: thermal receipt print CSS — #000/#fff required for reliable cross-printer rendering; CSS vars do not resolve in print stylesheets */
-body{font-family:'Courier New',monospace;font-size:12px;color:#000/* ds-allow-hardcode */;background:#fff/* ds-allow-hardcode */;width:302px;margin:0 auto;padding:10px 8px}
-.c{text-align:center}.b{font-weight:bold}.big{font-size:15px}
-.sep{border:none;border-top:1px dashed #000/* ds-allow-hardcode */;margin:5px 0}
-table{width:100%;border-collapse:collapse}
-td{padding:2px 0;vertical-align:top}
-td.r{text-align:right;white-space:nowrap;padding-left:6px}
-.foot{font-size:10px;text-align:center}
-@media print{@page{margin:0;size:80mm auto}body{width:80mm}}
-</style></head><body>
-<div class="c b big">Sofun Club Co., Ltd.</div>
-<div class="c">บริษัท โซฟัน จำกัด</div>
-<div class="c">สาขาอาร์ซีเอ (RCA)</div>
-<div>Serial: ${serialStr}</div>
-<div>CHK: ${chkStr}</div>
-<div>Open at: ${fmtDT(openAt)}</div>
-<hr class="sep">
-<div class="c">ROOM: ${room || '-'} | GST: ${members.length}</div>
-<hr class="sep">
-<div class="c b">ORDER</div>
-<table>${itemRows.join('')}${discAmt > 0 ? `<tr><td>Discount (${discount.type === 'percent' ? discount.value+'%' : '฿'+discount.value})</td><td class="r">-${discAmt.toFixed(2)}</td></tr>` : ''}</table>
-<hr class="sep">
-<table>
-<tr><td>Subtotal:</td><td class="r">${subtotal.toFixed(2)}</td></tr>
-<tr><td>Tax (7%):</td><td class="r">${tax.toFixed(2)}</td></tr>
-<tr class="b"><td>Total:</td><td class="r">${grandTotal.toFixed(2)}</td></tr>
-<tr><td>Cash:</td><td class="r">${grandTotal.toFixed(2)}</td></tr>
-</table>
-<hr class="sep">
-<div>[PAID]</div>
-<div>Print at: ${fmtDT(printAt)}</div>
-<div>Times of Printing: ${printCount}</div>
-<br>
-<div class="foot">
-<div>21/81 ซอยศูนย์วิจัย แขวงบางกะปิ เขตห้วยขวาง</div>
-<div>กรุงเทพ 10310</div>
-<div>Tax ID No.0105565117207</div>
-<div>www.sofunclub.com</div>
-<div>Tell +66 0814661166</div>
-<div>Just so fun!</div>
-<div>Thank you very much</div>
-</div>
-</body></html>`
-}
+import { doc, getDoc, updateDoc, increment } from 'firebase/firestore'
+import { DEFAULT_RECEIPT_SETTINGS, buildSlipHTML, fmtSlipDT } from '../constants/receipt'
 
 export default function SlipPrint({ payData, serial, paymentDocId, onClose }) {
   const [printCount, setPrintCount] = useState(1)
   const [printing, setPrinting] = useState(false)
+  const [receiptSettings, setReceiptSettings] = useState(DEFAULT_RECEIPT_SETTINGS)
+
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'receipt'))
+      .then(snap => {
+        if (snap.exists()) {
+          setReceiptSettings(prev => ({
+            ...prev,
+            ...snap.data(),
+            paymentSlip: { ...prev.paymentSlip, ...snap.data().paymentSlip },
+            orderIn: { ...prev.orderIn, ...snap.data().orderIn },
+          }))
+        }
+      })
+      .catch(e => console.warn('Could not load receipt settings:', e))
+  }, [])
 
   const { grandTotal, gameUnitPrice, gameTotal, foodItems, discount,
     room, members, scriptTitle, openAt } = payData
 
-  const tax = grandTotal * 7 / 107
+  const ps = receiptSettings.paymentSlip || DEFAULT_RECEIPT_SETTINGS.paymentSlip
+  const vatRate = Number(ps.vatRate) || 7
+  const tax = ps.showVat ? (grandTotal * vatRate / (100 + vatRate)) : 0
   const subtotal = grandTotal - tax
   const discAmt = discount?.applied || 0
 
@@ -94,9 +39,11 @@ export default function SlipPrint({ payData, serial, paymentDocId, onClose }) {
     } catch {}
 
     const now = new Date()
-    const html = buildSlipHTML({ serial, members, room, scriptTitle,
+    const html = buildSlipHTML({
+      serial, members, room, scriptTitle,
       gameUnitPrice, gameTotal, foodItems, discount, grandTotal,
-      openAt, printAt: now, printCount })
+      openAt, printAt: now, printCount
+    }, receiptSettings)
 
     const win = window.open('', '_blank', 'width=420,height=850,scrollbars=yes')
     if (win) {
@@ -110,27 +57,50 @@ export default function SlipPrint({ payData, serial, paymentDocId, onClose }) {
 
   const serialStr = String(serial).padStart(10, '0')
   const chkStr = String(serial).padStart(5, '0') + '/' + members.length
+  const is58 = ps.paperWidth === '58mm'
 
   return (
     <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="slip-modal">
+      <div className="slip-modal" style={{ maxWidth: is58 ? 320 : 420 }}>
         <div className="slip-modal-header">
-          <div className="slip-modal-title"><i className="fas fa-receipt" /> ใบเสร็จ</div>
+          <div className="slip-modal-title"><i className="fas fa-receipt" /> ใบเสร็จ ({ps.paperWidth || '80mm'})</div>
           <button className="modal-close" onClick={onClose}><i className="fas fa-times" /></button>
         </div>
 
         <div className="slip-modal-body">
-          <div className="slip-preview">
-            <div className="slip-co-name">Sofun Club Co., Ltd.</div>
-            <div className="slip-co-sub">บริษัท โซฟัน จำกัด</div>
-            <div className="slip-co-sub">สาขาอาร์ซีเอ (RCA)</div>
-            <div className="slip-meta-row">Serial: {serialStr}</div>
-            <div className="slip-meta-row">CHK: {chkStr}</div>
-            <div className="slip-meta-row">Open at: {fmtDT(openAt)}</div>
+          <div className="slip-preview" style={{
+            fontFamily: ps.fontFamily,
+            fontSize: `${ps.fontSize}px`,
+            fontWeight: ps.fontWeight,
+            lineHeight: ps.lineHeight,
+            maxWidth: is58 ? 220 : 302,
+          }}>
+            {ps.showCompanyEn && receiptSettings.companyNameEn && (
+              <div className="slip-co-name" style={{ textAlign: ps.headerAlign, fontSize: `${ps.headerFontSize}px` }}>
+                {receiptSettings.companyNameEn}
+              </div>
+            )}
+            {ps.showCompanyTh && receiptSettings.companyNameTh && (
+              <div className="slip-co-sub" style={{ textAlign: ps.headerAlign }}>{receiptSettings.companyNameTh}</div>
+            )}
+            {ps.showBranch && receiptSettings.branch && (
+              <div className="slip-co-sub" style={{ textAlign: ps.headerAlign }}>{receiptSettings.branch}</div>
+            )}
+            {ps.showSerialChk && (
+              <>
+                <div className="slip-meta-row">Serial: {serialStr}</div>
+                <div className="slip-meta-row">CHK: {chkStr}</div>
+              </>
+            )}
+            <div className="slip-meta-row">Open at: {fmtSlipDT(openAt)}</div>
             <div className="slip-sep" />
-            <div className="slip-room-row">ROOM: {room || '-'} | GST: {members.length}</div>
-            <div className="slip-sep" />
-            <div className="slip-section-label">ORDER</div>
+            {ps.showRoomGst && (
+              <>
+                <div className="slip-room-row">ROOM: {room || '-'} | GST: {members.length}</div>
+                <div className="slip-sep" />
+              </>
+            )}
+            <div className="slip-section-label" style={{ textAlign: ps.headerAlign }}>{ps.title || 'ORDER'}</div>
 
             {gameUnitPrice > 0 && (
               <div className="slip-item-row">
@@ -158,9 +128,11 @@ export default function SlipPrint({ payData, serial, paymentDocId, onClose }) {
             <div className="slip-total-row">
               <span>Subtotal:</span><span>{subtotal.toFixed(2)}</span>
             </div>
-            <div className="slip-total-row">
-              <span>Tax (7%):</span><span>{tax.toFixed(2)}</span>
-            </div>
+            {ps.showVat && (
+              <div className="slip-total-row">
+                <span>Tax ({vatRate}%):</span><span>{tax.toFixed(2)}</span>
+              </div>
+            )}
             <div className="slip-total-row slip-grand">
               <span>Total:</span><span>{grandTotal.toFixed(2)}</span>
             </div>
@@ -168,18 +140,18 @@ export default function SlipPrint({ payData, serial, paymentDocId, onClose }) {
               <span>Cash:</span><span>{grandTotal.toFixed(2)}</span>
             </div>
             <div className="slip-sep" />
-            <div className="slip-paid-badge">[PAID]</div>
-            <div className="slip-meta-row">Print at: {fmtDT(new Date())}</div>
-            <div className="slip-meta-row">Times of Printing: {printCount}</div>
+            {ps.showPaidBadge && <div className="slip-paid-badge">[PAID]</div>}
+            <div>Print at: {fmtSlipDT(new Date())}</div>
+            {ps.showPrintTimes && <div>Times of Printing: {printCount}</div>}
 
             <div className="slip-footer">
-              <div>21/81 ซอยศูนย์วิจัย แขวงบางกะปิ เขตห้วยขวาง</div>
-              <div>กรุงเทพ 10310</div>
-              <div>Tax ID No.0105565117207</div>
-              <div>www.sofunclub.com</div>
-              <div>Tell +66 0814661166</div>
-              <div>Just so fun!</div>
-              <div>Thank you very much</div>
+              {ps.showAddress && receiptSettings.addressLine1 && <div>{receiptSettings.addressLine1}</div>}
+              {ps.showAddress && receiptSettings.addressLine2 && <div>{receiptSettings.addressLine2}</div>}
+              {ps.showTaxId && receiptSettings.taxId && <div>Tax ID No.{receiptSettings.taxId}</div>}
+              {ps.showWebsite && receiptSettings.website && <div>{receiptSettings.website}</div>}
+              {ps.showPhone && receiptSettings.phone && <div>Tell {receiptSettings.phone}</div>}
+              {ps.showSlogan && receiptSettings.footerSlogan && <div>{receiptSettings.footerSlogan}</div>}
+              {ps.showSlogan && receiptSettings.footerThankYou && <div>{receiptSettings.footerThankYou}</div>}
             </div>
           </div>
         </div>

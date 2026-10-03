@@ -8,6 +8,7 @@ import {
   query, orderBy, limit, where
 } from 'firebase/firestore'
 import { BookingDetailModal } from './BookingPage'
+import { useOpenProfile } from '../UserProfileContext'
 
 const toWsrv = (fileId) =>
   `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${fileId}%26export%3Dview&w=400&output=webp`
@@ -263,6 +264,7 @@ function PartyMemberScanModal({ party, onClose }) {
 
 /* ── PARTY DETAIL MODAL ── */
 function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
+  const openProfile = useOpenProfile()
   const [messages, setMessages]   = useState([])
   const [msgText, setMsgText]     = useState('')
   const [sending, setSending]     = useState(false)
@@ -431,7 +433,11 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {(party.members || []).map((m, i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div
+                    key={i}
+                    onClick={() => m.uid && openProfile(m.uid)}
+                    style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: m.uid ? 'pointer' : 'default', padding: 4, margin: -4, borderRadius: 8 }}
+                  >
                     {m.avatar
                       ? <img src={m.avatar} alt={m.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
                       : <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '13px' }}>{(m.name || '?')[0]}</div>
@@ -593,6 +599,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
 
 /* ── PARTY CARD ── */
 function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onCopyLink, copiedId, onDetail }) {
+  const openProfile = useOpenProfile()
   const isMember = party.members?.some(m => m.uid === user?.uid)
   const isOwner = party.ownerId === user?.uid
   const isFull = (party.members?.length || 0) >= party.maxPlayers
@@ -654,7 +661,10 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
         </div>
 
         {/* Owner */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+        <div
+          onClick={e => { e.stopPropagation(); party.ownerId && openProfile(party.ownerId) }}
+          style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: party.ownerId ? 'pointer' : 'default' }}
+        >
           {party.ownerAvatar
             ? <img src={party.ownerAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" onError={e => e.currentTarget.style.display = 'none'} />
             : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -673,7 +683,11 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex' }}>
               {(party.members || []).slice(0, 5).map((m, i) => (
-                <div key={i} title={m.name} style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <div
+                  key={i} title={m.name}
+                  onClick={e => { e.stopPropagation(); m.uid && openProfile(m.uid) }}
+                  style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
+                >
                   {m.avatar
                     ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
                     : <span>{(m.name || '?')[0]}</span>
@@ -733,6 +747,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
 
 /* ── BOOKING PARTY CARD ── */
 function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
+  const openProfile = useOpenProfile()
   const members     = booking.members || []
   const maxMembers  = booking.maxMembers || 0
   const isMember    = members.some(m => m.uid === user?.uid)
@@ -800,7 +815,10 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
         )}
 
         {/* Leader */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+        <div
+          onClick={e => { e.stopPropagation(); booking.leaderId && openProfile(booking.leaderId) }}
+          style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: booking.leaderId ? 'pointer' : 'default' }}
+        >
           {booking.leaderAvatar
             ? <img src={booking.leaderAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" onError={e => e.currentTarget.style.display = 'none'} />
             : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -819,7 +837,11 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
             <div style={{ display: 'flex' }}>
               {members.slice(0, 5).map((m, i) => (
-                <div key={i} title={m.name} style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                <div
+                  key={i} title={m.name}
+                  onClick={e => { e.stopPropagation(); m.uid && openProfile(m.uid) }}
+                  style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
+                >
                   {m.avatar
                     ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
                     : <span>{(m.name || '?')[0]}</span>
@@ -1161,14 +1183,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
               <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>รวมกลุ่มกับเพื่อนใหม่ เล่นสคริปต์ที่คุณชื่นชอบ</p>
             </div>
 
-            {user ? (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                style={{ height: '42px', padding: '0 20px', borderRadius: '8px', background: 'var(--crimson-500)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
-              >
-                <i className="fas fa-plus" /> สร้างปาร์ตี้
-              </button>
-            ) : (
+            {!user && (
               <button
                 onClick={onLogin}
                 style={{ height: '42px', padding: '0 20px', borderRadius: '8px', background: 'var(--line-green, #06c755)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}
@@ -1249,21 +1264,17 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
               {hasFilters ? 'ไม่พบปาร์ตี้ที่ตรงกับการค้นหา' : filter === 'open' ? 'ยังไม่มีปาร์ตี้เปิดรับสมาชิก' : 'ยังไม่มีปาร์ตี้'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '280px' }}>
-              {hasFilters ? 'ลองปรับตัวกรองหรือล้างการค้นหา' : user ? 'กดสร้างปาร์ตี้เพื่อชวนเพื่อนเล่นด้วยกัน' : 'เข้าสู่ระบบเพื่อสร้างหรือเข้าร่วมปาร์ตี้'}
+              {hasFilters ? 'ลองปรับตัวกรองหรือล้างการค้นหา' : user ? 'ยังไม่มีปาร์ตี้ในขณะนี้ — ลองกลับมาใหม่' : 'เข้าสู่ระบบเพื่อเข้าร่วมปาร์ตี้'}
             </div>
             {hasFilters ? (
               <button onClick={() => { setGameSearch(''); setDateFilter('') }} style={{ height: '40px', padding: '0 20px', borderRadius: '8px', background: 'var(--crimson-500)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px', marginTop: '4px' }}>
                 ล้างตัวกรอง
               </button>
-            ) : user ? (
-              <button onClick={() => setShowCreateModal(true)} style={{ height: '40px', padding: '0 20px', borderRadius: '8px', background: 'var(--crimson-500)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '7px' }}>
-                <i className="fas fa-plus" /> สร้างปาร์ตี้แรก
-              </button>
-            ) : (
+            ) : !user ? (
               <button onClick={onLogin} style={{ height: '40px', padding: '0 20px', borderRadius: '8px', background: 'var(--line-green, #06c755)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '7px' }}>
                 <i className="fab fa-line" /> เข้าสู่ระบบ
               </button>
-            )}
+            ) : null}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
