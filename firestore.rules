@@ -105,6 +105,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Print jobs — queue for primary printer device to consume & print
+    match /print_jobs/{docId} {
+      allow read, write: if true;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;

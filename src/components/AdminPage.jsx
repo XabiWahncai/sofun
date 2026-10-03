@@ -11,6 +11,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import HistoryTab, { MemberHistoryModal, ThermalSlipModal } from './HistoryTab'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
@@ -452,11 +453,34 @@ function DashboardTab({ allGames, members, onGoTab }) {
 
       {/* ── Recent payments ── */}
       <div className="dash-chart-card">
-        <div className="dash-chart-title"><i className="fas fa-receipt" /> ออเดอร์ล่าสุด</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div className="dash-chart-title" style={{ margin: 0 }}><i className="fas fa-receipt" /> ออเดอร์ล่าสุด</div>
+          {onGoTab && (
+            <button
+              onClick={() => onGoTab('history')}
+              style={{
+                padding: '6px 14px', borderRadius: 8, background: 'var(--surface-page)',
+                border: '1px solid var(--border-default)', color: 'var(--text-primary)',
+                cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
+                fontFamily: "'Sarabun',sans-serif", transition: 'all 0.15s ease'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.color='var(--crimson-500)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border-default)'; e.currentTarget.style.color='var(--text-primary)' }}
+            >
+              ดูประวัติ & บิลทั้งหมด <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
+            </button>
+          )}
+        </div>
         {payments.slice(0, 10).map(p => {
           const d = paidDate(p)
           return (
-            <div key={p.id} className="dash-pay-row">
+            <div
+              key={p.id}
+              className="dash-pay-row"
+              style={{ cursor: onGoTab ? 'pointer' : 'default', transition: 'background 0.15s ease' }}
+              onClick={() => onGoTab && onGoTab('history')}
+              title="คลิกเพื่อดูรายละเอียดในหน้าประวัติ & บิล"
+            >
               <div className="dash-pay-left">
                 <div className="dash-pay-game">{p.scriptTitle || 'ไม่ระบุ'}</div>
                 <div className="dash-pay-meta">
@@ -689,9 +713,29 @@ function EditMemberModal({ member, onClose, showToast }) {
 }
 
 // ─── Members Tab ──────────────────────────────────────────────────────────────
-function MembersTab({ members, showToast }) {
-  const [search, setSearch]       = useState('')
-  const [editMember, setEditMember] = useState(null)
+function MembersTab({ members, showToast, onViewMemberHistory }) {
+  const [search, setSearch]           = useState('')
+  const [editMember, setEditMember]   = useState(null)
+  const [historyMember, setHistoryMember] = useState(null)
+  const [allPayments, setAllPayments] = useState([])
+  const [receiptSettings, setReceiptSettings] = useState(DEFAULT_RECEIPT_SETTINGS)
+  const [slipModalPayment, setSlipModalPayment] = useState(null)
+
+  useEffect(() => {
+    const unsub = onSnapshot(query(collection(db, 'payments'), orderBy('paidAt', 'desc')), snap => {
+      setAllPayments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+    getDoc(doc(db, 'settings', 'receipt')).then(snap => {
+      if (snap.exists()) {
+        setReceiptSettings({
+          ...DEFAULT_RECEIPT_SETTINGS,
+          ...snap.data(),
+          paymentSlip: { ...DEFAULT_RECEIPT_SETTINGS.paymentSlip, ...(snap.data().paymentSlip || {}) },
+        })
+      }
+    }).catch(e => console.warn(e))
+    return unsub
+  }, [])
 
   const filtered = members.filter(m => {
     const name  = (m.nickname || m.firstname || '').toLowerCase()
@@ -711,7 +755,7 @@ function MembersTab({ members, showToast }) {
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="adm-members-hint">กด ✏️ เพื่อแก้ไขข้อมูลสมาชิก</div>
+        <div className="adm-members-hint">กด 🧾 เพื่อดูประวัติการเล่นและบิลย้อนหลัง · กด ✏️ เพื่อแก้ไขข้อมูล</div>
 
         {filtered.map(m => {
           const name  = m.nickname || `${m.firstname || ''} ${m.lastname || ''}`.trim() || 'ไม่มีชื่อ'
@@ -746,9 +790,19 @@ function MembersTab({ members, showToast }) {
                 </div>
                 {isAdm && <span className="adm-badge" style={{ background: '#fbbf2422' /* ds-allow-hardcode */, color: '#fbbf24' /* ds-allow-hardcode */, border: '1px solid #fbbf2444' /* ds-allow-hardcode */, fontSize: 10, padding: '1px 7px', borderRadius: 4 }}>Admin</span>}
               </div>
-              <button className="adm-icon-btn adm-edit" onClick={() => setEditMember(m)} title="แก้ไขข้อมูล">
-                <i className="fas fa-edit" />
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <button
+                  className="adm-icon-btn"
+                  style={{ color: 'var(--crimson-500)', borderColor: 'rgba(239,68,68,0.2)' }}
+                  onClick={() => setHistoryMember(m)}
+                  title="ดูประวัติการเล่น & บิลย้อนหลังของสมาชิกคนนี้"
+                >
+                  <i className="fas fa-receipt" />
+                </button>
+                <button className="adm-icon-btn adm-edit" onClick={() => setEditMember(m)} title="แก้ไขข้อมูล">
+                  <i className="fas fa-edit" />
+                </button>
+              </div>
             </div>
           )
         })}
@@ -760,6 +814,26 @@ function MembersTab({ members, showToast }) {
         <EditMemberModal
           member={editMember}
           onClose={() => setEditMember(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {historyMember && (
+        <MemberHistoryModal
+          member={historyMember}
+          payments={allPayments}
+          receiptSettings={receiptSettings}
+          onClose={() => setHistoryMember(null)}
+          onOpenSlip={(p) => setSlipModalPayment(p)}
+          showToast={showToast}
+        />
+      )}
+
+      {slipModalPayment && (
+        <ThermalSlipModal
+          payment={slipModalPayment}
+          receiptSettings={receiptSettings}
+          onClose={() => setSlipModalPayment(null)}
           showToast={showToast}
         />
       )}
@@ -4295,6 +4369,7 @@ const NAV_SECTIONS = [
     label: 'ภาพรวม',
     items: [
       { key: 'dashboard',   icon: 'fa-chart-pie', label: 'Dashboard' },
+      { key: 'history',     icon: 'fa-history',   label: 'ประวัติ & บิลย้อนหลัง' },
       { key: 'evaluations', icon: 'fa-star',      label: 'แบบประเมิน' },
     ],
   },
@@ -4338,6 +4413,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
   const [members, setMembers] = useState([])
   const [tab, setTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [historyInitialMember, setHistoryInitialMember] = useState(null)
 
   useEffect(() => onAuthStateChanged(auth, user => setIsAdmin(!!user)), [])
 
@@ -4455,9 +4531,27 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
 
             <div className="adm-content-body">
               {tab === 'dashboard'   && <DashboardTab allGames={allGames} members={members} onGoTab={goTab} />}
+              {tab === 'history'     && (
+                <HistoryTab
+                  allGames={allGames}
+                  members={members}
+                  showToast={showToast}
+                  initialMember={historyInitialMember}
+                  onClearInitialMember={() => setHistoryInitialMember(null)}
+                />
+              )}
               {tab === 'evaluations' && <EvaluationsTab showToast={showToast} allGames={allGames} />}
               {tab === 'scripts'   && <ScriptsTab allGames={allGames} showToast={showToast} openModal={openModal} openEdit={openEdit} />}
-              {tab === 'members'   && <MembersTab members={members} showToast={showToast} />}
+              {tab === 'members'   && (
+                <MembersTab
+                  members={members}
+                  showToast={showToast}
+                  onViewMemberHistory={(m) => {
+                    setHistoryInitialMember(m)
+                    goTab('history')
+                  }}
+                />
+              )}
               {tab === 'menu'      && <MenuTab showToast={showToast} />}
               {tab === 'bookings'  && <BookingsTab showToast={showToast} adminUser={isAdmin} />}
               {tab === 'random'    && <RandomWheelTab showToast={showToast} members={members} />}

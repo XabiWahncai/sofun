@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useLang } from '../LangContext';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import Footer from './Footer';
 
 /* ── Design tokens ─────────────────────────────────────── */
 const VOID    = 'var(--void-950)';
@@ -902,42 +903,10 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
           </div>
         </div>
 
-        {/* Footer columns */}
-        <div className="mm-footer-cols" style={{ maxWidth: 1280, margin: '0 auto', padding: 'clamp(48px,6vw,72px) clamp(24px,5vw,64px) 40px' }}>
-          <div className="mm-reveal mm-d1">
-            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, letterSpacing: '0.06em', color: '#fff', marginBottom: 16 }}>
-              So<span style={{ color: C }}>Fun</span> Club
-            </div>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,.32)', lineHeight: 1.85, maxWidth: '28ch', marginBottom: 24 }}>
-              {t('home','footerTagline')}
-            </p>
-            <p style={{ fontSize: 11, color: 'rgba(255,255,255,.16)', margin: 0 }}>© 2026 SoFun Club. All Rights Reserved.</p>
-          </div>
-          {[
-            { head: t('home','footerScripts'),   links: [t('home','footerAllScripts'),t('home','footerFreeScripts'),t('home','footerNewScripts'),t('home','footerFeaturedScripts')], page: 'games', d: 'mm-d2' },
-            { head: t('home','footerCommunity'), links: [t('home','footerOpenParty'),t('home','footerCreateParty'),t('home','footerMyProfile')],                                    page: 'party', d: 'mm-d3' },
-            { head: t('home','footerInfo'),      links: ['Privacy Policy','Terms of Service',t('home','footerContact')],                                                            page: 'games', d: 'mm-d4' },
-          ].map(col => (
-            <div key={col.head} className={`mm-reveal ${col.d}`}>
-              <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: C, margin: '0 0 16px' }}>{col.head}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                {col.links.map(label => (
-                  <button key={label} onClick={() => showPage(col.page)} style={{
-                    background: 'none', border: 'none', cursor: 'pointer', fontSize: 13,
-                    color: 'rgba(255,255,255,.3)', fontFamily: "'Sarabun',sans-serif",
-                    padding: '9px 0', minHeight: 44, textAlign: 'left',
-                    transition: 'color .18s', display: 'block', width: '100%',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.color = '#fff'}
-                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,.3)'}>
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
       </footer>
+
+      {/* ── Contact / Info Footer ── */}
+      <Footer />
     </div>
   );
 }

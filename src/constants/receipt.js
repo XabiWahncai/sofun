@@ -137,6 +137,9 @@ export function buildSlipHTML({
   openAt = new Date(),
   printAt = new Date(),
   printCount = 1,
+  customerName = '',
+  characterName = '',
+  ending = '',
 }, customSettings = null) {
   const cfg = {
     ...DEFAULT_RECEIPT_SETTINGS,
@@ -156,7 +159,9 @@ export function buildSlipHTML({
 
   const itemRows = []
   if (gameUnitPrice > 0) {
-    itemRows.push(`<tr><td>${scriptTitle || 'เกม'} ×${members?.length || 1}</td><td class="r">${Number(gameTotal || 0).toFixed(2)}</td></tr>`)
+    // Per-person slip: show the unit price (what this customer actually pays for the game),
+    // not the total × N (that would mismatch grandTotal which is also per-person)
+    itemRows.push(`<tr><td>${scriptTitle || 'เกม'}</td><td class="r">${Number(gameUnitPrice || 0).toFixed(2)}</td></tr>`)
   }
   ;(foodItems || []).forEach(fi => {
     const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name).join(',')})` : ''
@@ -203,6 +208,7 @@ ${ps.showSerialChk ? `<div>Serial: ${serialStr}</div><div>CHK: ${chkStr}</div>` 
 <div>Open at: ${fmtSlipDT(openAt)}</div>
 <hr class="sep">
 ${ps.showRoomGst ? `<div class="c">ROOM: ${room || '-'} | GST: ${members?.length || 1}</div><hr class="sep">` : ''}
+${customerName ? `<div>Customer: ${customerName}${characterName ? ` (${characterName})` : ''}</div>` : ''}
 <div class="c b">${ps.title || 'ORDER'}</div>
 <table>${itemRows.join('')}${discAmt > 0 ? `<tr><td>Discount (${discount.type === 'percent' ? discount.value+'%' : '฿'+discount.value})</td><td class="r">-${discAmt.toFixed(2)}</td></tr>` : ''}</table>
 <hr class="sep">
@@ -214,6 +220,7 @@ ${ps.showVat ? `<tr><td>Tax (${vatRate}%):</td><td class="r">${tax.toFixed(2)}</
 </table>
 <hr class="sep">
 ${ps.showPaidBadge ? `<div>[PAID]</div>` : ''}
+${ending ? `<div>Result: ${ending}</div>` : ''}
 <div>Print at: ${fmtSlipDT(printAt)}</div>
 ${ps.showPrintTimes ? `<div>Times of Printing: ${printCount}</div>` : ''}
 <br>

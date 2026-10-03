@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, onSnapshot,
-  addDoc, updateDoc, arrayUnion, serverTimestamp, query, orderBy, where, runTransaction
+  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, runTransaction
 } from 'firebase/firestore'
 import { Html5Qrcode } from 'html5-qrcode'
 import QRScanner from './QRScanner'
@@ -278,6 +278,65 @@ export default function POSPage({
   const [mobilePanel, setMobilePanel] = useState('members') // 'members' | 'menu' | 'order' — mobile only
   const [expandedMembers, setExpandedMembers] = useState(() => new Set())
   const [editingUnlocked, setEditingUnlocked] = useState(false)
+  const [isPrimaryPrinter, setIsPrimaryPrinter] = useState(() => {
+    try { return localStorage.getItem('sofun_pos_primary_printer') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('sofun_pos_primary_printer', isPrimaryPrinter ? '1' : '0') } catch {}
+  }, [isPrimaryPrinter])
+
+  // ── Local print helper (hidden iframe → window.print) ───────────────
+  const printHtmlLocal = (html, printWidth = '80mm') => {
+    const frame = document.createElement('iframe')
+    frame.style.cssText = `position:fixed;left:-9999px;top:0;width:${printWidth};height:297mm;border:0;visibility:hidden;pointer-events:none`
+    document.body.appendChild(frame)
+    frame.srcdoc = html
+    frame.onload = () => {
+      setTimeout(() => {
+        try { frame.contentWindow.focus(); frame.contentWindow.print() } catch (e) { console.warn('print error', e) }
+        setTimeout(() => { try { document.body.removeChild(frame) } catch {} }, 5000)
+      }, 300)
+    }
+  }
+
+  // Dispatch print — local if this device is primary printer, else write to Firestore queue
+  const dispatchPrint = async (html, printWidth = '80mm', label = '') => {
+    if (isPrimaryPrinter) {
+      printHtmlLocal(html, printWidth)
+    } else {
+      try {
+        await addDoc(collection(db, 'print_jobs'), {
+          html, printWidth, label,
+          createdAt: serverTimestamp(),
+        })
+      } catch (e) { console.warn('send print job failed:', e); showToast('ส่งคำสั่งปริ้นไม่สำเร็จ', 'error') }
+    }
+  }
+
+  // ── Primary printer: subscribe to print_jobs, print each new, delete after ──
+  useEffect(() => {
+    if (!isPrimaryPrinter) return
+    const q = query(collection(db, 'print_jobs'), orderBy('createdAt', 'asc'))
+    const printed = new Set()
+    let isFirstSnap = true
+    return onSnapshot(q, snap => {
+      snap.docs.forEach(d => {
+        if (printed.has(d.id)) return
+        printed.add(d.id)
+        const data = d.data()
+        if (!data.html) { deleteDoc(doc(db, 'print_jobs', d.id)).catch(() => {}); return }
+        // Immediate print — relies on Chrome --kiosk-printing flag for silent auto-print.
+        // Without the flag, browser will show print dialog that admin must confirm.
+        printHtmlLocal(data.html, data.printWidth || '80mm')
+        if (!isFirstSnap) {
+          showToast(`🖨 ปริ้นออเดอร์: ${data.label || 'ไม่ระบุ'}`)
+        }
+        // Delete after delay so content has time to render into print pipeline
+        setTimeout(() => { deleteDoc(doc(db, 'print_jobs', d.id)).catch(() => {}) }, 8000)
+      })
+      isFirstSnap = false
+    }, err => console.warn('print queue subscribe failed:', err))
+  }, [isPrimaryPrinter])
   const [receiptSettings, setReceiptSettings] = useState(null)
 
   useEffect(() => {
@@ -292,7 +351,13 @@ export default function POSPage({
   const fallbackSession = useMemo(() => newPOSSession(), [])
   const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
   const activeSession = safeSessions.find(s => s.id === activeId) || safeSessions[0]
-  const isLocked = !!activeSession?.confirmedOrderId && !editingUnlocked
+  // Owner DM OR holder of 'manager' achievement — can edit/pay/cancel/close.
+  // If no DM set yet, anyone can act (party is still being setup).
+  const adminAchievements = adminUser?.achievements
+    || (adminUser?.achievement ? [adminUser.achievement] : [])
+  const isManager = Array.isArray(adminAchievements) && adminAchievements.includes('manager')
+  const isOwnerDM = !activeSession?.dmUid || adminUser?.uid === activeSession?.dmUid || isManager
+  const isLocked = (!!activeSession?.confirmedOrderId && !editingUnlocked) || !isOwnerDM
   useEffect(() => { setEditingUnlocked(false) }, [activeId])
 
   // initialise with 1 session if empty
@@ -536,22 +601,13 @@ export default function POSPage({
     setShowQueue(false)
     showToast(`รับ ${queuedItems.length} รายการจากลูกค้าแล้ว ✓`)
 
-    // Print via hidden iframe — srcdoc always renders as HTML, no popup/encoding issues
+    // Dispatch print — local if primary printer, else via Firestore queue
     const now = new Date()
     const isPaid = activeSession.members.length > 0 &&
       activeSession.members.every(m => memberPayments[m.uid]?.verified)
     const html = buildKitchenTicketHTML(memberQueue, activeSession, now, isPaid, receiptSettings)
     const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
-    const frame = document.createElement('iframe')
-    frame.style.cssText = `position:fixed;left:-9999px;top:0;width:${printWidth};height:297mm;border:0;visibility:hidden;pointer-events:none`
-    document.body.appendChild(frame)
-    frame.srcdoc = html
-    frame.onload = () => {
-      setTimeout(() => {
-        try { frame.contentWindow.focus(); frame.contentWindow.print() } catch (e) { console.warn('print error', e) }
-        setTimeout(() => { try { document.body.removeChild(frame) } catch {} }, 5000)
-      }, 300)
-    }
+    dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${memberQueue.length} รายการ`)
   }
 
   const handleScan = (uid) => {
@@ -779,22 +835,13 @@ export default function POSPage({
       })
       showToast(`รับ ${queue.length} รายการจาก ${order.room || order.scriptTitle || 'ลูกค้า'} แล้ว ✓`)
 
-      // Print ticket
+      // Dispatch print — local if primary printer, else via Firestore queue
       const now = new Date()
       const isPaid = (order.members || []).length > 0 &&
         order.members.every(m => order.memberPayments?.[m.uid]?.verified)
       const html = buildKitchenTicketHTML(queue, order, now, isPaid, receiptSettings)
       const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
-      const frame = document.createElement('iframe')
-      frame.style.cssText = `position:fixed;left:-9999px;top:0;width:${printWidth};height:297mm;border:0;visibility:hidden;pointer-events:none`
-      document.body.appendChild(frame)
-      frame.srcdoc = html
-      frame.onload = () => {
-        setTimeout(() => {
-          try { frame.contentWindow.focus(); frame.contentWindow.print() } catch (e) { console.warn('print error', e) }
-          setTimeout(() => { try { document.body.removeChild(frame) } catch {} }, 5000)
-        }, 300)
-      }
+      dispatchPrint(html, printWidth, `${order.room || order.scriptTitle || 'ตี้'} · ${queue.length} รายการ`)
     } catch (e) {
       showToast('รับออเดอร์ล้มเหลว: ' + e.message, 'error')
     }
@@ -1378,6 +1425,27 @@ export default function POSPage({
             <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}${totalPendingQueueCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
             <span>{soundMuted ? 'ปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
           </button>
+
+          {/* Primary printer toggle — only this device prints receipts */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsPrimaryPrinter(v => !v) }}
+            title={isPrimaryPrinter
+              ? 'เครื่องนี้คือเครื่องปริ้นหลัก — รับงานปริ้นจากทุก admin อัตโนมัติ'
+              : 'คลิกเพื่อตั้งเครื่องนี้เป็นเครื่องปริ้นหลัก — รับงานปริ้นจากมือถือ admin อื่น'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 12px', borderRadius: 10,
+              background: isPrimaryPrinter ? 'rgba(198,36,25,0.1)' : '#faf7f5',
+              color: isPrimaryPrinter ? '#c62419' : 'rgba(26,26,26,0.55)',
+              border: `1px solid ${isPrimaryPrinter ? 'rgba(198,36,25,0.3)' : 'rgba(26,26,26,0.1)'}`,
+              fontSize: 12, fontWeight: 800, cursor: 'pointer',
+              fontFamily: "'Sarabun', sans-serif",
+            }}
+          >
+            <i className={`fas fa-${isPrimaryPrinter ? 'print' : 'print'}`} style={{ fontSize: 11 }} />
+            <span>{isPrimaryPrinter ? 'เครื่องปริ้นหลัก ON' : 'ตั้งเป็นเครื่องปริ้น'}</span>
+          </button>
         </div>
         {showHistory && (
           <div className="pos-today-list">
@@ -1541,47 +1609,51 @@ export default function POSPage({
 
         {/* LEFT */}
         <div className={`pos-left${isLocked ? ' is-locked' : ''}${editingUnlocked ? ' is-editing' : ''}`}>
-          {/* Lock / edit banner — only visible after order is confirmed */}
-          {activeSession?.confirmedOrderId && (
+          {/* Lock / edit banner — show when confirmed OR when not the DM owner */}
+          {(activeSession?.confirmedOrderId || !isOwnerDM) && (
             <div className="pos-lock-banner" style={{
               display: 'flex', alignItems: 'center', gap: 12,
               padding: '12px 16px',
-              background: isLocked ? '#faf7f5' : 'rgba(198,36,25,0.08)',
-              borderBottom: `1px solid ${isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.2)'}`,
+              background: !isOwnerDM ? '#faf7f5' : (isLocked ? '#faf7f5' : 'rgba(198,36,25,0.08)'),
+              borderBottom: `1px solid ${!isOwnerDM ? 'rgba(26,26,26,0.08)' : (isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.2)')}`,
             }}>
               <div style={{
                 width: 32, height: 32, borderRadius: 10,
-                background: isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.15)',
-                color: isLocked ? 'rgba(26,26,26,0.55)' : '#c62419',
+                background: !isOwnerDM ? 'rgba(26,26,26,0.08)' : (isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.15)'),
+                color: !isOwnerDM ? 'rgba(26,26,26,0.65)' : (isLocked ? 'rgba(26,26,26,0.55)' : '#c62419'),
                 display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               }}>
-                <i className={`fas fa-${isLocked ? 'lock' : 'pen'}`} style={{ fontSize: 13 }} />
+                <i className={`fas fa-${!isOwnerDM ? 'eye' : (isLocked ? 'lock' : 'pen')}`} style={{ fontSize: 13 }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
-                  {isLocked ? 'ยืนยันออเดอร์แล้ว' : 'โหมดแก้ไข'}
+                  {!isOwnerDM ? 'โหมดดูอย่างเดียว' : (isLocked ? 'ยืนยันออเดอร์แล้ว' : 'โหมดแก้ไข')}
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
-                  {isLocked ? 'กด "แก้ไข" เพื่อปรับข้อมูล' : 'กดอัปเดตเมื่อเสร็จ หรือยกเลิก'}
+                <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', marginTop: 2 }}>
+                  {!isOwnerDM
+                    ? `DM เจ้าของตี้: ${activeSession.dm || '—'} · คุณกดรับออเดอร์ได้`
+                    : (isLocked ? 'กด "แก้ไข" เพื่อปรับข้อมูล' : 'กดอัปเดตเมื่อเสร็จ หรือยกเลิก')}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setEditingUnlocked(v => !v)}
-                style={{
-                  padding: '7px 14px', borderRadius: 10,
-                  background: isLocked ? '#1a1a1a' : '#ffffff',
-                  color: isLocked ? '#ffffff' : '#1a1a1a',
-                  border: isLocked ? 'none' : '1px solid rgba(26,26,26,0.14)',
-                  fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  fontFamily: "'Sarabun', sans-serif",
-                  flexShrink: 0,
-                }}
-              >
-                <i className={`fas fa-${isLocked ? 'pen' : 'times'}`} style={{ fontSize: 10 }} />
-                {isLocked ? 'แก้ไข' : 'ยกเลิก'}
-              </button>
+              {isOwnerDM && (
+                <button
+                  type="button"
+                  onClick={() => setEditingUnlocked(v => !v)}
+                  style={{
+                    padding: '7px 14px', borderRadius: 10,
+                    background: isLocked ? '#1a1a1a' : '#ffffff',
+                    color: isLocked ? '#ffffff' : '#1a1a1a',
+                    border: isLocked ? 'none' : '1px solid rgba(26,26,26,0.14)',
+                    fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontFamily: "'Sarabun', sans-serif",
+                    flexShrink: 0,
+                  }}
+                >
+                  <i className={`fas fa-${isLocked ? 'pen' : 'times'}`} style={{ fontSize: 10 }} />
+                  {isLocked ? 'แก้ไข' : 'ยกเลิก'}
+                </button>
+              )}
             </div>
           )}
 
@@ -2444,115 +2516,136 @@ export default function POSPage({
           </div>
 
           <div className="pos-right-footer" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px 14px', borderTop: '1px solid rgba(26,26,26,0.06)' }}>
-            {/* Primary action — Pay if confirmed+unpaid, else Confirm/Update */}
-            {activeSession.confirmedOrderId && !allMembersPaid ? (
-              <button
-                onClick={() => setShowPayment(true)}
-                style={{
-                  width: '100%', padding: '14px 16px', borderRadius: 12,
-                  background: '#c62419', color: '#fff', border: 'none',
-                  fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  fontFamily: "'Sarabun', sans-serif",
-                  boxShadow: '0 6px 18px rgba(198,36,25,0.3)',
-                  transition: 'all 0.14s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#9a1c13'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#c62419'; e.currentTarget.style.transform = 'translateY(0)' }}
-              >
-                <i className="fas fa-qrcode" />
-                ชำระเงิน{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
-              </button>
+            {/* Non-owner view — show a notice, hide all edit/pay/close actions */}
+            {!isOwnerDM ? (
+              <div style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: '#faf7f5', border: '1px solid rgba(26,26,26,0.08)',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(26,26,26,0.08)', color: 'rgba(26,26,26,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <i className="fas fa-eye" style={{ fontSize: 13 }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a' }}>ดูอย่างเดียว</div>
+                  <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', marginTop: 2 }}>
+                    DM เจ้าของตี้: <strong>{activeSession.dm || '—'}</strong> · คุณกดรับออเดอร์ได้
+                  </div>
+                </div>
+              </div>
             ) : (
-              <button
-                onClick={handleConfirm}
-                disabled={saving}
-                style={{
-                  width: '100%', padding: '14px 16px', borderRadius: 12,
-                  background: saving ? '#f0ebe9' : (activeSession.confirmedOrderId ? '#1a1a1a' : '#c62419'),
-                  color: saving ? 'rgba(26,26,26,0.4)' : '#fff', border: 'none',
-                  fontSize: 14.5, fontWeight: 800, cursor: saving ? 'wait' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  fontFamily: "'Sarabun', sans-serif",
-                  boxShadow: saving ? 'none' : (activeSession.confirmedOrderId ? '0 6px 18px rgba(26,26,26,0.2)' : '0 6px 18px rgba(198,36,25,0.3)'),
-                }}
-              >
-                {saving
-                  ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-                  : activeSession.confirmedOrderId
-                    ? <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
-                    : <><i className="fas fa-check-circle" /> ยืนยันออเดอร์</>
-                }
-              </button>
-            )}
+              <>
+                {/* Primary action — Pay if confirmed+unpaid, else Confirm/Update */}
+                {activeSession.confirmedOrderId && !allMembersPaid ? (
+                  <button
+                    onClick={() => setShowPayment(true)}
+                    style={{
+                      width: '100%', padding: '14px 16px', borderRadius: 12,
+                      background: '#c62419', color: '#fff', border: 'none',
+                      fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                      boxShadow: '0 6px 18px rgba(198,36,25,0.3)',
+                      transition: 'all 0.14s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#9a1c13'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#c62419'; e.currentTarget.style.transform = 'translateY(0)' }}
+                  >
+                    <i className="fas fa-qrcode" />
+                    ชำระเงิน{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={saving}
+                    style={{
+                      width: '100%', padding: '14px 16px', borderRadius: 12,
+                      background: saving ? '#f0ebe9' : (activeSession.confirmedOrderId ? '#1a1a1a' : '#c62419'),
+                      color: saving ? 'rgba(26,26,26,0.4)' : '#fff', border: 'none',
+                      fontSize: 14.5, fontWeight: 800, cursor: saving ? 'wait' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                      boxShadow: saving ? 'none' : (activeSession.confirmedOrderId ? '0 6px 18px rgba(26,26,26,0.2)' : '0 6px 18px rgba(198,36,25,0.3)'),
+                    }}
+                  >
+                    {saving
+                      ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                      : activeSession.confirmedOrderId
+                        ? <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                        : <><i className="fas fa-check-circle" /> ยืนยันออเดอร์</>
+                    }
+                  </button>
+                )}
 
-            {/* When already confirmed+unpaid: show secondary Update option */}
-            {activeSession.confirmedOrderId && !allMembersPaid && editingUnlocked && (
-              <button
-                onClick={handleConfirm}
-                disabled={saving}
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: 10,
-                  background: '#ffffff', color: '#1a1a1a',
-                  border: '1px solid rgba(26,26,26,0.14)',
-                  fontSize: 12.5, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  fontFamily: "'Sarabun', sans-serif",
-                }}
-              >
-                {saving
-                  ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-                  : <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
-                }
-              </button>
-            )}
+                {/* When already confirmed+unpaid: show secondary Update option */}
+                {activeSession.confirmedOrderId && !allMembersPaid && editingUnlocked && (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={saving}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      background: '#ffffff', color: '#1a1a1a',
+                      border: '1px solid rgba(26,26,26,0.14)',
+                      fontSize: 12.5, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                    }}
+                  >
+                    {saving
+                      ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                      : <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                    }
+                  </button>
+                )}
 
-            {/* Secondary ghost actions row */}
-            <div style={{ display: 'flex', gap: 6 }}>
-              {activeSession.confirmedOrderId && (
-                <button
-                  onClick={async () => {
-                    if (!window.confirm('ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR')) return
-                    try {
-                      await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
-                        status: 'closed', closedAt: serverTimestamp()
-                      })
-                      const remaining = sessions.filter(s => s.id !== activeId)
-                      if (remaining.length === 0) {
-                        const fresh = newPOSSession()
-                        setSessions([fresh]); setActiveId(fresh.id)
-                      } else {
-                        setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
-                      }
-                      showToast('ยกเลิกตี้แล้ว')
-                    } catch (e) { showToast('ยกเลิกล้มเหลว', 'error') }
-                  }}
-                  style={{
-                    flex: 1, padding: '9px 10px', borderRadius: 10,
-                    background: 'rgba(198,36,25,0.06)', color: '#c62419',
-                    border: '1px solid rgba(198,36,25,0.22)',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    fontFamily: "'Sarabun', sans-serif",
-                  }}
-                >
-                  <i className="fas fa-ban" style={{ fontSize: 10 }} /> ยกเลิกตี้
-                </button>
-              )}
-              <button
-                onClick={onClose}
-                style={{
-                  flex: 1, padding: '9px 10px', borderRadius: 10,
-                  background: 'transparent', color: 'rgba(26,26,26,0.55)',
-                  border: '1px solid rgba(26,26,26,0.12)',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  fontFamily: "'Sarabun', sans-serif",
-                }}
-              >
-                <i className="fas fa-times" style={{ fontSize: 10 }} /> ปิดหน้า POS
-              </button>
-            </div>
+                {/* Secondary ghost actions row */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {activeSession.confirmedOrderId && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR')) return
+                        try {
+                          await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+                            status: 'closed', closedAt: serverTimestamp()
+                          })
+                          const remaining = sessions.filter(s => s.id !== activeId)
+                          if (remaining.length === 0) {
+                            const fresh = newPOSSession()
+                            setSessions([fresh]); setActiveId(fresh.id)
+                          } else {
+                            setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
+                          }
+                          showToast('ยกเลิกตี้แล้ว')
+                        } catch (e) { showToast('ยกเลิกล้มเหลว', 'error') }
+                      }}
+                      style={{
+                        flex: 1, padding: '9px 10px', borderRadius: 10,
+                        background: 'rgba(198,36,25,0.06)', color: '#c62419',
+                        border: '1px solid rgba(198,36,25,0.22)',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    >
+                      <i className="fas fa-ban" style={{ fontSize: 10 }} /> ยกเลิกตี้
+                    </button>
+                  )}
+                  <button
+                    onClick={onClose}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 10,
+                      background: 'transparent', color: 'rgba(26,26,26,0.55)',
+                      border: '1px solid rgba(26,26,26,0.12)',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      fontFamily: "'Sarabun', sans-serif",
+                    }}
+                  >
+                    <i className="fas fa-times" style={{ fontSize: 10 }} /> ปิดหน้า POS
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>
