@@ -428,7 +428,16 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
       }
       const updates = {}
       if (forAll) {
-        allMembers.forEach(m => { updates[`memberPayments.${m.uid}`] = { ...entry, name: m.name, paidByProxy: lineUser.uid } })
+        allMembers.forEach(m => {
+          const memberAmount = getGroupMemberBill ? getGroupMemberBill(m) : Math.round(amount / (allMembers.length || 1))
+          updates[`memberPayments.${m.uid}`] = {
+            ...entry,
+            name: m.name,
+            amount: memberAmount,
+            forAll: true,
+            paidByProxy: m.uid === lineUser.uid ? null : lineUser.uid,
+          }
+        })
       } else if (forGroup && groupMembers.length >= 2) {
         const groupUids = groupMembers.map(m => m.uid)
         groupMembers.forEach(m => {

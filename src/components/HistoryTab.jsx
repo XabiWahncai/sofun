@@ -55,6 +55,22 @@ const calcDuration = (start, end) => {
   return `${mins} นาที`
 }
 
+export const getCleanGrandTotal = (p) => {
+  if (!p) return 0
+  const expectedItemsTotal = Math.max(
+    0,
+    (p.gameTotal || 0) +
+    (p.foodTotal !== undefined && p.foodTotal !== null
+      ? p.foodTotal
+      : (p.foodItems || []).reduce((s, f) => s + (f.price || 0) * (f.qty || 1), 0)) -
+    (p.discount?.applied || 0)
+  )
+  if (expectedItemsTotal > 0 && (!p.grandTotal || p.grandTotal > expectedItemsTotal * 1.05)) {
+    return expectedItemsTotal
+  }
+  return p.grandTotal || expectedItemsTotal || 0
+}
+
 // ── Thermal Slip Modal Component ─────────────────────────────────────────────
 export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast }) {
   const [selectedMemberUid, setSelectedMemberUid] = useState('all') // 'all' or uid
@@ -78,8 +94,9 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
   const activeMemberPayment = memberPayments[selectedMemberUid]
 
   // Calculate slip numbers depending on 'all' vs individual
+  const cleanTableTotal = getCleanGrandTotal(payment)
   let displayTitle = payment.scriptTitle || 'เกม'
-  let displayGrandTotal = payment.grandTotal || 0
+  let displayGrandTotal = cleanTableTotal
   let displayGamePrice = payment.gameUnitPrice || (payment.gameTotal ? payment.gameTotal / (members.length || 1) : 0)
   let displayGameTotal = payment.gameTotal || 0
   let displayFoodItems = payment.foodItems || []
@@ -94,9 +111,14 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
       displayFoodItems = activeMemberBill.foodItems || []
       displayGamePrice = activeMemberBill.gamePrice || displayGamePrice
     } else if (activeMemberPayment) {
-      displayGrandTotal = Number(activeMemberPayment.amount) || (payment.grandTotal / (members.length || 1))
+      const rawAmt = Number(activeMemberPayment.amount) || 0
+      if (rawAmt >= cleanTableTotal && members.length > 1) {
+        displayGrandTotal = cleanTableTotal / members.length
+      } else {
+        displayGrandTotal = rawAmt || (cleanTableTotal / (members.length || 1))
+      }
     } else {
-      displayGrandTotal = payment.grandTotal / (members.length || 1)
+      displayGrandTotal = cleanTableTotal / (members.length || 1)
     }
   }
 
@@ -661,7 +683,7 @@ export default function HistoryTab({
   ])
 
   // ── Derived KPI Metrics ──────────────────────────────────────────────────
-  const totalRevenue = filteredPayments.reduce((s, p) => s + (p.grandTotal || 0), 0)
+  const totalRevenue = filteredPayments.reduce((s, p) => s + getCleanGrandTotal(p), 0)
   const totalSessions = filteredPayments.length
   const totalPlayers = filteredPayments.reduce((s, p) => s + (p.members?.length || 0), 0)
   const totalFoodRevenue = filteredPayments.reduce((s, p) => s + (p.foodTotal || 0), 0)
@@ -688,6 +710,7 @@ export default function HistoryTab({
   const handleQuickPrint = (payment) => {
     try {
       const openAt = toDateObj(payment.openAt) || toDateObj(payment.paidAt) || new Date()
+      const cleanTotal = getCleanGrandTotal(payment)
       const html = buildSlipHTML({
         serial: payment.serial || 1,
         members: payment.members || [],
@@ -697,7 +720,7 @@ export default function HistoryTab({
         gameTotal: payment.gameTotal || 0,
         foodItems: payment.foodItems || [],
         discount: payment.discount,
-        grandTotal: payment.grandTotal || 0,
+        grandTotal: cleanTotal,
         openAt,
         printAt: new Date(),
         printCount: 1,
@@ -1067,7 +1090,7 @@ export default function HistoryTab({
                   {/* Right side: Grand total & Action buttons */}
                   <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
                     <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--crimson-500)' }}>
-                      ฿{(p.grandTotal || 0).toLocaleString()}
+                      ฿{getCleanGrandTotal(p).toLocaleString()}
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button
@@ -1212,7 +1235,7 @@ export default function HistoryTab({
                             )}
                             <tr style={{ fontWeight: 800, fontSize: 14, borderTop: '1px solid var(--border-default)' }}>
                               <td style={{ paddingTop: 8 }}>ยอดสุทธิ (Grand Total):</td>
-                              <td style={{ paddingTop: 8, textAlign: 'right', color: 'var(--crimson-500)' }}>฿{(p.grandTotal || 0).toLocaleString()}</td>
+                              <td style={{ paddingTop: 8, textAlign: 'right', color: 'var(--crimson-500)' }}>฿{getCleanGrandTotal(p).toLocaleString()}</td>
                             </tr>
                           </tbody>
                         </table>

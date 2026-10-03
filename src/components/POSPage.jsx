@@ -901,8 +901,21 @@ export default function POSPage({
           tx.set(counterRef, { slipSerial: serial }, { merge: true })
         })
 
-        const totalPaid = Object.values(memberPayments)
-          .reduce((s, p) => s + (Number(p.amount) || 0), 0)
+        const expectedTableTotal = Math.max(0, (gamePrice || 0) + (foodTotal || 0) - (totalDiscount || 0))
+
+        // Sum unique payments (deduplicate identical transRef from forAll / proxy payments)
+        const seenTransRefs = new Set()
+        let totalPaid = 0
+        Object.values(memberPayments).forEach(p => {
+          if (!p) return
+          if (p.transRef) {
+            if (seenTransRefs.has(p.transRef)) return
+            seenTransRefs.add(p.transRef)
+          }
+          totalPaid += Number(p.amount) || 0
+        })
+
+        const finalGrandTotal = expectedTableTotal > 0 ? expectedTableTotal : totalPaid
 
         await addDoc(collection(db, 'payments'), {
           orderId,
@@ -922,7 +935,7 @@ export default function POSPage({
           foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
           foodTotal,
           discount: { type: 'amount', value: totalDiscount, applied: totalDiscount },
-          grandTotal: totalPaid,
+          grandTotal: finalGrandTotal,
           memberPayments,
           serial,
           ending,
