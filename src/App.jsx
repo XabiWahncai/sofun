@@ -34,6 +34,7 @@ function parseUrl(pathname) {
   const parts = pathname.replace(/^\//, '').split('/')
   const first = parts[0] || ''
   if (first === 'games' && parts[1]) return { page: 'detail', detailId: parts[1] }
+  if (first === 'admindashboard') return { page: 'admin', detailId: null }
   if (PAGE_PATHS.includes(first)) return { page: first, detailId: null }
   return { page: 'home', detailId: null }
 }
@@ -378,7 +379,7 @@ export default function App() {
       />
 
       {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} lineUser={lineUser} />}
-      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} />}
+      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} lineUser={lineUser} />}
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}

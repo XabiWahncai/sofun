@@ -22,10 +22,17 @@ function fmtMoney(n) { return n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(Mat
 function fmtDate(d) { return `${d.getDate()}/${d.getMonth()+1}` }
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
-function DashboardTab({ allGames, members }) {
+function DashboardTab({ allGames, members, onGoTab }) {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState(14) // days
+  const [evalList, setEvalList] = useState([])
+
+  useEffect(() => {
+    return onSnapshot(collection(db, 'evaluations'), snap => {
+      setEvalList(snap.docs.map(d => d.data()))
+    }, () => {})
+  }, [])
 
   // ── Report ────────────────────────────────────────────────────────────────
   const [reportOpen, setReportOpen] = useState(false)
@@ -298,6 +305,41 @@ function DashboardTab({ allGames, members }) {
         <KpiCard icon="fa-coins" color="#fb923c" /* ds-allow-hardcode */ label="รายได้รวม"
           value={`฿${(totalGame+totalFood).toLocaleString()}`}
           sub={`เกม ฿${totalGame.toLocaleString()} · อาหาร ฿${totalFood.toLocaleString()}`} />
+      </div>
+
+      {/* ── Evaluations KPI Row ── */}
+      <div style={{ marginTop: 14, background: 'var(--surface-card)', borderRadius: 14, border: '1px solid var(--border-default)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
+            <i className="fas fa-star" />
+          </div>
+          <div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              ความพึงพอใจลูกค้า ({evalList.length} รีวิว)
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 3 }}>
+              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                เกม: <strong style={{ color: '#f59e0b' }}>⭐ {evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.gameRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
+              </span>
+              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                DM: <strong style={{ color: '#ec4899' }}>👑 {evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.dmRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
+              </span>
+            </div>
+          </div>
+        </div>
+        {onGoTab && (
+          <button
+            onClick={() => onGoTab('evaluations')}
+            style={{
+              padding: '8px 16px', borderRadius: 8, background: 'var(--surface-page)',
+              border: '1px solid var(--border-default)', color: 'var(--text-primary)',
+              cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
+              fontFamily: "'Sarabun',sans-serif"
+            }}
+          >
+            ดูแบบประเมินทั้งหมด <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
+          </button>
+        )}
       </div>
 
       {/* ── Range selector ── */}
@@ -2542,17 +2584,25 @@ function BookingsTab({ showToast, adminUser }) {
       const ref = doc(db, 'bookings', bookingId)
       const snap = await getDoc(ref)
       if (!snap.exists()) { showToast('ไม่พบการจอง', 'error'); return }
-      const updatedMembers = snap.data().members.map(m =>
+      const data = snap.data()
+      const updatedMembers = data.members.map(m =>
         m.uid === memberUid
           ? { ...m, paidDeposit: true, paidAt: new Date().toISOString(), slipStatus: 'verified' }
           : m
       )
       const allPaid = updatedMembers.every(m => m.paidDeposit)
-      const isFull = updatedMembers.length >= (snap.data().maxMembers || 1)
-      const payload = { members: updatedMembers, updatedAt: serverTimestamp() }
-      if (allPaid && isFull && snap.data().status === 'confirmed') payload.status = 'locked'
+      const isFull = updatedMembers.length >= (data.maxMembers || 1)
+      // Extend deadline by +3 days from max(current, now)
+      const baseMs = Math.max(new Date(data.depositDeadline || 0).getTime(), Date.now())
+      const newDeadline = new Date(baseMs + 3 * 86400000).toISOString()
+      const payload = {
+        members: updatedMembers,
+        depositDeadline: newDeadline,
+        updatedAt: serverTimestamp(),
+      }
+      if (allPaid && isFull && data.status === 'confirmed') payload.status = 'locked'
       await updateDoc(ref, payload)
-      showToast('ยืนยันสลิปสำเร็จ')
+      showToast(allPaid && isFull ? 'ครบแล้ว — ล็อกห้องอัตโนมัติ ✓' : 'ยืนยันสลิปสำเร็จ · ขยายเดดไลน์ +3 วัน')
     } catch (e) { showToast('เกิดข้อผิดพลาด: ' + e.message, 'error') }
   }
 
@@ -2947,10 +2997,369 @@ function BookingsTab({ showToast, adminUser }) {
   )
 }
 
+function EvaluationsTab({ showToast, allGames = [] }) {
+  const [evaluations, setEvaluations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [selectedGame, setSelectedGame] = useState('ALL')
+  const [selectedDm, setSelectedDm] = useState('ALL')
+  const [ratingFilter, setRatingFilter] = useState('ALL')
+  const [deletingId, setDeletingId] = useState(null)
+
+  useEffect(() => {
+    const q = query(collection(db, 'evaluations'), orderBy('createdAt', 'desc'))
+    const unsub = onSnapshot(q, snap => {
+      setEvaluations(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setLoading(false)
+    }, err => {
+      console.warn('evaluations orderBy query error, falling back:', err)
+      const fallbackUnsub = onSnapshot(collection(db, 'evaluations'), snap => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+        list.sort((a, b) => {
+          const ta = a.createdAt?.toMillis?.() || (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0)
+          const tb = b.createdAt?.toMillis?.() || (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0)
+          return tb - ta
+        })
+        setEvaluations(list)
+        setLoading(false)
+      })
+      return fallbackUnsub
+    })
+    return unsub
+  }, [])
+
+  const handleDelete = async (evalItem) => {
+    if (!window.confirm(`คุณแน่ใจหรือไม่ว่าต้องการลบแบบประเมินของ "${evalItem.userName || 'ลูกค้า'}"?`)) return
+    setDeletingId(evalItem.id)
+    try {
+      await deleteDoc(doc(db, 'evaluations', evalItem.id))
+      showToast('ลบแบบประเมินสำเร็จ')
+    } catch (err) {
+      console.error('Delete evaluation error:', err)
+      showToast('ลบไม่สำเร็จ: ' + err.message, 'error')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  // Summary Metrics
+  const totalCount = evaluations.length
+  const avgGameRating = totalCount > 0
+    ? (evaluations.reduce((s, e) => s + (Number(e.gameRating) || 0), 0) / totalCount).toFixed(1)
+    : '0.0'
+  const avgDmRating = totalCount > 0
+    ? (evaluations.reduce((s, e) => s + (Number(e.dmRating) || 0), 0) / totalCount).toFixed(1)
+    : '0.0'
+  const withFeedbackCount = evaluations.filter(e => e.feedback && e.feedback.trim()).length
+
+  // Unique Games & DMs for filter
+  const gameOptions = Array.from(new Set(evaluations.map(e => e.scriptTitle).filter(Boolean))).sort()
+  const dmOptions = Array.from(new Set(evaluations.map(e => e.dm).filter(Boolean))).sort()
+
+  // DM Performance breakdown
+  const dmStats = useMemo(() => {
+    const map = {}
+    evaluations.forEach(e => {
+      const dm = e.dm || 'ไม่ระบุ DM'
+      if (!map[dm]) map[dm] = { dm, count: 0, sumDm: 0, sumGame: 0 }
+      map[dm].count++
+      map[dm].sumDm += Number(e.dmRating) || 0
+      map[dm].sumGame += Number(e.gameRating) || 0
+    })
+    return Object.values(map)
+      .map(d => ({
+        ...d,
+        avgDm: (d.sumDm / d.count).toFixed(1),
+        avgGame: (d.sumGame / d.count).toFixed(1),
+      }))
+      .sort((a, b) => b.count - a.count)
+  }, [evaluations])
+
+  // Filtered evaluations
+  const filtered = evaluations.filter(e => {
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      const matchName = (e.userName || '').toLowerCase().includes(q)
+      const matchGame = (e.scriptTitle || '').toLowerCase().includes(q)
+      const matchDm = (e.dm || '').toLowerCase().includes(q)
+      const matchFeedback = (e.feedback || '').toLowerCase().includes(q)
+      const matchRoom = (e.room || '').toLowerCase().includes(q)
+      if (!matchName && !matchGame && !matchDm && !matchFeedback && !matchRoom) return false
+    }
+    if (selectedGame !== 'ALL' && e.scriptTitle !== selectedGame) return false
+    if (selectedDm !== 'ALL' && e.dm !== selectedDm) return false
+    if (ratingFilter === '5' && (e.gameRating !== 5 && e.dmRating !== 5)) return false
+    if (ratingFilter === '4+' && (e.gameRating < 4 || e.dmRating < 4)) return false
+    if (ratingFilter === '3+' && (e.gameRating < 3 || e.dmRating < 3)) return false
+    if (ratingFilter === 'low' && (e.gameRating >= 3 && e.dmRating >= 3)) return false
+
+    return true
+  })
+
+  const renderStars = (score) => {
+    const s = Math.round(Number(score) || 0)
+    return (
+      <span className="adm-eval-stars">
+        {[1, 2, 3, 4, 5].map(i => (
+          <i key={i} className={`fa-star ${i <= s ? 'fas active' : 'far'}`} />
+        ))}
+      </span>
+    )
+  }
+
+  const formatEvalDate = (createdAt) => {
+    if (!createdAt) return '—'
+    const dt = createdAt.toDate ? createdAt.toDate() : (createdAt.seconds ? new Date(createdAt.seconds * 1000) : new Date(createdAt))
+    if (isNaN(dt.getTime())) return '—'
+    return dt.toLocaleDateString('th-TH', {
+      day: 'numeric', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    })
+  }
+
+  if (loading) return <div className="adm-loading"><div className="spinner" /></div>
+
+  return (
+    <div className="adm-eval-root">
+      {/* ── Summary KPI Cards ── */}
+      <div className="adm-eval-kpi-grid">
+        <div className="adm-eval-kpi-card gold">
+          <div className="adm-eval-kpi-icon"><i className="fas fa-star" /></div>
+          <div className="adm-eval-kpi-info">
+            <div className="adm-eval-kpi-label">คะแนนเกมเฉลี่ย</div>
+            <div className="adm-eval-kpi-value">{avgGameRating} <span className="adm-eval-kpi-max">/ 5.0</span></div>
+            <div className="adm-eval-kpi-sub">{renderStars(avgGameRating)} จาก {totalCount} รีวิว</div>
+          </div>
+        </div>
+
+        <div className="adm-eval-kpi-card pink">
+          <div className="adm-eval-kpi-icon"><i className="fas fa-crown" /></div>
+          <div className="adm-eval-kpi-info">
+            <div className="adm-eval-kpi-label">คะแนน DM เฉลี่ย</div>
+            <div className="adm-eval-kpi-value">{avgDmRating} <span className="adm-eval-kpi-max">/ 5.0</span></div>
+            <div className="adm-eval-kpi-sub">{renderStars(avgDmRating)} จาก {totalCount} รีวิว</div>
+          </div>
+        </div>
+
+        <div className="adm-eval-kpi-card blue">
+          <div className="adm-eval-kpi-icon"><i className="fas fa-clipboard-check" /></div>
+          <div className="adm-eval-kpi-info">
+            <div className="adm-eval-kpi-label">แบบประเมินทั้งหมด</div>
+            <div className="adm-eval-kpi-value">{totalCount} <span className="adm-eval-kpi-max">รายการ</span></div>
+            <div className="adm-eval-kpi-sub">จากผู้เล่นที่ชำระเงินแล้ว</div>
+          </div>
+        </div>
+
+        <div className="adm-eval-kpi-card green">
+          <div className="adm-eval-kpi-icon"><i className="fas fa-comments" /></div>
+          <div className="adm-eval-kpi-info">
+            <div className="adm-eval-kpi-label">มีข้อเสนอแนะ</div>
+            <div className="adm-eval-kpi-value">{withFeedbackCount} <span className="adm-eval-kpi-max">ข้อความ</span></div>
+            <div className="adm-eval-kpi-sub">{totalCount > 0 ? Math.round((withFeedbackCount / totalCount) * 100) : 0}% ของผู้ประเมิน</div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── DM Performance Leaderboard ── */}
+      {dmStats.length > 0 && (
+        <div className="adm-card" style={{ marginBottom: 16 }}>
+          <div className="adm-card-header">
+            <div className="adm-card-title">
+              <i className="fas fa-award" style={{ color: '#ec4899' }} /> คะแนนรายบุคคล DM
+            </div>
+          </div>
+          <div className="adm-eval-dm-list">
+            {dmStats.map(stat => (
+              <button
+                key={stat.dm}
+                className={`adm-eval-dm-chip${selectedDm === stat.dm ? ' active' : ''}`}
+                onClick={() => setSelectedDm(prev => prev === stat.dm ? 'ALL' : stat.dm)}
+              >
+                <span className="adm-eval-dm-name"><i className="fas fa-user-circle" /> {stat.dm}</span>
+                <span className="adm-eval-dm-score">⭐ {stat.avgDm}</span>
+                <span className="adm-eval-dm-count">({stat.count} รีวิว)</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Filter and Search Bar ── */}
+      <div className="adm-card">
+        <div className="adm-card-header">
+          <div className="adm-card-title">
+            <i className="fas fa-list-alt" style={{ color: 'var(--crimson-500)' }} />
+            รายการแบบประเมิน ({filtered.length})
+          </div>
+          {(selectedGame !== 'ALL' || selectedDm !== 'ALL' || ratingFilter !== 'ALL' || search) && (
+            <button
+              className="adm-btn-text"
+              style={{ fontSize: 12, color: 'var(--crimson-500)', cursor: 'pointer', background: 'none', border: 'none', fontWeight: 700 }}
+              onClick={() => {
+                setSearch('')
+                setSelectedGame('ALL')
+                setSelectedDm('ALL')
+                setRatingFilter('ALL')
+              }}
+            >
+              <i className="fas fa-undo" /> ล้างตัวกรอง
+            </button>
+          )}
+        </div>
+
+        <div className="adm-eval-filter-bar">
+          <div className="adm-eval-search-wrap">
+            <i className="fas fa-search adm-eval-search-icon" />
+            <input
+              type="text"
+              className="adm-search"
+              placeholder="ค้นหาชื่อลูกค้า, ข้อความข้อเสนอแนะ, เกม, DM..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ paddingLeft: 36, marginBottom: 0 }}
+            />
+            {search && (
+              <button className="adm-search-clear-btn" onClick={() => setSearch('')}>
+                <i className="fas fa-times" />
+              </button>
+            )}
+          </div>
+
+          <div className="adm-eval-selects">
+            <select
+              className="adm-eval-select"
+              value={selectedGame}
+              onChange={e => setSelectedGame(e.target.value)}
+            >
+              <option value="ALL">🎮 ทุกเกม</option>
+              {gameOptions.map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+
+            <select
+              className="adm-eval-select"
+              value={selectedDm}
+              onChange={e => setSelectedDm(e.target.value)}
+            >
+              <option value="ALL">👑 ทุก DM</option>
+              {dmOptions.map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+
+            <select
+              className="adm-eval-select"
+              value={ratingFilter}
+              onChange={e => setRatingFilter(e.target.value)}
+            >
+              <option value="ALL">⭐ ทุกคะแนนดาว</option>
+              <option value="5">⭐⭐⭐⭐⭐ 5 ดาว</option>
+              <option value="4+">⭐ 4 ดาวขึ้นไป</option>
+              <option value="3+">⭐ 3 ดาวขึ้นไป</option>
+              <option value="low">⚠️ น้อยกว่า 3 ดาว</option>
+            </select>
+          </div>
+        </div>
+
+        {/* ── Evaluation Cards List ── */}
+        <div className="adm-eval-list">
+          {filtered.length === 0 ? (
+            <div className="adm-empty">
+              <i className="fas fa-comment-slash" />
+              <span>ไม่พบแบบประเมินตามเงื่อนไขที่เลือก</span>
+            </div>
+          ) : (
+            filtered.map(item => (
+              <div key={item.id} className="adm-eval-item-card">
+                <div className="adm-eval-item-top">
+                  <div className="adm-eval-user">
+                    <div className="adm-eval-avatar">
+                      {item.userAvatar ? (
+                        <img src={item.userAvatar} alt="" onError={e => e.currentTarget.style.display = 'none'} />
+                      ) : (
+                        <span>{(item.userName || '?')[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <div className="adm-eval-user-name">{item.userName || 'ไม่ระบุชื่อ'}</div>
+                      <div className="adm-eval-date">
+                        <i className="fas fa-clock" /> {formatEvalDate(item.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="adm-eval-tags">
+                    {item.scriptTitle && (
+                      <span className="adm-eval-tag game">
+                        <i className="fas fa-scroll" /> {item.scriptTitle}
+                      </span>
+                    )}
+                    {item.dm && (
+                      <span className="adm-eval-tag dm">
+                        <i className="fas fa-crown" /> {item.dm}
+                      </span>
+                    )}
+                    {item.room && (
+                      <span className="adm-eval-tag room">
+                        <i className="fas fa-door-open" /> {item.room}
+                      </span>
+                    )}
+                    <button
+                      className="adm-eval-del-btn"
+                      title="ลบแบบประเมิน"
+                      disabled={deletingId === item.id}
+                      onClick={() => handleDelete(item)}
+                    >
+                      <i className={`fas ${deletingId === item.id ? 'fa-spinner fa-spin' : 'fa-trash-alt'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="adm-eval-scores-row">
+                  <div className="adm-eval-score-block">
+                    <span className="adm-eval-score-title">คะแนนเกม:</span>
+                    <span className="adm-eval-score-val">
+                      {renderStars(item.gameRating)}
+                      <strong className="adm-eval-num">{item.gameRating}/5</strong>
+                    </span>
+                  </div>
+
+                  <div className="adm-eval-score-block">
+                    <span className="adm-eval-score-title">คะแนน DM:</span>
+                    <span className="adm-eval-score-val">
+                      {renderStars(item.dmRating)}
+                      <strong className="adm-eval-num">{item.dmRating}/5</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {item.feedback ? (
+                  <div className="adm-eval-feedback-box">
+                    <i className="fas fa-quote-left adm-eval-quote-icon" />
+                    <p className="adm-eval-feedback-text">{item.feedback}</p>
+                  </div>
+                ) : (
+                  <div className="adm-eval-feedback-empty">
+                    <span>(ไม่มีข้อเสนอแนะเพิ่มเติม)</span>
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 const NAV_SECTIONS = [
   {
     label: 'ภาพรวม',
-    items: [{ key: 'dashboard', icon: 'fa-chart-pie', label: 'Dashboard' }],
+    items: [
+      { key: 'dashboard',   icon: 'fa-chart-pie', label: 'Dashboard' },
+      { key: 'evaluations', icon: 'fa-star',      label: 'แบบประเมิน' },
+    ],
   },
   {
     label: 'จัดการข้อมูล',
@@ -3107,7 +3516,8 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
             </div>
 
             <div className="adm-content-body">
-              {tab === 'dashboard' && <DashboardTab allGames={allGames} members={members} />}
+              {tab === 'dashboard'   && <DashboardTab allGames={allGames} members={members} onGoTab={goTab} />}
+              {tab === 'evaluations' && <EvaluationsTab showToast={showToast} allGames={allGames} />}
               {tab === 'scripts'   && <ScriptsTab allGames={allGames} showToast={showToast} openModal={openModal} openEdit={openEdit} />}
               {tab === 'members'   && <MembersTab members={members} showToast={showToast} />}
               {tab === 'menu'      && <MenuTab showToast={showToast} />}

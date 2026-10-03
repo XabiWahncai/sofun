@@ -2,9 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { db, storage, appFunctions } from '../firebase'
 import { httpsCallable } from 'firebase/functions'
-import { doc, collection, onSnapshot, query, orderBy, updateDoc, arrayUnion, getDoc } from 'firebase/firestore'
+import { doc, collection, onSnapshot, query, orderBy, updateDoc, arrayUnion, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
-
 
 const ALL = 'ทั้งหมด'
 
@@ -52,7 +51,211 @@ function fmtDT(v) {
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
 }
 
-function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, forAll, onClose }) {
+function StarRatingInput({ value, onChange, label, sublabel, labels = [] }) {
+  const [hover, setHover] = useState(0)
+  const current = hover || value || 0
+  const defaultLabels = ['ต้องปรับปรุง', 'พอใช้', 'ปานกลาง', 'ดีมาก', 'ยอดเยี่ยม!']
+  const ratingLabels = labels.length === 5 ? labels : defaultLabels
+
+  return (
+    <div className="mo-star-input-group">
+      <div className="mo-star-input-header">
+        <span className="mo-star-input-label">{label}</span>
+        {current > 0 && (
+          <span className="mo-star-badge-text">
+            {current} ดาว · {ratingLabels[current - 1]}
+          </span>
+        )}
+      </div>
+      {sublabel && <div className="mo-star-sublabel">{sublabel}</div>}
+      <div className="mo-star-row">
+        {[1, 2, 3, 4, 5].map(star => {
+          const filled = star <= current
+          return (
+            <button
+              key={star}
+              type="button"
+              className={`mo-star-btn${filled ? ' filled' : ''}`}
+              onClick={() => onChange(star)}
+              onMouseEnter={() => setHover(star)}
+              onMouseLeave={() => setHover(0)}
+              aria-label={`${star} ดาว`}
+            >
+              <i className={`${filled ? 'fas' : 'far'} fa-star`} />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function EvaluationCard({ order, lineUser, showToast, isCompact = false }) {
+  const existingEval = order?.evaluations?.[lineUser?.uid]
+  const [editing, setEditing] = useState(false)
+  const [gameRating, setGameRating] = useState(existingEval?.gameRating || 5)
+  const [dmRating, setDmRating] = useState(existingEval?.dmRating || 5)
+  const [feedback, setFeedback] = useState(existingEval?.feedback || '')
+  const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (existingEval) {
+      setGameRating(existingEval.gameRating || 5)
+      setDmRating(existingEval.dmRating || 5)
+      setFeedback(existingEval.feedback || '')
+    }
+  }, [existingEval])
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault?.()
+    if (!order?.id || !lineUser?.uid) return
+    if (!gameRating || !dmRating) {
+      showToast('กรุณาให้คะแนนดาวทั้งเกมและ DM', 'error')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const evalId = `${order.id}_${lineUser.uid}`
+      const evalDoc = {
+        orderId: order.id,
+        uid: lineUser.uid,
+        userName: lineUser.name || 'ไม่ระบุชื่อ',
+        userAvatar: lineUser.avatar || '',
+        scriptId: order.scriptId || '',
+        scriptTitle: order.scriptTitle || 'ไม่ระบุเกม',
+        dm: order.dm || 'ไม่ระบุ DM',
+        room: order.room || '',
+        gameRating: Number(gameRating),
+        dmRating: Number(dmRating),
+        feedback: (feedback || '').trim(),
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      }
+
+      await setDoc(doc(db, 'evaluations', evalId), evalDoc, { merge: true })
+
+      await updateDoc(doc(db, 'orders', order.id), {
+        [`evaluations.${lineUser.uid}`]: {
+          gameRating: Number(gameRating),
+          dmRating: Number(dmRating),
+          feedback: (feedback || '').trim(),
+          evaluatedAt: new Date().toISOString(),
+          userName: lineUser.name || '',
+          userAvatar: lineUser.avatar || '',
+        }
+      })
+
+      showToast('ขอบคุณสำหรับแบบประเมินความพึงพอใจ! ⭐')
+      setEditing(false)
+    } catch (err) {
+      console.error('Submit evaluation error:', err)
+      showToast('ส่งแบบประเมินไม่สำเร็จ: ' + err.message, 'error')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  if (existingEval && !editing) {
+    return (
+      <div className="mo-eval-card submitted">
+        <div className="mo-eval-submitted-header">
+          <div className="mo-eval-submitted-title">
+            <i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)' }} />
+            <span>คุณส่งแบบประเมินเรียบร้อยแล้ว</span>
+          </div>
+          <button className="mo-eval-edit-btn" onClick={() => setEditing(true)}>
+            <i className="fas fa-pen" /> แก้ไข
+          </button>
+        </div>
+        <div className="mo-eval-submitted-scores">
+          <div className="mo-eval-score-item">
+            <span className="mo-eval-score-label"><i className="fas fa-scroll" /> คะแนนเกม ({order?.scriptTitle || 'เกม'}):</span>
+            <span className="mo-eval-stars">
+              {[1, 2, 3, 4, 5].map(s => (
+                <i key={s} className={`fa-star ${s <= existingEval.gameRating ? 'fas active' : 'far'}`} />
+              ))}
+              <strong style={{ marginLeft: 6 }}>{existingEval.gameRating}/5</strong>
+            </span>
+          </div>
+          <div className="mo-eval-score-item">
+            <span className="mo-eval-score-label"><i className="fas fa-crown" /> คะแนน DM ({order?.dm || 'DM'}):</span>
+            <span className="mo-eval-stars">
+              {[1, 2, 3, 4, 5].map(s => (
+                <i key={s} className={`fa-star ${s <= existingEval.dmRating ? 'fas active' : 'far'}`} />
+              ))}
+              <strong style={{ marginLeft: 6 }}>{existingEval.dmRating}/5</strong>
+            </span>
+          </div>
+        </div>
+        {existingEval.feedback && (
+          <div className="mo-eval-submitted-feedback">
+            <i className="fas fa-quote-left" style={{ marginRight: 6, opacity: 0.6 }} />
+            {existingEval.feedback}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className={`mo-eval-card${isCompact ? ' compact' : ''}`}>
+      <div className="mo-eval-header">
+        <div className="mo-eval-title-wrap">
+          <span className="mo-eval-badge"><i className="fas fa-star" /> แบบประเมิน</span>
+          <h4 className="mo-eval-title">ประเมินความพึงพอใจการเล่นเกม & DM</h4>
+          <p className="mo-eval-sub">ขอบคุณที่มาร่วมสนุกกับ Sofun! กรุณาให้คะแนนเพื่อพัฒนาการบริการ</p>
+        </div>
+        {editing && (
+          <button className="mo-eval-cancel-btn" onClick={() => setEditing(false)}>ยกเลิก</button>
+        )}
+      </div>
+
+      <form onSubmit={handleSubmit} className="mo-eval-form">
+        <StarRatingInput
+          label={`1. ความสนุกและความพึงพอใจของเกม "${order?.scriptTitle || 'เกมที่เล่น'}"`}
+          value={gameRating}
+          onChange={setGameRating}
+          labels={['ต้องปรับปรุง', 'พอใช้', 'ปานกลาง', 'สนุกมาก', 'ยอดเยี่ยมประทับใจ!']}
+        />
+
+        <StarRatingInput
+          label={`2. การดำเนินเกมและการดูแลของ DM "${order?.dm || 'Game Master'}"`}
+          value={dmRating}
+          onChange={setDmRating}
+          labels={['ต้องปรับปรุง', 'พอใช้', 'ปานกลาง', 'ดำเนินเกมดีมาก', 'ยอดเยี่ยมประทับใจ!']}
+        />
+
+        <div className="mo-eval-field">
+          <label className="mo-eval-field-label">
+            3. ข้อเสนอแนะเพิ่มเติม / ความประทับใจ (ไม่บังคับ)
+          </label>
+          <textarea
+            className="mo-eval-textarea"
+            rows={3}
+            placeholder="เขียนความคิดเห็น ข้อเสนอแนะ หรือความประทับใจถึงร้านและ DM ได้ที่นี่เลยครับ..."
+            value={feedback}
+            onChange={e => setFeedback(e.target.value)}
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="mo-eval-submit-btn"
+          disabled={submitting}
+        >
+          {submitting ? (
+            <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+          ) : (
+            <><i className="fas fa-paper-plane" /> {editing ? 'บันทึกการแก้ไข' : 'ส่งแบบประเมิน ⭐'}</>
+          )}
+        </button>
+      </form>
+    </div>
+  )
+}
+
+function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, forAll, onClose, activeOrder, lineUser, showToast }) {
   const total = Number(payment?.amount || amount)
   const tax   = total * 7 / 107
   const sub   = total - tax
@@ -115,12 +318,23 @@ function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembe
           <div>Thank you very much</div>
         </div>
       </div>
+
+      {activeOrder && lineUser && (
+        <div style={{ margin: '14px 16px 0' }}>
+          <EvaluationCard
+            order={activeOrder}
+            lineUser={lineUser}
+            showToast={showToast}
+          />
+        </div>
+      )}
+
       <button className="mo-pay-verify-btn" style={{ margin: '12px 16px 4px' }} onClick={onClose}>ปิด</button>
     </div>
   )
 }
 
-function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, lineUser, allMembers, promptPayPhone, memberPayments, onClose, showToast, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, getGroupMemberBill }) {
+function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, lineUser, allMembers, promptPayPhone, memberPayments, onClose, showToast, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, getGroupMemberBill, activeOrder }) {
   const myPayment = memberPayments?.[lineUser.uid]
   const [step, setStep] = useState(() =>
     myPayment?.verified || myPayment?.easyslipPending ? 'done'
@@ -239,6 +453,9 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
               myGameFee={myGameFee}
               forAll={forAll}
               onClose={onClose}
+              activeOrder={activeOrder}
+              lineUser={lineUser}
+              showToast={showToast}
             />
           ) : (
           <div className="mo-pay-done">
@@ -552,6 +769,17 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                 <i className="fas fa-users" /> เพื่อน {otherPending.length} รายการ
               </div>
             )}
+          </div>
+        )}
+
+        {/* ── Evaluation Section (after payment is verified) ── */}
+        {activeOrder.memberPayments?.[lineUser.uid]?.verified && (
+          <div style={{ marginTop: 12 }}>
+            <EvaluationCard
+              order={activeOrder}
+              lineUser={lineUser}
+              showToast={showToast}
+            />
           </div>
         )}
       </div>
@@ -887,6 +1115,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
           forGroup={!payForAll && payGroupMembers.length >= 2}
           groupMembers={payGroupMembers}
           orderId={activeOrder.id}
+          activeOrder={activeOrder}
           lineUser={lineUser}
           allMembers={activeOrder.members || []}
           promptPayPhone={promptPayPhone}

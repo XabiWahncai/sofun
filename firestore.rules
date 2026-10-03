@@ -54,6 +54,13 @@ service cloud.firestore {
       allow delete: if request.auth != null;
     }
 
+    // Evaluations — public read and create (LINE members after payment), admin update/delete
+    match /evaluations/{id} {
+      allow read: if true;
+      allow create: if true;
+      allow update, delete: if request.auth != null;
+    }
+
     // Play history — admin writes, public read
     match /playHistory/{id} {
       allow read: if true;
