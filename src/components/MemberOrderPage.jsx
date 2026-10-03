@@ -22,10 +22,22 @@ function crc16(str) {
 function buildPromptPayQR(phoneOrId, amount) {
   if (!phoneOrId) return ''
   const f = (tag, val) => { const v = String(val); return `${tag}${v.length.toString().padStart(2, '0')}${v}` }
-  const target = phoneOrId.replace(/[-\s]/g, '').replace(/^0/, '66')
-  const acct = f('00', 'A000000677010111') + f('01', target)
-  let s = f('00', '01') + f('01', '12') + f('29', acct) + f('53', '764')
-  if (amount > 0) s += f('54', amount.toFixed(2))
+  const clean = String(phoneOrId).replace(/[^0-9]/g, '')
+  let targetTag = '01'
+  let targetVal = ''
+  if (clean.length >= 13) {
+    targetTag = '02'
+    targetVal = clean.slice(0, 13)
+  } else {
+    let p = clean
+    if (p.startsWith('0')) p = '66' + p.slice(1)
+    if (!p.startsWith('00')) p = '00' + p
+    targetVal = p.padStart(13, '0')
+    targetTag = '01'
+  }
+  const acct = f('00', 'A000000677010111') + f(targetTag, targetVal)
+  let s = f('00', '01') + f('01', amount > 0 ? '12' : '11') + f('29', acct) + f('53', '764')
+  if (amount > 0) s += f('54', Number(amount).toFixed(2))
   s += f('58', 'TH') + '6304'
   return s + crc16(s).toString(16).toUpperCase().padStart(4, '0')
 }

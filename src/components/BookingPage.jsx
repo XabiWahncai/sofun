@@ -4,8 +4,10 @@ import {
   doc, serverTimestamp, query, orderBy, getDoc
 } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { QRCodeSVG } from 'qrcode.react'
-import { db, storage } from '../firebase'
+import { httpsCallable } from 'firebase/functions'
+import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
+import { db, storage, appFunctions } from '../firebase'
+import { useOpenProfile } from '../UserProfileContext'
 
 // ── Room Constants & Palette ───────────────────────────────────────────────────
 const ALL_ROOMS = [
@@ -54,10 +56,22 @@ function crc16(str) {
 function buildPromptPayQR(phoneOrId, amount) {
   if (!phoneOrId) return ''
   const f = (tag, val) => { const v = String(val); return `${tag}${v.length.toString().padStart(2, '0')}${v}` }
-  const target = phoneOrId.replace(/[-\s]/g, '').replace(/^0/, '66')
-  const acct = f('00', 'A000000677010111') + f('01', target)
-  let s = f('00', '01') + f('01', '12') + f('29', acct) + f('53', '764')
-  if (amount > 0) s += f('54', amount.toFixed(2))
+  const clean = String(phoneOrId).replace(/[^0-9]/g, '')
+  let targetTag = '01'
+  let targetVal = ''
+  if (clean.length >= 13) {
+    targetTag = '02'
+    targetVal = clean.slice(0, 13)
+  } else {
+    let p = clean
+    if (p.startsWith('0')) p = '66' + p.slice(1)
+    if (!p.startsWith('00')) p = '00' + p
+    targetVal = p.padStart(13, '0')
+    targetTag = '01'
+  }
+  const acct = f('00', 'A000000677010111') + f(targetTag, targetVal)
+  let s = f('00', '01') + f('01', amount > 0 ? '12' : '11') + f('29', acct) + f('53', '764')
+  if (amount > 0) s += f('54', Number(amount).toFixed(2))
   s += f('58', 'TH') + '6304'
   return s + crc16(s).toString(16).toUpperCase().padStart(4, '0')
 }
@@ -440,6 +454,9 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
   const exactSlotBookedIds = new Set(
     activeDateBookings.filter(b => finalTime && b.time === finalTime).map(b => b.gameId)
   )
+  const lockedSlotIds = new Set(
+    activeDateBookings.filter(b => finalTime && b.time === finalTime && b.status === 'locked').map(b => b.gameId)
+  )
 
   const filteredGames = allGames.filter(g =>
     !search || g.title?.toLowerCase().includes(search.toLowerCase())
@@ -447,6 +464,10 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
 
   const handleSubmit = async () => {
     if (!selectedGame || !selectedDate || !finalTime) return
+    if (lockedSlotIds.has(selectedGame.id)) {
+      showToast('เกมนี้ถูกล็อกในวันเวลานี้แล้ว — กรุณาเลือกวันหรือเวลาอื่น', 'error')
+      return
+    }
     setSubmitting(true)
     try {
       const maxMembers = selectedGame.characters?.length || parseInt(selectedGame.players) || 6
@@ -719,13 +740,14 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                 {filteredGames.map(g => {
                   const isSel = selectedGame?.id === g.id
                   const isExact = exactSlotBookedIds.has(g.id)
+                  const isLocked = lockedSlotIds.has(g.id)
                   const gImg = g.image ? convertImg(g.image, 200) : null
 
                   return (
                     <div
                       key={g.id}
-                      onClick={() => setSelectedGame(g)}
-                      className="flex items-center transition-all cursor-pointer"
+                      onClick={() => !isLocked && setSelectedGame(g)}
+                      className="flex items-center transition-all"
                       style={{
                         gap: 14,
                         padding: 12,
@@ -734,6 +756,8 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                         borderRadius: 14,
                         boxShadow: isSel ? `0 8px 20px ${C}1a` : '0 1px 2px rgba(26,26,26,0.02)',
                         transform: isSel ? 'translateY(-1px)' : 'none',
+                        opacity: isLocked ? 0.52 : 1,
+                        cursor: isLocked ? 'not-allowed' : 'pointer',
                       }}
                     >
                       <div className="shrink-0 overflow-hidden" style={{ width: 48, height: 60, borderRadius: 10, background: '#f5f1ef' }}>
@@ -765,7 +789,11 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                               <span style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)' }}>{g.difficulty}</span>
                             </>
                           )}
-                          {isExact && (
+                          {isLocked ? (
+                            <span style={{ padding: '2px 8px', background: INK, color: '#fff', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>
+                              <i className="fas fa-lock mr-1" style={{ fontSize: 8 }} />ล็อกแล้ว
+                            </span>
+                          ) : isExact && (
                             <span style={{ padding: '2px 8px', background: C, color: '#fff', borderRadius: 999, fontSize: 10, fontWeight: 700 }}>
                               จองแล้ว
                             </span>
@@ -863,6 +891,20 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   const amount = booking.depositAmount || 0
   const qrPayload = promptPayPhone ? buildPromptPayQR(promptPayPhone, amount) : ''
 
+  const saveQR = () => {
+    const canvas = document.getElementById('dp-deposit-qr-canvas')
+    if (!canvas) { showToast('ไม่พบรูป QR', 'error'); return }
+    try {
+      const a = document.createElement('a')
+      a.href = canvas.toDataURL('image/png')
+      a.download = `promptpay-${amount}-${booking.id}.png`
+      a.click()
+      showToast('บันทึก QR แล้ว ✓')
+    } catch (e) {
+      showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error')
+    }
+  }
+
   const handleFileSelect = (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -881,21 +923,70 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
     if (!slipFile) return
     setUploading(true)
     try {
+      // 1. Upload to Storage
       const path = `slips/deposits/${booking.id}/${lineUser.uid}_${Date.now()}`
       const fileRef = storageRef(storage, path)
       await uploadBytes(fileRef, slipFile)
       const slipUrl = await getDownloadURL(fileRef)
 
+      // 2. Try EasySlip verification via Cloud Function
+      let verified = false
+      let verifyData = {}
+      let slipCode = null
+      try {
+        const verifySlip = httpsCallable(appFunctions, 'verifySlip')
+        const result = await verifySlip({ slipUrl, amount, orderId: `booking_${booking.id}`, uid: lineUser.uid, name: lineUser.name })
+        const json = result.data
+        slipCode = json?.code || null
+        if (json?.success) {
+          verified = true
+          const slip = json.data?.rawSlip || {}
+          verifyData = {
+            slipTransRef: slip.transRef || '',
+            slipBank: slip.sender?.bank?.short || '',
+          }
+        } else if (json?.code === 'WRONG_RECEIVER') {
+          showToast('สลิปโอนไปยังบัญชีอื่น — กรุณาตรวจสอบและโอนใหม่', 'error')
+          return
+        }
+      } catch (e) {
+        console.warn('EasySlip verify failed:', e.message)
+      }
+
+      // 3. Update booking member
       const ref = doc(db, 'bookings', booking.id)
       const snap = await getDoc(ref)
       if (!snap.exists()) throw new Error('ไม่พบการจอง')
-      const updatedMembers = snap.data().members.map(m =>
+      const data = snap.data()
+      const nowIso = new Date().toISOString()
+      const updatedMembers = data.members.map(m =>
         m.uid === lineUser.uid
-          ? { ...m, slipUrl, slipStatus: 'pending_verification', slipSubmittedAt: new Date().toISOString() }
+          ? {
+              ...m,
+              slipUrl, slipSubmittedAt: nowIso,
+              ...(verified
+                ? { paidDeposit: true, paidAt: nowIso, slipStatus: 'verified', ...verifyData }
+                : { slipStatus: 'pending_verification' })
+            }
           : m
       )
-      await updateDoc(ref, { members: updatedMembers, updatedAt: serverTimestamp() })
-      showToast('อัปโหลดสลิปสำเร็จ รอแอดมินตรวจสอบ')
+      const payload = { members: updatedMembers, updatedAt: serverTimestamp() }
+      // If verified → extend deadline +3 days & lock when full
+      if (verified) {
+        const baseMs = Math.max(new Date(data.depositDeadline || 0).getTime(), Date.now())
+        payload.depositDeadline = new Date(baseMs + 3 * 86400000).toISOString()
+        const allPaid = updatedMembers.every(m => m.paidDeposit)
+        const isFull = updatedMembers.length >= (data.maxMembers || 1)
+        if (allPaid && isFull && data.status === 'confirmed') payload.status = 'locked'
+      }
+      await updateDoc(ref, payload)
+
+      if (verified) showToast('EasySlip ยืนยันแล้ว ✓')
+      else if (slipCode === 'QR_NOT_FOUND' || slipCode === 'IMAGE_ERROR') showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน (อ่าน QR ไม่สำเร็จ)')
+      else if (slipCode === 'SERVICE_EXPIRED') showToast('EasySlip หมดอายุ — รอแอดมินยืนยัน')
+      else if (slipCode === 'NO_API_KEY') showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน')
+      else showToast('ส่งสลิปสำเร็จ — รอแอดมินตรวจสอบ')
+
       setStep('done')
       onUpdated()
     } catch (e) {
@@ -906,118 +997,167 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   }
 
   const stepIndex = step === 'qr' ? 0 : step === 'upload' ? 1 : 2
+  const C = '#c62419'
+  const INK = '#1a1a1a'
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={e => e.target === e.currentTarget && onClose()}
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
+      style={{ background: 'rgba(26,26,26,0.5)', backdropFilter: 'blur(10px)' }}
     >
-      <div className="w-full max-w-sm bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl overflow-hidden flex flex-col">
-
-        {/* Mobile drag handle */}
-        <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto mt-3 sm:hidden shrink-0" />
+      <div
+        className="w-full sm:max-w-md flex flex-col overflow-hidden"
+        style={{
+          background: '#ffffff',
+          color: INK,
+          borderTopLeftRadius: 28, borderTopRightRadius: 28,
+          maxHeight: '94dvh',
+          boxShadow: '0 40px 100px rgba(26,26,26,0.22)',
+          fontFamily: "'Sarabun', sans-serif",
+        }}
+      >
+        {/* Drag handle */}
+        <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden shrink-0" style={{ background: 'rgba(26,26,26,0.12)' }} />
 
         {/* Header */}
-        <div className="px-5 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-0.5">
-              {/* Step dots */}
-              <div className="flex items-center gap-1">
+        <div className="flex items-start justify-between pt-7 pb-5 shrink-0" style={{ paddingLeft: 28, paddingRight: 28 }}>
+          <div className="min-w-0 flex-1">
+            {/* Step indicator eyebrow */}
+            <div className="flex items-center gap-3 mb-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: C }}>
+                ขั้นตอน {stepIndex + 1} / 3
+              </span>
+              <div className="flex-1 h-px" style={{ background: 'rgba(26,26,26,0.08)' }} />
+              <div className="flex items-center gap-1.5">
                 {[0, 1, 2].map(i => (
-                  <div
-                    key={i}
-                    className={`rounded-full transition-all ${
-                      i === stepIndex
-                        ? 'w-4 h-1.5 bg-[#c62419]'
-                        : i < stepIndex
-                          ? 'w-1.5 h-1.5 bg-[#c62419]/40'
-                          : 'w-1.5 h-1.5 bg-slate-200'
-                    }`}
+                  <div key={i} className="rounded-full"
+                    style={{
+                      width: i === stepIndex ? 20 : 6, height: 6,
+                      background: i <= stepIndex ? C : 'rgba(26,26,26,0.14)',
+                      transition: 'width 220ms',
+                    }}
                   />
                 ))}
               </div>
-              <span className="text-[10px] text-slate-400 font-medium">
-                {step === 'qr' ? 'สแกน & โอน' : step === 'upload' ? 'แนบหลักฐาน' : 'เสร็จสิ้น'}
-              </span>
             </div>
-            <h3 className="text-base font-black text-slate-900 leading-tight">ชำระมัดจำ</h3>
-            <p className="text-xs text-slate-500 mt-0.5 truncate">{booking.gameName}</p>
+            <h3 className="font-black leading-[1.15] tracking-tight" style={{ color: INK, fontSize: 24 }}>
+              {step === 'qr' ? 'ชำระมัดจำ' : step === 'upload' ? 'ตรวจสอบสลิป' : 'ส่งสลิปสำเร็จ'}
+            </h3>
+            <p className="text-[13px] mt-1.5 leading-snug truncate" style={{ color: 'rgba(26,26,26,0.55)' }}>
+              {step === 'qr' ? `สแกน QR แล้วโอน · ${booking.gameName}` : step === 'upload' ? 'ตรวจความถูกต้องก่อนส่ง' : 'รอแอดมินยืนยัน'}
+            </p>
           </div>
           {step !== 'done' && (
             <button
               onClick={onClose}
-              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors shrink-0 mt-1"
+              className="w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 ml-4"
+              style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.5)', marginTop: 2 }}
+              onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.color = 'rgba(26,26,26,0.5)' }}
             >
-              <i className="fas fa-times text-xs" />
+              <i className="fas fa-times text-sm" />
             </button>
           )}
         </div>
 
         {/* ── QR Step ── */}
         {step === 'qr' && (
-          <div className="px-5 pb-6 flex flex-col gap-5">
+          <div className="overflow-y-auto flex-1 flex flex-col" style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 28, gap: 24, background: '#fdfbfa' }}>
             {promptPayPhone ? (
               <>
                 {/* Amount hero */}
-                <div className="flex items-baseline justify-between px-4 py-3.5 rounded-xl bg-[#c62419]/5 border border-[#c62419]/12">
+                <div className="flex items-end justify-between" style={{ padding: '18px 20px', borderRadius: 16, background: `${C}0a`, border: `1px solid ${C}22` }}>
                   <div>
-                    <p className="text-[11px] font-bold uppercase tracking-widest text-slate-500 mb-0.5">ยอดมัดจำต่อคน</p>
-                    <p className="text-3xl font-black text-[#c62419] leading-none">฿{amount.toLocaleString()}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.5)', marginBottom: 4 }}>ยอดต่อคน</p>
+                    <p className="font-black leading-none" style={{ color: C, fontSize: 36, letterSpacing: '-0.02em' }}>฿{amount.toLocaleString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[11px] text-slate-400 leading-snug">
+                    <p className="text-[11px]" style={{ color: 'rgba(26,26,26,0.5)', lineHeight: 1.4 }}>
                       {booking.date ? fmtDate(booking.date) : ''}
                     </p>
                     {booking.time && (
-                      <p className="text-xs font-bold text-slate-700">{booking.time} น.</p>
+                      <p className="font-black mt-1" style={{ fontSize: 15, color: INK, fontFamily: "'JetBrains Mono', ui-monospace, monospace", letterSpacing: '0.02em' }}>{booking.time} น.</p>
                     )}
                   </div>
                 </div>
 
-                {/* QR code */}
-                <div className="flex flex-col items-center gap-3">
-                  <div className="p-4 rounded-2xl bg-white border-2 border-slate-100 shadow-md">
-                    <QRCodeSVG value={qrPayload} size={176} bgColor="#ffffff" fgColor="#0f172a" level="M" />
+                {/* QR code card */}
+                <div className="flex flex-col items-center" style={{ gap: 14 }}>
+                  <div style={{
+                    padding: 20, borderRadius: 20,
+                    background: '#ffffff',
+                    border: '1px solid rgba(26,26,26,0.08)',
+                    boxShadow: '0 12px 32px rgba(26,26,26,0.08)',
+                  }}>
+                    <QRCodeCanvas id="dp-deposit-qr-canvas" value={qrPayload} size={200} bgColor="#ffffff" fgColor={INK} level="M" includeMargin={true} />
                   </div>
-
-                  {/* PromptPay info */}
                   <div className="text-center">
-                    <p className="text-[11px] text-slate-400 uppercase tracking-wider mb-1">PromptPay</p>
-                    <p className="text-sm font-black text-slate-900 font-mono tracking-wide">{promptPayPhone}</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.4)', marginBottom: 4 }}>PromptPay</p>
+                    <p className="font-black tracking-wider" style={{ fontSize: 16, color: INK, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+                      {promptPayPhone}
+                    </p>
                   </div>
-
-                  {/* Instructions */}
-                  <ol className="w-full flex flex-col gap-2 mt-1">
-                    {[
-                      'สแกน QR ด้านบนผ่านแอปธนาคาร',
-                      `โอน ฿${amount} แล้วบันทึกหน้าจอสลิป`,
-                      'กดปุ่มด้านล่างเพื่อแนบสลิป',
-                    ].map((txt, i) => (
-                      <li key={i} className="flex items-start gap-2.5 text-xs text-slate-600">
-                        <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-500 font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">{i + 1}</span>
-                        <span>{txt}</span>
-                      </li>
-                    ))}
-                  </ol>
+                  <button
+                    type="button"
+                    onClick={saveQR}
+                    className="flex items-center justify-center font-bold transition-all"
+                    style={{
+                      gap: 8, height: 40, padding: '0 18px', borderRadius: 999,
+                      background: '#ffffff', color: INK,
+                      border: '1px solid rgba(26,26,26,0.12)',
+                      fontSize: 12.5, fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.borderColor = 'rgba(26,26,26,0.2)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = 'rgba(26,26,26,0.12)' }}
+                  >
+                    <i className="fas fa-download" style={{ fontSize: 11 }} />
+                    <span>บันทึกรูป QR</span>
+                  </button>
                 </div>
 
+                {/* Instructions */}
+                <ol className="flex flex-col" style={{ gap: 10 }}>
+                  {[
+                    'สแกน QR ผ่านแอปธนาคาร',
+                    `โอน ฿${amount.toLocaleString()} แล้วบันทึกสลิป`,
+                    'กดปุ่มด้านล่างเพื่อแนบสลิป',
+                  ].map((txt, i) => (
+                    <li key={i} className="flex items-center" style={{ gap: 12, padding: '10px 14px', borderRadius: 12, background: '#ffffff', border: '1px solid rgba(26,26,26,0.06)' }}>
+                      <span className="flex items-center justify-center font-black shrink-0"
+                        style={{ width: 24, height: 24, borderRadius: 999, background: `${C}10`, color: C, fontSize: 11 }}>
+                        {i + 1}
+                      </span>
+                      <span className="text-[13px]" style={{ color: 'rgba(26,26,26,0.75)', lineHeight: 1.5 }}>{txt}</span>
+                    </li>
+                  ))}
+                </ol>
+
                 {/* Upload CTA */}
-                <label className="w-full h-12 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-black text-sm flex items-center justify-center gap-2.5 shadow-md shadow-[#c62419]/25 cursor-pointer transition-all">
+                <label
+                  className="w-full font-black flex items-center justify-center transition-all cursor-pointer"
+                  style={{
+                    gap: 10, height: 56, borderRadius: 16,
+                    background: C, color: '#fff',
+                    fontSize: 15, letterSpacing: '0.01em',
+                    boxShadow: `0 10px 28px ${C}3f`,
+                  }}
+                >
                   <i className="fas fa-image" />
                   <span>โอนแล้ว — แนบสลิปที่นี่</span>
                   <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
                 </label>
               </>
             ) : (
-              <div className="text-center py-10 text-slate-400 text-sm flex flex-col items-center gap-3">
-                <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
-                  <i className="fas fa-qrcode text-2xl opacity-30" />
+              <div className="flex flex-col items-center gap-4 py-12 text-center">
+                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#f5f1ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fas fa-qrcode" style={{ fontSize: 30, color: 'rgba(26,26,26,0.35)' }} />
                 </div>
                 <div>
-                  <p className="font-bold text-slate-600">ยังไม่ได้ตั้งค่าบัญชี</p>
-                  <p className="text-xs text-slate-400 mt-1">ติดต่อแอดมินเพื่อรับข้อมูลการโอนเงิน</p>
+                  <p className="font-black text-[15px]" style={{ color: INK }}>ยังไม่ได้ตั้งค่าบัญชี</p>
+                  <p className="text-[13px] mt-1" style={{ color: 'rgba(26,26,26,0.55)', maxWidth: 260 }}>ติดต่อแอดมินเพื่อรับข้อมูลการโอนเงิน</p>
                 </div>
-                <button onClick={onClose} className="mt-2 h-10 px-6 rounded-xl bg-slate-100 text-slate-700 font-bold text-sm hover:bg-slate-200 transition-colors">
+                <button onClick={onClose} className="font-bold" style={{ marginTop: 6, height: 44, padding: '0 24px', borderRadius: 12, background: '#f5f1ef', color: INK, border: 'none', cursor: 'pointer', fontSize: 13.5, fontFamily: "'Sarabun', sans-serif" }}>
                   ปิด
                 </button>
               </div>
@@ -1027,47 +1167,63 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
 
         {/* ── Upload / Preview Step ── */}
         {step === 'upload' && (
-          <div className="px-5 pb-6 flex flex-col gap-4">
+          <div className="overflow-y-auto flex-1 flex flex-col" style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 28, gap: 18, background: '#fdfbfa' }}>
             {/* Amount reminder */}
-            <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200">
-              <i className="fas fa-receipt text-[#c62419] text-sm shrink-0" />
-              <span className="text-xs text-slate-600">ตรวจสอบยอด <strong className="text-slate-900">฿{amount}</strong> ก่อนส่ง</span>
+            <div className="flex items-center" style={{ gap: 12, padding: '14px 18px', borderRadius: 16, background: `${C}0a`, border: `1px solid ${C}22` }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fas fa-receipt" style={{ color: C, fontSize: 14 }} />
+              </div>
+              <div>
+                <div className="text-[11px] font-bold" style={{ color: 'rgba(26,26,26,0.5)' }}>ยอดที่ต้องชำระ</div>
+                <div className="font-black" style={{ fontSize: 18, color: C, lineHeight: 1.1 }}>฿{amount.toLocaleString()}</div>
+              </div>
             </div>
 
             {/* Slip preview */}
             {slipPreview && (
-              <div className="rounded-xl overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center" style={{ maxHeight: '280px' }}>
-                <img src={slipPreview} alt="slip" className="w-full object-contain" style={{ maxHeight: '280px' }} />
+              <div className="overflow-hidden flex items-center justify-center"
+                style={{ borderRadius: 16, border: '1px solid rgba(26,26,26,0.08)', background: '#f5f1ef', maxHeight: 320 }}>
+                <img src={slipPreview} alt="slip" className="w-full object-contain" style={{ maxHeight: 320 }} />
               </div>
             )}
 
-            {/* Label tag */}
-            <p className="text-center text-[11px] text-slate-400">
+            <p className="text-center text-[12px]" style={{ color: 'rgba(26,26,26,0.5)' }}>
               ตรวจสอบความถูกต้องของสลิปก่อนกดยืนยัน
             </p>
 
             {/* Action row */}
-            <div className="flex gap-2">
+            <div className="flex" style={{ gap: 10, marginTop: 4 }}>
               <button
                 type="button"
                 onClick={() => { setSlipFile(null); setSlipPreview(''); setStep('qr') }}
-                className="w-11 h-11 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-colors shrink-0"
+                className="flex items-center justify-center shrink-0 transition-all"
+                style={{
+                  width: 56, height: 56, borderRadius: 14,
+                  background: '#faf7f5', color: 'rgba(26,26,26,0.6)',
+                  border: 'none', cursor: 'pointer',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#faf7f5'; e.currentTarget.style.color = 'rgba(26,26,26,0.6)' }}
               >
-                <i className="fas fa-arrow-left text-xs" />
+                <i className="fas fa-arrow-left text-sm" />
               </button>
               <button
                 type="button"
                 disabled={uploading}
                 onClick={handleSubmit}
-                className={`flex-1 h-11 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 ${
-                  uploading
-                    ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                    : 'bg-[#c62419] hover:bg-[#9a1c13] text-white shadow-md shadow-[#c62419]/25'
-                }`}
+                className="flex-1 font-black flex items-center justify-center transition-all"
+                style={{
+                  gap: 10, height: 56, borderRadius: 14,
+                  background: uploading ? '#f0ebe9' : C,
+                  color: uploading ? 'rgba(26,26,26,0.3)' : '#fff',
+                  border: 'none', cursor: uploading ? 'wait' : 'pointer',
+                  fontSize: 15, letterSpacing: '0.01em',
+                  boxShadow: uploading ? 'none' : `0 10px 28px ${C}3f`,
+                }}
               >
                 {uploading ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-slate-300 border-t-slate-600 rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(26,26,26,0.2)', borderTopColor: INK }} />
                     <span>กำลังส่ง...</span>
                   </>
                 ) : (
@@ -1083,40 +1239,54 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
 
         {/* ── Done Step ── */}
         {step === 'done' && (
-          <div className="px-5 pb-8 flex flex-col items-center gap-4 text-center">
-            {/* Icon */}
-            <div className="relative">
-              <div className="w-20 h-20 rounded-full bg-[#c62419]/8 flex items-center justify-center">
-                <div className="w-14 h-14 rounded-full bg-[#c62419]/15 flex items-center justify-center">
-                  <i className="fas fa-check text-[#c62419] text-2xl" />
-                </div>
+          <div className="overflow-y-auto flex-1 flex flex-col items-center text-center" style={{ padding: '12px 28px 32px', gap: 20, background: '#fdfbfa' }}>
+            {/* Check circle */}
+            <div className="relative flex items-center justify-center" style={{ width: 96, height: 96 }}>
+              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `${C}0c` }} />
+              <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', background: `${C}1a` }} />
+              <div style={{ position: 'absolute', inset: 22, borderRadius: '50%', background: C, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 12px 28px ${C}48` }}>
+                <i className="fas fa-check" style={{ color: '#fff', fontSize: 22 }} />
               </div>
             </div>
 
             <div>
-              <h4 className="text-lg font-black text-slate-900">ส่งสลิปสำเร็จ</h4>
-              <p className="text-xs text-slate-500 mt-1.5 max-w-[220px] leading-relaxed">
+              <h4 className="font-black" style={{ fontSize: 22, color: INK, letterSpacing: '-0.02em' }}>ส่งสลิปสำเร็จ</h4>
+              <p className="text-[13px] mt-2" style={{ color: 'rgba(26,26,26,0.6)', maxWidth: 280, lineHeight: 1.55 }}>
                 แอดมินจะตรวจสอบและยืนยันภายใน 24 ชม. ระบบจะแจ้งผลทาง LINE
               </p>
             </div>
 
             {/* Booking recap */}
-            <div className="w-full px-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 text-left flex items-center gap-3">
-              <i className="fas fa-calendar-check text-[#c62419] text-sm shrink-0" />
-              <div>
-                <p className="font-bold text-slate-900 truncate">{booking.gameName}</p>
-                <p className="mt-0.5">{booking.date ? fmtDate(booking.date) : ''}{booking.time ? ` · ${booking.time} น.` : ''}</p>
+            <div className="w-full flex items-center text-left"
+              style={{ gap: 14, padding: '14px 18px', borderRadius: 16, background: '#ffffff', border: '1px solid rgba(26,26,26,0.08)' }}>
+              <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <i className="fas fa-calendar-check" style={{ color: C, fontSize: 15 }} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="font-black truncate" style={{ fontSize: 14, color: INK }}>{booking.gameName}</p>
+                <p className="mt-0.5 text-[12px]" style={{ color: 'rgba(26,26,26,0.55)' }}>
+                  {booking.date ? fmtDate(booking.date) : ''}{booking.time ? ` · ${booking.time} น.` : ''}
+                </p>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="w-full h-12 rounded-xl bg-[#c62419] hover:bg-[#9a1c13] text-white font-black text-sm transition-colors shadow-md shadow-[#c62419]/20"
+              className="w-full font-black transition-all"
+              style={{
+                height: 56, borderRadius: 16,
+                background: C, color: '#fff', border: 'none', cursor: 'pointer',
+                fontSize: 15, letterSpacing: '0.01em',
+                boxShadow: `0 10px 28px ${C}3f`,
+                marginTop: 4,
+              }}
             >
               เสร็จสิ้น
             </button>
           </div>
         )}
+
+        <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </div>
     </div>
   )
@@ -1124,6 +1294,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
 
 // ── Booking Detail & Party Lounge Modal ───────────────────────────────────────
 export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }) {
+  const openProfile = useOpenProfile()
   const [joining, setJoining] = useState(false)
   const [leaving, setLeaving] = useState(false)
   const [closing, setClosing] = useState(false)
@@ -1464,7 +1635,10 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               {/* Avatar overview row */}
               <div className="flex items-center gap-2.5 flex-wrap">
                 {(booking.members || []).map(m => (
-                  <div key={m.uid} className="relative shrink-0" title={m.name}>
+                  <div key={m.uid} className="relative shrink-0" title={m.name}
+                    onClick={() => openProfile(m.uid)}
+                    style={{ cursor: 'pointer' }}
+                  >
                     {m.avatar
                       ? <img src={m.avatar} alt={m.name} className="w-11 h-11 rounded-full object-cover"
                           style={m.paidDeposit
@@ -1520,7 +1694,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                       background: m.paidDeposit ? `${C}08` : m.slipStatus === 'pending_verification' ? `${C}05` : '#faf7f5',
                       border: `1px solid ${m.paidDeposit ? `${C}22` : m.slipStatus === 'pending_verification' ? `${C}14` : 'rgba(26,26,26,0.06)'}`,
                     }}>
-                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => openProfile(m.uid)}>
                       <div className="shrink-0">
                         {m.avatar
                           ? <img src={m.avatar} alt="" className="w-10 h-10 rounded-full object-cover"
