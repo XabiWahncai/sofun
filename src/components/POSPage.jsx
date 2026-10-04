@@ -449,6 +449,7 @@ export default function POSPage({
   }
 
   const [orderModal, setOrderModal] = useState(null)
+  const [editingGamePriceMember, setEditingGamePriceMember] = useState(null)
   const [editingBillKey, setEditingBillKey] = useState(null)
   const [showPayment, setShowPayment] = useState(false)
   const [groupPayMode, setGroupPayMode] = useState(false)
@@ -632,6 +633,81 @@ export default function POSPage({
   const setPersonalDiscountNote = (uid, val) =>
     updateActive({ members: activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscountNote: val } : m) })
 
+  const calcMemberGamePrice = (m, fallback = gameUnitPay) => {
+    if (m?.customGamePrice !== undefined && m?.customGamePrice !== null && m?.customGamePrice !== '') {
+      return Number(m.customGamePrice) || 0
+    }
+    return fallback
+  }
+
+  const setMemberCustomGamePrice = (uid, price, reason) => {
+    const cleanPrice = (price !== '' && price !== undefined && price !== null) ? Math.max(0, Number(price)) : null
+    updateActive({
+      members: (activeSession.members || []).map(m => {
+        if (m.uid !== uid) return m
+        return {
+          ...m,
+          customGamePrice: cleanPrice,
+          customGamePriceReason: reason !== undefined ? reason : (m.customGamePriceReason || ''),
+        }
+      })
+    })
+  }
+
+  const saveMemberCustomGamePrice = async (uid, price, reason) => {
+    const cleanPrice = (price !== '' && price !== undefined && price !== null) ? Math.max(0, Number(price)) : null
+    const cleanReason = (reason || '').trim()
+
+    const updatedMembers = (activeSession.members || []).map(m => {
+      if (m.uid !== uid) return m
+      return {
+        ...m,
+        customGamePrice: cleanPrice,
+        customGamePriceReason: cleanPrice !== null ? cleanReason : '',
+      }
+    })
+
+    updateActive({ members: updatedMembers })
+
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      const newGamePrice = updatedMembers.reduce((sum, m) => sum + calcMemberGamePrice(m, gameUnitPay), 0)
+      const d = Number(activeSession.discount) || 0
+      const mode = activeSession.discountMode || 'perPerson'
+      const totalD = mode === 'split' ? d : d * updatedMembers.length
+      const totalPersonalDisc = updatedMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+      const newGrandTotal = Math.max(0, foodTotal + newGamePrice - totalD - totalPersonalDisc)
+
+      const membersPayload = updatedMembers.map(m => ({
+        uid: m.uid,
+        name: m.name,
+        character: m.character || '',
+        avatar: m.avatar || '',
+        scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? Number(m.customGamePrice) : null,
+        customGamePriceReason: m.customGamePriceReason || '',
+      }))
+
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          gameTotal: newGamePrice,
+          grandTotal: newGrandTotal,
+        })
+        const targetMember = updatedMembers.find(m => m.uid === uid)
+        showToast(cleanPrice !== null ? `อัปเดตราคาค่าเกมของ ${targetMember?.name || 'สมาชิก'} เป็น ฿${cleanPrice} สำเร็จ ✓` : `คืนค่าราคาค่าเกมของ ${targetMember?.name || 'สมาชิก'} เป็นราคาเดิมแล้ว ✓`)
+      } catch (err) {
+        console.error('Failed to sync custom game price:', err)
+        showToast('บันทึกล้มเหลว: ' + err.message, 'error')
+      }
+    } else {
+      const targetMember = updatedMembers.find(m => m.uid === uid)
+      showToast(cleanPrice !== null ? `บันทึกราคาค่าเกมของ ${targetMember?.name || 'สมาชิก'} เป็น ฿${cleanPrice} แล้ว ✓` : `คืนค่าราคาค่าเกมของ ${targetMember?.name || 'สมาชิก'} เป็นราคาเดิมแล้ว ✓`)
+    }
+  }
+
   const syncMembersDiscount = async () => {
     const orderId = activeSession.confirmedOrderId
     if (!orderId) return
@@ -640,13 +716,16 @@ export default function POSPage({
       avatar: m.avatar || '', scanInAt: m.scanInAt || null,
       personalDiscount: Number(m.personalDiscount) || 0,
       personalDiscountNote: m.personalDiscountNote || '',
+      customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? Number(m.customGamePrice) : null,
+      customGamePriceReason: m.customGamePriceReason || '',
     }))
     const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
     await updateDoc(doc(db, 'orders', orderId), {
       members: membersPayload,
+      gameTotal: gamePrice,
       grandTotal: Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDisc),
     })
-    showToast('อัปเดตส่วนลดรายบุคคลแล้ว ✓')
+    showToast('อัปเดตข้อมูลสมาชิกและส่วนลดแล้ว ✓')
   }
 
   const removeMember = (uid) =>
@@ -781,11 +860,11 @@ export default function POSPage({
       ? selectedIds.filter(uid => members.some(mm => mm.uid === uid))
       : members.map(mm => mm.uid)
     const nDisc = effectiveIds.length
-    const isMemberDiscounted = effectiveIds.includes(m.uid)
     const myDisc = isMemberDiscounted
       ? (mode === 'split' ? (nDisc > 0 ? rawD / nDisc : 0) : rawD)
       : 0
-    return Math.max(0, gameUnitPay + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+    const myGameFee = calcMemberGamePrice(m, gameUnitPay)
+    return Math.max(0, myGameFee + myFood - (Number(m.personalDiscount) || 0) - myDisc)
   }
 
   const confirmGroupPayment = async () => {
@@ -880,7 +959,7 @@ export default function POSPage({
     ? Number(activeSession.customPrice) || 0
     : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
   const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
-  const gamePrice = sessionMembers.length * gameUnitPay
+  const gamePrice = sessionMembers.reduce((sum, m) => sum + calcMemberGamePrice(m, gameUnitPay), 0)
   const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
   const discountRaw = Number(activeSession?.discount) || 0
   // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
@@ -1038,6 +1117,10 @@ export default function POSPage({
           members: activeSession.members.map(m => ({
             uid: m.uid, name: m.name, character: m.character || '',
             avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+            personalDiscount: Number(m.personalDiscount) || 0,
+            personalDiscountNote: m.personalDiscountNote || '',
+            customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? Number(m.customGamePrice) : null,
+            customGamePriceReason: m.customGamePriceReason || '',
           })),
           memberUids: activeSession.members.map(m => m.uid),
           gameUnitPrice: gameUnitPay,
@@ -1098,6 +1181,8 @@ export default function POSPage({
           avatar: m.avatar || '', scanInAt: m.scanInAt || null,
           personalDiscount: Number(m.personalDiscount) || 0,
           personalDiscountNote: m.personalDiscountNote || '',
+          customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? Number(m.customGamePrice) : null,
+          customGamePriceReason: m.customGamePriceReason || '',
         })),
         memberUids: s.members.map(m => m.uid),
         scriptId: s.scriptId,
@@ -1108,6 +1193,7 @@ export default function POSPage({
         foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
         memberFoodHistory: orderArr.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
         foodTotal,
+        gameUnitPrice: gameUnitPay,
         gameTotal: gamePrice,
         discount: discountRaw,  // raw input value (per-person or lump sum)
         discountMode,           // 'perPerson' | 'split'
@@ -2037,10 +2123,65 @@ export default function POSPage({
                       </div>
 
                       {/* Breakdown summary */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'rgba(26,26,26,0.6)', background: '#faf7f5', padding: '8px 12px', borderRadius: 10 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>ค่าเกม / คน</span>
-                          <span>฿{gameUnitPay.toLocaleString()}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 11.5, color: 'rgba(26,26,26,0.6)', background: '#faf7f5', padding: '8px 12px', borderRadius: 10 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 600 }}>ค่าเกม / คน</span>
+                            {m.customGamePrice !== undefined && m.customGamePrice !== null && (
+                              <span style={{
+                                fontSize: 9.5, fontWeight: 800, color: '#c62419',
+                                background: 'rgba(198,36,25,0.08)', padding: '1px 6px',
+                                borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3
+                              }} title={m.customGamePriceReason ? `เหตุผล: ${m.customGamePriceReason}` : 'ปรับราคาพิเศษ'}>
+                                <i className="fas fa-tag" style={{ fontSize: 8 }} />
+                                {m.customGamePriceReason ? `ปรับ: ${m.customGamePriceReason}` : 'ปรับราคาพิเศษ'}
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            {m.customGamePrice !== undefined && m.customGamePrice !== null && (
+                              <span style={{ textDecoration: 'line-through', color: 'rgba(26,26,26,0.35)', fontSize: 10.5 }}>
+                                ฿{gameUnitPay.toLocaleString()}
+                              </span>
+                            )}
+                            <span style={{ fontWeight: m.customGamePrice !== undefined && m.customGamePrice !== null ? 800 : 600, color: m.customGamePrice !== undefined && m.customGamePrice !== null ? '#c62419' : 'inherit' }}>
+                              ฿{calcMemberGamePrice(m, gameUnitPay).toLocaleString()}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setEditingGamePriceMember({
+                                  uid: m.uid,
+                                  name: m.name,
+                                  character: m.character || '',
+                                  avatar: m.avatar || '',
+                                  currentPrice: m.customGamePrice !== undefined && m.customGamePrice !== null ? m.customGamePrice : gameUnitPay,
+                                  currentReason: m.customGamePriceReason || '',
+                                  basePrice: gameUnitPay,
+                                })
+                              }}
+                              style={{
+                                padding: '2px 8px',
+                                borderRadius: 6,
+                                background: m.customGamePrice !== undefined && m.customGamePrice !== null ? '#c62419' : 'rgba(26,26,26,0.06)',
+                                color: m.customGamePrice !== undefined && m.customGamePrice !== null ? '#ffffff' : '#1a1a1a',
+                                border: 'none',
+                                fontSize: 10.5,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 3,
+                                fontFamily: "'Sarabun', sans-serif",
+                                transition: 'all 0.12s ease',
+                              }}
+                              title="DM / Admin แก้ราคาค่าเกมเฉพาะคนนี้"
+                            >
+                              <i className="fas fa-pen" style={{ fontSize: 8.5 }} />
+                              {m.customGamePrice !== undefined && m.customGamePrice !== null ? 'แก้ไข' : 'แก้ราคา'}
+                            </button>
+                          </div>
                         </div>
                         {myFoodTotal > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -2058,6 +2199,53 @@ export default function POSPage({
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
                             <span>− {m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
                             <span>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Custom Game Price Section */}
+                      <div style={{ padding: '8px 10px', borderRadius: 10, background: m.customGamePrice !== undefined && m.customGamePrice !== null ? 'rgba(198,36,25,0.04)' : 'transparent', border: m.customGamePrice !== undefined && m.customGamePrice !== null ? '1px dashed rgba(198,36,25,0.3)' : '1px solid rgba(26,26,26,0.06)', marginBottom: 8 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 800, color: m.customGamePrice !== undefined && m.customGamePrice !== null ? '#c62419' : 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                            <i className="fas fa-tag" style={{ marginRight: 4 }} />
+                            ค่าเกมเฉพาะบุคคล {m.customGamePrice !== undefined && m.customGamePrice !== null ? `(฿${Number(m.customGamePrice).toLocaleString()})` : `(ปกติ ฿${gameUnitPay.toLocaleString()})`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingGamePriceMember({
+                                uid: m.uid,
+                                name: m.name,
+                                character: m.character || '',
+                                avatar: m.avatar || '',
+                                currentPrice: m.customGamePrice !== undefined && m.customGamePrice !== null ? m.customGamePrice : gameUnitPay,
+                                currentReason: m.customGamePriceReason || '',
+                                basePrice: gameUnitPay,
+                              })
+                            }}
+                            style={{
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              background: '#c62419',
+                              color: '#fff',
+                              border: 'none',
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 4,
+                              fontFamily: "'Sarabun', sans-serif",
+                            }}
+                          >
+                            <i className="fas fa-edit" style={{ fontSize: 9 }} />
+                            {m.customGamePrice !== undefined && m.customGamePrice !== null ? 'แก้ไข / คืนค่า' : 'ปรับราคา'}
+                          </button>
+                        </div>
+                        {m.customGamePrice !== undefined && m.customGamePrice !== null && (
+                          <div style={{ fontSize: 11.5, color: '#c62419', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <span><strong>เหตุผล:</strong> {m.customGamePriceReason || 'ไม่ได้ระบุเหตุผล'}</span>
+                            <span style={{ fontWeight: 800 }}>฿{Number(m.customGamePrice).toLocaleString()}</span>
                           </div>
                         )}
                       </div>
@@ -3344,6 +3532,269 @@ export default function POSPage({
                   </>
                 )
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Custom Game Price Modal (ปรับราคาค่าเกมเฉพาะคน & ระบุเหตุผล) ── */}
+      {editingGamePriceMember && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setEditingGamePriceMember(null)}>
+          <div className="pos-order-modal" style={{ maxWidth: 440 }}>
+            {/* Modal Header */}
+            <div className="pos-order-modal-header">
+              <div>
+                <div className="pos-order-modal-title">
+                  <i className="fas fa-tag" style={{ color: '#c62419' }} />
+                  <span>ปรับราคาค่าเกมเฉพาะคน</span>
+                </div>
+                <div className="pos-order-modal-subtitle">
+                  DM / Admin สามารถตั้งราคาใหม่เฉพาะผู้เล่นนี้ พร้อมระบุเหตุผล
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setEditingGamePriceMember(null)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: '#faf7f5', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#1a1a1a', fontSize: 13
+                }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            {/* Member info preview banner */}
+            <div className="pos-order-item-banner">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                {editingGamePriceMember.avatar ? (
+                  <img
+                    src={editingGamePriceMember.avatar}
+                    alt=""
+                    style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(198,36,25,0.2)' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 42, height: 42, borderRadius: '50%',
+                    background: '#faeceb', color: '#c62419',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 16, fontWeight: 800
+                  }}>
+                    {(editingGamePriceMember.name || '?')[0].toUpperCase()}
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: 14.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                    {editingGamePriceMember.name}
+                  </div>
+                  {editingGamePriceMember.character && (
+                    <div style={{ fontSize: 11.5, color: '#c62419', fontWeight: 700, marginTop: 2 }}>
+                      🎭 {editingGamePriceMember.character}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 700, textTransform: 'uppercase' }}>
+                  ราคาปกติ
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'rgba(26,26,26,0.7)' }}>
+                  ฿{editingGamePriceMember.basePrice.toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="pos-order-modal-body" style={{ gap: 16 }}>
+              {/* Price input + quick chips */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1a1a1a', marginBottom: 6 }}>
+                  <i className="fas fa-coins" style={{ color: '#c62419', marginRight: 5 }} />
+                  ราคาค่าเกมใหม่ (฿ บาท)
+                </label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ position: 'relative', flex: 1 }}>
+                    <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', fontWeight: 800, color: '#c62419' }}>฿</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      value={editingGamePriceMember.currentPrice !== '' && editingGamePriceMember.currentPrice !== null && editingGamePriceMember.currentPrice !== undefined ? editingGamePriceMember.currentPrice : ''}
+                      onChange={e => {
+                        const val = e.target.value === '' ? '' : Math.max(0, Number(e.target.value))
+                        setEditingGamePriceMember(prev => ({ ...prev, currentPrice: val }))
+                      }}
+                      placeholder={`ปกติ ฿${editingGamePriceMember.basePrice}`}
+                      style={{
+                        width: '100%',
+                        padding: '10px 12px 10px 30px',
+                        borderRadius: 10,
+                        border: '1.5px solid rgba(26,26,26,0.15)',
+                        fontSize: 16,
+                        fontWeight: 800,
+                        color: '#1a1a1a',
+                        outline: 'none',
+                        fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Quick price chips */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {[
+                    { label: 'ฟรี ฿0', val: 0 },
+                    { label: `ลด 50% (฿${Math.round(editingGamePriceMember.basePrice * 0.5)})`, val: Math.round(editingGamePriceMember.basePrice * 0.5) },
+                    { label: '฿100', val: 100 },
+                    { label: '฿150', val: 150 },
+                    { label: '฿200', val: 200 },
+                    { label: `ราคาเดิม ฿${editingGamePriceMember.basePrice}`, val: editingGamePriceMember.basePrice },
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setEditingGamePriceMember(prev => ({ ...prev, currentPrice: preset.val }))}
+                      style={{
+                        padding: '5px 9px',
+                        borderRadius: 8,
+                        background: Number(editingGamePriceMember.currentPrice) === preset.val ? '#c62419' : 'rgba(26,26,26,0.05)',
+                        color: Number(editingGamePriceMember.currentPrice) === preset.val ? '#fff' : '#1a1a1a',
+                        border: 'none',
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        fontFamily: "'Sarabun', sans-serif",
+                        transition: 'all 0.12s ease',
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Reason input + quick chips */}
+              <div>
+                <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: '#1a1a1a', marginBottom: 6 }}>
+                  <i className="fas fa-comment-dots" style={{ color: '#c62419', marginRight: 5 }} />
+                  เหตุผลในการแก้ไขราคา <span style={{ color: '#c62419' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={editingGamePriceMember.currentReason || ''}
+                  onChange={e => setEditingGamePriceMember(prev => ({ ...prev, currentReason: e.target.value }))}
+                  placeholder="เช่น วันเกิด, VIP, เพื่อน DM, เล่นครึ่งรอบ..."
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: 10,
+                    border: '1.5px solid rgba(26,26,26,0.15)',
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: '#1a1a1a',
+                    outline: 'none',
+                    fontFamily: "'Sarabun', sans-serif",
+                  }}
+                />
+
+                {/* Reason presets */}
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                  {[
+                    '🎂 วันเกิด',
+                    '⭐ ลูกค้าประจำ VIP',
+                    '👥 เพื่อน / คนรู้จัก DM',
+                    '⏳ เล่นครึ่งหลัง / มาสาย',
+                    '🎟️ สิทธิพิเศษ / คูปอง',
+                    '🎮 เล่นเทสระบบ',
+                    '🎉 สปอนเซอร์ / กิจกรรม',
+                  ].map((r, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setEditingGamePriceMember(prev => ({ ...prev, currentReason: r }))}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 7,
+                        background: editingGamePriceMember.currentReason === r ? '#faeceb' : 'rgba(26,26,26,0.04)',
+                        color: editingGamePriceMember.currentReason === r ? '#c62419' : 'rgba(26,26,26,0.7)',
+                        border: editingGamePriceMember.currentReason === r ? '1px solid #c62419' : '1px solid transparent',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pos-order-modal-footer" style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  saveMemberCustomGamePrice(editingGamePriceMember.uid, null, '')
+                  setEditingGamePriceMember(null)
+                }}
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  background: 'transparent',
+                  border: '1px solid rgba(26,26,26,0.15)',
+                  color: 'rgba(26,26,26,0.7)',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                คืนค่าราคาปกติ
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  const p = editingGamePriceMember.currentPrice
+                  const priceNum = p === '' ? null : Number(p)
+                  const reason = (editingGamePriceMember.currentReason || '').trim()
+
+                  // Check if price changed from base price but no reason
+                  if (priceNum !== null && priceNum !== editingGamePriceMember.basePrice && !reason) {
+                    showToast('กรุณาระบุเหตุผลในการแก้ไขราคาค่าเกม', 'error')
+                    return
+                  }
+
+                  saveMemberCustomGamePrice(editingGamePriceMember.uid, priceNum, reason)
+                  setEditingGamePriceMember(null)
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px 18px',
+                  borderRadius: 10,
+                  background: '#c62419',
+                  border: 'none',
+                  color: '#fff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  boxShadow: '0 4px 14px rgba(198,36,25,0.25)',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                <i className="fas fa-check" />
+                <span>บันทึกราคา</span>
+              </button>
             </div>
           </div>
         </div>

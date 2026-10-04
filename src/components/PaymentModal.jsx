@@ -70,11 +70,20 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
   }, [splitMode])
 
   const orderArr = Array.isArray(session.order) ? session.order : []
-  const gameUnitPrice = selectedGame?.price || 0
+  const baseGameUnitPrice = (session.customPrice !== '' && session.customPrice !== undefined)
+    ? (Number(session.customPrice) || 0)
+    : (selectedGame?.payPrice ?? selectedGame?.price ?? 0)
+  const calcMemberGamePrice = (m) => {
+    if (m?.customGamePrice !== undefined && m?.customGamePrice !== null && m?.customGamePrice !== '') {
+      return Math.max(0, Number(m.customGamePrice))
+    }
+    return baseGameUnitPrice
+  }
   const n = session.members.length
 
   const rawFoodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-  const rawGameTotal = n * gameUnitPrice
+  const rawGameTotal = session.members.reduce((s, m) => s + calcMemberGamePrice(m), 0)
+  const totalPersonalDiscounts = session.members.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const rawTotal = rawFoodTotal + rawGameTotal
 
   // Members already paid via EasySlip
@@ -85,16 +94,19 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
   const discountAmt = discountType === 'amount'
     ? Math.min(discNum, rawTotal)
     : Math.min((rawTotal * Math.min(discNum, 100)) / 100, rawTotal)
-  const grandTotal = Math.max(0, rawTotal - alreadyPaid - discountAmt)
+  const grandTotal = Math.max(0, rawTotal - alreadyPaid - discountAmt - totalPersonalDiscounts)
 
   // Per-member total in split mode
   const getMemberTotal = (uid) => {
+    const m = session.members.find(x => x.uid === uid)
+    const myGame = m ? calcMemberGamePrice(m) : baseGameUnitPrice
     const keys = memberFoodKeys[uid] || new Set()
     const myFood = orderArr
       .filter(x => keys.has(x.key))
       .reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
     const myDiscount = n > 0 ? discountAmt / n : 0
-    return Math.max(0, gameUnitPrice + myFood - myDiscount)
+    const myPersonalDiscount = Number(m?.personalDiscount) || 0
+    return Math.max(0, myGame + myFood - myDiscount - myPersonalDiscount)
   }
 
   const toggleFood = (uid, key) => {
@@ -137,7 +149,11 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
           character: m.character || '',
           avatar: m.avatar || '',
           scanInAt: m.scanInAt || null,
-          gamePrice: gameUnitPrice,
+          gamePrice: calcMemberGamePrice(m),
+          customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== null && m.customGamePrice !== '') ? Number(m.customGamePrice) : null,
+          customGamePriceReason: m.customGamePriceReason || '',
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
           foodItems: food.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
           total: splitMode ? getMemberTotal(m.uid) : (grandTotal / (n || 1)),
         }
@@ -155,9 +171,13 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
           character: m.character || '',
           avatar: m.avatar || '',
           scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== null && m.customGamePrice !== '') ? Number(m.customGamePrice) : null,
+          customGamePriceReason: m.customGamePriceReason || '',
         })),
         memberUids: session.members.map(m => m.uid),
-        gameUnitPrice,
+        gameUnitPrice: baseGameUnitPrice,
         gameTotal: rawGameTotal,
         foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
         foodTotal: rawFoodTotal,
@@ -320,7 +340,13 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
                 </label>
               ))}
               <div className="pay-food-assign-total">
-                ค่าเกม ฿{gameUnitPrice.toLocaleString()} + อาหาร ฿{
+                ค่าเกม ฿{calcMemberGamePrice(activeMemberObj).toLocaleString()}
+                {activeMemberObj?.customGamePrice !== undefined && activeMemberObj?.customGamePrice !== null && (
+                  <span style={{ fontSize: 11, color: 'var(--crimson-500)', marginLeft: 4 }}>
+                    ({activeMemberObj.customGamePriceReason || 'ปรับพิเศษ'})
+                  </span>
+                )}
+                {' '}+ อาหาร ฿{
                   orderArr.filter(x => (memberFoodKeys[activeMember]||new Set()).has(x.key))
                     .reduce((s,x)=>s+x.totalPrice*x.qty,0).toLocaleString()
                 } = <strong>฿{getMemberTotal(activeMember).toLocaleString()}</strong>

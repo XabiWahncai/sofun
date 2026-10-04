@@ -732,14 +732,20 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
   const myPersonalDiscount = Number(me?.personalDiscount) || 0
   const myPersonalDiscountNote = me?.personalDiscountNote || ''
   const tableTotalDiscount = myDiscount * numMembers
-  const myGameFee = Math.round((activeOrder.gameTotal || 0) / numMembers)
+  const calcMemberGameFee = (member) => {
+    if (member?.customGamePrice !== undefined && member?.customGamePrice !== null && member?.customGamePrice !== '') {
+      return Math.max(0, Number(member.customGamePrice))
+    }
+    return Math.round((activeOrder.gameTotal || 0) / numMembers)
+  }
+  const myGameFee = calcMemberGameFee(me)
   const myTotal = Math.max(0, myHistoryTotal + myPendingTotal + myGameFee - myDiscount - myPersonalDiscount)
 
   const getGroupMemberBill = (m) => {
     const food = (activeOrder.memberFoodHistory || [])
       .filter(f => f.orderedBy?.uid === m.uid)
       .reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
-    const gameFee = Math.round((activeOrder.gameTotal || 0) / numMembers)
+    const gameFee = calcMemberGameFee(m)
     return Math.max(0, food + gameFee - (activeOrder.discount || 0) - (Number(m.personalDiscount) || 0))
   }
   const groupPayTotal = [...groupPayUids].reduce((s, uid) => {
@@ -1049,7 +1055,13 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                 <div className="mo-bill-row game">
                   <span className="mo-bill-row-name">
                     <i className="fas fa-scroll" style={{ marginRight: 5 }} />{activeOrder.scriptTitle || 'ค่าเกม'}
-                    {numMembers > 1 && <span className="mo-bill-sub"> · หาร {numMembers} คน</span>}
+                    {me?.customGamePrice !== undefined && me?.customGamePrice !== null && me?.customGamePrice !== '' ? (
+                      <span className="mo-bill-sub" style={{ color: 'var(--feedback-success-icon)', fontWeight: 600 }}>
+                        {me.customGamePriceReason ? ` · ปรับพิเศษ (${me.customGamePriceReason})` : ' · ราคาพิเศษเฉพาะคุณ'}
+                      </span>
+                    ) : (
+                      numMembers > 1 && <span className="mo-bill-sub"> · หาร {numMembers} คน</span>
+                    )}
                   </span>
                   <span className="mo-bill-row-price">฿{myGameFee.toLocaleString()}</span>
                 </div>

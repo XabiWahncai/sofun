@@ -106,6 +106,9 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
   if (selectedMemberUid !== 'all' && activeMember) {
     displayCustomerName = activeMember.name || 'ลูกค้า'
     displayCharacterName = activeMember.character || ''
+    if (activeMember.customGamePrice !== undefined && activeMember.customGamePrice !== null && activeMember.customGamePrice !== '') {
+      displayGamePrice = Number(activeMember.customGamePrice)
+    }
     if (activeMemberBill) {
       displayGrandTotal = activeMemberBill.total || 0
       displayFoodItems = activeMemberBill.foodItems || []
@@ -136,6 +139,7 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
         room: payment.room,
         scriptTitle: payment.scriptTitle,
         gameUnitPrice: selectedMemberUid !== 'all' ? displayGamePrice : 0,
+        gameUnitPriceNote: selectedMemberUid !== 'all' ? (activeMember?.customGamePriceReason || '') : '',
         gameTotal: selectedMemberUid === 'all' ? displayGameTotal : 0,
         foodItems: displayFoodItems,
         discount: selectedMemberUid === 'all' ? payment.discount : null,
@@ -271,7 +275,10 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
                 ) : (
                   displayGamePrice > 0 && (
                     <tr>
-                      <td>{payment.scriptTitle || 'เกม'} (รายคน)</td>
+                      <td>
+                        {payment.scriptTitle || 'เกม'} (รายคน)
+                        {activeMember?.customGamePriceReason ? ` [${activeMember.customGamePriceReason}]` : ''}
+                      </td>
                       <td className="r">{displayGamePrice.toFixed(2)}</td>
                     </tr>
                   )

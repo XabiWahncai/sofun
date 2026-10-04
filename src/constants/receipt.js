@@ -130,6 +130,7 @@ export function buildSlipHTML({
   room = '',
   scriptTitle = '',
   gameUnitPrice = 0,
+  gameUnitPriceNote = '',
   gameTotal = 0,
   foodItems = [],
   discount = null,
@@ -161,7 +162,8 @@ export function buildSlipHTML({
   if (gameUnitPrice > 0) {
     // Per-person slip: show the unit price (what this customer actually pays for the game),
     // not the total × N (that would mismatch grandTotal which is also per-person)
-    itemRows.push(`<tr><td>${scriptTitle || 'เกม'}</td><td class="r">${Number(gameUnitPrice || 0).toFixed(2)}</td></tr>`)
+    const noteStr = gameUnitPriceNote ? ` [${gameUnitPriceNote}]` : ''
+    itemRows.push(`<tr><td>${scriptTitle || 'เกม'}${noteStr}</td><td class="r">${Number(gameUnitPrice || 0).toFixed(2)}</td></tr>`)
   }
   ;(foodItems || []).forEach(fi => {
     const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name).join(',')})` : ''
