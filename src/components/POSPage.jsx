@@ -351,11 +351,17 @@ export default function POSPage({
   const fallbackSession = useMemo(() => newPOSSession(), [])
   const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
   const activeSession = safeSessions.find(s => s.id === activeId) || safeSessions[0]
-  // Owner DM OR holder of 'manager' achievement — can edit/pay/cancel/close.
+  // Owner DM OR 'manager' admin — can edit/pay/cancel/close any party.
+  // Manager = either (a) LINE admin with 'manager' achievement
+  //           or (b) Firebase-authenticated admin (store owner/staff).
+  //              Firebase admins never have an `achievements` array; LINE users always do.
   // If no DM set yet, anyone can act (party is still being setup).
   const adminAchievements = adminUser?.achievements
-    || (adminUser?.achievement ? [adminUser.achievement] : [])
-  const isManager = Array.isArray(adminAchievements) && adminAchievements.includes('manager')
+    || (adminUser?.achievement ? [adminUser.achievement] : null)
+  const hasManagerAchievement = Array.isArray(adminAchievements) && adminAchievements.includes('manager')
+  const isFirebaseAdmin = !!adminUser?.uid && !Array.isArray(adminUser.achievements)
+  const isAdminRole = adminUser?.role === 'admin'
+  const isManager = hasManagerAchievement || isFirebaseAdmin || isAdminRole
   const isOwnerDM = !activeSession?.dmUid || adminUser?.uid === activeSession?.dmUid || isManager
   const isLocked = (!!activeSession?.confirmedOrderId && !editingUnlocked) || !isOwnerDM
   useEffect(() => { setEditingUnlocked(false) }, [activeId])
@@ -442,7 +448,7 @@ export default function POSPage({
     } catch { showToast('โหลดข้อมูลล้มเหลว', 'error') }
   }
 
-  const [addonPopup, setAddonPopup] = useState(null)
+  const [orderModal, setOrderModal] = useState(null)
   const [editingBillKey, setEditingBillKey] = useState(null)
   const [showPayment, setShowPayment] = useState(false)
   const [groupPayMode, setGroupPayMode] = useState(false)
@@ -573,12 +579,13 @@ export default function POSPage({
     const cur = activeSession.order || []
     const updated = [...cur]
     for (const qi of queuedItems) {
-      const key = qi.menuId + '|' + (qi.addons || []).map(a => a.name).sort().join(',') + '|' + (qi.orderedBy?.uid || '')
+      // Include note in key so same item + different notes = separate order lines
+      const key = qi.menuId + '|' + (qi.addons || []).map(a => a.name).sort().join(',') + '|' + (qi.orderedBy?.uid || '') + '|' + (qi.note || '')
       const idx = updated.findIndex(x => x.key === key)
       if (idx >= 0) {
         updated[idx] = { ...updated[idx], qty: updated[idx].qty + qi.qty }
       } else {
-        updated.push({ key, menuId: qi.menuId, name: qi.name, basePrice: qi.totalPrice, addons: qi.addons || [], totalPrice: qi.totalPrice, qty: qi.qty, orderedBy: qi.orderedBy || null })
+        updated.push({ key, menuId: qi.menuId, name: qi.name, basePrice: qi.totalPrice, addons: qi.addons || [], note: qi.note || '', totalPrice: qi.totalPrice, qty: qi.qty, orderedBy: qi.orderedBy || null })
       }
     }
     updateActive({ order: updated })
@@ -595,6 +602,7 @@ export default function POSPage({
       gameTotal: newGamePrice,
       discount: d,
       discountMode: mode,
+      discountMemberIds: Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : [],
       promoName: activeSession.promoName || '',
       grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
     })
@@ -644,28 +652,108 @@ export default function POSPage({
   const removeMember = (uid) =>
     updateActive({ members: activeSession.members.filter(m => m.uid !== uid) })
 
-  // order is now array: [{ key, menuId, name, basePrice, addons, totalPrice, qty }]
+  // order is now array: [{ key, menuId, name, basePrice, addons, totalPrice, qty, orderedBy, note }]
   const addItem = (menuItem) => {
-    if (menuItem.addons?.length > 0) {
-      setAddonPopup({ item: menuItem, selectedAddons: [] })
-    } else {
-      commitAddItem(menuItem, [])
-    }
+    const members = activeSession?.members || []
+    setOrderModal({
+      item: menuItem,
+      member: members.length === 1 ? members[0] : (members.length === 0 ? 'all' : undefined),
+      selectedAddons: [],
+      note: '',
+      qty: 1,
+    })
   }
 
-  const commitAddItem = (menuItem, selectedAddons) => {
-    const addonTotal = selectedAddons.reduce((s, a) => s + (a.price || 0), 0)
-    const totalPrice = (menuItem.price || 0) + addonTotal
-    const key = menuItem.id + '|' + selectedAddons.map(a => a.name).sort().join(',')
+  const commitAddItem = async (menuItem, selectedAddons = [], orderedBy = null, note = '', qty = 1) => {
+    const addonTotal = (selectedAddons || []).reduce((s, a) => s + (a.price || 0), 0)
+    const unitPrice = (menuItem.price || 0) + addonTotal
+    const addQty = Math.max(1, Number(qty) || 1)
+    const trimmedNote = (note || '').trim()
+
+    // Include orderedBy + note in key so same item for different members / notes = separate order lines
+    const memberUid = orderedBy?.uid || ''
+    const key = menuItem.id + '|' + (selectedAddons || []).map(a => a.name).sort().join(',') + '|' + memberUid + '|' + trimmedNote
     const cur = activeSession.order || []
     const idx = cur.findIndex(x => x.key === key)
+    let updated
     if (idx >= 0) {
-      const updated = [...cur]
-      updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 }
-      updateActive({ order: updated })
+      updated = [...cur]
+      updated[idx] = { ...updated[idx], qty: updated[idx].qty + addQty }
     } else {
-      updateActive({ order: [...cur, { key, menuId: menuItem.id, name: menuItem.name, basePrice: menuItem.price, addons: selectedAddons, totalPrice, qty: 1 }] })
+      updated = [...cur, {
+        key,
+        menuId: menuItem.id,
+        name: menuItem.name,
+        basePrice: menuItem.price,
+        addons: selectedAddons || [],
+        note: trimmedNote,
+        totalPrice: unitPrice,
+        qty: addQty,
+        orderedBy: orderedBy ? {
+          uid: orderedBy.uid,
+          name: orderedBy.name,
+          avatar: orderedBy.avatar || '',
+          character: orderedBy.character || '',
+        } : null,
+      }]
     }
+
+    updateActive({ order: updated })
+
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+      const newGamePrice = (activeSession.members || []).length * (selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0)
+      const d = Number(activeSession.discount) || 0
+      const mode = activeSession.discountMode || 'perPerson'
+      const totalD = mode === 'split' ? d : d * (activeSession.members || []).length
+
+      const newItemsHistory = [{
+        menuId: menuItem.id,
+        name: menuItem.name,
+        addons: selectedAddons || [],
+        totalPrice: unitPrice,
+        qty: addQty,
+        note: trimmedNote,
+        orderedBy: orderedBy ? {
+          uid: orderedBy.uid,
+          name: orderedBy.name,
+          avatar: orderedBy.avatar || '',
+          character: orderedBy.character || '',
+        } : null,
+        addedAt: new Date().toISOString(),
+      }]
+
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          foodItems: updated.map(x => ({
+            name: x.name,
+            addons: x.addons || [],
+            price: x.totalPrice,
+            qty: x.qty,
+            orderedBy: x.orderedBy || null,
+            note: x.note || '',
+          })),
+          memberFoodHistory: arrayUnion(...newItemsHistory),
+          foodTotal: newFoodTotal,
+          gameTotal: newGamePrice,
+          grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
+        })
+
+        // Print kitchen ticket for this newly ordered item
+        const now = new Date()
+        const isPaid = (activeSession.members || []).length > 0 &&
+          activeSession.members.every(m => memberPayments[m.uid]?.verified)
+        const html = buildKitchenTicketHTML(newItemsHistory, activeSession, now, isPaid, receiptSettings)
+        const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
+        dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${menuItem.name} × ${addQty}`)
+      } catch (err) {
+        console.error('Failed to sync new order item to firestore:', err)
+      }
+    }
+
+    const recipientName = orderedBy ? (orderedBy.name || '').split(' ')[0] : 'ทั้งโต๊ะ'
+    showToast(`สั่ง ${menuItem.name} ${addQty > 1 ? `× ${addQty} ` : ''}ให้ ${recipientName} สำเร็จ ✓`)
   }
 
   const removeItem = (key) => {
@@ -684,11 +772,20 @@ export default function POSPage({
     const myFood = orderArr
       .filter(x => x.orderedBy?.uid === m.uid)
       .reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const n = Array.isArray(activeSession?.members) ? activeSession.members.length : 0
+    const members = Array.isArray(activeSession?.members) ? activeSession.members : []
     const rawD = Number(activeSession?.discount) || 0
     const mode = activeSession?.discountMode || 'perPerson'
-    const discountPerPerson = mode === 'split' ? (n > 0 ? rawD / n : 0) : rawD
-    return Math.max(0, gameUnitPay + myFood - (Number(m.personalDiscount) || 0) - discountPerPerson)
+    // discountMemberIds: empty = applies to all. Otherwise only selected uids get the discount.
+    const selectedIds = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
+    const effectiveIds = selectedIds.length > 0
+      ? selectedIds.filter(uid => members.some(mm => mm.uid === uid))
+      : members.map(mm => mm.uid)
+    const nDisc = effectiveIds.length
+    const isMemberDiscounted = effectiveIds.includes(m.uid)
+    const myDisc = isMemberDiscounted
+      ? (mode === 'split' ? (nDisc > 0 ? rawD / nDisc : 0) : rawD)
+      : 0
+    return Math.max(0, gameUnitPay + myFood - (Number(m.personalDiscount) || 0) - myDisc)
   }
 
   const confirmGroupPayment = async () => {
@@ -748,6 +845,7 @@ export default function POSPage({
       gameTotal: newGamePrice,
       discount: d,
       discountMode: mode,
+      discountMemberIds: Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : [],
       promoName: activeSession.promoName || '',
       grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
     })
@@ -785,8 +883,20 @@ export default function POSPage({
   const gamePrice = sessionMembers.length * gameUnitPay
   const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
   const discountRaw = Number(activeSession?.discount) || 0
-  const totalDiscount = discountMode === 'split' ? discountRaw : discountRaw * sessionMembers.length
-  const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person
+  // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
+  const discountMemberIdsRaw = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
+  const discountEffectiveIds = discountMemberIdsRaw.length > 0
+    ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid))
+    : sessionMembers.map(m => m.uid)
+  const nDiscounted = discountEffectiveIds.length
+  const totalDiscount = nDiscounted > 0
+    ? (discountMode === 'split' ? discountRaw : discountRaw * nDiscounted)
+    : 0
+  const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person (across all)
+  const discountPerDiscounted = nDiscounted > 0
+    ? (discountMode === 'split' ? discountRaw / nDiscounted : discountRaw)
+    : 0  // per selected member
+  const isPartialDiscount = discountMemberIdsRaw.length > 0 && nDiscounted < sessionMembers.length
   const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
 
@@ -1001,6 +1111,7 @@ export default function POSPage({
         gameTotal: gamePrice,
         discount: discountRaw,  // raw input value (per-person or lump sum)
         discountMode,           // 'perPerson' | 'split'
+        discountMemberIds: discountMemberIdsRaw,  // [] = all members, else selected uids
         promoName: s.promoName || '',
         grandTotal,
         createdBy: adminUser?.name || 'admin',
@@ -1148,8 +1259,141 @@ export default function POSPage({
           box-shadow: 0 0 0 2px rgba(198,36,25,0.18), 0 2px 8px rgba(26,26,26,0.04) !important;
         }
 
-        /* Menu picker — locked (can scroll/view, can't add) */
-        .pos-middle.is-locked .pos-menu-item { pointer-events: none; }
+        /* Member Order Picker Modal */
+        .pos-order-modal {
+          background: #ffffff !important;
+          border-radius: 22px !important;
+          width: 94vw !important;
+          max-width: 480px !important;
+          max-height: 90vh !important;
+          display: flex !important;
+          flex-direction: column !important;
+          overflow: hidden !important;
+          box-shadow: 0 25px 60px rgba(0,0,0,0.35) !important;
+          animation: posModalIn 0.16s ease-out !important;
+        }
+        @keyframes posModalIn {
+          from { opacity: 0; transform: scale(0.96) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .pos-order-modal-header {
+          padding: 16px 20px 14px !important;
+          border-bottom: 1px solid rgba(26,26,26,0.07) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+        }
+        .pos-order-modal-title {
+          font-size: 16.5px !important;
+          font-weight: 800 !important;
+          color: #1a1a1a !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+        }
+        .pos-order-modal-subtitle {
+          font-size: 11.5px !important;
+          color: rgba(26,26,26,0.55) !important;
+          margin-top: 2px !important;
+        }
+        .pos-order-item-banner {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+          padding: 12px 20px !important;
+          background: #faf7f5 !important;
+          border-bottom: 1px solid rgba(26,26,26,0.06) !important;
+        }
+        .pos-order-modal-body {
+          padding: 16px 20px !important;
+          overflow-y: auto !important;
+          flex: 1 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 15px !important;
+        }
+        .pos-order-section-title {
+          font-size: 11px !important;
+          font-weight: 800 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.08em !important;
+          color: rgba(26,26,26,0.5) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          margin-bottom: 8px !important;
+        }
+        .pos-order-members-grid {
+          display: grid !important;
+          grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+          gap: 8px !important;
+        }
+        .pos-order-member-card {
+          padding: 10px 12px !important;
+          border-radius: 12px !important;
+          background: #ffffff !important;
+          border: 1.5px solid rgba(26,26,26,0.1) !important;
+          cursor: pointer !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 10px !important;
+          text-align: left !important;
+          transition: all 0.14s ease !important;
+          font-family: 'Sarabun', sans-serif !important;
+          user-select: none !important;
+        }
+        .pos-order-member-card:hover {
+          border-color: #c62419 !important;
+          background: #fffafa !important;
+          transform: translateY(-1px) !important;
+        }
+        .pos-order-member-card.selected {
+          background: #fff5f5 !important;
+          border-color: #c62419 !important;
+          box-shadow: 0 0 0 1px #c62419, 0 4px 12px rgba(198,36,25,0.12) !important;
+        }
+        .pos-order-member-avatar {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 50% !important;
+          object-fit: cover !important;
+          flex-shrink: 0 !important;
+        }
+        .pos-order-member-avatar-ph {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 50% !important;
+          background: #ebe4e1 !important;
+          color: #1a1a1a !important;
+          font-weight: 800 !important;
+          font-size: 13.5px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          flex-shrink: 0 !important;
+        }
+        .pos-order-all-icon {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 10px !important;
+          background: rgba(198,36,25,0.08) !important;
+          color: #c62419 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          font-size: 15px !important;
+          flex-shrink: 0 !important;
+        }
+        .pos-order-modal-footer {
+          padding: 14px 20px 18px !important;
+          background: #faf7f5 !important;
+          border-top: 1px solid rgba(26,26,26,0.06) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 10px !important;
+        }
         .pos-member-avatar, .pos-member-avatar-ph { width: 36px !important; height: 36px !important; }
         .pos-member-avatar-ph { background: #ebe4e1 !important; color: #1a1a1a !important; font-weight: 800 !important; font-size: 13px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
         .pos-member-name { color: #1a1a1a !important; font-weight: 700 !important; font-size: 13.5px !important; gap: 6px !important; }
@@ -1604,12 +1848,17 @@ export default function POSPage({
           {showQueue && (
             <div className="pos-queue-list">
               {memberQueue.map((qi, i) => (
-                <div key={i} className="pos-queue-item">
+                <div key={i} className="pos-queue-item" style={{ flexWrap: 'wrap', rowGap: 4 }}>
                   <span className="pos-queue-item-name">
                     {qi.name}{qi.addons?.length ? ` (${qi.addons.map(a => a.name).join(',')})` : ''}
                   </span>
                   {qi.orderedBy && <span className="pos-queue-item-by"><i className="fas fa-user" /> {(qi.orderedBy.name || '').split(' ')[0]}</span>}
                   <span className="pos-queue-item-price">฿{qi.totalPrice}</span>
+                  {qi.note && (
+                    <span style={{ flexBasis: '100%', fontSize: 11, color: '#c62419', fontStyle: 'italic', padding: '3px 8px', background: 'rgba(198,36,25,0.08)', borderRadius: 6, border: '1px solid rgba(198,36,25,0.18)' }}>
+                      <i className="fas fa-sticky-note" style={{ marginRight: 5, fontSize: 9 }} />{qi.note}
+                    </span>
+                  )}
                 </div>
               ))}
             </div>
@@ -1681,7 +1930,8 @@ export default function POSPage({
               const myItems = orderArr.filter(x => x.orderedBy?.uid === m.uid)
               const bill = getMemberBill(m)
               const myFoodTotal = myItems.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-              const discountPerPerson = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0
+              const memberIsDiscounted = discountEffectiveIds.includes(m.uid)
+              const discountPerPerson = memberIsDiscounted ? discountPerDiscounted : 0
               const toggleMember = () => setExpandedMembers(prev => {
                 const next = new Set(prev)
                 if (next.has(m.uid)) next.delete(m.uid); else next.add(m.uid)
@@ -2073,8 +2323,11 @@ export default function POSPage({
                     </span>
                   </div>
                   <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', display: 'flex', justifyContent: 'space-between' }}>
-                    <span>{discountMode === 'split' ? 'เฉลี่ยทั้งตี้' : 'คนต่อคน'}</span>
-                    <span>คนละ ฿{discount.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                    <span>
+                      {discountMode === 'split' ? 'เฉลี่ย' : 'คนต่อคน'}
+                      {isPartialDiscount ? ` · ${nDiscounted}/${sessionMembers.length} คน` : ' · ทั้งตี้'}
+                    </span>
+                    <span>คนที่ลด ฿{discountPerDiscounted.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </>
@@ -2137,16 +2390,75 @@ export default function POSPage({
                   <span className="pos-promo-unit">บาท</span>
                 </div>
 
+                {/* Members eligible for discount — chips multi-select */}
+                {sessionMembers.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(26,26,26,0.55)' }}>ลดให้ใคร</span>
+                      <button
+                        type="button"
+                        onClick={() => updateActive({ discountMemberIds: [] })}
+                        style={{
+                          background: 'none', border: 'none', cursor: 'pointer',
+                          fontSize: 10.5, fontWeight: 700,
+                          color: discountMemberIdsRaw.length === 0 ? '#c62419' : 'rgba(26,26,26,0.45)',
+                          fontFamily: "'Sarabun', sans-serif",
+                          padding: 0,
+                        }}
+                      >
+                        {discountMemberIdsRaw.length === 0 ? '✓ ทั้งตี้' : 'เลือกทั้งหมด'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                      {sessionMembers.map(m => {
+                        const selected = discountMemberIdsRaw.length === 0 || discountMemberIdsRaw.includes(m.uid)
+                        const customSelected = discountMemberIdsRaw.length > 0 && discountMemberIdsRaw.includes(m.uid)
+                        return (
+                          <button
+                            key={m.uid}
+                            type="button"
+                            onClick={() => {
+                              const cur = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+                              let next
+                              if (cur.length === 0) {
+                                // Was "all" → clicking one deselects it (so pick only others as default? better: pick only this one)
+                                next = [m.uid]
+                              } else if (cur.includes(m.uid)) {
+                                next = cur.filter(uid => uid !== m.uid)
+                              } else {
+                                next = [...cur, m.uid]
+                              }
+                              updateActive({ discountMemberIds: next })
+                            }}
+                            style={{
+                              padding: '4px 10px', borderRadius: 999,
+                              background: customSelected ? '#c62419' : (selected ? 'rgba(198,36,25,0.08)' : '#ffffff'),
+                              color: customSelected ? '#ffffff' : (selected ? '#c62419' : 'rgba(26,26,26,0.4)'),
+                              border: `1px solid ${customSelected ? '#c62419' : (selected ? 'rgba(198,36,25,0.25)' : 'rgba(26,26,26,0.12)')}`,
+                              fontSize: 11.5, fontWeight: 700, cursor: 'pointer',
+                              fontFamily: "'Sarabun', sans-serif",
+                            }}
+                          >
+                            {customSelected && <i className="fas fa-check" style={{ marginRight: 4, fontSize: 9 }} />}
+                            {(m.name || '').split(' ')[0]}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
                 {discountRaw > 0 && (
                   <div className="pos-promo-preview" style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                     <div>
                       <i className="fas fa-check-circle" /> {activeSession.promoName || 'ส่วนลด'} · รวม <strong>−฿{totalDiscount.toLocaleString()}</strong>
                     </div>
-                    {sessionMembers.length > 0 && (
+                    {nDiscounted > 0 && (
                       <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.55)', paddingLeft: 18 }}>
+                        {isPartialDiscount && <>เฉพาะ <strong>{nDiscounted}/{sessionMembers.length}</strong> คน · </>}
                         {discountMode === 'split'
-                          ? `หารเฉลี่ย ${sessionMembers.length} คน = คนละ ฿${discount.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
-                          : `${sessionMembers.length} คน × ฿${discountRaw.toLocaleString()}`}
+                          ? `หารเฉลี่ย ${nDiscounted} คน = คนละ ฿${discountPerDiscounted.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                          : `${nDiscounted} คน × ฿${discountRaw.toLocaleString()}`}
                       </div>
                     )}
                   </div>
@@ -2157,7 +2469,7 @@ export default function POSPage({
         </div>
 
         {/* MIDDLE — menu */}
-        <div className={`pos-middle${isLocked ? ' is-locked' : ''}`}>
+        <div className="pos-middle">
           <div className="pos-section-title"><i className="fas fa-utensils" /> เมนูอาหาร</div>
 
           {menuItems.length > 0 && (
@@ -2201,9 +2513,13 @@ export default function POSPage({
                 <div className="pos-menu-cat">{menuCategory === 'ทั้งหมด' ? cat : ''}</div>
                 {items.map(item => {
                   const itemQty = orderArr.filter(x => x.menuId === item.id).reduce((s, x) => s + x.qty, 0)
-                  const baseKey = item.id + '|'
                   return (
-                    <div key={item.id} className={`pos-menu-item${itemQty > 0 ? ' in-order' : ''}`}>
+                    <div
+                      key={item.id}
+                      className={`pos-menu-item${itemQty > 0 ? ' in-order' : ''}`}
+                      onClick={() => addItem(item)}
+                      style={{ cursor: 'pointer' }}
+                    >
                       {item.imageUrl && <img src={item.imageUrl} alt="" className="pos-menu-item-img" />}
                       <div className="pos-menu-item-info">
                         <div className="pos-menu-item-name">
@@ -2213,24 +2529,15 @@ export default function POSPage({
                         <div className="pos-menu-item-price">฿{item.price}</div>
                       </div>
                       <div className="pos-menu-qty">
-                        {item.addons?.length > 0 ? (
-                          <>
-                            {itemQty > 0 && <span className="pos-qty-badge">{itemQty}</span>}
-                            <button className="pos-qty-btn add" onClick={() => addItem(item)}>+</button>
-                          </>
-                        ) : (
-                          <>
-                            {itemQty > 0 ? (
-                              <>
-                                <button className="pos-qty-btn" onClick={() => removeItem(baseKey)}>−</button>
-                                <span className="pos-qty-badge">{itemQty}</span>
-                                <button className="pos-qty-btn add" onClick={() => addItem(item)}>+</button>
-                              </>
-                            ) : (
-                              <button className="pos-qty-btn add" onClick={() => addItem(item)}>+</button>
-                            )}
-                          </>
-                        )}
+                        {itemQty > 0 && <span className="pos-qty-badge">{itemQty}</span>}
+                        <button
+                          type="button"
+                          className="pos-qty-btn add"
+                          onClick={(e) => { e.stopPropagation(); addItem(item) }}
+                          title="สั่งอาหารรายการนี้"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
                   )
@@ -2701,48 +3008,342 @@ export default function POSPage({
         />
       )}
 
-      {addonPopup && (
-        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setAddonPopup(null)}>
-          <div className="pos-addon-modal">
-            <div className="pos-addon-header">
-              <div className="pos-addon-title">
-                <i className="fas fa-utensils" /> {addonPopup.item.name}
-                <span className="pos-addon-base-price">฿{addonPopup.item.price}</span>
+      {/* ── Order Member Picker Modal (สั่งให้ลูกค้าคนไหน) ── */}
+      {orderModal && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setOrderModal(null)}>
+          <div className="pos-order-modal">
+            {/* Header */}
+            <div className="pos-order-modal-header">
+              <div>
+                <div className="pos-order-modal-title">
+                  <i className="fas fa-user-tag" style={{ color: '#c62419' }} />
+                  <span>สั่งให้ลูกค้าคนไหน?</span>
+                </div>
+                <div className="pos-order-modal-subtitle">
+                  เลือกผู้สั่งเพื่อคิดบิลรายบุคคล หรือสั่งรวมทั้งโต๊ะ
+                </div>
               </div>
-              <button className="modal-close" onClick={() => setAddonPopup(null)}><i className="fas fa-times" /></button>
-            </div>
-            <div className="pos-addon-label">เลือก Add-on (เพิ่มเติม)</div>
-            <div className="pos-addon-chips">
-              {addonPopup.item.addons.map((a, i) => {
-                const selected = addonPopup.selectedAddons.some(s => s.name === a.name)
-                return (
-                  <button
-                    key={i}
-                    className={`pos-addon-chip${selected ? ' selected' : ''}`}
-                    onClick={() => setAddonPopup(p => ({
-                      ...p,
-                      selectedAddons: selected
-                        ? p.selectedAddons.filter(s => s.name !== a.name)
-                        : [...p.selectedAddons, a]
-                    }))}
-                  >
-                    {a.name}{(a.price || 0) > 0 ? ` +฿${a.price}` : ''}
-                    {selected && <i className="fas fa-check" style={{ marginLeft: 4 }} />}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="pos-addon-footer">
-              <div className="pos-addon-total-label">ราคารวม</div>
-              <div className="pos-addon-total-price">
-                ฿{((addonPopup.item.price || 0) + addonPopup.selectedAddons.reduce((s, a) => s + (a.price || 0), 0)).toLocaleString()}
-              </div>
-              <button className="pos-confirm-btn" style={{ marginTop: 8 }} onClick={() => {
-                commitAddItem(addonPopup.item, addonPopup.selectedAddons)
-                setAddonPopup(null)
-              }}>
-                <i className="fas fa-plus" /> เพิ่มลงออเดอร์
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setOrderModal(null)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: '#faf7f5', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#1a1a1a', fontSize: 13
+                }}
+              >
+                <i className="fas fa-times" />
               </button>
+            </div>
+
+            {/* Item preview banner */}
+            <div className="pos-order-item-banner">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {orderModal.item.imageUrl ? (
+                  <img
+                    src={orderModal.item.imageUrl}
+                    alt=""
+                    style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 10,
+                    background: 'rgba(198,36,25,0.08)', color: '#c62419',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18
+                  }}>
+                    <i className="fas fa-utensils" />
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                    {orderModal.item.name}
+                  </div>
+                  {orderModal.item.category && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: 'rgba(26,26,26,0.5)',
+                      background: 'rgba(26,26,26,0.05)', padding: '2px 7px',
+                      borderRadius: 6, display: 'inline-block', marginTop: 3
+                    }}>
+                      {orderModal.item.category}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 700, textTransform: 'uppercase' }}>ราคาเริ่มต้น</div>
+                <div style={{ fontSize: 17, fontWeight: 900, color: '#c62419' }}>
+                  ฿{(orderModal.item.price || 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="pos-order-modal-body">
+              {/* Member Selection */}
+              <div>
+                <div className="pos-order-section-title">
+                  <span>
+                    <i className="fas fa-users" style={{ color: '#c62419', marginRight: 6 }} />
+                    เลือกลูกค้าในตี้ ({(activeSession?.members || []).length} คน)
+                  </span>
+                  {orderModal.member === 'all' ? (
+                    <span style={{ color: '#c62419', fontWeight: 800 }}>สั่งรวมทั้งโต๊ะ</span>
+                  ) : orderModal.member ? (
+                    <span style={{ color: '#c62419', fontWeight: 800 }}>สั่งให้: {orderModal.member.name}</span>
+                  ) : (
+                    <span style={{ color: '#e53e3e', fontWeight: 800 }}>* กรุณาเลือกคนที่สั่ง</span>
+                  )}
+                </div>
+
+                <div className="pos-order-members-grid">
+                  {/* Table-wide option */}
+                  <button
+                    type="button"
+                    className={`pos-order-member-card${orderModal.member === 'all' ? ' selected' : ''}`}
+                    onClick={() => setOrderModal(p => ({ ...p, member: 'all' }))}
+                  >
+                    <div className="pos-order-all-icon">
+                      <i className="fas fa-users" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                        ทั้งโต๊ะ (สั่งรวม)
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
+                        หารบิลกลาง
+                      </div>
+                    </div>
+                    {orderModal.member === 'all' && (
+                      <i className="fas fa-check-circle" style={{ color: '#c62419', fontSize: 16 }} />
+                    )}
+                  </button>
+
+                  {/* Individual members */}
+                  {(activeSession?.members || []).map(m => {
+                    const isPicked = orderModal.member && orderModal.member !== 'all' && orderModal.member.uid === m.uid
+                    return (
+                      <button
+                        key={m.uid}
+                        type="button"
+                        className={`pos-order-member-card${isPicked ? ' selected' : ''}`}
+                        onClick={() => setOrderModal(p => ({ ...p, member: m }))}
+                      >
+                        {m.avatar ? (
+                          <img src={m.avatar} alt="" className="pos-order-member-avatar" />
+                        ) : (
+                          <div className="pos-order-member-avatar-ph">
+                            {(m.name || '?')[0].toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+                            {m.name || 'ไม่ระบุ'}
+                          </div>
+                          {m.character ? (
+                            <div style={{ fontSize: 10.5, color: '#c62419', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                              🎭 {m.character}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.4)', marginTop: 2 }}>
+                              สมาชิก
+                            </div>
+                          )}
+                        </div>
+                        {isPicked && (
+                          <i className="fas fa-check-circle" style={{ color: '#c62419', fontSize: 16 }} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {(activeSession?.members || []).length === 0 && (
+                  <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: '#faf7f5', border: '1px dashed rgba(26,26,26,0.12)', fontSize: 12, color: 'rgba(26,26,26,0.6)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-info-circle" style={{ color: '#c62419' }} />
+                    <span>ยังไม่มีสมาชิกในปาร์ตี้นี้ (ระบบจะบันทึกเป็นบิลรวมทั้งโต๊ะ)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Addons (if item has them) */}
+              {(orderModal.item.addons || []).length > 0 && (
+                <div>
+                  <div className="pos-order-section-title">
+                    <span><i className="fas fa-layer-group" style={{ color: '#c62419', marginRight: 6 }} /> ตัวเลือกเพิ่มเติม (Add-on)</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {orderModal.item.addons.map((a, i) => {
+                      const isSelected = (orderModal.selectedAddons || []).some(s => s.name === a.name)
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`pos-addon-chip${isSelected ? ' selected' : ''}`}
+                          onClick={() => setOrderModal(p => ({
+                            ...p,
+                            selectedAddons: isSelected
+                              ? (p.selectedAddons || []).filter(s => s.name !== a.name)
+                              : [...(p.selectedAddons || []), a]
+                          }))}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: 10,
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span>{a.name}</span>
+                          {(a.price || 0) > 0 && <span style={{ opacity: 0.8 }}>+฿{a.price}</span>}
+                          {isSelected && <i className="fas fa-check" style={{ fontSize: 10 }} />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Note */}
+              <div>
+                <div className="pos-order-section-title">
+                  <span><i className="fas fa-pen" style={{ color: '#c62419', marginRight: 6 }} /> หมายเหตุ</span>
+                  <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.4)', textTransform: 'none' }}>(ถ้ามี)</span>
+                </div>
+                <input
+                  type="text"
+                  value={orderModal.note || ''}
+                  onChange={e => setOrderModal(p => ({ ...p, note: e.target.value }))}
+                  placeholder="เช่น ไม่ใส่ผัก, เผ็ดน้อย, แยกน้ำแข็ง..."
+                  maxLength={120}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '10px 12px', borderRadius: 10,
+                    background: '#faf7f5', border: '1px solid rgba(26,26,26,0.1)',
+                    fontSize: 13, fontFamily: "'Sarabun', sans-serif",
+                    color: '#1a1a1a', outline: 'none',
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#c62419'; e.target.style.boxShadow = '0 0 0 3px rgba(198,36,25,0.08)' }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(26,26,26,0.1)'; e.target.style.boxShadow = 'none' }}
+                />
+              </div>
+
+              {/* Quantity */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 12, background: '#faf7f5',
+                border: '1px solid rgba(26,26,26,0.06)'
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>
+                  <i className="fas fa-sort-numeric-up" style={{ color: '#c62419', marginRight: 6 }} />
+                  จำนวน
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOrderModal(p => ({ ...p, qty: Math.max(1, (p.qty || 1) - 1) }))}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: '#ffffff', border: '1px solid rgba(26,26,26,0.14)',
+                      fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a1a1a'
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ fontSize: 16, fontWeight: 800, minWidth: 24, textAlign: 'center', color: '#1a1a1a' }}>
+                    {orderModal.qty || 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOrderModal(p => ({ ...p, qty: (p.qty || 1) + 1 }))}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: '#c62419', color: '#ffffff', border: 'none',
+                      fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pos-order-modal-footer">
+              {(() => {
+                const addonSum = (orderModal.selectedAddons || []).reduce((s, a) => s + (a.price || 0), 0)
+                const unitTotal = (orderModal.item.price || 0) + addonSum
+                const itemTotal = unitTotal * (orderModal.qty || 1)
+                const isSelected = orderModal.member !== undefined
+                const isAll = orderModal.member === 'all'
+                const memberObj = !isAll ? orderModal.member : null
+                const recipientLabel = isAll ? 'ทั้งโต๊ะ' : (memberObj?.name ? memberObj.name.split(' ')[0] : '')
+
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(26,26,26,0.55)' }}>
+                        ยอดรวม ({orderModal.qty || 1} รายการ)
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a' }}>
+                        ฿{itemTotal.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!isSelected}
+                      onClick={() => {
+                        if (!isSelected) return
+                        commitAddItem(
+                          orderModal.item,
+                          orderModal.selectedAddons || [],
+                          isAll ? null : memberObj,
+                          orderModal.note || '',
+                          orderModal.qty || 1
+                        )
+                        setOrderModal(null)
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '14px 18px',
+                        borderRadius: 12,
+                        background: isSelected ? '#c62419' : 'rgba(26,26,26,0.08)',
+                        color: isSelected ? '#ffffff' : 'rgba(26,26,26,0.35)',
+                        border: 'none',
+                        fontSize: 14.5,
+                        fontWeight: 800,
+                        cursor: isSelected ? 'pointer' : 'not-allowed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        boxShadow: isSelected ? '0 6px 18px rgba(198,36,25,0.28)' : 'none',
+                        transition: 'all 0.15s ease',
+                        fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    >
+                      {!isSelected ? (
+                        <>
+                          <i className="fas fa-hand-pointer" />
+                          <span>กรุณาเลือกลูกค้าที่สั่งอาหาร</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-plus-circle" />
+                          <span>สั่งให้ {recipientLabel} · ฿{itemTotal.toLocaleString()}</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )
+              })()}
             </div>
           </div>
         </div>

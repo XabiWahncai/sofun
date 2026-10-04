@@ -661,10 +661,12 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
     return g
   }, {})
 
-  const addToCart = (menuItem, selectedAddons = []) => {
+  const addToCart = (menuItem, selectedAddons = [], note = '') => {
     const addonTotal = selectedAddons.reduce((s, a) => s + (a.price || 0), 0)
     const totalPrice = (menuItem.price || 0) + addonTotal
-    const key = menuItem.id + '|' + selectedAddons.map(a => a.name).sort().join(',')
+    const trimmedNote = (note || '').trim()
+    // Include note in key so same item + different notes are separate cart entries
+    const key = menuItem.id + '|' + selectedAddons.map(a => a.name).sort().join(',') + '|' + trimmedNote
     setCart(prev => {
       const idx = prev.findIndex(x => x.key === key)
       if (idx >= 0) {
@@ -672,7 +674,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
         updated[idx] = { ...updated[idx], qty: updated[idx].qty + 1 }
         return updated
       }
-      return [...prev, { key, menuId: menuItem.id, name: menuItem.name, addons: selectedAddons, totalPrice, qty: 1 }]
+      return [...prev, { key, menuId: menuItem.id, name: menuItem.name, addons: selectedAddons, note: trimmedNote, totalPrice, qty: 1 }]
     })
   }
 
@@ -697,6 +699,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
     try {
       const items = cart.map(x => ({
         menuId: x.menuId, name: x.name, addons: x.addons,
+        note: x.note || '',
         totalPrice: x.totalPrice, qty: x.qty,
         orderedBy: { uid: lineUser.uid, name: lineUser.name },
         requestedAt: new Date().toISOString(),
@@ -968,6 +971,11 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                 <div className="mo-cart-row-left">
                   <span className="mo-cart-name">{x.name}</span>
                   {x.addons?.length > 0 && <span className="mo-cart-addons">{x.addons.map(a => a.name).join(', ')}</span>}
+                  {x.note && (
+                    <span className="mo-cart-addons" style={{ color: '#c62419', fontStyle: 'italic' }}>
+                      <i className="fas fa-sticky-note" style={{ marginRight: 4, fontSize: 9 }} />{x.note}
+                    </span>
+                  )}
                 </div>
                 <div className="mo-cart-row-right">
                   <button className="mo-qty-btn" onClick={() => changeQty(x.key, -1)}>−</button>
@@ -1204,13 +1212,39 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                 )
               })}
             </div>
+
+            {/* Customer note */}
+            <div className="pos-addon-label" style={{ marginTop: 14 }}>
+              หมายเหตุ <span style={{ fontWeight: 500, color: 'rgba(26,26,26,0.4)', fontSize: 11, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>(ถ้ามี)</span>
+            </div>
+            <textarea
+              value={addonPopup.note || ''}
+              onChange={e => setAddonPopup(p => ({ ...p, note: e.target.value }))}
+              placeholder="เช่น ไม่ใส่ผัก, เผ็ดน้อย, ไม่ใส่น้ำแข็ง..."
+              maxLength={120}
+              rows={2}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                padding: '10px 12px', borderRadius: 10,
+                background: '#faf7f5', border: '1px solid rgba(26,26,26,0.1)',
+                fontSize: 13, fontFamily: "'Sarabun', sans-serif",
+                color: '#1a1a1a', resize: 'vertical', minHeight: 56,
+                outline: 'none', transition: 'border-color 0.14s, box-shadow 0.14s',
+              }}
+              onFocus={e => { e.target.style.borderColor = '#c62419'; e.target.style.boxShadow = '0 0 0 3px rgba(198,36,25,0.1)' }}
+              onBlur={e => { e.target.style.borderColor = 'rgba(26,26,26,0.1)'; e.target.style.boxShadow = 'none' }}
+            />
+            <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.4)', textAlign: 'right', marginTop: 4 }}>
+              {(addonPopup.note || '').length} / 120
+            </div>
+
             <div className="pos-addon-footer">
               <div className="pos-addon-total-label">ราคารวม</div>
               <div className="pos-addon-total-price">
                 ฿{((addonPopup.item.price || 0) + addonPopup.selectedAddons.reduce((s, a) => s + (a.price || 0), 0)).toLocaleString()}
               </div>
               <button className="pos-confirm-btn" style={{ marginTop: 8 }} onClick={() => {
-                addToCart(addonPopup.item, addonPopup.selectedAddons)
+                addToCart(addonPopup.item, addonPopup.selectedAddons, addonPopup.note || '')
                 setAddonPopup(null)
               }}>
                 <i className="fas fa-plus" /> เพิ่มลงตะกร้า

@@ -37,6 +37,11 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
           <button className={`nav-btn${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
             <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />จอง
           </button>
+          {lineUser && !effectiveAdmin && (
+            <button className={`nav-btn${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
+              <i className="fas fa-qrcode" style={{ marginRight: '5px', fontSize: '11px' }} />QR
+            </button>
+          )}
 
           {/* Language toggle */}
           <button className="lang-toggle-btn" onClick={toggle} title="Switch language">

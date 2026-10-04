@@ -263,7 +263,10 @@ export function buildKitchenTicketHTML(items = [], session = {}, now = new Date(
     const addonLines = (oi.showAddons && qi.addons?.length)
       ? qi.addons.map(a => row(`+ ${a.name}${qi.qty > 1 ? ` ×${qi.qty}` : ''}`, oi.showItemPrice ? ((a.price || 0) * (qi.qty || 1)).toFixed(2) : '', true))
       : []
-    return [row(label, baseTotal.toFixed(2), false), ...addonLines]
+    const noteLines = qi.note
+      ? [`<tr><td colspan="${oi.showItemPrice ? 2 : 1}" style="padding-left:12px;font-size:${oi.fontSize}px;font-weight:bold;font-style:italic">** ${qi.note} **</td></tr>`]
+      : []
+    return [row(label, baseTotal.toFixed(2), false), ...addonLines, ...noteLines]
   }).join('')}</table>`
 
   return `<!DOCTYPE html><html lang="th"><head>
