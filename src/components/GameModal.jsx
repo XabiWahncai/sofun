@@ -33,10 +33,10 @@ const ALL_ROOMS = [
 ]
 
 const DIFFICULTIES = [
-  { id: 'Beginner', label: 'Beginner', desc: 'ง่าย / เริ่มต้น', color: '#10b981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)', icon: 'fa-seedling' },
-  { id: 'Normal',   label: 'Normal',   desc: 'ปานกลาง / ทั่วไป', color: '#3b82f6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)', icon: 'fa-compass' },
-  { id: 'Hard',     label: 'Hard',     desc: 'ท้าทาย / ซับซ้อน', color: '#f59e0b', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)', icon: 'fa-puzzle-piece' },
-  { id: 'Expert',   label: 'Expert',   desc: 'ระดับเซียน / เข้มข้น', color: '#ef4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', icon: 'fa-fire' }
+  { id: 'Beginner', label: 'Beginner', desc: 'ง่าย / เริ่มต้น', color: '#059669', bg: '#ecfdf5', border: '#a7f3d0', icon: 'fa-seedling' },
+  { id: 'Normal',   label: 'Normal',   desc: 'ปานกลาง / ทั่วไป', color: '#2563eb', bg: '#eff6ff', border: '#bfdbfe', icon: 'fa-compass' },
+  { id: 'Hard',     label: 'Hard',     desc: 'ท้าทาย / ซับซ้อน', color: '#d97706', bg: '#fffbeb', border: '#fde68a', icon: 'fa-puzzle-piece' },
+  { id: 'Expert',   label: 'Expert',   desc: 'ระดับเซียน / เข้มข้น', color: '#dc2626', bg: '#fef2f2', border: '#fecaca', icon: 'fa-fire' }
 ]
 
 const QUICK_TAG_SUGGESTIONS = [
@@ -77,7 +77,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
   const [trigger, setTrigger] = useState('')
   const [tags, setTags] = useState([])
   const [tagInput, setTagInput] = useState('')
-  const [imageMode, setImageMode] = useState('url') // default to 'url' for fast web Drive flow
+  const [imageMode, setImageMode] = useState('url')
   const [imageFile, setImageFile] = useState(null)
   const [imageDriveUrl, setImageDriveUrl] = useState('')
   const [videoFile, setVideoFile] = useState(null)
@@ -167,7 +167,6 @@ export default function GameModal({ editingGame, onClose, showToast }) {
       }
       setVideoPreview(editingGame.videoUrl || '')
     } else {
-      // Default initial state for new script
       setDifficulty('Normal')
       setDetective(3)
       setRoleplay(3)
@@ -331,14 +330,14 @@ export default function GameModal({ editingGame, onClose, showToast }) {
       }}
     >
       <div className="sc-modal-container">
-        {/* Scoped CSS for modern studio redesign */}
+        {/* Scoped CSS: Clean Light Theme (พื้นหลังขาว ตัวอักษรดำ) */}
         <style>{`
           .sc-modal-overlay {
             position: fixed;
             inset: 0;
             z-index: 3100;
-            background: rgba(4, 4, 8, 0.82);
-            backdrop-filter: blur(10px);
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(8px);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -355,9 +354,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           }
 
           .sc-modal-container {
-            background: #14141a;
-            color: #f1f1f5;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #ffffff;
+            color: #0f172a;
+            border: 1px solid rgba(0, 0, 0, 0.1);
             border-radius: 20px;
             width: 100%;
             max-width: 980px;
@@ -365,7 +364,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            box-shadow: 0 24px 60px -12px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(198, 36, 25, 0.15);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.05);
             animation: scSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
             font-family: 'Google Sans', 'Sarabun', sans-serif;
           }
@@ -373,8 +372,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           /* Header */
           .sc-modal-header {
             padding: 18px 24px 14px;
-            background: #181822;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -391,9 +390,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             width: 44px;
             height: 44px;
             border-radius: 12px;
-            background: linear-gradient(135deg, rgba(198,36,25,0.25), rgba(198,36,25,0.08));
-            border: 1px solid rgba(198,36,25,0.4);
-            color: #ff574d;
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            color: #dc2626;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -406,7 +405,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-header-title {
             font-size: 17px;
             font-weight: 800;
-            color: #ffffff;
+            color: #0f172a;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -417,13 +416,13 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             font-weight: 700;
             padding: 2px 8px;
             border-radius: 999px;
-            background: rgba(198, 36, 25, 0.2);
-            color: #ff7b72;
-            border: 1px solid rgba(198, 36, 25, 0.4);
+            background: #fef2f2;
+            color: #b91c1c;
+            border: 1px solid #fecaca;
           }
           .sc-header-subtitle {
             font-size: 12.5px;
-            color: #9292a8;
+            color: #64748b;
             margin-top: 2px;
             white-space: nowrap;
             overflow: hidden;
@@ -440,9 +439,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             width: 36px;
             height: 36px;
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: #9ea0b4;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -451,30 +450,30 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             transition: all 0.15s;
           }
           .sc-close-btn:hover {
-            background: rgba(239, 68, 68, 0.15);
-            border-color: rgba(239, 68, 68, 0.4);
-            color: #ff6b6b;
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: #dc2626;
             transform: rotate(90deg);
           }
 
           /* Tab Bar */
           .sc-tab-bar {
-            background: #14141d;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
             display: flex;
-            padding: 4px 16px;
+            padding: 5px 16px;
             gap: 6px;
             overflow-x: auto;
             flex-shrink: 0;
           }
           .sc-tab-btn {
             background: transparent;
-            border: none;
-            color: #8c8da6;
+            border: 1px solid transparent;
+            color: #64748b;
             font-size: 13px;
             font-weight: 700;
             font-family: inherit;
-            padding: 10px 16px;
+            padding: 9px 16px;
             border-radius: 10px;
             cursor: pointer;
             display: flex;
@@ -485,26 +484,29 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             position: relative;
           }
           .sc-tab-btn:hover {
-            color: #ffffff;
-            background: rgba(255, 255, 255, 0.04);
+            color: #0f172a;
+            background: rgba(0, 0, 0, 0.04);
           }
           .sc-tab-btn.active {
-            color: #ffffff;
-            background: rgba(198, 36, 25, 0.16);
-            border: 1px solid rgba(198, 36, 25, 0.35);
+            color: #b91c1c;
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
           }
           .sc-tab-btn.active i {
-            color: #ff574d;
+            color: #dc2626;
           }
           .sc-tab-count {
-            background: rgba(255, 255, 255, 0.12);
+            background: #e2e8f0;
+            color: #475569;
             font-size: 10.5px;
+            font-weight: 800;
             padding: 2px 7px;
             border-radius: 999px;
-            color: #fff;
           }
           .sc-tab-btn.active .sc-tab-count {
             background: var(--crimson-500);
+            color: #ffffff;
           }
 
           /* Body Content */
@@ -512,31 +514,33 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             flex: 1;
             overflow-y: auto;
             padding: 24px;
+            background: #f8fafc;
             display: flex;
             flex-direction: column;
-            gap: 22px;
+            gap: 20px;
           }
 
           /* Section Cards */
           .sc-section-card {
-            background: #1a1a24;
-            border: 1px solid rgba(255, 255, 255, 0.07);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
             border-radius: 14px;
             padding: 20px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
           }
           .sc-section-title {
             font-size: 13.5px;
             font-weight: 800;
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            color: #9292ab;
+            color: #334155;
             margin-bottom: 16px;
             display: flex;
             align-items: center;
             gap: 8px;
           }
           .sc-section-title i {
-            color: #ff574d;
+            color: #dc2626;
           }
 
           /* Form Controls */
@@ -564,7 +568,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-form-label {
             font-size: 12px;
             font-weight: 700;
-            color: #c4c5db;
+            color: #0f172a;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -572,7 +576,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-label-sub {
             font-weight: 400;
             font-size: 11px;
-            color: #7b7c94;
+            color: #64748b;
           }
           .sc-input-wrap {
             position: relative;
@@ -582,35 +586,39 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-input-icon {
             position: absolute;
             left: 14px;
-            color: #6d6e87;
+            color: #94a3b8;
             font-size: 13px;
             pointer-events: none;
           }
           .sc-input {
             width: 100%;
-            background: #111117;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #ffffff;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #0f172a;
             font-family: inherit;
             font-size: 13.5px;
+            font-weight: 500;
             padding: 10px 14px;
             border-radius: 9px;
             outline: none;
             transition: all 0.15s;
           }
+          .sc-input::placeholder {
+            color: #94a3b8;
+          }
           .sc-input.with-icon {
             padding-left: 38px;
           }
           .sc-input:focus {
-            border-color: #ff574d;
-            background: #13131c;
-            box-shadow: 0 0 0 3px rgba(198, 36, 25, 0.2);
+            border-color: #dc2626;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
           }
           .sc-textarea {
             width: 100%;
-            background: #111117;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #ffffff;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #0f172a;
             font-family: inherit;
             font-size: 13.5px;
             line-height: 1.6;
@@ -621,10 +629,13 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             min-height: 110px;
             transition: all 0.15s;
           }
+          .sc-textarea::placeholder {
+            color: #94a3b8;
+          }
           .sc-textarea:focus {
-            border-color: #ff574d;
-            background: #13131c;
-            box-shadow: 0 0 0 3px rgba(198, 36, 25, 0.2);
+            border-color: #dc2626;
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
           }
 
           /* Preset chips */
@@ -635,9 +646,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             margin-top: 6px;
           }
           .sc-preset-chip {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: #9da0bc;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #475569;
             font-size: 11px;
             font-weight: 600;
             padding: 3px 9px;
@@ -646,9 +657,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             transition: all 0.15s;
           }
           .sc-preset-chip:hover {
-            background: rgba(198, 36, 25, 0.18);
-            border-color: rgba(198, 36, 25, 0.4);
-            color: #fff;
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: #b91c1c;
           }
 
           /* Difficulty Cards */
@@ -661,8 +672,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             .sc-diff-grid { grid-template-columns: repeat(2, 1fr); }
           }
           .sc-diff-card {
-            background: #121219;
-            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
             border-radius: 10px;
             padding: 12px;
             cursor: pointer;
@@ -674,13 +685,14 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             text-align: left;
           }
           .sc-diff-card:hover {
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: #cbd5e1;
             transform: translateY(-1px);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
           }
           .sc-diff-card.selected {
             border-color: var(--diff-color);
             background: var(--diff-bg);
-            box-shadow: 0 0 16px -4px var(--diff-border);
+            box-shadow: 0 2px 10px -2px var(--diff-border);
           }
           .sc-diff-card-head {
             display: flex;
@@ -688,11 +700,11 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             justify-content: space-between;
             font-size: 13px;
             font-weight: 800;
-            color: #ffffff;
+            color: #0f172a;
           }
           .sc-diff-desc {
             font-size: 11px;
-            color: #8c8ea8;
+            color: #64748b;
           }
 
           /* Star Rating Rows */
@@ -700,8 +712,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             display: flex;
             align-items: center;
             gap: 8px;
-            background: #111117;
-            border: 1px solid rgba(255, 255, 255, 0.09);
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
             padding: 8px 14px;
             border-radius: 9px;
           }
@@ -714,13 +726,12 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             border: none;
             cursor: pointer;
             font-size: 17px;
-            color: #3b3c50;
+            color: #cbd5e1;
             padding: 2px;
             transition: all 0.15s;
           }
           .sc-star-btn.active {
             color: #f59e0b;
-            text-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
           }
           .sc-star-btn:hover {
             transform: scale(1.15);
@@ -729,7 +740,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-star-label {
             font-size: 12px;
             font-weight: 700;
-            color: #d1d2e6;
+            color: #1e293b;
             margin-left: auto;
           }
 
@@ -739,21 +750,21 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             flex-wrap: wrap;
             gap: 6px;
             align-items: center;
-            background: #111117;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
             border-radius: 9px;
             padding: 8px 12px;
             min-height: 48px;
             cursor: text;
           }
           .sc-tags-box:focus-within {
-            border-color: #ff574d;
-            box-shadow: 0 0 0 3px rgba(198, 36, 25, 0.2);
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
           }
           .sc-tag-pill {
-            background: rgba(198, 36, 25, 0.16);
-            border: 1px solid rgba(198, 36, 25, 0.4);
-            color: #ffb4ae;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #b91c1c;
             font-size: 12px;
             font-weight: 700;
             padding: 3px 9px;
@@ -769,12 +780,12 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           }
           .sc-tag-del:hover {
             opacity: 1;
-            color: #ffffff;
+            color: #7f1d1d;
           }
           .sc-tags-input {
             background: none;
             border: none;
-            color: #ffffff;
+            color: #0f172a;
             font-family: inherit;
             font-size: 13px;
             outline: none;
@@ -784,8 +795,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
 
           /* Pricing Cards */
           .sc-price-card {
-            background: #111117;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 16px;
             display: flex;
@@ -794,8 +805,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             position: relative;
           }
           .sc-price-card.featured {
-            border-color: rgba(198, 36, 25, 0.5);
-            background: linear-gradient(180deg, rgba(198,36,25,0.08), #111117);
+            border-color: #fca5a5;
+            background: linear-gradient(180deg, #fff7f7, #ffffff);
+            box-shadow: 0 2px 8px rgba(220, 38, 38, 0.06);
           }
           .sc-price-tag-badge {
             position: absolute;
@@ -812,7 +824,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-price-head {
             font-size: 12px;
             font-weight: 800;
-            color: #b0b2ce;
+            color: #1e293b;
             display: flex;
             align-items: center;
             gap: 7px;
@@ -828,8 +840,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             .sc-room-grid { grid-template-columns: repeat(2, 1fr); }
           }
           .sc-room-card {
-            background: #111117;
-            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border: 1.5px solid #e2e8f0;
             border-radius: 9px;
             padding: 10px 12px;
             cursor: pointer;
@@ -839,19 +851,21 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             gap: 8px;
             transition: all 0.15s;
             user-select: none;
+            color: #1e293b;
           }
           .sc-room-card:hover {
-            border-color: rgba(255, 255, 255, 0.2);
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
           }
           .sc-room-card.selected {
-            background: rgba(198, 36, 25, 0.12);
-            border-color: var(--crimson-500);
-            color: #ffffff;
+            background: #fff5f5;
+            border-color: #ef4444;
+            color: #b91c1c;
           }
           .sc-room-card.is-main {
-            background: linear-gradient(135deg, rgba(198,36,25,0.3), rgba(198,36,25,0.1));
-            border-color: #ff574d;
-            box-shadow: 0 0 12px -2px rgba(198, 36, 25, 0.35);
+            background: linear-gradient(135deg, #fff1f2, #fef2f2);
+            border-color: #dc2626;
+            box-shadow: 0 0 0 1px #dc2626, 0 3px 10px rgba(220, 38, 38, 0.12);
           }
           .sc-room-info {
             display: flex;
@@ -865,18 +879,17 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             background: none;
             border: none;
             cursor: pointer;
-            color: #555770;
+            color: #94a3b8;
             font-size: 12px;
             padding: 4px;
             border-radius: 4px;
             transition: all 0.15s;
           }
           .sc-room-crown-btn.crown-active {
-            color: #f59e0b;
-            text-shadow: 0 0 8px rgba(245, 158, 11, 0.7);
+            color: #d97706;
           }
           .sc-room-crown-btn:hover {
-            color: #fbbf24;
+            color: #b45309;
             transform: scale(1.15);
           }
 
@@ -898,17 +911,19 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             .sc-char-grid { grid-template-columns: 1fr; }
           }
           .sc-char-card {
-            background: #111117;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             padding: 14px;
             display: flex;
             gap: 14px;
             position: relative;
-            transition: border-color 0.15s;
+            transition: all 0.15s;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
           }
           .sc-char-card:hover {
-            border-color: rgba(255, 255, 255, 0.18);
+            border-color: #cbd5e1;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
           }
           .sc-char-avatar-col {
             display: flex;
@@ -923,8 +938,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             height: 76px;
             border-radius: 10px;
             overflow: hidden;
-            background: #1c1c28;
-            border: 1.5px dashed rgba(255, 255, 255, 0.15);
+            background: #f8fafc;
+            border: 1.5px dashed #cbd5e1;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -939,7 +954,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-char-avatar-overlay {
             position: absolute;
             inset: 0;
-            background: rgba(0, 0, 0, 0.6);
+            background: rgba(0, 0, 0, 0.5);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -953,8 +968,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           }
           .sc-char-mode-pill {
             display: flex;
-            background: #181824;
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
             border-radius: 6px;
             padding: 2px;
             width: 100%;
@@ -963,7 +978,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             flex: 1;
             background: none;
             border: none;
-            color: #7b7d9b;
+            color: #64748b;
             font-size: 11px;
             padding: 3px 0;
             cursor: pointer;
@@ -971,8 +986,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             transition: all 0.15s;
           }
           .sc-char-mode-btn.active {
-            background: #2a2a3e;
-            color: #ffffff;
+            background: #ffffff;
+            color: #0f172a;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
           }
           .sc-char-body-col {
             flex: 1;
@@ -987,7 +1003,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             right: 10px;
             background: none;
             border: none;
-            color: #6d6f8a;
+            color: #94a3b8;
             cursor: pointer;
             font-size: 13px;
             padding: 4px;
@@ -996,7 +1012,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           }
           .sc-char-del-btn:hover {
             color: #ef4444;
-            background: rgba(239, 68, 68, 0.1);
+            background: #fee2e2;
           }
 
           /* Media Tab */
@@ -1009,8 +1025,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             .sc-media-grid { grid-template-columns: 1fr; }
           }
           .sc-media-preview-card {
-            background: #0d0d12;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: #0f172a;
+            border: 1px solid #e2e8f0;
             border-radius: 12px;
             overflow: hidden;
             position: relative;
@@ -1039,8 +1055,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
 
           /* Converted URL banner */
           .sc-convert-box {
-            background: rgba(16, 185, 129, 0.08);
-            border: 1px solid rgba(16, 185, 129, 0.3);
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
             border-radius: 9px;
             padding: 10px 14px;
             margin-top: 10px;
@@ -1051,7 +1067,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           .sc-convert-label {
             font-size: 11px;
             font-weight: 700;
-            color: #34d399;
+            color: #15803d;
             display: flex;
             align-items: center;
             gap: 6px;
@@ -1062,9 +1078,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           }
           .sc-convert-input {
             flex: 1;
-            background: #09090e;
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            color: #d1fae5;
+            background: #ffffff;
+            border: 1px solid #86efac;
+            color: #166534;
             font-family: monospace;
             font-size: 11.5px;
             padding: 6px 10px;
@@ -1072,8 +1088,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             outline: none;
           }
           .sc-convert-copy {
-            background: #10b981;
-            color: #064e3b;
+            background: #16a34a;
+            color: #ffffff;
             border: none;
             padding: 6px 12px;
             border-radius: 6px;
@@ -1086,7 +1102,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             transition: all 0.15s;
           }
           .sc-convert-copy:hover {
-            background: #34d399;
+            background: #15803d;
           }
           .sc-convert-copy.copied {
             background: #059669;
@@ -1096,8 +1112,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
           /* Footer */
           .sc-modal-footer {
             padding: 14px 24px;
-            background: #181822;
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: #ffffff;
+            border-top: 1px solid #e5e7eb;
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -1130,34 +1146,35 @@ export default function GameModal({ editingGame, onClose, showToast }) {
             border: none;
           }
           .sc-btn-secondary {
-            background: rgba(255, 255, 255, 0.06);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            color: #c9cae2;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #334155;
           }
           .sc-btn-secondary:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+            background: #e2e8f0;
+            color: #0f172a;
           }
           .sc-btn-nav {
-            background: #232332;
-            border: 1px solid rgba(255, 255, 255, 0.09);
-            color: #b0b2cd;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #475569;
             font-size: 12px;
             padding: 8px 14px;
           }
           .sc-btn-nav:hover {
-            background: #2e2e42;
-            color: #fff;
+            background: #f8fafc;
+            color: #0f172a;
+            border-color: #94a3b8;
           }
           .sc-btn-primary {
             background: var(--crimson-500);
             color: #ffffff;
-            box-shadow: 0 4px 14px rgba(198, 36, 25, 0.35);
+            box-shadow: 0 4px 12px rgba(198, 36, 25, 0.25);
           }
           .sc-btn-primary:hover:not(:disabled) {
             background: var(--crimson-600);
             transform: translateY(-1px);
-            box-shadow: 0 6px 18px rgba(198, 36, 25, 0.5);
+            box-shadow: 0 6px 16px rgba(198, 36, 25, 0.35);
           }
           .sc-btn-primary:disabled {
             opacity: 0.6;
@@ -1180,7 +1197,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
               </div>
               <div className="sc-header-subtitle">
                 {title ? (
-                  <span><strong style={{ color: '#fff' }}>{title}</strong> · {players || '?'} คน · {time || '?'} · {currentDiffObj.label}</span>
+                  <span><strong style={{ color: '#0f172a' }}>{title}</strong> · {players || '?'} คน · {time || '?'} · {currentDiffObj.label}</span>
                 ) : (
                   'กรอกรายละเอียดสคริปต์เพื่อนำไปแสดงบนหน้าเว็บและคำนวณในระบบ POS'
                 )}
@@ -1315,7 +1332,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                         onClick={() => setDifficulty(d.id)}
                       >
                         <div className="sc-diff-card-head">
-                          <span style={{ color: isSelected ? d.color : '#fff' }}>{d.label}</span>
+                          <span style={{ color: isSelected ? d.color : '#0f172a' }}>{d.label}</span>
                           <i className={`fas ${d.icon}`} style={{ color: d.color }} />
                         </div>
                         <div className="sc-diff-desc">{d.desc}</div>
@@ -1333,7 +1350,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                 <div className="sc-form-grid-2">
                   <div className="sc-form-group">
                     <label className="sc-form-label">
-                      <span><i className="fas fa-search" style={{ color: '#60a5fa', marginRight: 5 }} /> ระดับการสืบสวน</span>
+                      <span><i className="fas fa-search" style={{ color: '#2563eb', marginRight: 5 }} /> ระดับการสืบสวน</span>
                       <span className="sc-label-sub">{detective} / 5</span>
                     </label>
                     <div className="sc-star-row">
@@ -1362,7 +1379,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
 
                   <div className="sc-form-group">
                     <label className="sc-form-label">
-                      <span><i className="fas fa-theater-masks" style={{ color: '#f472b6', marginRight: 5 }} /> ระดับการสวมบทบาท</span>
+                      <span><i className="fas fa-theater-masks" style={{ color: '#db2777', marginRight: 5 }} /> ระดับการสวมบทบาท</span>
                       <span className="sc-label-sub">{roleplay} / 5</span>
                     </label>
                     <div className="sc-star-row">
@@ -1403,7 +1420,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   {tags.map(t => (
                     <span key={t} className="sc-tag-pill">
                       #{t}
-                      <span className="sc-tag-del" onClick={(e) => { e.stopPropagation(); removeTag(t); }}><i className="fas fa-times" style={{ fontSize: 10 }} /></span>
+                      <span className="sc-tag-del" onClick={(e) => { e.stopPropagation(); removeTag(t); }}>
+                        <i className="fas fa-times" style={{ fontSize: 10 }} />
+                      </span>
                     </span>
                   ))}
                   <input
@@ -1415,7 +1434,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   />
                 </div>
                 <div style={{ marginTop: 10 }}>
-                  <div style={{ fontSize: 11, color: '#7b7d99', marginBottom: 6 }}>แท็กแนะนำคลิกเพื่อเพิ่มเร็ว:</div>
+                  <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>แท็กแนะนำคลิกเพื่อเพิ่มเร็ว:</div>
                   <div className="sc-preset-row">
                     {QUICK_TAG_SUGGESTIONS.map(t => (
                       <button
@@ -1424,9 +1443,10 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                         className="sc-preset-chip"
                         onClick={() => addTagPreset(t)}
                         style={{
-                          background: tags.includes(t) ? 'rgba(198,36,25,0.25)' : undefined,
-                          borderColor: tags.includes(t) ? 'rgba(198,36,25,0.45)' : undefined,
-                          color: tags.includes(t) ? '#fff' : undefined
+                          background: tags.includes(t) ? '#fee2e2' : undefined,
+                          borderColor: tags.includes(t) ? '#fca5a5' : undefined,
+                          color: tags.includes(t) ? '#b91c1c' : undefined,
+                          fontWeight: tags.includes(t) ? 800 : undefined
                         }}
                       >
                         {tags.includes(t) ? '' : '+ '} {t}
@@ -1450,7 +1470,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   {/* Full Price */}
                   <div className="sc-price-card">
                     <div className="sc-price-head">
-                      <i className="fas fa-tag" style={{ color: '#60a5fa' }} />
+                      <i className="fas fa-tag" style={{ color: '#2563eb' }} />
                       <span>ราคาเต็ม / โชว์ลูกค้า</span>
                     </div>
                     <div className="sc-input-wrap">
@@ -1469,7 +1489,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   <div className="sc-price-card featured">
                     <span className="sc-price-tag-badge">POS คำนวณ</span>
                     <div className="sc-price-head">
-                      <i className="fas fa-cash-register" style={{ color: '#ff7b72' }} />
+                      <i className="fas fa-cash-register" style={{ color: '#dc2626' }} />
                       <span>ราคาจ่ายจริง (POS)</span>
                     </div>
                     <div className="sc-input-wrap">
@@ -1499,7 +1519,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   {/* Deposit */}
                   <div className="sc-price-card">
                     <div className="sc-price-head">
-                      <i className="fas fa-shield-alt" style={{ color: '#f59e0b' }} />
+                      <i className="fas fa-shield-alt" style={{ color: '#d97706' }} />
                       <span>ราคามัดจำต่อคน</span>
                     </div>
                     <div className="sc-input-wrap">
@@ -1532,8 +1552,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   </div>
                 </div>
 
-                <div style={{ fontSize: 12, color: '#8d8ea6', marginBottom: 12 }}>
-                  คลิกที่ห้องเพื่อเปิด/ปิดการรองรับ และกดไอคอน <i className="fas fa-crown" style={{ color: '#f59e0b' }} /> เพื่อตั้งเป็น <strong>ห้องหลัก (Default Room)</strong>
+                <div style={{ fontSize: 12, color: '#64748b', marginBottom: 12 }}>
+                  คลิกที่ห้องเพื่อเปิด/ปิดการรองรับ และกดไอคอน <i className="fas fa-crown" style={{ color: '#d97706' }} /> เพื่อตั้งเป็น <strong>ห้องหลัก (Default Room)</strong>
                 </div>
 
                 <div className="sc-room-grid">
@@ -1547,7 +1567,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                         onClick={() => toggleRoom(room.name)}
                       >
                         <div className="sc-room-info">
-                          <i className={`fas ${room.icon}`} style={{ color: isSelected ? '#ff7b72' : '#6b6c85', width: 16 }} />
+                          <i className={`fas ${room.icon}`} style={{ color: isSelected ? '#dc2626' : '#94a3b8', width: 16 }} />
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {room.name}
                           </span>
@@ -1571,9 +1591,9 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                 </div>
 
                 {mainRoom && (
-                  <div style={{ marginTop: 14, padding: '8px 14px', background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                    <i className="fas fa-crown" style={{ color: '#f59e0b' }} />
-                    <span>ห้องหลักปัจจุบัน: <strong style={{ color: '#fff' }}>{mainRoom}</strong> (ห้องเริ่มต้นในระบบ POS / การจอง)</span>
+                  <div style={{ marginTop: 14, padding: '8px 14px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, color: '#92400e' }}>
+                    <i className="fas fa-crown" style={{ color: '#d97706' }} />
+                    <span>ห้องหลักปัจจุบัน: <strong style={{ color: '#0f172a' }}>{mainRoom}</strong> (ห้องเริ่มต้นในระบบ POS / การจอง)</span>
                   </div>
                 )}
               </div>
@@ -1604,8 +1624,8 @@ export default function GameModal({ editingGame, onClose, showToast }) {
               </div>
 
               {/* Trigger Warning */}
-              <div className="sc-section-card" style={{ borderColor: trigger ? 'rgba(245,158,11,0.3)' : undefined }}>
-                <div className="sc-section-title" style={{ color: '#f59e0b' }}>
+              <div className="sc-section-card" style={{ borderColor: trigger ? '#fde68a' : undefined, background: trigger ? '#fffdf7' : undefined }}>
+                <div className="sc-section-title" style={{ color: '#d97706' }}>
                   <i className="fas fa-exclamation-triangle" /> Trigger Warning (คำเตือนเนื้อหาสำหรับผู้เล่น)
                 </div>
                 <div className="sc-form-group">
@@ -1620,7 +1640,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                     onChange={e => setTrigger(e.target.value)}
                   />
                   <div style={{ marginTop: 8 }}>
-                    <div style={{ fontSize: 11, color: '#8d8ea6', marginBottom: 6 }}>คลิกเพื่อเพิ่มคำเตือนที่พบบ่อย:</div>
+                    <div style={{ fontSize: 11, color: '#64748b', marginBottom: 6 }}>คลิกเพื่อเพิ่มคำเตือนที่พบบ่อย:</div>
                     <div className="sc-preset-row">
                       {TRIGGER_PRESETS.map(t => (
                         <button key={t} type="button" className="sc-preset-chip" onClick={() => addTriggerPreset(t)}>
@@ -1642,7 +1662,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   <div className="sc-section-title" style={{ margin: 0 }}>
                     <i className="fas fa-theater-masks" /> ตัวละครในเกม ({characters.length} คน)
                   </div>
-                  <div style={{ fontSize: 12, color: '#8c8ea6', marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
                     มีรูปภาพแล้ว {charsWithImg} จาก {characters.length} คน · สามารถอัปโหลดไฟล์หรือวาง Google Drive URL ได้ทันที
                   </div>
                 </div>
@@ -1657,10 +1677,10 @@ export default function GameModal({ editingGame, onClose, showToast }) {
               </div>
 
               {characters.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '40px 20px', border: '2px dashed rgba(255,255,255,0.1)', borderRadius: 12 }}>
-                  <i className="fas fa-users-slash" style={{ fontSize: 32, color: '#4f5068', marginBottom: 12 }} />
-                  <div style={{ color: '#fff', fontWeight: 700, fontSize: 14 }}>ยังไม่มีตัวละครในสคริปต์นี้</div>
-                  <div style={{ color: '#8c8ea6', fontSize: 12, marginTop: 4, marginBottom: 16 }}>
+                <div style={{ textAlign: 'center', padding: '40px 20px', border: '2px dashed #cbd5e1', borderRadius: 12 }}>
+                  <i className="fas fa-users-slash" style={{ fontSize: 32, color: '#94a3b8', marginBottom: 12 }} />
+                  <div style={{ color: '#0f172a', fontWeight: 700, fontSize: 14 }}>ยังไม่มีตัวละครในสคริปต์นี้</div>
+                  <div style={{ color: '#64748b', fontSize: 12, marginTop: 4, marginBottom: 16 }}>
                     เพิ่มตัวละครเพื่อให้ผู้เล่นสามารถเลือกบทบาทและดูโปรไฟล์ก่อนเริ่มเกมได้
                   </div>
                   <button type="button" className="sc-btn sc-btn-primary" onClick={addCharacter}>
@@ -1687,7 +1707,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                             {char.imagePreview ? (
                               <img src={char.imagePreview} alt="" className="sc-char-avatar-img" onError={e => e.currentTarget.style.display = 'none'} />
                             ) : (
-                              <i className="fab fa-google-drive" style={{ color: '#6d6e88', fontSize: 22 }} />
+                              <i className="fab fa-google-drive" style={{ color: '#94a3b8', fontSize: 22 }} />
                             )}
                           </div>
                         ) : (
@@ -1701,7 +1721,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                             {char.imagePreview ? (
                               <img src={char.imagePreview} alt="" className="sc-char-avatar-img" />
                             ) : (
-                              <i className="fas fa-user" style={{ color: '#6d6e88', fontSize: 22 }} />
+                              <i className="fas fa-user" style={{ color: '#94a3b8', fontSize: 22 }} />
                             )}
                             <div className="sc-char-avatar-overlay">
                               <i className="fas fa-camera" />
@@ -1732,7 +1752,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                       {/* Info Fields Column */}
                       <div className="sc-char-body-col">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.15)', padding: '2px 6px', borderRadius: 4 }}>
+                          <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--crimson-500)', background: '#fee2e2', padding: '2px 6px', borderRadius: 4 }}>
                             #{idx + 1}
                           </span>
                           <input
@@ -1755,7 +1775,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                         {char.imageMode === 'url' && (
                           <input
                             className="sc-input"
-                            style={{ padding: '6px 10px', fontSize: 11, color: '#8dd' }}
+                            style={{ padding: '6px 10px', fontSize: 11, color: '#0369a1' }}
                             placeholder="วาง Google Drive URL..."
                             value={char.imageDriveUrl || ''}
                             onChange={e => handleCharacterDriveUrl(idx, e.target.value)}
@@ -1851,26 +1871,26 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   ) : (
                     <label style={{
                       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                      padding: '24px 16px', background: '#111117', border: '2px dashed rgba(255,255,255,0.15)',
+                      padding: '24px 16px', background: '#f8fafc', border: '2px dashed #cbd5e1',
                       borderRadius: 10, cursor: 'pointer', gap: 6, textAlign: 'center'
                     }}>
                       <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
-                      <i className="fas fa-image" style={{ fontSize: 28, color: '#ff574d' }} />
-                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>คลิกเพื่ออัปโหลดรูปภาพ</span>
-                      <span style={{ fontSize: 11, color: '#7b7d99' }}>PNG, JPG, WEBP ขนาดไม่เกิน 5MB</span>
+                      <i className="fas fa-image" style={{ fontSize: 28, color: '#dc2626' }} />
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>คลิกเพื่ออัปโหลดรูปภาพ</span>
+                      <span style={{ fontSize: 11, color: '#64748b' }}>PNG, JPG, WEBP ขนาดไม่เกิน 5MB</span>
                     </label>
                   )}
 
                   {/* Poster Preview Card */}
                   <div style={{ marginTop: 4 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#9292a8', marginBottom: 8 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', marginBottom: 8 }}>
                       พรีวิวการ์ดสคริปต์ (Preview on Catalog)
                     </div>
                     <div className="sc-media-preview-card">
                       {imagePreview ? (
                         <img src={imagePreview} alt="Cover Preview" onError={e => e.currentTarget.style.display = 'none'} />
                       ) : (
-                        <div style={{ color: '#555670', fontSize: 13, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+                        <div style={{ color: '#94a3b8', fontSize: 13, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                           <i className="fas fa-image" style={{ fontSize: 24 }} />
                           <span>ยังไม่มีรูปภาพหน้าปก</span>
                         </div>
@@ -1909,26 +1929,26 @@ export default function GameModal({ editingGame, onClose, showToast }) {
 
                   <label style={{
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    padding: '24px 16px', background: '#111117', border: '2px dashed rgba(255,255,255,0.15)',
+                    padding: '24px 16px', background: '#f8fafc', border: '2px dashed #cbd5e1',
                     borderRadius: 10, cursor: 'pointer', gap: 6, textAlign: 'center'
                   }}>
                     <input type="file" accept="video/*" style={{ display: 'none' }} onChange={handleVideoChange} />
-                    <i className="fas fa-video" style={{ fontSize: 28, color: '#38bdf8' }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>คลิกเพื่อเลือกวิดีโอ</span>
-                    <span style={{ fontSize: 11, color: '#7b7d99' }}>อัปโหลดวิดีโอตัวอย่างคดีเพื่อความตื่นเต้น</span>
+                    <i className="fas fa-video" style={{ fontSize: 28, color: '#0284c7' }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>คลิกเพื่อเลือกวิดีโอ</span>
+                    <span style={{ fontSize: 11, color: '#64748b' }}>อัปโหลดวิดีโอตัวอย่างคดีเพื่อความตื่นเต้น</span>
                   </label>
 
                   {videoPreview && (
                     <div>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#9292a8' }}>พรีวิววิดีโอ</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>พรีวิววิดีโอ</span>
                         <button
                           type="button"
                           className="sc-preset-chip"
-                          style={{ color: '#ef4444' }}
+                          style={{ color: '#dc2626' }}
                           onClick={() => { setVideoFile(null); setVideoPreview(''); setCurrentVideoUrl(''); }}
                         >
-                          นำวิดีโอออก
+                          <i className="fas fa-times" style={{ marginRight: 4 }} /> นำวิดีโอออก
                         </button>
                       </div>
                       <div className="sc-media-preview-card" style={{ background: '#000' }}>
