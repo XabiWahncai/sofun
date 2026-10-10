@@ -1641,12 +1641,170 @@ function EditMemberModal({ member, onClose, showToast }) {
   )
 }
 
+// ─── Member Row Item ─────────────────────────────────────────────────────────
+function MemberRowItem({ member, isAdm, onOpenHistory, onOpenEdit }) {
+  const name = member.nickname || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'ไม่มีชื่อ'
+  const realName = [member.firstname, member.lastname].filter(Boolean).join(' ')
+  const showRealName = member.nickname && realName && realName !== member.nickname
+  const achievements = getMemberAchievements(member)
+
+  return (
+    <div
+      className={`adm-member-row${isAdm ? ' is-admin' : ''}`}
+      style={{
+        padding: '12px 16px',
+        borderBottom: '1px solid #f1f5f9',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        background: isAdm ? 'rgba(254, 243, 199, 0.14)' : '#ffffff',
+        transition: 'background 0.15s ease',
+      }}
+    >
+      <div className="adm-member-ava large" style={{ position: 'relative', flexShrink: 0 }}>
+        {member.pictureUrl ? (
+          <img
+            src={member.pictureUrl}
+            alt=""
+            onError={(e) => { e.currentTarget.style.display = 'none' }}
+          />
+        ) : (
+          <span style={{ fontWeight: 700 }}>{name[0]}</span>
+        )}
+        {isAdm && (
+          <div className="adm-crown" style={{ color: '#f59e0b', fontSize: 13 }}>
+            <i className="fas fa-crown" />
+          </div>
+        )}
+      </div>
+
+      <div className="adm-list-info" style={{ flex: 1, minWidth: 0 }}>
+        <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+          <span style={{ fontWeight: 700, color: '#0f172a', fontSize: 14 }}>{name}</span>
+          {showRealName && (
+            <span style={{ fontSize: 12, fontWeight: 500, color: '#64748b' }}>
+              ({realName})
+            </span>
+          )}
+          {achievements.map((id) => {
+            const ach = ACHIEVEMENTS[id]
+            if (!ach) return null
+            return (
+              <span
+                key={id}
+                className="adm-ach-inline"
+                style={{
+                  color: ach.color,
+                  background: ach.bg,
+                  border: `1px solid ${ach.border}`,
+                  fontSize: 11,
+                  padding: '1px 7px',
+                  borderRadius: 12,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                }}
+              >
+                <i className={`fas ${ach.icon}`} /> {ach.label}
+              </span>
+            )
+          })}
+        </div>
+
+        <div className="adm-list-sub" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 3, fontSize: 12, color: '#64748b' }}>
+          {member.email && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <i className="fas fa-envelope" style={{ fontSize: 10, opacity: 0.7 }} /> {member.email}
+            </span>
+          )}
+          {member.tel_no && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {member.email && <span style={{ opacity: 0.4 }}>·</span>}
+              <i className="fas fa-phone" style={{ fontSize: 10, opacity: 0.7 }} /> {member.tel_no}
+            </span>
+          )}
+          {member.position && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#0284c7', fontWeight: 600 }}>
+              {(member.email || member.tel_no) && <span style={{ opacity: 0.4, color: '#64748b' }}>·</span>}
+              <i className="fas fa-briefcase" style={{ fontSize: 10 }} /> {member.position}
+            </span>
+          )}
+          {isAdm && (
+            <span
+              className="adm-badge"
+              style={{
+                background: '#fef3c7',
+                color: '#b45309',
+                border: '1px solid #fde68a',
+                fontSize: 10,
+                padding: '1px 7px',
+                borderRadius: 4,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 3,
+                marginLeft: 4,
+              }}
+            >
+              <i className="fas fa-shield-halved" style={{ fontSize: 9 }} /> Admin
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+        <button
+          type="button"
+          className="adm-icon-btn"
+          style={{
+            color: 'var(--crimson-500)',
+            borderColor: 'rgba(239,68,68,0.2)',
+            background: 'rgba(239,68,68,0.06)',
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            border: '1px solid rgba(239,68,68,0.2)',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={onOpenHistory}
+          title="ดูประวัติการเล่น & บิลย้อนหลังของสมาชิกคนนี้"
+        >
+          <i className="fas fa-receipt" />
+        </button>
+        <button
+          type="button"
+          className="adm-icon-btn adm-edit"
+          style={{
+            width: 34,
+            height: 34,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          onClick={onOpenEdit}
+          title="แก้ไขข้อมูล"
+        >
+          <i className="fas fa-edit" />
+        </button>
+      </div>
+    </div>
+  )
+}
+
 // ─── Members Tab ──────────────────────────────────────────────────────────────
 function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) {
-  const [search, setSearch]           = useState('')
-  const [editMember, setEditMember]   = useState(null)
-  const [historyMember, setHistoryMember] = useState(null)
-  const [allPayments, setAllPayments] = useState([])
+  const [search, setSearch]                 = useState('')
+  const [roleFilter, setRoleFilter]         = useState('ALL') // 'ALL' | 'admin' | 'member'
+  const [criteriaFilter, setCriteriaFilter] = useState('ALL') // 'ALL' | 'with_tel' | 'with_email' | 'with_ach'
+  const [sortBy, setSortBy]                 = useState('name_asc') // 'name_asc' | 'name_desc' | 'ach_desc' | 'recent'
+  const [editMember, setEditMember]         = useState(null)
+  const [historyMember, setHistoryMember]   = useState(null)
+  const [allPayments, setAllPayments]       = useState([])
   const [receiptSettings, setReceiptSettings] = useState(DEFAULT_RECEIPT_SETTINGS)
   const [slipModalPayment, setSlipModalPayment] = useState(null)
   const [editingPayment, setEditingPayment] = useState(null)
@@ -1667,77 +1825,592 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
     return unsub
   }, [])
 
-  const filtered = members.filter(m => {
-    const name  = (m.nickname || m.firstname || '').toLowerCase()
-    const email = (m.email || '').toLowerCase()
-    return name.includes(search.toLowerCase()) || email.includes(search.toLowerCase())
-  })
+  // Statistical counters
+  const adminTotal   = useMemo(() => members.filter(m => m.role === 'admin').length, [members])
+  const regularTotal = useMemo(() => members.filter(m => m.role !== 'admin').length, [members])
+  const withTelTotal = useMemo(() => members.filter(m => !!m.tel_no).length, [members])
+  const withAchTotal = useMemo(() => members.filter(m => getMemberAchievements(m).length > 0).length, [members])
+
+  // Filter & Sort computation
+  const { adminMembers, regularMembers, totalMatched } = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    const cleanQ = q.replace(/[-\s]/g, '')
+
+    const matches = (m) => {
+      // 1. Search Query
+      if (q) {
+        const nick   = (m.nickname || '').toLowerCase()
+        const first  = (m.firstname || '').toLowerCase()
+        const last   = (m.lastname || '').toLowerCase()
+        const full   = `${first} ${last}`.trim().toLowerCase()
+        const email  = (m.email || '').toLowerCase()
+        const tel    = (m.tel_no || '').replace(/[-\s]/g, '').toLowerCase()
+        const rawTel = (m.tel_no || '').toLowerCase()
+        const pos    = (m.position || '').toLowerCase()
+        const id     = (m.id || '').toLowerCase()
+
+        const found =
+          nick.includes(q) ||
+          first.includes(q) ||
+          last.includes(q) ||
+          full.includes(q) ||
+          email.includes(q) ||
+          pos.includes(q) ||
+          id.includes(q) ||
+          rawTel.includes(q) ||
+          (cleanQ && tel.includes(cleanQ))
+
+        if (!found) return false
+      }
+
+      // 2. Role Filter
+      if (roleFilter === 'admin' && m.role !== 'admin') return false
+      if (roleFilter === 'member' && m.role === 'admin') return false
+
+      // 3. Criteria Filter
+      if (criteriaFilter === 'with_tel' && !m.tel_no) return false
+      if (criteriaFilter === 'with_email' && !m.email) return false
+      if (criteriaFilter === 'with_ach' && getMemberAchievements(m).length === 0) return false
+
+      return true
+    }
+
+    const matched = members.filter(matches)
+
+    // Separate into Admin and Regular Member arrays
+    const admins = matched.filter(m => m.role === 'admin')
+    const regulars = matched.filter(m => m.role !== 'admin')
+
+    // Sort function
+    const sortFn = (a, b) => {
+      const nameA = (a.nickname || a.firstname || a.name || '').toLowerCase()
+      const nameB = (b.nickname || b.firstname || b.name || '').toLowerCase()
+
+      if (sortBy === 'name_asc') {
+        return nameA.localeCompare(nameB, 'th')
+      }
+      if (sortBy === 'name_desc') {
+        return nameB.localeCompare(nameA, 'th')
+      }
+      if (sortBy === 'ach_desc') {
+        const achA = getMemberAchievements(a).length
+        const achB = getMemberAchievements(b).length
+        if (achB !== achA) return achB - achA
+        return nameA.localeCompare(nameB, 'th')
+      }
+      if (sortBy === 'recent') {
+        const timeA = a.createdAt?.seconds || 0
+        const timeB = b.createdAt?.seconds || 0
+        return timeB - timeA
+      }
+      return nameA.localeCompare(nameB, 'th')
+    }
+
+    admins.sort(sortFn)
+    regulars.sort(sortFn)
+
+    return {
+      adminMembers: admins,
+      regularMembers: regulars,
+      totalMatched: matched.length,
+    }
+  }, [members, search, roleFilter, criteriaFilter, sortBy])
+
+  const isFiltered = !!search || roleFilter !== 'ALL' || criteriaFilter !== 'ALL' || sortBy !== 'name_asc'
+  const handleResetFilters = () => {
+    setSearch('')
+    setRoleFilter('ALL')
+    setCriteriaFilter('ALL')
+    setSortBy('name_asc')
+  }
 
   return (
     <>
-      <div className="adm-card">
-        <div className="adm-card-header">
-          <div className="adm-card-title"><i className="fas fa-users" style={{ color: '#4ade80' /* ds-allow-hardcode */ }} /> สมาชิก ({members.length})</div>
+      <div className="adm-card" style={{ background: '#ffffff', borderRadius: 16, border: '1px solid rgba(0,0,0,0.08)', padding: 20 }}>
+        {/* Card Header with Totals */}
+        <div className="adm-card-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+          <div className="adm-card-title" style={{ fontSize: 16, fontWeight: 800, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <i className="fas fa-users" style={{ color: '#10b981' }} />
+            <span>สมาชิกทั้งหมด ({members.length})</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{
+              background: '#fef3c7',
+              color: '#b45309',
+              border: '1px solid #fde68a',
+              padding: '3px 10px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}>
+              <i className="fas fa-shield-halved" /> แอดมิน {adminTotal}
+            </span>
+            <span style={{
+              background: '#f1f5f9',
+              color: '#475569',
+              border: '1px solid #e2e8f0',
+              padding: '3px 10px',
+              borderRadius: 20,
+              fontSize: 11,
+              fontWeight: 700,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+            }}>
+              <i className="fas fa-user-group" /> สมาชิก {regularTotal}
+            </span>
+          </div>
         </div>
-        <input
-          className="adm-search"
-          placeholder="ค้นหาชื่อหรืออีเมล..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-        />
-        <div className="adm-members-hint"><i className="fas fa-receipt" style={{ marginRight: 4 }} /> ดูประวัติการเล่นและบิลย้อนหลัง · <i className="fas fa-edit" style={{ margin: '0 4px' }} /> แก้ไขข้อมูล</div>
 
-        {filtered.map(m => {
-          const name  = m.nickname || `${m.firstname || ''} ${m.lastname || ''}`.trim() || 'ไม่มีชื่อ'
-          const isAdm = m.role === 'admin'
-          return (
-            <div key={m.id} className={`adm-member-row${isAdm ? ' is-admin' : ''}`}>
-              <div className="adm-member-ava large">
-                {m.pictureUrl
-                  ? <img src={m.pictureUrl} alt="" onError={e => e.currentTarget.style.display = 'none'} />
-                  : <span>{name[0]}</span>
-                }
-                {isAdm && <div className="adm-crown"><i className="fas fa-crown" /></div>}
-              </div>
-              <div className="adm-list-info">
-                <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                  {name}
-                  {getMemberAchievements(m).map(id => {
-                    const ach = ACHIEVEMENTS[id]
-                    if (!ach) return null
-                    return (
-                      <span key={id} className="adm-ach-inline"
-                        style={{ color: ach.color, background: ach.bg, border: `1px solid ${ach.border}` }}>
-                        <i className={`fas ${ach.icon}`} /> {ach.label}
-                      </span>
-                    )
-                  })}
-                </div>
-                <div className="adm-list-sub">
-                  {m.email && <span>{m.email}</span>}
-                  {m.tel_no && <span> · {m.tel_no}</span>}
-                  {m.position && <span> · {m.position}</span>}
-                </div>
-                {isAdm && <span className="adm-badge" style={{ background: '#fbbf2422' /* ds-allow-hardcode */, color: '#fbbf24' /* ds-allow-hardcode */, border: '1px solid #fbbf2444' /* ds-allow-hardcode */, fontSize: 10, padding: '1px 7px', borderRadius: 4 }}>Admin</span>}
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        {/* ── Search & Filter Controls ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+          {/* Row 1: Search Box + Dropdown Selects */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+            {/* Search Input with Icon and Clear button */}
+            <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 220 }}>
+              <i className="fas fa-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+              <input
+                type="text"
+                className="adm-input"
+                placeholder="ค้นหาชื่อเล่น, ชื่อจริง, อีเมล, เบอร์โทร, ตำแหน่ง..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                style={{
+                  paddingLeft: 34,
+                  paddingRight: search ? 32 : 12,
+                  width: '100%',
+                  boxSizing: 'border-box',
+                  height: 38,
+                  borderRadius: 10,
+                  fontSize: 13,
+                  border: '1px solid #cbd5e1',
+                }}
+              />
+              {search && (
                 <button
-                  className="adm-icon-btn"
-                  style={{ color: 'var(--crimson-500)', borderColor: 'rgba(239,68,68,0.2)' }}
-                  onClick={() => setHistoryMember(m)}
-                  title="ดูประวัติการเล่น & บิลย้อนหลังของสมาชิกคนนี้"
+                  type="button"
+                  onClick={() => setSearch('')}
+                  title="ล้างข้อความค้นหา"
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94a3b8',
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
                 >
-                  <i className="fas fa-receipt" />
+                  <i className="fas fa-times" />
                 </button>
-                <button className="adm-icon-btn adm-edit" onClick={() => setEditMember(m)} title="แก้ไขข้อมูล">
-                  <i className="fas fa-edit" />
+              )}
+            </div>
+
+            {/* Role Filter Dropdown */}
+            <select
+              className="adm-input"
+              style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer', borderRadius: 10, border: '1px solid #cbd5e1' }}
+              value={roleFilter}
+              onChange={e => setRoleFilter(e.target.value)}
+            >
+              <option value="ALL">ทุกยศ ({members.length})</option>
+              <option value="admin">ผู้ดูแลระบบ ({adminTotal})</option>
+              <option value="member">สมาชิกทั่วไป ({regularTotal})</option>
+            </select>
+
+            {/* Criteria Dropdown */}
+            <select
+              className="adm-input"
+              style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer', borderRadius: 10, border: '1px solid #cbd5e1' }}
+              value={criteriaFilter}
+              onChange={e => setCriteriaFilter(e.target.value)}
+            >
+              <option value="ALL">เงื่อนไขทั้งหมด</option>
+              <option value="with_tel">มีเบอร์โทร ({withTelTotal})</option>
+              <option value="with_email">มีอีเมล</option>
+              <option value="with_ach">มีเหรียญ/ตรา ({withAchTotal})</option>
+            </select>
+
+            {/* Sort Dropdown */}
+            <select
+              className="adm-input"
+              style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer', borderRadius: 10, border: '1px solid #cbd5e1' }}
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value)}
+            >
+              <option value="name_asc">ชื่อ (ก-ฮ / A-Z)</option>
+              <option value="name_desc">ชื่อ (ฮ-ก / Z-A)</option>
+              <option value="ach_desc">ตราความสำเร็จมากสุด</option>
+              <option value="recent">เพิ่มล่าสุด</option>
+            </select>
+          </div>
+
+          {/* Row 2: Quick Filter Pills & Result Stats */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 8,
+            padding: '8px 12px',
+            background: '#f8fafc',
+            borderRadius: 10,
+            border: '1px solid #e2e8f0',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>ทางลัด:</span>
+              <button
+                type="button"
+                onClick={() => { setRoleFilter('ALL'); setCriteriaFilter('ALL') }}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: roleFilter === 'ALL' && criteriaFilter === 'ALL' ? 'var(--red, #e11d48)' : '#cbd5e1',
+                  background: roleFilter === 'ALL' && criteriaFilter === 'ALL' ? 'var(--red, #e11d48)' : '#ffffff',
+                  color: roleFilter === 'ALL' && criteriaFilter === 'ALL' ? '#ffffff' : '#475569',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                ทั้งหมด ({members.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoleFilter(roleFilter === 'admin' ? 'ALL' : 'admin')}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: roleFilter === 'admin' ? '#d97706' : '#cbd5e1',
+                  background: roleFilter === 'admin' ? '#fef3c7' : '#ffffff',
+                  color: roleFilter === 'admin' ? '#92400e' : '#475569',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <i className="fas fa-shield-halved" /> แอดมิน ({adminTotal})
+              </button>
+              <button
+                type="button"
+                onClick={() => setRoleFilter(roleFilter === 'member' ? 'ALL' : 'member')}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: roleFilter === 'member' ? '#2563eb' : '#cbd5e1',
+                  background: roleFilter === 'member' ? '#dbeafe' : '#ffffff',
+                  color: roleFilter === 'member' ? '#1e40af' : '#475569',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <i className="fas fa-user-group" /> สมาชิก ({regularTotal})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCriteriaFilter(criteriaFilter === 'with_tel' ? 'ALL' : 'with_tel')}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: criteriaFilter === 'with_tel' ? '#059669' : '#cbd5e1',
+                  background: criteriaFilter === 'with_tel' ? '#d1fae5' : '#ffffff',
+                  color: criteriaFilter === 'with_tel' ? '#065f46' : '#475569',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <i className="fas fa-phone" /> มีเบอร์โทร ({withTelTotal})
+              </button>
+              <button
+                type="button"
+                onClick={() => setCriteriaFilter(criteriaFilter === 'with_ach' ? 'ALL' : 'with_ach')}
+                style={{
+                  padding: '3px 10px',
+                  borderRadius: 16,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  borderColor: criteriaFilter === 'with_ach' ? '#7c3aed' : '#cbd5e1',
+                  background: criteriaFilter === 'with_ach' ? '#ede9fe' : '#ffffff',
+                  color: criteriaFilter === 'with_ach' ? '#5b21b6' : '#475569',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <i className="fas fa-award" /> มีเหรียญ/ตรา ({withAchTotal})
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+                แสดง <strong>{totalMatched}</strong> จาก {members.length} คน
+              </span>
+              {isFiltered && (
+                <button
+                  type="button"
+                  onClick={handleResetFilters}
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    color: 'var(--crimson-500, #e11d48)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    padding: '2px 6px',
+                    borderRadius: 4,
+                  }}
+                >
+                  <i className="fas fa-rotate-left" /> ล้างตัวกรอง
                 </button>
+              )}
+            </div>
+          </div>
+
+          {/* Hint Line */}
+          <div className="adm-members-hint" style={{ margin: '2px 0 6px', fontSize: 12, color: '#64748b' }}>
+            <i className="fas fa-receipt" style={{ marginRight: 4, color: 'var(--crimson-500)' }} /> ดูประวัติการเล่นและบิลย้อนหลัง · <i className="fas fa-edit" style={{ margin: '0 4px', color: '#2563eb' }} /> แก้ไขข้อมูล
+          </div>
+        </div>
+
+        {/* ── 1. ADMIN SECTION (แยกกรอบด้านบนสุดตามคำสั่ง) ── */}
+        {(roleFilter === 'ALL' || roleFilter === 'admin') && (
+          <div style={{
+            background: '#ffffff',
+            border: '1.5px solid rgba(245, 158, 11, 0.4)',
+            borderRadius: 14,
+            marginBottom: 20,
+            overflow: 'hidden',
+            boxShadow: '0 4px 16px -2px rgba(245, 158, 11, 0.08), 0 1px 3px rgba(0, 0, 0, 0.03)',
+          }}>
+            {/* Header ของกรอบ Admin */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              background: 'linear-gradient(135deg, rgba(254, 243, 199, 0.7) 0%, rgba(254, 243, 199, 0.3) 100%)',
+              borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 8,
+                  background: '#fef3c7',
+                  border: '1px solid #fde68a',
+                  color: '#b45309',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 15,
+                }}>
+                  <i className="fas fa-shield-halved" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#92400e', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>ผู้ดูแลระบบ (Admin)</span>
+                    <span style={{
+                      background: '#b45309',
+                      color: '#ffffff',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '1px 8px',
+                      borderRadius: 20,
+                    }}>
+                      {adminMembers.length} คน
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#b45309', opacity: 0.85 }}>สิทธิ์เข้าถึงระบบจัดการ คลังสคริปต์ บิล และสมาชิก</div>
+                </div>
+              </div>
+              <div style={{
+                fontSize: 11,
+                fontWeight: 700,
+                color: '#b45309',
+                background: 'rgba(255, 255, 255, 0.85)',
+                padding: '4px 10px',
+                borderRadius: 20,
+                border: '1px solid rgba(245, 158, 11, 0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}>
+                <i className="fas fa-crown" /> Admin Priority
               </div>
             </div>
-          )
-        })}
 
-        {filtered.length === 0 && <p className="adm-empty">{search ? 'ไม่พบสมาชิก' : 'ยังไม่มีสมาชิก'}</p>}
+            {/* รายชื่อแอดมิน */}
+            {adminMembers.length > 0 ? (
+              <div>
+                {adminMembers.map(m => (
+                  <MemberRowItem
+                    key={m.id}
+                    member={m}
+                    isAdm={true}
+                    onOpenHistory={() => setHistoryMember(m)}
+                    onOpenEdit={() => setEditMember(m)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                <i className="fas fa-user-shield" style={{ marginRight: 6, fontSize: 16 }} />
+                {search ? 'ไม่พบผู้ดูแลระบบที่ตรงกับคำค้นหา' : 'ไม่มีรายชื่อผู้ดูแลระบบตามตัวกรองนี้'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── 2. REGULAR MEMBERS SECTION (แยกกรอบสมาชิกล่างลงมา) ── */}
+        {(roleFilter === 'ALL' || roleFilter === 'member') && (
+          <div style={{
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            borderRadius: 14,
+            overflow: 'hidden',
+            boxShadow: '0 2px 8px -2px rgba(0, 0, 0, 0.04)',
+          }}>
+            {/* Header ของกรอบ Regular Members */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              background: '#f8fafc',
+              borderBottom: '1px solid #e2e8f0',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 34,
+                  height: 34,
+                  borderRadius: 8,
+                  background: '#e0f2fe',
+                  border: '1px solid #bae6fd',
+                  color: '#0284c7',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 15,
+                }}>
+                  <i className="fas fa-users" />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 14, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span>สมาชิกทั่วไป (Members)</span>
+                    <span style={{
+                      background: '#e2e8f0',
+                      color: '#334155',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '1px 8px',
+                      borderRadius: 20,
+                    }}>
+                      {regularMembers.length} คน
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>รายชื่อสมาชิกและลูกค้าในระบบ SOFUN CLUB</div>
+                </div>
+              </div>
+            </div>
+
+            {/* รายชื่อสมาชิกทั่วไป */}
+            {regularMembers.length > 0 ? (
+              <div>
+                {regularMembers.map(m => (
+                  <MemberRowItem
+                    key={m.id}
+                    member={m}
+                    isAdm={false}
+                    onOpenHistory={() => setHistoryMember(m)}
+                    onOpenEdit={() => setEditMember(m)}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: '24px 16px', textAlign: 'center', color: '#94a3b8', fontSize: 13 }}>
+                <i className="fas fa-user-group" style={{ marginRight: 6, fontSize: 16 }} />
+                {search ? 'ไม่พบสมาชิกทั่วไปที่ตรงกับคำค้นหา' : 'ไม่มีรายชื่อสมาชิกทั่วไปตามตัวกรองนี้'}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Overall Empty State (ถ้าทั้งสองกรอบไม่มีสมาชิกเลย) ── */}
+        {adminMembers.length === 0 && regularMembers.length === 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: '44px 20px',
+            background: '#ffffff',
+            borderRadius: 14,
+            border: '1px dashed #cbd5e1',
+            margin: '16px 0',
+          }}>
+            <div style={{
+              width: 44,
+              height: 44,
+              borderRadius: '50%',
+              background: '#f1f5f9',
+              color: '#94a3b8',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 10px',
+              fontSize: 18,
+            }}>
+              <i className="fas fa-search" />
+            </div>
+            <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>
+              ไม่พบข้อมูลสมาชิก
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+              ลองค้นหาด้วยคำอื่น หรือคลิกล้างตัวกรองเพื่อดูสมาชิกทั้งหมด
+            </div>
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="adm-btn-red"
+                style={{ fontSize: 12, padding: '6px 16px', borderRadius: 8 }}
+              >
+                <i className="fas fa-rotate-left" /> ล้างตัวกรองทั้งหมด
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {editMember && (
