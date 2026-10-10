@@ -871,7 +871,27 @@ const getMemberAchievements = (m) =>
   : m.achievement && m.achievement !== 'none' ? [m.achievement]
   : []
 
+function MemberField({ label, value, onChange, placeholder, type = 'text', icon }) {
+  return (
+    <div className="adm-mem-field">
+      <label className="adm-mem-label">{label}</label>
+      <div className="adm-mem-input-wrap">
+        {icon && <i className={`fas ${icon} adm-mem-input-icon`} />}
+        <input
+          className={`adm-mem-input ${icon ? 'with-icon' : ''}`}
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          onChange={e => onChange(e.target.value)}
+        />
+      </div>
+    </div>
+  )
+}
+
 function EditMemberModal({ member, onClose, showToast }) {
+  const [activeTab, setActiveTab] = useState('info') // 'info' | 'achievements'
+  const [rarityFilter, setRarityFilter] = useState('ALL')
   const [form, setForm] = useState({
     nickname:    member.nickname   || '',
     firstname:   member.firstname  || '',
@@ -883,6 +903,18 @@ function EditMemberModal({ member, onClose, showToast }) {
     pictureUrl:  member.pictureUrl || '',
     achievements: getMemberAchievements(member),
   })
+  const [saving, setSaving] = useState(false)
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
   const toggleAchievement = (id) => {
     setForm(f => ({
@@ -892,9 +924,15 @@ function EditMemberModal({ member, onClose, showToast }) {
         : [...f.achievements, id],
     }))
   }
-  const [saving, setSaving] = useState(false)
 
-  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+  const selectAllAchievements = () => {
+    const all = Object.keys(ACHIEVEMENTS)
+    setForm(f => ({ ...f, achievements: all }))
+  }
+
+  const clearAchievements = () => {
+    setForm(f => ({ ...f, achievements: [] }))
+  }
 
   const save = async () => {
     setSaving(true)
@@ -921,109 +959,683 @@ function EditMemberModal({ member, onClose, showToast }) {
     }
   }
 
-  const F = ({ label, k, placeholder, type = 'text' }) => (
-    <div className="adm-field">
-      <label className="adm-label">{label}</label>
-      <input className="adm-input" type={type} value={form[k]} placeholder={placeholder}
-        onChange={e => set(k, e.target.value)} />
-    </div>
-  )
+  const name = form.nickname || `${form.firstname || ''} ${form.lastname || ''}`.trim() || member.nickname || 'ไม่มีชื่อ'
+  const totalAchievements = Object.keys(ACHIEVEMENTS).length
 
-  const name = member.nickname || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'ไม่มีชื่อ'
+  const visibleRarities = useMemo(() => {
+    if (rarityFilter === 'ALL') return ACHIEVEMENTS_BY_RARITY
+    return ACHIEVEMENTS_BY_RARITY.filter(r => r.rarity.id === rarityFilter)
+  }, [rarityFilter])
 
   return (
-    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="adm-edit-modal">
-        <div className="adm-edit-modal-header">
-          <div className="adm-edit-modal-title">
-            <div className="adm-member-ava" style={{ width: 40, height: 40 }}>
-              {form.pictureUrl
-                ? <img src={form.pictureUrl} alt="" onError={e => e.currentTarget.style.display = 'none'} />
-                : <span>{name[0]}</span>
-              }
+    <div className="adm-mem-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="adm-mem-modal">
+        <style>{`
+          .adm-mem-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 3100;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: scFadeIn 0.2s ease-out;
+          }
+          .adm-mem-modal {
+            background: #ffffff;
+            color: #0f172a;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 780px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.25);
+            animation: scSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Google Sans', 'Sarabun', sans-serif;
+          }
+          .adm-mem-header {
+            padding: 18px 24px 14px;
+            background: #ffffff;
+            border-bottom: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-shrink: 0;
+          }
+          .adm-mem-title-box {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+          }
+          .adm-mem-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            border: 2px solid #e2e8f0;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 18px;
+            color: #64748b;
+            flex-shrink: 0;
+          }
+          .adm-mem-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+          }
+          .adm-mem-name {
+            font-size: 17px;
+            font-weight: 800;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .adm-mem-role-badge {
+            font-size: 10.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            padding: 2px 8px;
+            border-radius: 999px;
+            letter-spacing: 0.04em;
+          }
+          .adm-mem-role-badge.admin {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #fecaca;
+          }
+          .adm-mem-role-badge.member {
+            background: #f0f9ff;
+            color: #0284c7;
+            border: 1px solid #bae6fd;
+          }
+          .adm-mem-subtitle {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 2px;
+          }
+          .adm-mem-close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.15s;
+          }
+          .adm-mem-close-btn:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: #dc2626;
+            transform: rotate(90deg);
+          }
+          .adm-mem-tab-bar {
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            padding: 4px 16px;
+            gap: 6px;
+            flex-shrink: 0;
+          }
+          .adm-mem-tab-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: #64748b;
+            font-size: 13px;
+            font-weight: 700;
+            font-family: inherit;
+            padding: 9px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.15s;
+          }
+          .adm-mem-tab-btn:hover {
+            color: #0f172a;
+            background: rgba(0, 0, 0, 0.04);
+          }
+          .adm-mem-tab-btn.active {
+            color: #b91c1c;
+            background: #ffffff;
+            border-color: #e2e8f0;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+          }
+          .adm-mem-tab-btn.active i {
+            color: #dc2626;
+          }
+          .adm-mem-tab-count {
+            background: #e2e8f0;
+            color: #475569;
+            font-size: 10.5px;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 999px;
+          }
+          .adm-mem-tab-btn.active .adm-mem-tab-count {
+            background: var(--crimson-500);
+            color: #ffffff;
+          }
+          .adm-mem-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 22px 24px;
+            background: #f8fafc;
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+          }
+          .adm-mem-card {
+            background: #ffffff;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 18px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+          }
+          .adm-mem-card-title {
+            font-size: 13px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: #334155;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+          }
+          .adm-mem-card-title i {
+            color: #dc2626;
+          }
+          .adm-mem-grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+          }
+          @media (max-width: 640px) {
+            .adm-mem-grid-2 { grid-template-columns: 1fr; }
+          }
+          .adm-mem-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 12px;
+          }
+          .adm-mem-field:last-child {
+            margin-bottom: 0;
+          }
+          .adm-mem-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #0f172a;
+          }
+          .adm-mem-input-wrap {
+            position: relative;
+            display: flex;
+            align-items: center;
+          }
+          .adm-mem-input-icon {
+            position: absolute;
+            left: 12px;
+            color: #94a3b8;
+            font-size: 13px;
+            pointer-events: none;
+          }
+          .adm-mem-input {
+            width: 100%;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #0f172a;
+            font-family: inherit;
+            font-size: 13.5px;
+            font-weight: 500;
+            padding: 9px 12px;
+            border-radius: 9px;
+            outline: none;
+            transition: all 0.15s;
+          }
+          .adm-mem-input::placeholder {
+            color: #94a3b8;
+          }
+          .adm-mem-input.with-icon {
+            padding-left: 36px;
+          }
+          .adm-mem-input:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+          }
+          .adm-mem-select {
+            width: 100%;
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+            color: #0f172a;
+            font-family: inherit;
+            font-size: 13.5px;
+            font-weight: 600;
+            padding: 9px 12px;
+            border-radius: 9px;
+            outline: none;
+            cursor: pointer;
+          }
+          .adm-mem-select:focus {
+            border-color: #dc2626;
+            box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12);
+          }
+          .adm-mem-chip {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 9px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+          }
+          .adm-mem-chip:hover {
+            background: #fee2e2;
+            border-color: #fca5a5;
+            color: #b91c1c;
+          }
+          .adm-mem-chip.active {
+            background: #dc2626;
+            border-color: #dc2626;
+            color: #ffffff;
+          }
+          .adm-mem-ach-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+          }
+          @media (max-width: 640px) {
+            .adm-mem-ach-grid { grid-template-columns: 1fr; }
+          }
+          .adm-mem-ach-card {
+            position: relative;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            border: 1.5px solid #e2e8f0;
+            background: #ffffff;
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: left;
+            width: 100%;
+          }
+          .adm-mem-ach-card:hover {
+            border-color: #cbd5e1;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          }
+          .adm-mem-ach-card.on {
+            border-color: var(--abr);
+            background: var(--ab);
+          }
+          .adm-mem-ach-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--ab, #f1f5f9);
+            color: var(--ac, #64748b);
+            font-size: 15px;
+          }
+          .adm-mem-ach-card.on .adm-mem-ach-icon {
+            background: var(--ac);
+            color: #ffffff;
+          }
+          .adm-mem-ach-body {
+            flex: 1;
+            min-width: 0;
+          }
+          .adm-mem-ach-name {
+            font-size: 12.5px;
+            font-weight: 800;
+            color: #0f172a;
+            line-height: 1.3;
+          }
+          .adm-mem-ach-card.on .adm-mem-ach-name {
+            color: var(--ac);
+          }
+          .adm-mem-ach-th {
+            font-size: 11px;
+            font-weight: 600;
+            color: #64748b;
+          }
+          .adm-mem-ach-desc {
+            font-size: 10px;
+            color: #64748b;
+            margin-top: 3px;
+            line-height: 1.4;
+          }
+          .adm-mem-ach-check {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--ac);
+            color: #ffffff;
+            font-size: 9px;
+          }
+          .adm-mem-footer {
+            padding: 14px 24px;
+            background: #ffffff;
+            border-top: 1px solid #e5e7eb;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+          }
+        `}</style>
+
+        {/* ── HEADER ── */}
+        <div className="adm-mem-header">
+          <div className="adm-mem-title-box">
+            <div className="adm-mem-avatar">
+              {form.pictureUrl ? (
+                <img src={form.pictureUrl} alt="" onError={e => e.currentTarget.style.display = 'none'} />
+              ) : (
+                <span>{name[0]}</span>
+              )}
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: 15 }}>{name}</div>
-              <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>แก้ไขข้อมูลสมาชิก</div>
+              <div className="adm-mem-name">
+                {name}
+                <span className={`adm-mem-role-badge ${form.role}`}>
+                  {form.role.toUpperCase()}
+                </span>
+              </div>
+              <div className="adm-mem-subtitle">
+                ID: {member.id?.slice(0, 8)} · {form.email || 'ไม่มีอีเมล'}
+              </div>
             </div>
           </div>
-          <button className="modal-close-btn" onClick={onClose}><i className="fas fa-times" /></button>
-        </div>
-
-        <div className="adm-edit-modal-body">
-          <div className="adm-field-row">
-            <F label="ชื่อเล่น / Display Name" k="nickname" placeholder="เช่น นิค" />
-            <div className="adm-field">
-              <label className="adm-label">Role</label>
-              <select className="adm-input" value={form.role} onChange={e => set('role', e.target.value)}>
-                <option value="member">Member</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="adm-field-row">
-            <F label="ชื่อจริง" k="firstname" placeholder="ชื่อ" />
-            <F label="นามสกุล" k="lastname" placeholder="นามสกุล" />
-          </div>
-
-          <div className="adm-field-row">
-            <F label="อีเมล" k="email" placeholder="email@example.com" type="email" />
-            <F label="เบอร์โทร" k="tel_no" placeholder="08x-xxx-xxxx" />
-          </div>
-
-          <F label="ตำแหน่ง (แสดงในหน้า Team)" k="position" placeholder="เช่น Game Master, Designer" />
-          <F label="URL รูปโปรไฟล์" k="pictureUrl" placeholder="https://..." />
-
-          <div className="adm-field">
-            <label className="adm-label">Achievements</label>
-            <div className="adm-ach-picker">
-              {ACHIEVEMENTS_BY_RARITY.map(({ rarity: rar, items }) => (
-                <div key={rar.id} className="adm-ach-picker-group">
-                  <div className="adm-ach-picker-rarity" style={{ color: rar.color }}>
-                    <span className="adm-ach-picker-dot" style={{ background: rar.color }} />
-                    {rar.label}
-                  </div>
-                  <div className="adm-ach-picker-row">
-                    {items.map(ach => {
-                      const on = form.achievements.includes(ach.id)
-                      return (
-                        <button key={ach.id} type="button"
-                          className={`adm-ach-pick-card${on ? ' on' : ''}`}
-                          style={{ '--ac': ach.color, '--ab': ach.bg, '--abr': ach.border }}
-                          onClick={() => toggleAchievement(ach.id)}>
-                          <div className="adm-ach-pick-icon">
-                            <i className={`fas ${ach.icon}`} />
-                          </div>
-                          <div className="adm-ach-pick-body">
-                            <div className="adm-ach-pick-name">{ach.label}</div>
-                            <div className="adm-ach-pick-th">{ach.labelTH}</div>
-                            <div className="adm-ach-pick-desc">{ach.descTH}</div>
-                          </div>
-                          {on && <div className="adm-ach-pick-check"><i className="fas fa-check" /></div>}
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {form.pictureUrl && (
-            <div className="adm-preview-img" style={{ marginTop: 8 }}>
-              <img src={form.pictureUrl} alt="" style={{ height: 80, borderRadius: 8, objectFit: 'cover' }}
-                onError={e => e.currentTarget.style.display = 'none'} />
-            </div>
-          )}
-        </div>
-
-        <div className="adm-edit-modal-footer">
-          <button className="btn-secondary" onClick={onClose}>ยกเลิก</button>
-          <button className="adm-btn-red" onClick={save} disabled={saving} style={{ minWidth: 120 }}>
-            {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึก</>}
+          <button className="adm-mem-close-btn" onClick={onClose} title="ปิดหน้าต่าง (Esc)">
+            <i className="fas fa-times" />
           </button>
         </div>
+
+        {/* ── TAB BAR ── */}
+        <div className="adm-mem-tab-bar">
+          <button
+            type="button"
+            className={`adm-mem-tab-btn ${activeTab === 'info' ? 'active' : ''}`}
+            onClick={() => setActiveTab('info')}
+          >
+            <i className="fas fa-user" /> ข้อมูลทั่วไป
+          </button>
+          <button
+            type="button"
+            className={`adm-mem-tab-btn ${activeTab === 'achievements' ? 'active' : ''}`}
+            onClick={() => setActiveTab('achievements')}
+          >
+            <i className="fas fa-trophy" /> ความสำเร็จ
+            <span className="adm-mem-tab-count">{form.achievements.length}</span>
+          </button>
+        </div>
+
+        {/* ── BODY ── */}
+        <div className="adm-mem-body">
+
+          {/* ═════════ TAB 1: PROFILE INFO ═════════ */}
+          {activeTab === 'info' && (
+            <>
+              {/* Account & Role */}
+              <div className="adm-mem-card">
+                <div className="adm-mem-card-title">
+                  <i className="fas fa-id-badge" /> บัญชีและบทบาท
+                </div>
+                <div className="adm-mem-grid-2">
+                  <MemberField
+                    label="ชื่อเล่น / Display Name"
+                    value={form.nickname}
+                    onChange={v => set('nickname', v)}
+                    placeholder="เช่น นิค, Karinaa"
+                    icon="fa-user-tag"
+                  />
+                  <div className="adm-mem-field">
+                    <label className="adm-mem-label">บทบาทในระบบ (Role)</label>
+                    <select
+                      className="adm-mem-select"
+                      value={form.role}
+                      onChange={e => set('role', e.target.value)}
+                    >
+                      <option value="member">Member (ผู้เล่นทั่วไป)</option>
+                      <option value="admin">Admin (ผู้ดูแลระบบ)</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Personal Details */}
+              <div className="adm-mem-card">
+                <div className="adm-mem-card-title">
+                  <i className="fas fa-address-card" /> ข้อมูลส่วนตัว
+                </div>
+                <div className="adm-mem-grid-2">
+                  <MemberField
+                    label="ชื่อจริง"
+                    value={form.firstname}
+                    onChange={v => set('firstname', v)}
+                    placeholder="ชื่อจริง"
+                    icon="fa-user"
+                  />
+                  <MemberField
+                    label="นามสกุล"
+                    value={form.lastname}
+                    onChange={v => set('lastname', v)}
+                    placeholder="นามสกุล"
+                    icon="fa-user"
+                  />
+                </div>
+                <div className="adm-mem-grid-2">
+                  <MemberField
+                    label="อีเมล"
+                    value={form.email}
+                    onChange={v => set('email', v)}
+                    placeholder="email@example.com"
+                    type="email"
+                    icon="fa-envelope"
+                  />
+                  <MemberField
+                    label="เบอร์โทรศัพท์"
+                    value={form.tel_no}
+                    onChange={v => set('tel_no', v)}
+                    placeholder="08x-xxx-xxxx"
+                    icon="fa-phone"
+                  />
+                </div>
+                <MemberField
+                  label="ตำแหน่ง (แสดงในหน้า Team)"
+                  value={form.position}
+                  onChange={v => set('position', v)}
+                  placeholder="เช่น Game Master, Story Designer, DM"
+                  icon="fa-briefcase"
+                />
+              </div>
+
+              {/* Avatar Picture */}
+              <div className="adm-mem-card">
+                <div className="adm-mem-card-title">
+                  <i className="fas fa-camera" /> รูปโปรไฟล์
+                </div>
+                <MemberField
+                  label="URL รูปโปรไฟล์ (Image URL)"
+                  value={form.pictureUrl}
+                  onChange={v => set('pictureUrl', v)}
+                  placeholder="https://profile.line-scdn.net/..."
+                  icon="fa-link"
+                />
+                {form.pictureUrl && (
+                  <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 14, padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 10 }}>
+                    <img
+                      src={form.pictureUrl}
+                      alt="Avatar Preview"
+                      style={{ width: 56, height: 56, borderRadius: 10, objectFit: 'cover', border: '1px solid #cbd5e1' }}
+                      onError={e => e.currentTarget.style.display = 'none'}
+                    />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#0f172a' }}>พรีวิวรูปโปรไฟล์</div>
+                      <div style={{ fontSize: 11, color: '#64748b' }}>รูปภาพแสดงบนหน้าเว็บ บิล และโปรไฟล์ผู้เล่น</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+
+          {/* ═════════ TAB 2: ACHIEVEMENTS ═════════ */}
+          {activeTab === 'achievements' && (
+            <div className="adm-mem-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <div className="adm-mem-card-title" style={{ margin: 0 }}>
+                    <i className="fas fa-medal" /> รายการความสำเร็จ ({form.achievements.length}/{totalAchievements})
+                  </div>
+                  <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 3 }}>
+                    คลิกเพื่อเปิด/ปิดเหรียญรางวัลให้กับสมาชิกท่านนี้
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button type="button" className="adm-mem-chip" onClick={selectAllAchievements}>
+                    เลือกทั้งหมด
+                  </button>
+                  <button type="button" className="adm-mem-chip" onClick={clearAchievements}>
+                    ล้างทั้งหมด
+                  </button>
+                </div>
+              </div>
+
+              {/* Rarity Filter */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16, padding: '8px 10px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  className={`adm-mem-chip ${rarityFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setRarityFilter('ALL')}
+                >
+                  ทั้งหมด ({totalAchievements})
+                </button>
+                {Object.values(RARITY).map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className={`adm-mem-chip ${rarityFilter === r.id ? 'active' : ''}`}
+                    onClick={() => setRarityFilter(r.id)}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Achievements grouped by rarity */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {visibleRarities.map(({ rarity: rar, items }) => (
+                  <div key={rar.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: rar.color, marginBottom: 8 }}>
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: rar.color }} />
+                      {rar.label} ({items.length})
+                    </div>
+                    <div className="adm-mem-ach-grid">
+                      {items.map(ach => {
+                        const on = form.achievements.includes(ach.id)
+                        return (
+                          <button
+                            key={ach.id}
+                            type="button"
+                            className={`adm-mem-ach-card ${on ? 'on' : ''}`}
+                            style={{
+                              '--ac': ach.color,
+                              '--ab': ach.bg,
+                              '--abr': ach.border
+                            }}
+                            onClick={() => toggleAchievement(ach.id)}
+                          >
+                            <div className="adm-mem-ach-icon">
+                              <i className={`fas ${ach.icon}`} />
+                            </div>
+                            <div className="adm-mem-ach-body">
+                              <div className="adm-mem-ach-name">{ach.label}</div>
+                              <div className="adm-mem-ach-th">{ach.labelTH}</div>
+                              <div className="adm-mem-ach-desc">{ach.descTH}</div>
+                            </div>
+                            {on && (
+                              <div className="adm-mem-ach-check">
+                                <i className="fas fa-check" />
+                              </div>
+                            )}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+        </div>
+
+        {/* ── FOOTER ── */}
+        <div className="adm-mem-footer">
+          <div style={{ fontSize: 12, color: '#64748b' }}>
+            สถานะ: <strong style={{ color: '#0f172a' }}>{form.role.toUpperCase()}</strong> · ปลดล็อค <strong>{form.achievements.length}</strong> รางวัล
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={onClose}
+              disabled={saving}
+              style={{ padding: '9px 18px', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
+            >
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              className="adm-btn-red"
+              onClick={save}
+              disabled={saving}
+              style={{ minWidth: 120, padding: '9px 20px', borderRadius: 9, fontSize: 13, fontWeight: 700 }}
+            >
+              {saving ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" /> กำลังบันทึก...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-save" /> บันทึกข้อมูล
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
   )
