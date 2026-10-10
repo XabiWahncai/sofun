@@ -502,7 +502,46 @@ function DashboardTab({ allGames, members, onGoTab }) {
 }
 
 // ─── Scripts Tab ──────────────────────────────────────────────────────────────
-function ScriptsTab({ allGames, showToast, openModal, openEdit }) {
+const matchPlayersCount = (playersStr, filterVal) => {
+  if (filterVal === 'ALL') return true
+  if (!playersStr) return false
+  const s = String(playersStr).trim()
+  if (filterVal === '9+') {
+    const nums = s.match(/\d+/g)?.map(Number) || []
+    return nums.some(n => n >= 9)
+  }
+  const target = parseInt(filterVal, 10)
+  if (isNaN(target)) return true
+  const parts = s.split(/[-–—]/).map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n))
+  if (parts.length === 1) return parts[0] === target
+  if (parts.length >= 2) return target >= parts[0] && target <= parts[1]
+  return s.includes(String(target))
+}
+
+const getDiffBadgeStyle = (diff) => {
+  const d = (diff || '').toLowerCase()
+  if (d.includes('beginner') || d.includes('ง่าย')) {
+    return { background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.25)' }
+  }
+  if (d.includes('normal') || d.includes('ปานกลาง')) {
+    return { background: 'rgba(59,130,246,0.1)', color: '#2563eb', border: '1px solid rgba(59,130,246,0.25)' }
+  }
+  if (d.includes('hard') || d.includes('ยาก')) {
+    return { background: 'rgba(245,158,11,0.12)', color: '#b45309', border: '1px solid rgba(245,158,11,0.3)' }
+  }
+  if (d.includes('expert') || d.includes('เซียน')) {
+    return { background: 'rgba(239,68,68,0.12)', color: 'var(--crimson-500)', border: '1px solid rgba(239,68,68,0.3)' }
+  }
+  return { background: 'var(--surface-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }
+}
+
+function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
+  const [search, setSearch] = useState('')
+  const [difficultyFilter, setDifficultyFilter] = useState('ALL')
+  const [playerFilter, setPlayerFilter] = useState('ALL')
+  const [tagFilter, setTagFilter] = useState('ALL')
+  const [sortBy, setSortBy] = useState('default')
+
   const handleDelete = async (id, title) => {
     if (!confirm(`ลบ "${title}" ออกจากระบบ?`)) return
     try {
@@ -518,31 +557,309 @@ function ScriptsTab({ allGames, showToast, openModal, openEdit }) {
     } catch { showToast('โหลดข้อมูลล้มเหลว', 'error') }
   }
 
+  // Collect unique tags
+  const allTags = useMemo(() => {
+    const set = new Set()
+    allGames.forEach(g => {
+      if (Array.isArray(g.tags)) {
+        g.tags.forEach(t => { if (t?.trim()) set.add(t.trim()) })
+      }
+    })
+    return Array.from(set).sort()
+  }, [allGames])
+
+  // Filter games
+  const filteredGames = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return allGames.filter(g => {
+      if (q) {
+        const matchTitle = (g.title || '').toLowerCase().includes(q)
+        const matchPlayers = String(g.players || '').toLowerCase().includes(q)
+        const matchDiff = (g.difficulty || '').toLowerCase().includes(q)
+        const matchPrice = String(g.price || g.payPrice || '').includes(q)
+        const matchTime = (g.time || '').toLowerCase().includes(q)
+        const matchSynopsis = (g.synopsis || '').toLowerCase().includes(q)
+        const matchTags = Array.isArray(g.tags) && g.tags.some(t => t.toLowerCase().includes(q))
+        const matchRooms = (Array.isArray(g.selectedRooms) && g.selectedRooms.some(r => r.toLowerCase().includes(q))) ||
+          (g.mainRoom && g.mainRoom.toLowerCase().includes(q))
+        if (!matchTitle && !matchPlayers && !matchDiff && !matchPrice && !matchTime && !matchSynopsis && !matchTags && !matchRooms) {
+          return false
+        }
+      }
+      if (difficultyFilter !== 'ALL') {
+        if ((g.difficulty || '').toLowerCase() !== difficultyFilter.toLowerCase()) return false
+      }
+      if (playerFilter !== 'ALL') {
+        if (!matchPlayersCount(g.players, playerFilter)) return false
+      }
+      if (tagFilter !== 'ALL') {
+        if (!Array.isArray(g.tags) || !g.tags.includes(tagFilter)) return false
+      }
+      return true
+    })
+  }, [allGames, search, difficultyFilter, playerFilter, tagFilter])
+
+  // Sort games
+  const sortedGames = useMemo(() => {
+    return [...filteredGames].sort((a, b) => {
+      if (sortBy === 'name_asc') return (a.title || '').localeCompare(b.title || '', 'th')
+      if (sortBy === 'name_desc') return (b.title || '').localeCompare(a.title || '', 'th')
+      if (sortBy === 'price_asc') {
+        const pa = Number(a.payPrice || a.price || 0)
+        const pb = Number(b.payPrice || b.price || 0)
+        return pa - pb
+      }
+      if (sortBy === 'price_desc') {
+        const pa = Number(a.payPrice || a.price || 0)
+        const pb = Number(b.payPrice || b.price || 0)
+        return pb - pa
+      }
+      if (sortBy === 'players_asc') {
+        const pa = parseInt(a.players || '0', 10) || 0
+        const pb = parseInt(b.players || '0', 10) || 0
+        return pa - pb
+      }
+      if (sortBy === 'players_desc') {
+        const pa = parseInt(a.players || '0', 10) || 0
+        const pb = parseInt(b.players || '0', 10) || 0
+        return pb - pa
+      }
+      return 0
+    })
+  }, [filteredGames, sortBy])
+
+  const hasActiveFilters = search || difficultyFilter !== 'ALL' || playerFilter !== 'ALL' || tagFilter !== 'ALL' || sortBy !== 'default'
+
+  const handleResetFilters = () => {
+    setSearch('')
+    setDifficultyFilter('ALL')
+    setPlayerFilter('ALL')
+    setTagFilter('ALL')
+    setSortBy('default')
+  }
+
   return (
     <div className="adm-card">
-      <div className="adm-card-header">
-        <div className="adm-card-title"><i className="fas fa-scroll" style={{ color: 'var(--crimson-500)' }} /> สคริปต์ ({allGames.length})</div>
-        <button className="adm-btn-red" onClick={openModal}><i className="fas fa-plus" /> เพิ่มใหม่</button>
+      <div className="adm-card-header" style={{ flexWrap: 'wrap', gap: 10 }}>
+        <div className="adm-card-title">
+          <i className="fas fa-scroll" style={{ color: 'var(--crimson-500)' }} /> สคริปต์ ({allGames.length})
+        </div>
+        <button className="adm-btn-red" onClick={openModal}>
+          <i className="fas fa-plus" /> เพิ่มใหม่
+        </button>
       </div>
+
+      {/* ── Search & Filter Controls Bar ── */}
+      <div style={{ padding: '0 0 12px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {/* Row 1: Search + Dropdown filters */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {/* Search box */}
+          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 200 }}>
+            <i className="fas fa-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', fontSize: 13 }} />
+            <input
+              type="text"
+              className="adm-input"
+              placeholder="🔍 ค้นหาชื่อสคริปต์, จำนวนคน, แท็ก, ราคา..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{ paddingLeft: 34, paddingRight: search ? 32 : 12, width: '100%', boxSizing: 'border-box', height: 38 }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                title="ล้างข้อความค้นหา"
+                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 4 }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            )}
+          </div>
+
+          {/* Difficulty Dropdown */}
+          <select
+            className="adm-input"
+            style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer' }}
+            value={difficultyFilter}
+            onChange={e => setDifficultyFilter(e.target.value)}
+          >
+            <option value="ALL">🎯 ทุกความยาก</option>
+            <option value="Beginner">🟢 Beginner</option>
+            <option value="Normal">🔵 Normal</option>
+            <option value="Hard">🟡 Hard</option>
+            <option value="Expert">🔴 Expert</option>
+          </select>
+
+          {/* Player Count Dropdown */}
+          <select
+            className="adm-input"
+            style={{ width: 'auto', minWidth: 130, height: 38, fontSize: 13, cursor: 'pointer' }}
+            value={playerFilter}
+            onChange={e => setPlayerFilter(e.target.value)}
+          >
+            <option value="ALL">👥 ทุกจำนวนคน</option>
+            <option value="2">2 คน</option>
+            <option value="4">4 คน</option>
+            <option value="5">5 คน</option>
+            <option value="6">6 คน</option>
+            <option value="7">7 คน</option>
+            <option value="8">8 คน</option>
+            <option value="9+">9+ คนขึ้นไป</option>
+          </select>
+
+          {/* Tag Dropdown */}
+          {allTags.length > 0 && (
+            <select
+              className="adm-input"
+              style={{ width: 'auto', minWidth: 130, height: 38, fontSize: 13, cursor: 'pointer' }}
+              value={tagFilter}
+              onChange={e => setTagFilter(e.target.value)}
+            >
+              <option value="ALL">🏷️ ทุกแนวเกม ({allTags.length})</option>
+              {allTags.map(t => (
+                <option key={t} value={t}>{t}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Sort Dropdown */}
+          <select
+            className="adm-input"
+            style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer' }}
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+          >
+            <option value="default">↕️ เรียง: ค่าเริ่มต้น</option>
+            <option value="name_asc">🔤 ชื่อ (A-Z / ก-ฮ)</option>
+            <option value="name_desc">🔤 ชื่อ (Z-A / ฮ-ก)</option>
+            <option value="price_asc">💵 ราคา (น้อย ➔ มาก)</option>
+            <option value="price_desc">💵 ราคา (มาก ➔ น้อย)</option>
+            <option value="players_asc">👥 จำนวนคน (น้อย ➔ มาก)</option>
+            <option value="players_desc">👥 จำนวนคน (มาก ➔ น้อย)</option>
+          </select>
+        </div>
+
+        {/* Row 2: Quick filter pills & Result stats */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8, padding: '8px 12px', background: 'var(--surface-page)', borderRadius: 10, border: '1px solid var(--border-default)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>ทางลัด:</span>
+            {['ALL', 'Beginner', 'Normal', 'Hard', 'Expert'].map(d => {
+              const isSel = difficultyFilter === d
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => setDifficultyFilter(d)}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 16,
+                    fontSize: 11,
+                    fontWeight: isSel ? 800 : 600,
+                    cursor: 'pointer',
+                    border: isSel ? '1px solid var(--crimson-500)' : '1px solid var(--border-default)',
+                    background: isSel ? 'var(--crimson-500)' : 'var(--surface-elevated)',
+                    color: isSel ? '#ffffff' : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {d === 'ALL' ? 'ทั้งหมด' : d}
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-secondary)', fontWeight: 700 }}>
+              แสดง <strong style={{ color: 'var(--crimson-500)' }}>{sortedGames.length}</strong> จาก {allGames.length} สคริปต์
+            </span>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--crimson-500)',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: 0,
+                }}
+              >
+                <i className="fas fa-undo" /> ล้างตัวกรอง
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Scripts List ── */}
       <div className="adm-scripts-list">
-        {allGames.length === 0
-          ? <p className="adm-empty">ยังไม่มีสคริปต์</p>
-          : allGames.map(g => (
+        {sortedGames.length === 0 ? (
+          <div className="adm-empty" style={{ padding: '36px 0', textAlign: 'center' }}>
+            <i className="fas fa-search" style={{ fontSize: 28, opacity: 0.3, marginBottom: 8, display: 'block' }} />
+            <div>{allGames.length === 0 ? 'ยังไม่มีสคริปต์ในระบบ' : `ไม่พบสคริปต์ที่ตรงกับเงื่อนไขการค้นหา ${search ? `"${search}"` : ''}`}</div>
+            {hasActiveFilters && (
+              <button
+                type="button"
+                className="adm-btn-outline"
+                style={{ marginTop: 12, padding: '6px 14px', fontSize: 12 }}
+                onClick={handleResetFilters}
+              >
+                <i className="fas fa-undo" style={{ marginRight: 6 }} /> ล้างตัวกรองทั้งหมด
+              </button>
+            )}
+          </div>
+        ) : (
+          sortedGames.map(g => (
             <div key={g.id} className="adm-script-row">
               <div className="adm-script-img">
                 {g.image || g.coverUrl ? <img src={g.image || g.coverUrl} alt="" /> : '🎭'}
               </div>
               <div className="adm-list-info">
-                <div className="adm-list-name">{g.title || 'ไม่มีชื่อ'}</div>
-                <div className="adm-list-sub">{g.players || '-'} คน · {g.time || '-'} · {g.price || 0}฿ · {g.difficulty || '-'}</div>
+                <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                  <span>{g.title || 'ไม่มีชื่อ'}</span>
+                  {g.difficulty && (
+                    <span style={{
+                      fontSize: 10,
+                      fontWeight: 800,
+                      padding: '1px 7px',
+                      borderRadius: 12,
+                      ...getDiffBadgeStyle(g.difficulty)
+                    }}>
+                      {g.difficulty}
+                    </span>
+                  )}
+                  {Array.isArray(g.tags) && g.tags.slice(0, 2).map((tg, tIdx) => (
+                    <span key={tIdx} style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--surface-page)', padding: '1px 6px', borderRadius: 6, border: '1px solid var(--border-default)' }}>
+                      #{tg}
+                    </span>
+                  ))}
+                </div>
+                <div className="adm-list-sub">
+                  <span><i className="fas fa-users" style={{ marginRight: 4, fontSize: 10 }} />{g.players || '-'} คน</span>
+                  <span> · </span>
+                  <span><i className="fas fa-clock" style={{ marginRight: 4, fontSize: 10 }} />{g.time || '-'}</span>
+                  <span> · </span>
+                  <span style={{ fontWeight: 800, color: 'var(--crimson-500)' }}>฿{(g.payPrice || g.price || 0).toLocaleString()}</span>
+                  {g.mainRoom && (
+                    <>
+                      <span> · </span>
+                      <span style={{ color: 'var(--text-tertiary)' }}><i className="fas fa-door-open" style={{ marginRight: 3, fontSize: 10 }} />{g.mainRoom}</span>
+                    </>
+                  )}
+                </div>
               </div>
               <div className="adm-row-actions">
-                <button className="adm-icon-btn adm-edit" onClick={() => handleEdit(g.id)}><i className="fas fa-edit" /></button>
-                <button className="adm-icon-btn adm-del" onClick={() => handleDelete(g.id, g.title || '')}><i className="fas fa-trash" /></button>
+                <button className="adm-icon-btn adm-edit" onClick={() => handleEdit(g.id)} title="แก้ไขสคริปต์"><i className="fas fa-edit" /></button>
+                <button className="adm-icon-btn adm-del" onClick={() => handleDelete(g.id, g.title || '')} title="ลบสคริปต์"><i className="fas fa-trash" /></button>
               </div>
             </div>
           ))
-        }
+        )}
       </div>
     </div>
   )
