@@ -750,13 +750,16 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
   const openProfile = useOpenProfile()
   const members     = booking.members || []
   const maxMembers  = booking.maxMembers || 0
-  const isMember    = members.some(m => m.uid === user?.uid)
+  const isMember    = members.some(m => m.uid === user?.uid || m.id === user?.uid)
+  const isLeader    = booking.leaderId === user?.uid
+  const isAdmin     = user?.role === 'admin' || user?.isAdmin
   const isFull      = members.length >= maxMembers
   const isLocked    = booking.status === 'locked'
+  const isLockedRestricted = isLocked && !isMember && !isLeader && !isAdmin
   const hasPending  = booking.joinRequests?.some(r => r.uid === user?.uid)
 
-  const statusBg    = (isLocked || isFull) ? 'rgba(198,36,25,0.85)' : 'rgba(0,0,0,0.55)'
-  const statusLabel = isLocked ? 'ล็อกแล้ว' : isFull ? 'เต็มแล้ว' : 'เปิดรับ'
+  const statusBg    = isLockedRestricted ? 'rgba(15,23,42,0.85)' : (isLocked || isFull) ? 'rgba(198,36,25,0.85)' : 'rgba(0,0,0,0.55)'
+  const statusLabel = isLocked ? 'ล็อกห้องแล้ว' : isFull ? 'เต็มแล้ว' : 'เปิดรับ'
 
   const fillPct = maxMembers > 0 ? Math.min(100, (members.length / maxMembers) * 100) : 0
   const fillColor = 'var(--crimson-500)'
@@ -863,7 +866,11 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
 
         {/* Action */}
         <div style={{ marginTop: 'auto', paddingTop: '2px' }}>
-          {!user ? (
+          {isLockedRestricted ? (
+            <button disabled style={{ width: '100%', height: '36px', borderRadius: '8px', background: 'rgba(15,23,42,0.06)', color: 'var(--text-tertiary)', border: '1px solid rgba(15,23,42,0.1)', cursor: 'not-allowed', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <i className="fas fa-lock" /> ล็อกห้องแล้ว (เฉพาะสมาชิก)
+            </button>
+          ) : !user ? (
             <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
               <i className="fab fa-line" /> Login ก่อน
             </span>
@@ -1285,7 +1292,16 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
                     booking={item}
                     user={user}
                     onRequestJoin={handleBookingRequestJoin}
-                    onOpen={() => setDetailBooking(item)}
+                    onOpen={() => {
+                      const isMember = item.members?.some(m => m.uid === user?.uid || m.id === user?.uid)
+                      const isLeader = item.leaderId === user?.uid
+                      const isAdmin = user?.role === 'admin' || user?.isAdmin
+                      if (item.status === 'locked' && !isMember && !isLeader && !isAdmin) {
+                        showToast?.('ตี้ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
+                        return
+                      }
+                      setDetailBooking(item)
+                    }}
                   />
                 : <PartyCard
                     key={item.id}

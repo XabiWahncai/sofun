@@ -45,6 +45,8 @@ function buildPromptPayQR(phoneOrId, amount) {
 // ── Component ───────────────────────────────────────────────────────────────
 export default function PaymentModal({ session, selectedGame, onClose, onPaid, showToast, adminUser, memberPayments }) {
   const [promptPayPhone, setPromptPayPhone] = useState('')
+  const [paymentAccountName, setPaymentAccountName] = useState('')
+  const [paymentBankName, setPaymentBankName] = useState('')
   const [discountType, setDiscountType] = useState('amount') // 'amount' | 'percent'
   const [discountValue, setDiscountValue] = useState('')
   const [splitMode, setSplitMode] = useState(false)
@@ -55,7 +57,12 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'payment')).then(snap => {
-      if (snap.exists()) setPromptPayPhone(snap.data().promptPayPhone || '')
+      if (snap.exists()) {
+        const d = snap.data()
+        setPromptPayPhone(d.promptPayPhone || '')
+        setPaymentAccountName(d.paymentAccountName || '')
+        setPaymentBankName(d.paymentBankName || '')
+      }
     })
   }, [])
 
@@ -345,6 +352,11 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
                   />
                 </div>
                 <div className="pay-qr-phone">{promptPayPhone}</div>
+                {(paymentAccountName || paymentBankName) && (
+                  <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px', fontWeight: 500, textAlign: 'center' }}>
+                    {paymentAccountName}{paymentBankName ? ` (${paymentBankName})` : ''}
+                  </div>
+                )}
                 {splitMode && n > 1 && (
                   <div className="pay-split-nav">
                     {session.members.map((m, i) => (

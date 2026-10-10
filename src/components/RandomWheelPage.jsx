@@ -78,9 +78,21 @@ class WheelAudio {
 
 const wheelAudio = new WheelAudio()
 
+const fmtThaiDT = (d) => {
+  if (!d) return '-'
+  const date = d instanceof Date ? d : (d?.toDate ? d.toDate() : new Date(d))
+  if (isNaN(date.getTime())) return '-'
+  return date.toLocaleDateString('th-TH', {
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit',
+  }) + ' · ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+}
+
 export default function RandomWheelPage({ lineUser, showToast, showPage }) {
   // ── Firestore live states ──────────────────────────────────────────────────
   const [playHistory, setPlayHistory] = useState([])
+  const [payments, setPayments] = useState([])
   const [membersMap, setMembersMap] = useState({})
   const [config, setConfig] = useState({
     lockedWinnerId: null,
@@ -93,6 +105,12 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
   const [winnerHistory, setWinnerHistory] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // ── History inspect states ────────────────────────────────────────────────
+  const [selectedUserForHistory, setSelectedUserForHistory] = useState(null)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
+  const [playHistorySearch, setPlayHistorySearch] = useState('')
+  const [playHistoryFilter, setPlayHistoryFilter] = useState('all') // 'all' | 'me'
+
   // ── Animation & wheel physics states ───────────────────────────────────────
   const [isSpinning, setIsSpinning] = useState(false)
   const [currentWinner, setCurrentWinner] = useState(null)
@@ -101,7 +119,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
   const [muted, setMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
-  const [activeTab, setActiveTab] = useState('candidates') // candidates | removed | history | settings
+  const [activeTab, setActiveTab] = useState('candidates') // candidates | playHistory | removed | history
 
   // Manual entry form
   const [newManualName, setNewManualName] = useState('')
@@ -184,6 +202,11 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
       setLoading(false)
     })
 
+    // 2.5 Payments History (for store sessions)
+    const unsubPayments = onSnapshot(collection(db, 'payments'), (snap) => {
+      setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+
     // 3. Members lookup
     const unsubMembers = onSnapshot(collection(db, 'members'), (snap) => {
       const map = {}
@@ -202,10 +225,102 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
     return () => {
       unsubConfig()
       unsubHistory()
+      unsubPayments()
       unsubMembers()
       unsubWin()
     }
   }, [isSpinning])
+
+  // ── Combine & Deduplicate Play Records ─────────────────────────────────────
+  const allPlayRecords = useMemo(() => {
+    const records = []
+    const seenKeys = new Set()
+
+    // 1. From playHistory collection
+    playHistory.forEach(ph => {
+      const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : new Date())
+      const uid = ph.userId || ph.userName || 'unknown'
+      const key = `${uid}_${ph.scriptId || ph.scriptTitle}_${pDate.toDateString()}`
+      seenKeys.add(key)
+      records.push({
+        id: ph.id,
+        userId: uid,
+        userName: ph.userName || 'ลูกค้า',
+        userAvatar: ph.userAvatar || '',
+        scriptId: ph.scriptId || '',
+        scriptTitle: ph.scriptTitle || 'เกมสืบคดี',
+        character: ph.character || '',
+        dm: ph.dm || '',
+        room: ph.room || '',
+        playedAt: pDate,
+        recordedBy: ph.recordedBy || '',
+        source: 'playHistory',
+      })
+    })
+
+    // 2. From payments collection
+    payments.forEach(pm => {
+      const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : pm.createdAt?.toDate ? pm.createdAt.toDate() : new Date())
+      const members = Array.isArray(pm.members) ? pm.members : []
+      members.forEach(m => {
+        const uid = m.uid || m.name || 'unknown'
+        const key = `${uid}_${pm.scriptId || pm.scriptTitle}_${pDate.toDateString()}`
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key)
+          records.push({
+            id: `pay_${pm.id}_${uid}`,
+            userId: uid,
+            userName: m.name || 'ลูกค้า',
+            userAvatar: m.avatar || '',
+            scriptId: pm.scriptId || '',
+            scriptTitle: pm.scriptTitle || 'เกมสืบคดี',
+            character: m.character || '',
+            dm: pm.dm || '',
+            room: pm.room || pm.sessionLabel || '',
+            playedAt: pDate,
+            recordedBy: 'POS Checkout',
+            source: 'payment',
+          })
+        }
+      })
+    })
+
+    return records.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime())
+  }, [playHistory, payments])
+
+  // ── Logged-in User Plays & Stats ───────────────────────────────────────────
+  const myPlays = useMemo(() => {
+    if (!lineUser) return []
+    return allPlayRecords.filter(r => r.userId === lineUser.uid || (lineUser.name && r.userName === lineUser.name))
+  }, [allPlayRecords, lineUser])
+
+  const myPlayCount = myPlays.length
+
+  // Filtered play history for sidebar drawer
+  const filteredPlayRecords = useMemo(() => {
+    let list = allPlayRecords
+    if (playHistoryFilter === 'me' && lineUser) {
+      list = list.filter(r => r.userId === lineUser.uid || (lineUser.name && r.userName === lineUser.name))
+    }
+    if (playHistorySearch.trim()) {
+      const q = playHistorySearch.toLowerCase()
+      list = list.filter(r =>
+        (r.userName || '').toLowerCase().includes(q) ||
+        (r.scriptTitle || '').toLowerCase().includes(q) ||
+        (r.character || '').toLowerCase().includes(q) ||
+        (r.dm || '').toLowerCase().includes(q)
+      )
+    }
+    return list
+  }, [allPlayRecords, playHistoryFilter, playHistorySearch, lineUser])
+
+  // History list for selected user modal
+  const userHistoryList = useMemo(() => {
+    if (!selectedUserForHistory) return []
+    const targetId = selectedUserForHistory.id
+    const targetName = selectedUserForHistory.name
+    return allPlayRecords.filter(r => r.userId === targetId || (targetName && r.userName === targetName))
+  }, [allPlayRecords, selectedUserForHistory])
 
   // ── Aggregate Candidates ───────────────────────────────────────────────────
   const candidates = useMemo(() => {
@@ -213,27 +328,22 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
     const userPlays = {}
     const userDetails = {}
 
-    // 1. From playHistory
-    playHistory.forEach(ph => {
+    allPlayRecords.forEach(ph => {
       // Filter by date if configured
       if (config.dateFilter === 'today') {
-        if (!ph.playedAt) return
-        const pDate = ph.playedAt.toDate ? ph.playedAt.toDate() : new Date(ph.playedAt)
         const today = new Date()
-        if (pDate.toDateString() !== today.toDateString()) return
+        if (ph.playedAt.toDateString() !== today.toDateString()) return
       } else if (config.dateFilter === 'month') {
-        if (!ph.playedAt) return
-        const pDate = ph.playedAt.toDate ? ph.playedAt.toDate() : new Date(ph.playedAt)
         const today = new Date()
-        if (pDate.getMonth() !== today.getMonth() || pDate.getFullYear() !== today.getFullYear()) return
+        if (ph.playedAt.getMonth() !== today.getMonth() || ph.playedAt.getFullYear() !== today.getFullYear()) return
       }
 
-      const uid = ph.userId || ph.userName || 'unknown'
+      const uid = ph.userId
       userPlays[uid] = (userPlays[uid] || 0) + 1
       if (!userDetails[uid]) {
         userDetails[uid] = {
           id: uid,
-          name: ph.userName || 'ลูกค้า',
+          name: ph.userName,
           avatar: ph.userAvatar || '',
         }
       }
@@ -254,7 +364,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
       }
     })
 
-    // 2. Add manual participants
+    // Add manual participants
     manualParticipants.forEach(mp => {
       userPlays[mp.id] = (userPlays[mp.id] || 0) + (mp.tickets || 1)
       userDetails[mp.id] = {
@@ -279,7 +389,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
           fullName: details.fullName || details.name || uid,
           avatar: details.avatar || '',
           tel_no: details.tel_no || '',
-          tickets,
+          tickets, // 1 play = 1 ticket
           isRemoved: removedSet.has(uid),
           isManual: !!details.isManual,
         }
@@ -308,7 +418,12 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
         chance: totalTickets > 0 ? ((weight / totalTickets) * 100).toFixed(1) : 0,
       }
     })
-  }, [playHistory, membersMap, manualParticipants, config.removedUserIds, config.dateFilter])
+  }, [allPlayRecords, membersMap, manualParticipants, config.removedUserIds, config.dateFilter])
+
+  const myCandidate = useMemo(() => {
+    if (!lineUser) return null
+    return candidates.find(c => c.id === lineUser.uid || (lineUser.name && c.name === lineUser.name)) || null
+  }, [candidates, lineUser])
 
   const totalActiveTickets = useMemo(() => candidates.reduce((s, c) => s + c.tickets, 0), [candidates])
 
@@ -813,17 +928,31 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
     showToast(`เพิ่ม ${newManualName} เรียบร้อยแล้ว`)
   }
 
+  // ── Handle Spin Click with Play-history based permission check ────────────
+  const handleSpinClick = useCallback(() => {
+    if (isSpinning) return
+    if (candidates.length === 0) {
+      showToast('ยังไม่มีรายชื่อผู้มีสิทธิ์สุ่มในระบบ', 'warning')
+      return
+    }
+    if (!isAdmin && (!lineUser || myPlayCount === 0)) {
+      showToast('คุณยังไม่มีสิทธิ์สุ่ม เนื่องจากต้องมีประวัติการเล่นที่ร้านก่อน', 'warning')
+      return
+    }
+    startSpin()
+  }, [isSpinning, candidates.length, isAdmin, lineUser, myPlayCount, startSpin, showToast])
+
   // ── Keyboard shortcut: Spacebar to spin ────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.code === 'Space' && !isSpinning && e.target.tagName !== 'INPUT') {
+      if (e.code === 'Space' && !isSpinning && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
         e.preventDefault()
-        startSpin()
+        handleSpinClick()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [startSpin, isSpinning])
+  }, [handleSpinClick, isSpinning])
 
   return (
     <div style={{
@@ -841,9 +970,11 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '14px 20px',
+        flexWrap: 'wrap',
+        gap: 10,
+        padding: '12px 16px',
         borderBottom: '1px solid rgba(255,255,255,0.08)',
-        background: 'rgba(9,9,15,0.85)',
+        background: 'rgba(9,9,15,0.95)',
         backdropFilter: 'blur(12px)',
         zIndex: 20,
       }}>
@@ -875,16 +1006,6 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
 
         {/* Top actions */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Locked Badge (If active and user is admin) */}
-          {isAdmin && config.lockedWinnerId && (
-            <div style={{
-              background: 'rgba(239,68,68,0.2)', border: '1px solid rgba(239,68,68,0.5)',
-              color: '#ef4444', fontSize: 11, fontWeight: 800,
-              padding: '4px 10px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 5,
-            }}>
-              <i className="fas fa-lock" /> ล็อคผลรอบนี้
-            </div>
-          )}
 
           {/* Sound Toggle */}
           <button
@@ -912,12 +1033,37 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
             <i className={`fas ${isFullscreen ? 'fa-compress' : 'fa-expand'}`} />
           </button>
 
+          {/* View Play History */}
+          <button
+            onClick={() => {
+              setActiveTab('playHistory')
+              setShowSidebar(true)
+            }}
+            style={{
+              background: showSidebar && activeTab === 'playHistory' ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${showSidebar && activeTab === 'playHistory' ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.15)'}`,
+              color: '#fbbf24', padding: '7px 12px', borderRadius: 8,
+              cursor: 'pointer', fontSize: 13, fontWeight: 700,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <i className="fas fa-history" />
+            <span>ประวัติเล่น ({allPlayRecords.length})</span>
+          </button>
+
           {/* Toggle Sidebar */}
           <button
-            onClick={() => setShowSidebar(o => !o)}
+            onClick={() => {
+              if (showSidebar && activeTab === 'candidates') {
+                setShowSidebar(false)
+              } else {
+                setActiveTab('candidates')
+                setShowSidebar(true)
+              }
+            }}
             style={{
-              background: showSidebar ? 'var(--crimson-500)' : 'rgba(255,255,255,0.06)',
-              border: `1px solid ${showSidebar ? 'var(--crimson-500)' : 'rgba(255,255,255,0.15)'}`,
+              background: showSidebar && activeTab === 'candidates' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.06)',
+              border: `1px solid ${showSidebar && activeTab === 'candidates' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.15)'}`,
               color: '#fff', padding: '7px 14px', borderRadius: 8,
               cursor: 'pointer', fontSize: 13, fontWeight: 700,
               display: 'flex', alignItems: 'center', gap: 6,
@@ -964,12 +1110,12 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
                 display: 'block',
                 cursor: isSpinning ? 'default' : 'pointer',
               }}
-              onClick={() => !isSpinning && startSpin()}
+              onClick={() => !isSpinning && handleSpinClick()}
             />
 
             {/* Floating Center Spin Touch Area */}
             <button
-              onClick={() => !isSpinning && startSpin()}
+              onClick={() => !isSpinning && handleSpinClick()}
               disabled={isSpinning || candidates.length === 0}
               style={{
                 position: 'absolute',
@@ -996,7 +1142,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
             maxWidth: 440,
           }}>
             <button
-              onClick={() => !isSpinning && startSpin()}
+              onClick={handleSpinClick}
               disabled={isSpinning || candidates.length === 0}
               style={{
                 width: '100%',
@@ -1007,11 +1153,11 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
                   ? '#333'
                   : 'linear-gradient(135deg, #c62419 0%, #e02d20 50%, #9a1c13 100%)',
                 color: '#fff',
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: 900,
                 fontFamily: "'Barlow Condensed', sans-serif",
                 letterSpacing: '0.06em',
-                cursor: isSpinning || candidates.length === 0 ? 'default' : 'pointer',
+                cursor: isSpinning || candidates.length === 0 ? 'not-allowed' : 'pointer',
                 boxShadow: isSpinning ? 'none' : '0 8px 32px rgba(198,36,25,0.45)',
                 display: 'flex',
                 alignItems: 'center',
@@ -1021,7 +1167,9 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
               }}
             >
               <i className={`fas ${isSpinning ? 'fa-spinner fa-spin' : 'fa-play'}`} />
-              <span>{isSpinning ? 'กำลังหมุนวงล้อ...' : 'หมุนวงล้อ (SPIN)'}</span>
+              <span>
+                {isSpinning ? 'กำลังหมุนวงล้อ...' : 'สุ่ม'}
+              </span>
             </button>
 
             {/* Quick Stats Pill */}
@@ -1092,19 +1240,21 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
             background: 'rgba(0,0,0,0.2)',
           }}>
             {[
-              { key: 'candidates', label: `รายชื่อ (${candidates.length})` },
+              { key: 'candidates', label: `ผู้มีสิทธิ์ (${candidates.length})` },
+              { key: 'playHistory', label: `ประวัติเล่น (${allPlayRecords.length})` },
+              { key: 'history', label: `ผู้ชนะ (${winnerHistory.length})` },
               { key: 'removed', label: `ลบออก (${removedCandidates.length})` },
-              { key: 'history', label: 'ประวัติ' },
             ].map(tab => (
               <button
                 key={tab.key}
                 onClick={() => setActiveTab(tab.key)}
                 style={{
-                  flex: 1, padding: '10px 6px', border: 'none',
+                  flex: 1, padding: '10px 4px', border: 'none',
                   background: activeTab === tab.key ? 'rgba(198,36,25,0.15)' : 'none',
                   color: activeTab === tab.key ? 'var(--crimson-500)' : '#888',
                   borderBottom: activeTab === tab.key ? '2px solid var(--crimson-500)' : 'none',
-                  fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {tab.label}
@@ -1117,35 +1267,6 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
             {/* ── TAB 1: CANDIDATES ── */}
             {activeTab === 'candidates' && (
               <div>
-                {/* Admin Quick Lock Section */}
-                {isAdmin && (
-                  <div style={{
-                    marginBottom: 16, padding: '12px 14px', borderRadius: 10,
-                    background: config.lockedWinnerId ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.03)',
-                    border: `1px solid ${config.lockedWinnerId ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.08)'}`,
-                  }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: config.lockedWinnerId ? '#ef4444' : '#fbbf24', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
-                      <i className="fas fa-lock" /> ล็อคผลรอบถัดไป (Admin)
-                    </div>
-                    <select
-                      value={config.lockedWinnerId || ''}
-                      onChange={e => handleSetLockedWinner(e.target.value)}
-                      style={{
-                        width: '100%', padding: '8px 10px', borderRadius: 8,
-                        background: '#09090f', border: '1px solid rgba(255,255,255,0.2)',
-                        color: '#fff', fontSize: 13, fontFamily: "'Sarabun', sans-serif",
-                      }}
-                    >
-                      <option value="">-- สุ่มตามธรรมชาติ (Fair) --</option>
-                      {candidates.map(c => (
-                        <option key={c.id} value={c.id}>
-                          🔒 ล็อคให้: {c.name} ({c.tickets} สิทธิ์)
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
                 {/* Candidate list */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {candidates.map(c => (
@@ -1155,7 +1276,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
                         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                         padding: '10px 12px', borderRadius: 10,
                         background: 'rgba(255,255,255,0.04)',
-                        border: `1px solid ${config.lockedWinnerId === c.id ? '#ef4444' : 'rgba(255,255,255,0.06)'}`,
+                        border: '1px solid rgba(255,255,255,0.06)',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
@@ -1177,9 +1298,6 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
                             whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                           }}>
                             {c.name}
-                            {config.lockedWinnerId === c.id && (
-                              <span style={{ marginLeft: 6, fontSize: 10, color: '#ef4444' }}>[ล็อค]</span>
-                            )}
                           </div>
                           <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
                             {c.tickets} ครั้ง · {c.chance}%
@@ -1188,6 +1306,22 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button
+                          onClick={() => {
+                            setSelectedUserForHistory(c)
+                            setShowHistoryModal(true)
+                          }}
+                          title="ดูประวัติการเล่น"
+                          style={{
+                            background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.3)',
+                            color: '#fbbf24', padding: '4px 8px', borderRadius: 6,
+                            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+                            fontSize: 11, fontWeight: 700,
+                          }}
+                        >
+                          <i className="fas fa-history" style={{ fontSize: 10 }} />
+                          <span>ประวัติ</span>
+                        </button>
                         <button
                           onClick={() => handleRemoveFromWheel(c.id)}
                           title="ลบออกจากวงล้อ"
@@ -1245,6 +1379,118 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
                     เพิ่มเข้าวงล้อ
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* ── TAB: PLAY HISTORY ── */}
+            {activeTab === 'playHistory' && (
+              <div>
+                {/* Filter & Search */}
+                <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                  <button
+                    onClick={() => setPlayHistoryFilter('all')}
+                    style={{
+                      flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                      background: playHistoryFilter === 'all' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.06)',
+                      border: 'none', color: '#fff',
+                    }}
+                  >
+                    ทั้งหมด ({allPlayRecords.length})
+                  </button>
+                  {lineUser && (
+                    <button
+                      onClick={() => setPlayHistoryFilter('me')}
+                      style={{
+                        flex: 1, padding: '6px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        background: playHistoryFilter === 'me' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.06)',
+                        border: 'none', color: '#fff',
+                      }}
+                    >
+                      ของฉัน ({myPlays.length})
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ position: 'relative', marginBottom: 12 }}>
+                  <input
+                    type="text"
+                    placeholder="ค้นหาชื่อผู้เล่น / เกม / บท / DM..."
+                    value={playHistorySearch}
+                    onChange={e => setPlayHistorySearch(e.target.value)}
+                    style={{
+                      width: '100%', padding: '8px 10px 8px 30px', borderRadius: 8,
+                      background: '#09090f', border: '1px solid rgba(255,255,255,0.15)',
+                      color: '#fff', fontSize: 12, boxSizing: 'border-box',
+                    }}
+                  />
+                  <i className="fas fa-search" style={{ position: 'absolute', left: 10, top: 10, fontSize: 11, color: '#888' }} />
+                </div>
+
+                {filteredPlayRecords.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '30px 0', color: '#666', fontSize: 13 }}>
+                    ไม่พบประวัติการเล่น
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {filteredPlayRecords.map(r => (
+                      <div
+                        key={r.id}
+                        onClick={() => {
+                          setSelectedUserForHistory({ id: r.userId, name: r.userName, avatar: r.userAvatar })
+                          setShowHistoryModal(true)
+                        }}
+                        style={{
+                          padding: '10px 12px', borderRadius: 10,
+                          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                          cursor: 'pointer', transition: 'background 0.2s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.07)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                              width: 24, height: 24, borderRadius: '50%',
+                              background: 'var(--crimson-500)', overflow: 'hidden',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 10, fontWeight: 900,
+                            }}>
+                              {r.userAvatar ? (
+                                <img src={r.userAvatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                r.userName[0]
+                              )}
+                            </div>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{r.userName}</span>
+                          </div>
+                          <span style={{
+                            fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                            background: r.source === 'payment' ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)',
+                            color: r.source === 'payment' ? '#60a5fa' : '#34d399',
+                            border: `1px solid ${r.source === 'payment' ? 'rgba(59,130,246,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                          }}>
+                            {r.source === 'payment' ? 'เช็คบิล' : 'บันทึกเล่น'}
+                          </span>
+                        </div>
+
+                        <div style={{ fontSize: 12, fontWeight: 600, color: '#fbbf24', marginBottom: 4 }}>
+                          🎮 {r.scriptTitle}
+                        </div>
+
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
+                          {r.character && <span>บท: <strong style={{ color: '#fff' }}>{r.character}</strong></span>}
+                          {r.dm && <span>DM: <strong style={{ color: '#fff' }}>{r.dm}</strong></span>}
+                          {r.room && <span>ห้อง: {r.room}</span>}
+                        </div>
+
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span><i className="far fa-clock" style={{ marginRight: 4 }} />{fmtThaiDT(r.playedAt)}</span>
+                          <span style={{ color: '#fbbf24' }}>ดูประวัติทั้งหมด →</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1434,6 +1680,25 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
               </div>
             </div>
 
+            {/* View Winner's Full Play History */}
+            <button
+              onClick={() => {
+                setSelectedUserForHistory(currentWinner)
+                setShowHistoryModal(true)
+              }}
+              style={{
+                width: '100%', padding: '10px 16px', borderRadius: 12,
+                border: '1px solid rgba(251,191,36,0.3)',
+                background: 'rgba(251,191,36,0.1)', color: '#fbbf24',
+                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                marginBottom: 14,
+              }}
+            >
+              <i className="fas fa-history" />
+              <span>ดูประวัติการเล่นของผู้ชนะ ({currentWinner.tickets} ครั้ง)</span>
+            </button>
+
             {/* Requirement: "ชื่อไหนที่ถูกสุ่มได้ไปแล้วจะเลือกได้ว่าจะเก็บจะลบออกจากวงไหม" */}
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', marginBottom: 12 }}>
               ต้องการจัดการรายชื่อผู้ชนะนี้ในรอบถัดไปอย่างไร?
@@ -1468,6 +1733,212 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
               >
                 <i className="fas fa-user-minus" />
                 <span>ลบชื่อออกจากวงล้อ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── PLAYER PLAY HISTORY INSPECTION MODAL ── */}
+      {showHistoryModal && selectedUserForHistory && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(8px)',
+          zIndex: 120,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
+        }}>
+          <div style={{
+            background: 'linear-gradient(180deg, #1c1c2c 0%, #10101c 100%)',
+            border: '1px solid rgba(251,191,36,0.4)',
+            borderRadius: 20,
+            maxWidth: 500,
+            width: '100%',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.9)',
+            animation: 'modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            overflow: 'hidden',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '18px 20px',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(0,0,0,0.2)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: '50%',
+                  background: 'var(--crimson-500)', overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 18, fontWeight: 900, border: '2px solid #fbbf24',
+                  flexShrink: 0,
+                }}>
+                  {selectedUserForHistory.avatar ? (
+                    <img src={selectedUserForHistory.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    (selectedUserForHistory.name || 'U')[0]
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>
+                    {selectedUserForHistory.name}
+                  </div>
+                  {selectedUserForHistory.fullName && selectedUserForHistory.fullName !== selectedUserForHistory.name && (
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)' }}>
+                      {selectedUserForHistory.fullName}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                style={{
+                  background: 'none', border: 'none', color: '#888',
+                  fontSize: 20, cursor: 'pointer', padding: 6,
+                }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            {/* Summary KPI Badges */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              padding: '12px 18px',
+              background: 'rgba(0,0,0,0.3)',
+              borderBottom: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>เล่นที่ร้านทั้งหมด</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#fbbf24' }}>
+                  {userHistoryList.length} <span style={{ fontSize: 11, fontWeight: 500 }}>ครั้ง</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center', borderLeft: '1px solid rgba(255,255,255,0.08)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>สิทธิ์ในวงล้อ</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#4ade80' }}>
+                  {candidates.find(c => c.id === selectedUserForHistory.id || c.name === selectedUserForHistory.name)?.tickets || userHistoryList.length} <span style={{ fontSize: 11, fontWeight: 500 }}>สิทธิ์</span>
+                </div>
+              </div>
+              <div style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginBottom: 2 }}>โอกาสในวงล้อ</div>
+                <div style={{ fontSize: 18, fontWeight: 900, color: '#60a5fa' }}>
+                  {candidates.find(c => c.id === selectedUserForHistory.id || c.name === selectedUserForHistory.name)?.chance || 0}%
+                </div>
+              </div>
+            </div>
+
+            {/* History Timeline Body */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '16px 18px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                <i className="fas fa-list-ol" /> รายการบันทึกการเล่น (1 ครั้ง = 1 สิทธิ์)
+              </div>
+
+              {userHistoryList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '36px 12px', color: '#777', fontSize: 13 }}>
+                  <i className="fas fa-history" style={{ fontSize: 32, display: 'block', marginBottom: 10, opacity: 0.4 }} />
+                  ยังไม่มีประวัติบันทึกการเล่นในระบบ
+                </div>
+              ) : (
+                userHistoryList.map((item, idx) => (
+                  <div
+                    key={item.id || idx}
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '1px solid rgba(255,255,255,0.07)',
+                      position: 'relative',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <span style={{
+                        fontSize: 13, fontWeight: 800, color: '#fff', display: 'flex', alignItems: 'center', gap: 6
+                      }}>
+                        <span style={{
+                          width: 20, height: 20, borderRadius: '50%',
+                          background: 'rgba(251,191,36,0.2)', color: '#fbbf24',
+                          fontSize: 10, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center'
+                        }}>
+                          {idx + 1}
+                        </span>
+                        🎮 {item.scriptTitle}
+                      </span>
+
+                      <span style={{
+                        fontSize: 10, padding: '2px 7px', borderRadius: 4,
+                        background: item.source === 'payment' ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)',
+                        color: item.source === 'payment' ? '#60a5fa' : '#34d399',
+                        border: `1px solid ${item.source === 'payment' ? 'rgba(59,130,246,0.3)' : 'rgba(16,185,129,0.3)'}`,
+                      }}>
+                        {item.source === 'payment' ? 'เช็คบิลหน้าร้าน' : 'บันทึกการเล่น'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+                      {item.character && (
+                        <div>บทบาท: <strong style={{ color: '#fff' }}>{item.character}</strong></div>
+                      )}
+                      {item.dm && (
+                        <div>DM: <strong style={{ color: '#fff' }}>{item.dm}</strong></div>
+                      )}
+                      {item.room && (
+                        <div>ห้อง: <strong style={{ color: '#fff' }}>{item.room}</strong></div>
+                      )}
+                      {item.recordedBy && (
+                        <div>บันทึกโดย: <strong style={{ color: '#fff' }}>{item.recordedBy}</strong></div>
+                      )}
+                    </div>
+
+                    <div style={{
+                      fontSize: 10, color: 'rgba(255,255,255,0.45)',
+                      paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.05)',
+                      display: 'flex', alignItems: 'center', gap: 4
+                    }}>
+                      <i className="far fa-clock" />
+                      <span>เล่นเมื่อ: {fmtThaiDT(item.playedAt)}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 20px',
+              borderTop: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(0,0,0,0.2)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                style={{
+                  padding: '8px 18px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                ปิดหน้าต่าง
               </button>
             </div>
           </div>

@@ -367,18 +367,20 @@ export default function App() {
 
   return (
     <>
-      <Nav
-        currentPage={currentPage}
-        showPage={showPage}
-        lineUser={lineUser}
-        onLogin={handleLineLogin}
-        onLogout={handleLogout}
-        liffLoading={liffLoading}
-        hasActiveOrder={!!activeMemberOrder}
-        isAdmin={isEffectiveAdmin}
-      />
+      {currentPage !== 'random' && (
+        <Nav
+          currentPage={currentPage}
+          showPage={showPage}
+          lineUser={lineUser}
+          onLogin={handleLineLogin}
+          onLogout={handleLogout}
+          liffLoading={liffLoading}
+          hasActiveOrder={!!activeMemberOrder}
+          isAdmin={isEffectiveAdmin}
+        />
+      )}
 
-      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} lineUser={lineUser} />}
+      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} />}
       {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} lineUser={lineUser} />}
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}

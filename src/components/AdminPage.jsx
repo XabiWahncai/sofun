@@ -11,7 +11,7 @@ import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
-import HistoryTab, { MemberHistoryModal, ThermalSlipModal } from './HistoryTab'
+import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
@@ -713,13 +713,14 @@ function EditMemberModal({ member, onClose, showToast }) {
 }
 
 // ─── Members Tab ──────────────────────────────────────────────────────────────
-function MembersTab({ members, showToast, onViewMemberHistory }) {
+function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) {
   const [search, setSearch]           = useState('')
   const [editMember, setEditMember]   = useState(null)
   const [historyMember, setHistoryMember] = useState(null)
   const [allPayments, setAllPayments] = useState([])
   const [receiptSettings, setReceiptSettings] = useState(DEFAULT_RECEIPT_SETTINGS)
   const [slipModalPayment, setSlipModalPayment] = useState(null)
+  const [editingPayment, setEditingPayment] = useState(null)
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'payments'), orderBy('paidAt', 'desc')), snap => {
@@ -825,6 +826,7 @@ function MembersTab({ members, showToast, onViewMemberHistory }) {
           receiptSettings={receiptSettings}
           onClose={() => setHistoryMember(null)}
           onOpenSlip={(p) => setSlipModalPayment(p)}
+          onEditPayment={(p) => setEditingPayment(p)}
           showToast={showToast}
         />
       )}
@@ -834,6 +836,16 @@ function MembersTab({ members, showToast, onViewMemberHistory }) {
           payment={slipModalPayment}
           receiptSettings={receiptSettings}
           onClose={() => setSlipModalPayment(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {editingPayment && (
+        <EditPaymentModal
+          payment={editingPayment}
+          allGames={allGames}
+          availableMembers={members}
+          onClose={() => setEditingPayment(null)}
           showToast={showToast}
         />
       )}
@@ -1071,6 +1083,13 @@ function MenuTab({ showToast }) {
 // ─── Payment Settings Tab ────────────────────────────────────────────────────
 function PaymentTab({ showToast }) {
   const [phone, setPhone] = useState('')
+  const [accountName, setAccountName] = useState('')
+  const [bankName, setBankName] = useState('')
+
+  const [depositPhone, setDepositPhone] = useState('')
+  const [depositAccountName, setDepositAccountName] = useState('')
+  const [depositBankName, setDepositBankName] = useState('')
+
   const [easySlipApiKey, setEasySlipApiKey] = useState('')
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
@@ -1078,8 +1097,14 @@ function PaymentTab({ showToast }) {
   useEffect(() => {
     getDoc(doc(db, 'settings', 'payment')).then(snap => {
       if (snap.exists()) {
-        setPhone(snap.data().promptPayPhone || '')
-        setEasySlipApiKey(snap.data().easySlipApiKey || '')
+        const d = snap.data()
+        setPhone(d.promptPayPhone || '')
+        setAccountName(d.paymentAccountName || '')
+        setBankName(d.paymentBankName || '')
+        setDepositPhone(d.depositPromptPayPhone || '')
+        setDepositAccountName(d.depositAccountName || '')
+        setDepositBankName(d.depositBankName || '')
+        setEasySlipApiKey(d.easySlipApiKey || '')
       }
       setLoaded(true)
     })
@@ -1090,6 +1115,11 @@ function PaymentTab({ showToast }) {
     try {
       await setDoc(doc(db, 'settings', 'payment'), {
         promptPayPhone: phone.trim(),
+        paymentAccountName: accountName.trim(),
+        paymentBankName: bankName.trim(),
+        depositPromptPayPhone: depositPhone.trim(),
+        depositAccountName: depositAccountName.trim(),
+        depositBankName: depositBankName.trim(),
         easySlipApiKey: easySlipApiKey.trim(),
         updatedAt: serverTimestamp(),
       })
@@ -1101,35 +1131,111 @@ function PaymentTab({ showToast }) {
   if (!loaded) return <div className="adm-loading"><div className="spinner" /></div>
 
   return (
-    <div className="adm-card">
-      <div className="adm-card-title"><i className="fas fa-mobile-alt" style={{ color: '#4ade80' /* ds-allow-hardcode */ }} /> ตั้งค่าการชำระเงิน</div>
-      <div className="adm-field" style={{ marginTop: 16 }}>
-        <label className="adm-label">เบอร์โทรศัพท์ หรือ เลขบัตรประชาชน (PromptPay)</label>
-        <input
-          className="adm-input"
-          placeholder="เช่น 0812345678"
-          value={phone}
-          onChange={e => setPhone(e.target.value)}
-        />
-        <div className="adm-hint" style={{ marginTop: 6 }}>
-          ใช้สร้าง QR Code PromptPay ให้ลูกค้าสแกนจ่าย
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* ── บัญชีจ่ายเงินหน้าร้าน / ค่าบิล (POS & สั่งอาหาร) ── */}
+      <div className="adm-card">
+        <div className="adm-card-title">
+          <i className="fas fa-cash-register" style={{ color: '#06c755' }} /> บัญชีจ่ายเงิน / ชำระบิล (POS & สั่งอาหารที่ร้าน)
+        </div>
+        <div className="adm-hint" style={{ marginTop: 4, marginBottom: 12 }}>
+          ใช้สำหรับสร้าง QR Code ในหน้า POS และหน้าสั่งอาหารของลูกค้าสำหรับชำระเงินค่าอาหาร/เกม/ปิดบิล
+        </div>
+
+        <div className="adm-field">
+          <label className="adm-label">เบอร์โทรศัพท์ หรือ เลขบัตร/เลขนิติบุคคล (PromptPay)</label>
+          <input
+            className="adm-input"
+            placeholder="เช่น 0812345678 หรือ 01055xxxxxxxx"
+            value={phone}
+            onChange={e => setPhone(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
+          <div className="adm-field">
+            <label className="adm-label">ชื่อบัญชี (แสดงใต้ QR Code)</label>
+            <input
+              className="adm-input"
+              placeholder="เช่น บจก. โซฟัน คลับ"
+              value={accountName}
+              onChange={e => setAccountName(e.target.value)}
+            />
+          </div>
+          <div className="adm-field">
+            <label className="adm-label">ธนาคาร (แสดงใต้ QR Code)</label>
+            <input
+              className="adm-input"
+              placeholder="เช่น ธ.กสิกรไทย / พร้อมเพย์"
+              value={bankName}
+              onChange={e => setBankName(e.target.value)}
+            />
+          </div>
         </div>
       </div>
-      <div className="adm-field" style={{ marginTop: 16 }}>
-        <label className="adm-label">EasySlip API Key (ตรวจสลิปอัตโนมัติ)</label>
-        <input
-          className="adm-input"
-          type="password"
-          placeholder="ใส่ API Key จาก developer.easyslip.com"
-          value={easySlipApiKey}
-          onChange={e => setEasySlipApiKey(e.target.value)}
-        />
-        <div className="adm-hint" style={{ marginTop: 6 }}>
-          ถ้าใส่ API Key ระบบจะตรวจสลิปอัตโนมัติ — ถ้าไม่ใส่ลูกค้าส่งสลิปแล้วรอแอดมินยืนยันเอง
+
+      {/* ── บัญชีโอนมัดจำ (ระบบจองห้อง Booking) ── */}
+      <div className="adm-card">
+        <div className="adm-card-title">
+          <i className="fas fa-calendar-check" style={{ color: '#c62419' }} /> บัญชีโอนมัดจำ (สำหรับระบบจองห้องสืบคดี)
+        </div>
+        <div className="adm-hint" style={{ marginTop: 4, marginBottom: 12 }}>
+          ใช้สำหรับสร้าง QR Code ในหน้าระบบจองห้อง (Booking) ให้ลูกค้าสแกนโอนเงินมัดจำเปิดตี้ (หากเว้นว่างไว้ จะใช้บัญชีจ่ายเงินหลักด้านบน)
+        </div>
+
+        <div className="adm-field">
+          <label className="adm-label">เบอร์โทรศัพท์ หรือ เลขบัตร/เลขนิติบุคคล สำหรับมัดจำ (PromptPay)</label>
+          <input
+            className="adm-input"
+            placeholder="เช่น 0898765432 (เว้นว่างเพื่อใช้บัญชีเดียวกับข้างบน)"
+            value={depositPhone}
+            onChange={e => setDepositPhone(e.target.value)}
+          />
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginTop: 12 }}>
+          <div className="adm-field">
+            <label className="adm-label">ชื่อบัญชีมัดจำ (แสดงใต้ QR Code)</label>
+            <input
+              className="adm-input"
+              placeholder="เช่น บจก. โซฟัน มัดจำ"
+              value={depositAccountName}
+              onChange={e => setDepositAccountName(e.target.value)}
+            />
+          </div>
+          <div className="adm-field">
+            <label className="adm-label">ธนาคารมัดจำ (แสดงใต้ QR Code)</label>
+            <input
+              className="adm-input"
+              placeholder="เช่น ธ.ไทยพาณิชย์ / พร้อมเพย์"
+              value={depositBankName}
+              onChange={e => setDepositBankName(e.target.value)}
+            />
+          </div>
         </div>
       </div>
-      <button className="adm-btn-red" style={{ marginTop: 20, width: '100%', padding: 14 }} onClick={save} disabled={saving}>
-        {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึก</>}
+
+      {/* ── EasySlip ตรวจสลิปอัตโนมัติ ── */}
+      <div className="adm-card">
+        <div className="adm-card-title">
+          <i className="fas fa-bolt" style={{ color: '#f59e0b' }} /> ตรวจสลิปอัตโนมัติ (EasySlip API)
+        </div>
+        <div className="adm-field" style={{ marginTop: 12 }}>
+          <label className="adm-label">EasySlip API Key</label>
+          <input
+            className="adm-input"
+            type="password"
+            placeholder="ใส่ API Key จาก developer.easyslip.com"
+            value={easySlipApiKey}
+            onChange={e => setEasySlipApiKey(e.target.value)}
+          />
+          <div className="adm-hint" style={{ marginTop: 6 }}>
+            ถ้าใส่ API Key ระบบจะตรวจสลิปอัตโนมัติสำหรับทั้งสองบัญชี (ทั้งมัดจำและชำระเงิน) — ถ้าไม่ใส่ ลูกค้าส่งสลิปแล้วรอแอดมินยืนยันเอง
+          </div>
+        </div>
+      </div>
+
+      <button className="adm-btn-red" style={{ width: '100%', padding: 14 }} onClick={save} disabled={saving}>
+        {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกการตั้งค่าทั้งหมด</>}
       </button>
     </div>
   )
@@ -2068,24 +2174,56 @@ function ReceiptSettingsTab({ showToast }) {
   )
 }
 
-// ─── Promotion Tab ────────────────────────────────────────────────────────────
-function PromotionTab({ showToast }) {
+// ─── Promotion & New Games Tab ──────────────────────────────────────────────
+function PromotionTab({ showToast, allGames = [] }) {
   const [promo, setPromo] = useState({
-    heading: 'โปรโมชั่น เดือน',
-    month: 'มิถุนายน 2025',
-    description: 'โปรโมชั่นสำหรับผู้ที่สมัครเป็นสมาชิกร้าน',
-    badge1: '🎭 สคริปต์ใหม่',
-    badge2: '⚡ โปรโมชั่นพิเศษ',
+    heading: 'โปรเปิดตี้สืบคดีสุดคุ้ม',
+    month: 'ประจำเดือนนี้',
+    description: 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร รับสิทธิพิเศษส่วนลดทันทีเมื่อเปิดตี้หรือจองรอบเล่นล่วงหน้า',
+    promoTag: '🔥 SPECIAL PROMOTION',
+    badge1: '🎭 สคริปต์ยอดฮิต',
+    badge2: '⚡ ส่วนลดพิเศษ',
     badge3: '🔥 จำนวนจำกัด',
-    videoUrl: '',
     bannerUrl: '',
+    discountAmount: '100',
+    discountType: 'party', // 'party' (ลดทั้งตี้) | 'person' (ลดต่อคน)
+    buttonText: 'จองรอบรับสิทธิ์เลย →',
+    buttonLink: 'booking', // 'booking' | 'games' | 'party'
+    newGameIds: [], // array of up to 3 game IDs
+    customCovers: {}, // { [gameId]: url }
   })
   const [saving, setSaving] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [uploadingBanner, setUploadingBanner] = useState(false)
+  const [uploadingCoverFor, setUploadingCoverFor] = useState(null)
+  const [gameSearch, setGameSearch] = useState('')
+  const [showGamePicker, setShowGamePicker] = useState(false)
+
+  // Drive image helper
+  const toWsrv = (id, w = 400) => `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
+  const convertImg = (url, w = 400) => {
+    if (!url) return url
+    const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
+    if (lh3) return toWsrv(lh3[1], w)
+    const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
+    if (m1) return toWsrv(m1[1], w)
+    const m2 = url.match(/[?&]id=([^&]+)/)
+    if (m2) return toWsrv(m2[1], w)
+    return url
+  }
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'promotion')).then(snap => {
-      if (snap.exists()) setPromo(p => ({ ...p, ...snap.data() }))
+      if (snap.exists()) {
+        const d = snap.data()
+        setPromo(p => ({
+          ...p,
+          ...d,
+          discountType: d.discountType || 'party',
+          newGameIds: Array.isArray(d.newGameIds) ? d.newGameIds.slice(0, 3) : [],
+          customCovers: d.customCovers || {},
+        }))
+      }
       setLoaded(true)
     })
   }, [])
@@ -2093,10 +2231,86 @@ function PromotionTab({ showToast }) {
   const save = async () => {
     setSaving(true)
     try {
-      await setDoc(doc(db, 'settings', 'promotion'), { ...promo, updatedAt: serverTimestamp() })
-      showToast('บันทึกโปรโมชั่นสำเร็จ ✓')
-    } catch { showToast('บันทึกล้มเหลว', 'error') }
-    finally { setSaving(false) }
+      await setDoc(doc(db, 'settings', 'promotion'), {
+        ...promo,
+        newGameIds: (promo.newGameIds || []).slice(0, 3),
+        updatedAt: serverTimestamp(),
+      })
+      showToast('บันทึกโปรโมชั่นและเกมใหม่สำเร็จ ✓')
+    } catch (err) {
+      console.error(err)
+      showToast('บันทึกล้มเหลว', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Handle Banner Upload
+  const handleBannerUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingBanner(true)
+    try {
+      const { ref: storageRef, uploadBytes, getDownloadURL } = await import('firebase/storage')
+      const { storage } = await import('../firebase')
+      const r = storageRef(storage, `promotions/${Date.now()}_${file.name}`)
+      const snap = await uploadBytes(r, file)
+      const url = await getDownloadURL(snap.ref)
+      setPromo(p => ({ ...p, bannerUrl: url }))
+      showToast('อัพโหลดรูปโปรโมชั่นสำเร็จ ✓')
+    } catch (err) {
+      console.error(err)
+      showToast('อัพโหลดรูปล้มเหลว', 'error')
+    } finally {
+      setUploadingBanner(false)
+    }
+  }
+
+  // Handle Custom Cover Upload for a Game
+  const handleGameCoverUpload = async (gameId, e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingCoverFor(gameId)
+    try {
+      const { ref: storageRef, uploadBytes, getDownloadURL } = await import('firebase/storage')
+      const { storage } = await import('../firebase')
+      const r = storageRef(storage, `newGameCovers/${Date.now()}_${file.name}`)
+      const snap = await uploadBytes(r, file)
+      const url = await getDownloadURL(snap.ref)
+      setPromo(p => ({
+        ...p,
+        customCovers: { ...(p.customCovers || {}), [gameId]: url }
+      }))
+      showToast('อัพโหลดปกเกมสำเร็จ ✓')
+    } catch (err) {
+      console.error(err)
+      showToast('อัพโหลดปกเกมล้มเหลว', 'error')
+    } finally {
+      setUploadingCoverFor(null)
+    }
+  }
+
+  const handleAddGame = (gameId) => {
+    if ((promo.newGameIds || []).includes(gameId)) return
+    if ((promo.newGameIds || []).length >= 3) {
+      showToast('เลือกเกมใหม่ได้สูงสุด 3 เกมเท่านั้น', 'warning')
+      return
+    }
+    setPromo(p => ({
+      ...p,
+      newGameIds: [...(p.newGameIds || []), gameId]
+    }))
+    setShowGamePicker(false)
+    setGameSearch('')
+  }
+
+  const handleRemoveGame = (gameId) => {
+    setPromo(p => {
+      const nextIds = (p.newGameIds || []).filter(id => id !== gameId)
+      const nextCovers = { ...(p.customCovers || {}) }
+      delete nextCovers[gameId]
+      return { ...p, newGameIds: nextIds, customCovers: nextCovers }
+    })
   }
 
   const field = (label, key, placeholder, type = 'text') => (
@@ -2113,63 +2327,519 @@ function PromotionTab({ showToast }) {
 
   if (!loaded) return <div className="adm-loading"><div className="spinner" /></div>
 
+  // Filter games from inventory for picker
+  const filteredAvailableGames = allGames.filter(g =>
+    !(promo.newGameIds || []).includes(g.id) &&
+    ((g.title || g.name || '').toLowerCase().includes(gameSearch.toLowerCase()) ||
+     (g.difficulty || '').toLowerCase().includes(gameSearch.toLowerCase()))
+  )
+
+  const selectedGamesList = (promo.newGameIds || []).map(id => allGames.find(g => g.id === id)).filter(Boolean)
+
   return (
-    <div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+
+      {/* ── CARD 1: โปรโมชั่น (Promotion Settings) ── */}
       <div className="adm-card">
-        <div className="adm-card-title" style={{ marginBottom: '20px' }}>
-          <i className="fas fa-bullhorn" style={{ color: '#fbbf24' /* ds-allow-hardcode */ }} /> ข้อความโปรโมชั่น
+        <div className="adm-card-title" style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>
+            <i className="fas fa-fire-alt" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
+            ตั้งค่าโปรโมชั่น (Promotion)
+          </span>
+          <span style={{ fontSize: 11, background: 'rgba(198,36,25,0.12)', color: 'var(--crimson-500)', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
+            โชว์ฝั่งซ้ายของหน้าหลัก
+          </span>
         </div>
-        <div className="adm-field-row">
-          {field('หัวข้อ', 'heading', 'โปรโมชั่น เดือน')}
-          {field('เดือน/ปี', 'month', 'มิถุนายน 2025')}
+
+        {/* รูปภาพโปรโมชั่น */}
+        <div className="adm-field" style={{ marginBottom: 16 }}>
+          <label className="adm-label">รูปภาพโปรโมชั่น (แบนเนอร์ / โปสเตอร์)</label>
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+            <label style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8,
+              background: 'var(--crimson-500)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              transition: 'opacity 0.15s', opacity: uploadingBanner ? 0.6 : 1,
+            }}>
+              <i className={`fas ${uploadingBanner ? 'fa-spinner fa-spin' : 'fa-upload'}`} />
+              {uploadingBanner ? 'กำลังอัพโหลด...' : 'อัพโหลดรูปโปรโมชั่น'}
+              <input type="file" accept="image/*" onChange={handleBannerUpload} disabled={uploadingBanner} style={{ display: 'none' }} />
+            </label>
+            {promo.bannerUrl && (
+              <button
+                type="button"
+                onClick={() => setPromo(p => ({ ...p, bannerUrl: '' }))}
+                style={{
+                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#ef4444', padding: '10px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                }}
+              >
+                <i className="fas fa-trash-alt" style={{ marginRight: 6 }} /> ลบรูปออก
+              </button>
+            )}
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <input
+              className="adm-input"
+              type="text"
+              value={promo.bannerUrl || ''}
+              placeholder="หรือวาง URL รูปภาพโดยตรง (https://...)"
+              onChange={e => setPromo(p => ({ ...p, bannerUrl: e.target.value }))}
+            />
+          </div>
+          {promo.bannerUrl && (
+            <div style={{ marginTop: 12, maxWidth: 360, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
+              <img src={convertImg(promo.bannerUrl, 600)} alt="Promo Banner" style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+            </div>
+          )}
         </div>
-        {field('คำอธิบาย', 'description', 'รายละเอียดโปรโมชั่น...', 'textarea')}
+
+        {/* ส่วนลด และประเภทส่วนลด */}
+        <div style={{
+          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+          borderRadius: 12, padding: 16, marginBottom: 16,
+        }}>
+          <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="fas fa-tags" /> การตั้งค่าส่วนลด (Discount Price & Type)
+          </div>
+          <div className="adm-field-row" style={{ alignItems: 'flex-start' }}>
+            <div className="adm-field" style={{ flex: 1 }}>
+              <label className="adm-label">ราคาส่วนลด (ใส่จำนวนเงิน หรือ %)</label>
+              <input
+                className="adm-input"
+                type="text"
+                value={promo.discountAmount || ''}
+                placeholder="เช่น 100 บาท หรือ 15%"
+                onChange={e => setPromo(p => ({ ...p, discountAmount: e.target.value }))}
+              />
+              <div className="adm-hint">ตัวอย่าง: "100", "50 บาท", "20%"</div>
+            </div>
+
+            <div className="adm-field" style={{ flex: 1.2 }}>
+              <label className="adm-label">ประเภทส่วนลด (ลดทั้งตี้ หรือ ลดต่อคน)</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setPromo(p => ({ ...p, discountType: 'party' }))}
+                  style={{
+                    padding: '10px 12px', borderRadius: 8, border: '1px solid',
+                    borderColor: promo.discountType === 'party' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.12)',
+                    background: promo.discountType === 'party' ? 'rgba(198,36,25,0.2)' : 'rgba(255,255,255,0.04)',
+                    color: promo.discountType === 'party' ? '#fff' : 'rgba(255,255,255,0.6)',
+                    fontWeight: 800, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <i className="fas fa-users" style={{ color: promo.discountType === 'party' ? 'var(--crimson-500)' : 'inherit' }} />
+                  ลดทั้งตี้
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPromo(p => ({ ...p, discountType: 'person' }))}
+                  style={{
+                    padding: '10px 12px', borderRadius: 8, border: '1px solid',
+                    borderColor: promo.discountType === 'person' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.12)',
+                    background: promo.discountType === 'person' ? 'rgba(198,36,25,0.2)' : 'rgba(255,255,255,0.04)',
+                    color: promo.discountType === 'person' ? '#fff' : 'rgba(255,255,255,0.6)',
+                    fontWeight: 800, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <i className="fas fa-user" style={{ color: promo.discountType === 'person' ? 'var(--crimson-500)' : 'inherit' }} />
+                  ลดต่อคน
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ข้อความและรายละเอียด */}
         <div className="adm-field-row">
-          {field('Badge 1', 'badge1', '🎭 สคริปต์ใหม่')}
-          {field('Badge 2', 'badge2', '⚡ โปรโมชั่นพิเศษ')}
-          {field('Badge 3', 'badge3', '🔥 จำนวนจำกัด')}
+          {field('หัวข้อโปรโมชั่น', 'heading', 'เช่น โปรเปิดตี้สืบคดีสุดคุ้ม')}
+          {field('ช่วงเวลา / เดือน', 'month', 'เช่น ประจำเดือนนี้ หรือ จำกัดเวลา')}
+        </div>
+        {field('คำอธิบายโปรโมชั่น', 'description', 'รายละเอียดและเงื่อนไขโปรโมชั่น...', 'textarea')}
+
+        <div className="adm-field-row">
+          {field('ป้ายกำกับด้านบน (Badge Tag)', 'promoTag', '🔥 SPECIAL PROMOTION')}
+          {field('ข้อความปุ่ม CTA', 'buttonText', 'จองรอบรับสิทธิ์เลย →')}
+          <div className="adm-field">
+            <label className="adm-label">ปุ่มลิงก์ไปยังหน้า</label>
+            <select
+              className="adm-input"
+              value={promo.buttonLink || 'booking'}
+              onChange={e => setPromo(p => ({ ...p, buttonLink: e.target.value }))}
+            >
+              <option value="booking">📅 หน้าจองห้อง / ปฏิทิน (Booking)</option>
+              <option value="games">🎲 หน้าคลังเกม (Games)</option>
+              <option value="party">👥 หน้าร่วมตี้ (Party)</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="adm-field-row">
+          {field('จุดเด่น 1', 'badge1', '🎭 สคริปต์ยอดฮิต')}
+          {field('จุดเด่น 2', 'badge2', '⚡ ส่วนลดพิเศษ')}
+          {field('จุดเด่น 3', 'badge3', '🔥 จำนวนจำกัด')}
         </div>
       </div>
 
+      {/* ── CARD 2: สปอตไลท์เกมใหม่ (New Games Spotlight - Max 3) ── */}
       <div className="adm-card">
-        <div className="adm-card-title" style={{ marginBottom: '20px' }}>
-          <i className="fas fa-photo-video" style={{ color: '#60a5fa' /* ds-allow-hardcode */ }} /> มีเดีย
+        <div className="adm-card-title" style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span>
+            <i className="fas fa-sparkles" style={{ color: '#fbbf24', marginRight: 8 }} />
+            เลือกเกมใหม่มาโชว์ (สูงสุด 3 เกม)
+          </span>
+          <span style={{ fontSize: 11, background: 'rgba(251,191,36,0.12)', color: '#fbbf24', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
+            {(promo.newGameIds || []).length} / 3 เกม
+          </span>
         </div>
-        {field('URL วิดีโอ YouTube', 'videoUrl', 'https://www.youtube.com/embed/...')}
-        <div className="adm-hint">วาง Embed URL จาก YouTube (Share → Embed → ก็อป src) · ถ้าว่างจะใช้วิดีโอ default</div>
-        {promo.videoUrl && (
-          <div className="adm-preview-video">
-            <iframe src={promo.videoUrl} allow="autoplay; encrypted-media" allowFullScreen title="preview" />
+
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>
+          คุณสามารถกดเลือกเกมจากคลังเกมในร้าน เพื่อนำมาแสดงเป็นเกมใหม่ล่าสุดที่หน้าหลัก (สูงสุด 3 เกม) และสามารถอัพโหลดรูปปกเฉพาะสำหรับเกมใหม่นั้นๆ ได้
+        </div>
+
+        {/* Selected 3 Slots */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 20 }}>
+          {[0, 1, 2].map(slotIdx => {
+            const gameId = (promo.newGameIds || [])[slotIdx]
+            const game = gameId ? allGames.find(g => g.id === gameId) : null
+            const customCover = gameId ? promo.customCovers?.[gameId] : null
+            const displayCover = customCover || game?.image || game?.coverUrl
+
+            if (!game) {
+              return (
+                <div
+                  key={slotIdx}
+                  onClick={() => setShowGamePicker(true)}
+                  style={{
+                    border: '2px dashed rgba(255,255,255,0.15)', borderRadius: 14, padding: 24,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    gap: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.02)', minHeight: 180,
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = 'var(--crimson-500)'
+                    e.currentTarget.style.background = 'rgba(198,36,25,0.04)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
+                  }}
+                >
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>
+                    <i className="fas fa-plus" />
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>
+                    สล็อตเกมใหม่ #{slotIdx + 1} (ว่าง)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
+                    คลิกเพื่อเลือกเกมจากคลัง
+                  </div>
+                </div>
+              )
+            }
+
+            return (
+              <div
+                key={slotIdx}
+                style={{
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
+                  position: 'relative',
+                }}
+              >
+                {/* Badge Slot */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.15)', padding: '2px 8px', borderRadius: 6 }}>
+                    สล็อต #{slotIdx + 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveGame(game.id)}
+                    title="นำออกจากเกมใหม่"
+                    style={{
+                      background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
+                      fontSize: 14, padding: 4,
+                    }}
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
+
+                {/* Game Info Row */}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                  <div style={{ width: 60, height: 80, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#111', position: 'relative' }}>
+                    {displayCover ? (
+                      <img src={convertImg(displayCover, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
+                        <i className="fas fa-image" />
+                      </div>
+                    )}
+                    {customCover && (
+                      <span style={{ position: 'absolute', bottom: 2, right: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 3px', borderRadius: 3 }}>
+                        ปกใหม่
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {game.title || game.name}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      {game.players ? `${game.players} คน` : ''} · {game.difficulty || ''}
+                    </div>
+                    {game.price !== undefined && (
+                      <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+                        ฿{game.fullPrice ?? game.price}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Upload Custom Cover */}
+                <div style={{ marginTop: 'auto', paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <label style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    padding: '7px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)',
+                    color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    transition: 'background 0.15s',
+                  }}>
+                    <i className={`fas ${uploadingCoverFor === game.id ? 'fa-spinner fa-spin' : 'fa-camera'}`} />
+                    {uploadingCoverFor === game.id ? 'กำลังอัพโหลด...' : customCover ? 'เปลี่ยนรูปปกใหม่' : 'อัพโหลดปกเกมใหม่นี้'}
+                    <input type="file" accept="image/*" onChange={e => handleGameCoverUpload(game.id, e)} disabled={uploadingCoverFor === game.id} style={{ display: 'none' }} />
+                  </label>
+                  {customCover && (
+                    <button
+                      type="button"
+                      onClick={() => setPromo(p => {
+                        const nextCovers = { ...(p.customCovers || {}) }
+                        delete nextCovers[game.id]
+                        return { ...p, customCovers: nextCovers }
+                      })}
+                      style={{
+                        width: '100%', marginTop: 4, background: 'none', border: 'none',
+                        color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', padding: 2,
+                      }}
+                    >
+                      รีเซ็ตกลับเป็นรูปปกเดิม
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Picker Button / Drawer */}
+        {(promo.newGameIds || []).length < 3 && (
+          <div>
+            {!showGamePicker ? (
+              <button
+                type="button"
+                onClick={() => setShowGamePicker(true)}
+                style={{
+                  padding: '10px 18px', borderRadius: 8, background: 'rgba(251,191,36,0.15)',
+                  border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', fontSize: 13,
+                  fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+                }}
+              >
+                <i className="fas fa-plus" /> เลือกเกมจากคลังมาเพิ่ม (เหลืออีก {3 - (promo.newGameIds || []).length} สล็อต)
+              </button>
+            ) : (
+              <div style={{
+                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
+                borderRadius: 14, padding: 16,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                    เลือกเกมจากคลัง ({filteredAvailableGames.length} เกมที่พร้อมเลือก)
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowGamePicker(false)}
+                    style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 14 }}
+                  >
+                    <i className="fas fa-times" /> ปิด
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  className="adm-input"
+                  placeholder="ค้นหาชื่อเกม..."
+                  value={gameSearch}
+                  onChange={e => setGameSearch(e.target.value)}
+                  style={{ marginBottom: 12 }}
+                />
+                <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {filteredAvailableGames.length === 0 ? (
+                    <div style={{ textAlign: 'center', color: '#888', padding: 20, fontSize: 12 }}>
+                      ไม่พบเกมที่ค้นหา
+                    </div>
+                  ) : (
+                    filteredAvailableGames.map(g => (
+                      <div
+                        key={g.id}
+                        onClick={() => handleAddGame(g.id)}
+                        style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer',
+                          transition: 'background 0.12s',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                          <div style={{ width: 32, height: 42, borderRadius: 4, overflow: 'hidden', background: '#222', flexShrink: 0 }}>
+                            {(g.image || g.coverUrl) && (
+                              <img src={convertImg(g.image || g.coverUrl, 100)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {g.title || g.name}
+                            </div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                              {g.players} คน · {g.difficulty || ''}
+                            </div>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          style={{
+                            background: 'var(--crimson-500)', border: 'none', color: '#fff',
+                            padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                          }}
+                        >
+                          + เลือก
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
-        {field('URL รูปแบนเนอร์ (ถ้ามี)', 'bannerUrl', 'https://...')}
-        {promo.bannerUrl && (
-          <div className="adm-preview-img">
-            <img src={promo.bannerUrl} alt="banner preview" onError={e => e.currentTarget.style.display = 'none'} />
-          </div>
-        )}
       </div>
 
-      <div className="adm-card" style={{ background: 'rgba(var(--crimson-500-rgb), 0.06)', border: '1px solid rgba(var(--crimson-500-rgb), 0.20)' }}>
-        <div className="adm-card-title" style={{ marginBottom: '12px' }}>
-          <i className="fas fa-eye" style={{ color: 'var(--crimson-500)' }} /> ตัวอย่างที่จะโชว์หน้าหลัก
+      {/* ── CARD 3: ตัวอย่างแสดงผลจริง (Live Preview) ── */}
+      <div className="adm-card" style={{ background: '#060606', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="adm-card-title" style={{ marginBottom: 16 }}>
+          <i className="fas fa-eye" style={{ color: 'var(--crimson-500)' }} /> ตัวอย่างแสดงผลจริงที่หน้าหลัก (Editorial Live Preview)
         </div>
-        <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', lineHeight: 1.8 }}>
-          <div style={{ fontSize: '11px', color: 'var(--crimson-500)', textTransform: 'uppercase', letterSpacing: '2px' }}>โปรโมชั่นประจำเดือน</div>
-          <div style={{ fontSize: '28px', fontWeight: 900, color: 'var(--text-on-action)', fontFamily: "'Barlow Condensed', sans-serif" }}>
-            {promo.heading}<br /><span style={{ color: 'var(--crimson-500)' }}>{promo.month}</span>
+
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden',
+        }}>
+          {/* Left Preview: Promo */}
+          <div style={{
+            background: '#060606', borderRight: '1px solid rgba(255,255,255,0.06)',
+            padding: 24, display: 'flex', flexDirection: 'column', gap: 14, position: 'relative',
+          }}>
+            {promo.month && (
+              <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+                {promo.month}
+              </span>
+            )}
+
+            <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', fontFamily: "'Bebas Neue', sans-serif", textTransform: 'uppercase', lineHeight: 0.95 }}>
+              {promo.heading || 'โปรเปิดตี้สืบคดี'}
+            </div>
+
+            {promo.discountAmount && (
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 10,
+                padding: '8px 12px', background: 'rgba(198,36,25,0.08)',
+                border: '1px solid rgba(198,36,25,0.3)', borderRadius: 4, width: 'fit-content',
+              }}>
+                <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>ส่วนลด</span>
+                <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, color: '#fff' }}>{promo.discountAmount}</span>
+                <span style={{ fontSize: 9, fontWeight: 800, background: 'var(--crimson-500)', color: '#fff', padding: '2px 6px', borderRadius: 3 }}>
+                  {promo.discountType === 'person' ? 'ลดต่อคน' : 'ลดทั้งตี้'}
+                </span>
+              </div>
+            )}
+
+            {promo.bannerUrl && (
+              <div style={{ borderRadius: 4, overflow: 'hidden', height: 130, background: '#111', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <img src={convertImg(promo.bannerUrl, 500)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </div>
+            )}
+
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
+              {promo.description}
+            </div>
+
+            <button style={{
+              marginTop: 'auto', background: '#fff', border: 'none', color: '#111',
+              padding: '12px 24px', borderRadius: 4, fontSize: 11, fontWeight: 800, letterSpacing: '0.14em',
+              textTransform: 'uppercase', cursor: 'pointer', textAlign: 'center', width: 'fit-content',
+            }}>
+              {promo.buttonText || 'เริ่มเล่นเลย →'}
+            </button>
           </div>
-          <div style={{ marginTop: '8px' }}>{promo.description}</div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px', flexWrap: 'wrap' }}>
-            {[promo.badge1, promo.badge2, promo.badge3].filter(Boolean).map((b, i) => (
-              <span key={i} style={{ background: 'rgba(255,255,255,0.08)', padding: '4px 12px', borderRadius: '20px', fontSize: '12px' }}>{b}</span>
-            ))}
+
+          {/* Right Preview: 3 New Games */}
+          <div style={{
+            background: '#09090f', padding: 24,
+            display: 'flex', flexDirection: 'column', gap: 14,
+          }}>
+            <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', fontFamily: "'Bebas Neue', sans-serif", textTransform: 'uppercase', lineHeight: 0.95 }}>
+              3 คดีใหม่ล่าสุด
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {selectedGamesList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
+                  ยังไม่ได้เลือกเกมใหม่ (จะดึง 3 เกมล่าสุดจากคลังอัตโนมัติ)
+                </div>
+              ) : (
+                selectedGamesList.map(g => {
+                  const cover = promo.customCovers?.[g.id] || g.image || g.coverUrl
+                  return (
+                    <div
+                      key={g.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                        borderRadius: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <div style={{ width: 38, height: 52, borderRadius: 3, overflow: 'hidden', background: '#222', flexShrink: 0, position: 'relative' }}>
+                        {cover && <img src={convertImg(cover, 200)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                        <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 7, fontWeight: 900, padding: '1px 3px', borderRadius: 2 }}>
+                          NEW
+                        </span>
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {g.title || g.name}
+                        </div>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                          {g.players} คน · {g.difficulty}
+                        </div>
+                      </div>
+                      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18, color: '#fff' }}>
+                        ฿{g.fullPrice ?? g.price}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      <button className="adm-btn-red" style={{ width: '100%', padding: '14px', fontSize: '15px' }} onClick={save} disabled={saving}>
-        {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกโปรโมชั่น</>}
+      {/* Save Button */}
+      <button
+        className="adm-btn-red"
+        style={{ width: '100%', padding: '15px', fontSize: '15px', fontWeight: 800, borderRadius: 12 }}
+        onClick={save}
+        disabled={saving}
+      >
+        {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกโปรโมชั่นและเกมใหม่</>}
       </button>
     </div>
   )
@@ -2185,11 +2855,14 @@ function RandomWheelTab({ showToast, members = [] }) {
     dateFilter: 'all',
   })
   const [playHistory, setPlayHistory] = useState([])
+  const [payments, setPayments] = useState([])
   const [winnerHistory, setWinnerHistory] = useState([])
   const [selectedLockedId, setSelectedLockedId] = useState('')
   const [savingLock, setSavingLock] = useState(false)
   const [triggeringSpin, setTriggeringSpin] = useState(false)
   const [search, setSearch] = useState('')
+  const [selectedUserForHistory, setSelectedUserForHistory] = useState(null)
+  const [showHistoryModal, setShowHistoryModal] = useState(false)
 
   useEffect(() => {
     // 1. Live config
@@ -2206,6 +2879,11 @@ function RandomWheelTab({ showToast, members = [] }) {
       setPlayHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     })
 
+    // 2.5 Payments
+    const unsubPay = onSnapshot(collection(db, 'payments'), (snap) => {
+      setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    })
+
     // 3. Winner history
     const qWin = query(collection(db, 'wheelHistory'), orderBy('wonAt', 'desc'), limit(50))
     const unsubWin = onSnapshot(qWin, (snap) => {
@@ -2215,9 +2893,65 @@ function RandomWheelTab({ showToast, members = [] }) {
     return () => {
       unsubConf()
       unsubPh()
+      unsubPay()
       unsubWin()
     }
   }, [])
+
+  // Combine & Deduplicate Play Records
+  const allPlayRecords = useMemo(() => {
+    const records = []
+    const seenKeys = new Set()
+
+    playHistory.forEach(ph => {
+      const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : new Date())
+      const uid = ph.userId || ph.userName || 'unknown'
+      const key = `${uid}_${ph.scriptId || ph.scriptTitle}_${pDate.toDateString()}`
+      seenKeys.add(key)
+      records.push({
+        id: ph.id,
+        userId: uid,
+        userName: ph.userName || 'ลูกค้า',
+        userAvatar: ph.userAvatar || '',
+        scriptId: ph.scriptId || '',
+        scriptTitle: ph.scriptTitle || 'เกมสืบคดี',
+        character: ph.character || '',
+        dm: ph.dm || '',
+        room: ph.room || '',
+        playedAt: pDate,
+        recordedBy: ph.recordedBy || '',
+        source: 'playHistory',
+      })
+    })
+
+    payments.forEach(pm => {
+      const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : pm.createdAt?.toDate ? pm.createdAt.toDate() : new Date())
+      const members = Array.isArray(pm.members) ? pm.members : []
+      members.forEach(m => {
+        const uid = m.uid || m.name || 'unknown'
+        const key = `${uid}_${pm.scriptId || pm.scriptTitle}_${pDate.toDateString()}`
+        if (!seenKeys.has(key)) {
+          seenKeys.add(key)
+          records.push({
+            id: `pay_${pm.id}_${uid}`,
+            userId: uid,
+            userName: m.name || 'ลูกค้า',
+            userAvatar: m.avatar || '',
+            scriptId: pm.scriptId || '',
+            scriptTitle: pm.scriptTitle || 'เกมสืบคดี',
+            character: m.character || '',
+            dm: pm.dm || '',
+            room: pm.room || pm.sessionLabel || '',
+            playedAt: pDate,
+            recordedBy: 'POS Checkout',
+            source: 'payment',
+          })
+        }
+      })
+    })
+
+    return records.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime())
+  }, [playHistory, payments])
 
   // Aggregate user play counts
   const candidates = useMemo(() => {
@@ -2227,7 +2961,7 @@ function RandomWheelTab({ showToast, members = [] }) {
     const memMap = {}
     members.forEach(m => { memMap[m.id] = m })
 
-    playHistory.forEach(ph => {
+    allPlayRecords.forEach(ph => {
       const uid = ph.userId || ph.userName || 'unknown'
       userPlays[uid] = (userPlays[uid] || 0) + 1
       if (!userDetails[uid]) {
@@ -2274,7 +3008,14 @@ function RandomWheelTab({ showToast, members = [] }) {
       ...c,
       chance: totalTickets > 0 && !c.isRemoved ? ((c.tickets / totalTickets) * 100).toFixed(1) : 0,
     })).sort((a, b) => b.tickets - a.tickets)
-  }, [playHistory, members, config.removedUserIds])
+  }, [allPlayRecords, members, config.removedUserIds])
+
+  const userHistoryList = useMemo(() => {
+    if (!selectedUserForHistory) return []
+    const targetId = selectedUserForHistory.id
+    const targetName = selectedUserForHistory.name
+    return allPlayRecords.filter(r => r.userId === targetId || (targetName && r.userName === targetName))
+  }, [allPlayRecords, selectedUserForHistory])
 
   const activeCandidates = useMemo(() => candidates.filter(c => !c.isRemoved), [candidates])
   const removedCandidates = useMemo(() => candidates.filter(c => c.isRemoved), [candidates])
@@ -2752,6 +3493,22 @@ function RandomWheelTab({ showToast, members = [] }) {
                       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
                         <button
                           onClick={() => {
+                            setSelectedUserForHistory(c)
+                            setShowHistoryModal(true)
+                          }}
+                          title="ดูประวัติการเล่น"
+                          style={{
+                            padding: '4px 8px', borderRadius: 6,
+                            background: 'rgba(200,160,80,0.12)', color: '#c8a050',
+                            border: '1px solid rgba(200,160,80,0.3)',
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4,
+                          }}
+                        >
+                          📜 ประวัติ
+                        </button>
+                        <button
+                          onClick={() => {
                             setSelectedLockedId(c.id)
                             updateDoc(doc(db, 'wheelSettings', 'config'), {
                               lockedWinnerId: c.id,
@@ -2829,6 +3586,177 @@ function RandomWheelTab({ showToast, members = [] }) {
           </div>
         )}
       </div>
+
+      {/* ── PLAYER HISTORY MODAL FOR ADMIN ── */}
+      {showHistoryModal && selectedUserForHistory && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(0,0,0,0.7)',
+          backdropFilter: 'blur(6px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
+        }}>
+          <div style={{
+            background: 'var(--surface-modal, #1e1e2d)',
+            border: '1px solid var(--border-default, rgba(255,255,255,0.15))',
+            borderRadius: 16,
+            maxWidth: 520,
+            width: '100%',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+            overflow: 'hidden',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '16px 20px',
+              borderBottom: '1px solid var(--border-default, rgba(255,255,255,0.1))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{
+                  width: 38, height: 38, borderRadius: '50%',
+                  background: 'var(--crimson-500, #c62419)', overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 14, fontWeight: 900, color: '#fff',
+                }}>
+                  {selectedUserForHistory.avatar ? (
+                    <img src={selectedUserForHistory.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : (
+                    (selectedUserForHistory.name || 'U')[0]
+                  )}
+                </div>
+                <div>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary, #fff)' }}>
+                    {selectedUserForHistory.name}
+                  </div>
+                  {selectedUserForHistory.fullName && selectedUserForHistory.fullName !== selectedUserForHistory.name && (
+                    <div style={{ fontSize: 12, color: 'var(--text-tertiary, #888)' }}>
+                      {selectedUserForHistory.fullName}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-tertiary, #888)', fontSize: 18, cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Summary Bar */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gap: 8,
+              padding: '12px 18px',
+              background: 'rgba(0,0,0,0.2)',
+              borderBottom: '1px solid var(--border-default, rgba(255,255,255,0.06))',
+              textAlign: 'center',
+            }}>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary, #888)' }}>เล่นที่ร้านทั้งหมด</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#fbbf24' }}>
+                  {userHistoryList.length} ครั้ง
+                </div>
+              </div>
+              <div style={{ borderLeft: '1px solid rgba(255,255,255,0.08)', borderRight: '1px solid rgba(255,255,255,0.08)' }}>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary, #888)' }}>สิทธิ์ในวงล้อ</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#4ade80' }}>
+                  {candidates.find(c => c.id === selectedUserForHistory.id)?.tickets || userHistoryList.length} สิทธิ์
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary, #888)' }}>โอกาสชนะ</div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#60a5fa' }}>
+                  {candidates.find(c => c.id === selectedUserForHistory.id)?.chance || 0}%
+                </div>
+              </div>
+            </div>
+
+            {/* List */}
+            <div style={{
+              flex: 1,
+              overflowY: 'auto',
+              padding: '16px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-tertiary, #aaa)' }}>
+                รายการการเล่นที่บันทึกไว้ ({userHistoryList.length} รายการ)
+              </div>
+              {userHistoryList.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--text-tertiary, #777)', fontSize: 13 }}>
+                  ไม่มีประวัติการเล่นเกมที่บันทึกในระบบ
+                </div>
+              ) : (
+                userHistoryList.map((item, idx) => {
+                  const dStr = item.playedAt ? (item.playedAt.toLocaleString ? item.playedAt.toLocaleString('th-TH') : String(item.playedAt)) : '-'
+                  return (
+                    <div
+                      key={item.id || idx}
+                      style={{
+                        padding: '10px 12px',
+                        borderRadius: 8,
+                        background: 'var(--surface-page, rgba(255,255,255,0.03))',
+                        border: '1px solid var(--border-default, rgba(255,255,255,0.06))',
+                        fontSize: 12,
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <strong style={{ color: 'var(--text-primary, #fff)', fontSize: 13 }}>
+                          🎮 {item.scriptTitle}
+                        </strong>
+                        <span style={{
+                          fontSize: 10, padding: '2px 6px', borderRadius: 4,
+                          background: item.source === 'payment' ? 'rgba(59,130,246,0.15)' : 'rgba(16,185,129,0.15)',
+                          color: item.source === 'payment' ? '#60a5fa' : '#34d399',
+                        }}>
+                          {item.source === 'payment' ? 'เช็คบิลหน้าร้าน' : 'บันทึกการเล่น'}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 12px', color: 'var(--text-secondary, #aaa)', marginBottom: 4 }}>
+                        {item.character && <span>บท: <strong style={{ color: '#fff' }}>{item.character}</strong></span>}
+                        {item.dm && <span>DM: <strong style={{ color: '#fff' }}>{item.dm}</strong></span>}
+                        {item.room && <span>ห้อง: {item.room}</span>}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--text-tertiary, #777)' }}>
+                        🕒 {dStr}
+                      </div>
+                    </div>
+                  )
+                })
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: '12px 20px',
+              borderTop: '1px solid var(--border-default, rgba(255,255,255,0.1))',
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="btn-secondary"
+                style={{ padding: '6px 14px', fontSize: 12 }}
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -3042,7 +3970,7 @@ function ConfirmBookingModal({ booking, adminUser, onClose, showToast }) {
       style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 9900, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
       <div style={{
-        background: 'var(--surface-elevated)', borderRadius: '20px 20px 0 0',
+        background: 'var(--surface-elevated, #ffffff)', borderRadius: '20px 20px 0 0',
         width: '100%', maxWidth: 520,
         border: '1px solid var(--border-default)', borderBottom: 'none',
         boxShadow: '0 -8px 48px rgba(0,0,0,0.45)',
@@ -3127,39 +4055,72 @@ function ConfirmBookingModal({ booking, adminUser, onClose, showToast }) {
   )
 }
 
-function MockBookingModal({ adminUser, onClose, showToast }) {
-  const [date, setDate] = useState('')
+function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
+  const dayAfter = new Date(Date.now() + 172800000).toISOString().slice(0, 10)
+
+  const [date, setDate] = useState(today)
+  const [time, setTime] = useState('13:00')
   const [room, setRoom] = useState('')
   const [note, setNote] = useState('')
+  const [gameMode, setGameMode] = useState('select') // 'select' | 'custom'
+  const [selectedGameId, setSelectedGameId] = useState('')
+  const [customGameName, setCustomGameName] = useState('')
+  const [gameSearch, setGameSearch] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const selectedGame = allGames.find(g => g.id === selectedGameId)
+
+  const filteredGames = useMemo(() => {
+    if (!gameSearch.trim()) return allGames
+    const q = gameSearch.toLowerCase()
+    return allGames.filter(g => (g.title || g.name || '').toLowerCase().includes(q))
+  }, [allGames, gameSearch])
+
+  const QUICK_TIMES = ['13:00', '14:00', '15:30', '18:00', '19:30', '21:00']
+  const QUICK_PRESETS = [
+    '🔒 ปิดห้องส่วนตัว (Private)',
+    '🎉 งานวันเกิด / ปาร์ตี้',
+    '🛠️ ปิดซ่อมบำรุงห้อง',
+    '🚶 Walk-in หน้าร้าน',
+    '📹 ถ่ายทำ / กองถ่าย',
+  ]
+
   const handleSubmit = async () => {
-    if (!date || !room) { showToast('กรุณาเลือกวันที่และห้อง', 'error'); return }
+    if (!date) { showToast('กรุณาเลือกวันที่', 'error'); return }
+    if (!room) { showToast('กรุณาเลือกห้องที่ต้องการบล็อก', 'error'); return }
+
+    const finalGameName = (gameMode === 'select' ? selectedGame?.title : customGameName) || customGameName || note || 'Mock Block'
+    const finalGameImage = (gameMode === 'select' ? (selectedGame?.image || selectedGame?.coverUrl) : '') || ''
+    const finalGameId = (gameMode === 'select' ? selectedGameId : '') || ''
+
     setSaving(true)
     try {
       await addDoc(collection(db, 'bookings'), {
-        gameId: '',
-        gameName: note || 'Mock Block',
-        gameImage: '',
+        gameId: finalGameId,
+        gameName: finalGameName,
+        gameImage: finalGameImage,
         date,
+        time: time || '13:00',
         room,
-        status: 'confirmed',
+        status: 'confirmed', // สถานะยืนยันแล้วทันที!
         isMock: true,
-        mockNote: note,
+        mockNote: note || '',
+        adminNote: note || '',
         leaderId: adminUser?.uid || 'admin',
-        leaderName: adminUser?.name || 'Admin',
+        leaderName: adminUser?.name || 'Admin Block',
         leaderAvatar: '',
         members: [],
-        maxMembers: 0,
+        maxMembers: selectedGame?.players ? (parseInt(selectedGame.players) || 0) : 0,
         depositAmount: 0,
         depositDeadline: '',
-        adminNote: note,
         confirmedAt: new Date().toISOString(),
         confirmedBy: adminUser?.name || 'admin',
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       })
-      showToast('เพิ่ม Mock Booking สำเร็จ')
+      showToast(`สร้าง Mock Block "${finalGameName}" (สถานะยืนยันแล้ว) สำเร็จ`, 'success')
       onClose()
     } catch (e) {
       showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
@@ -3170,90 +4131,406 @@ function MockBookingModal({ adminUser, onClose, showToast }) {
 
   return (
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.72)', zIndex: 9900, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{
-        background: 'var(--surface-elevated)', borderRadius: '20px 20px 0 0',
-        width: '100%', maxWidth: 520,
-        border: '1px solid var(--border-default)', borderBottom: 'none',
-        boxShadow: '0 -8px 48px rgba(0,0,0,0.45)',
-        fontFamily: "'Sarabun', sans-serif",
-        animation: 'slideUp 0.28s cubic-bezier(0.22,1,0.36,1)',
-      }}>
-        {/* Handle bar */}
-        <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 14, paddingBottom: 4 }}>
-          <div style={{ width: 40, height: 4, borderRadius: 2, background: 'var(--border-strong)' }} />
-        </div>
-
+      style={{
+        position: 'fixed', inset: 0,
+        background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(5px)',
+        zIndex: 9900, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '16px',
+      }}
+      onClick={e => e.target === e.currentTarget && onClose()}
+    >
+      <div
+        style={{
+          background: '#ffffff',
+          borderRadius: 18, width: '100%', maxWidth: 580, maxHeight: '92vh',
+          display: 'flex', flexDirection: 'column',
+          border: '1px solid #e2e8f0',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+          fontFamily: "'Sarabun', sans-serif",
+          overflow: 'hidden',
+          animation: 'mmFadeUp 0.22s cubic-bezier(0.22,1,0.36,1)',
+        }}
+      >
         {/* Header */}
-        <div style={{ padding: '12px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-          <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--text-primary)' }}>
-            Mock Block
-          </h3>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 17, color: 'var(--text-tertiary)', padding: 6, lineHeight: 1 }}>
+        <div style={{
+          padding: '18px 22px', borderBottom: '1px solid #f1f5f9',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: '#ffffff',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: 10,
+              background: '#fef3c7', color: '#d97706',
+              border: '1px solid #fde68a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17,
+            }}>
+              <i className="fas fa-lock" />
+            </div>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#0f172a' }}>
+                  สร้าง Mock Block (ล็อกห้อง / จองพิเศษ)
+                </h3>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                ระบบจะตั้งสถานะเป็น <strong style={{ color: '#059669' }}>"ยืนยันแล้ว"</strong> ทันที เพื่อล็อกห้องไม่ให้ลูกค้าจองชน
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 16, color: '#94a3b8', padding: '6px 8px', borderRadius: 8,
+              transition: 'background 0.15s, color 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f1f5f9'; e.currentTarget.style.color = '#0f172a' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none'; e.currentTarget.style.color = '#94a3b8' }}
+          >
             <i className="fas fa-times" />
           </button>
         </div>
 
-        <div style={{ padding: '0 20px 28px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Utility note */}
-          <p style={{ margin: 0, fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.6 }}>
-            Mock block ป้องกันไม่ให้ลูกค้าจองวันนี้ — ใช้สำหรับงานส่วนตัว ปิดห้อง หรือ hold วันไว้ก่อน
-          </p>
-
-          {/* Date */}
-          <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>วันที่ *</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)}
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-default)', background: 'var(--surface-page)', color: 'var(--text-primary)', fontSize: 14, fontFamily: "'Sarabun',sans-serif", outline: 'none', boxSizing: 'border-box' }} />
+        {/* Scrollable Form Body */}
+        <div style={{ padding: '20px 22px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          
+          {/* Status Alert Badge */}
+          <div style={{
+            padding: '10px 14px', borderRadius: 10,
+            background: '#ecfdf5', border: '1px solid #a7f3d0',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <i className="fas fa-check-circle" style={{ color: '#059669', fontSize: 16, flexShrink: 0 }} />
+            <div style={{ fontSize: 12, color: '#065f46', lineHeight: 1.5 }}>
+              <span style={{ color: '#047857', fontWeight: 800, marginRight: 6 }}>[สถานะ: ยืนยันแล้ว]</span>
+              หลังบันทึก ระบบจะลงตารางและขึ้นในปฏิทินทันที พร้อมล็อกห้องอัตโนมัติ
+            </div>
           </div>
 
-          {/* Room chip selector */}
+          {/* Row 1: Date & Time */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+            {/* Date */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  วันที่เล่น / บล็อก *
+                </label>
+              </div>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                style={{
+                  width: '100%', padding: '9px 12px', borderRadius: 10,
+                  border: '1px solid #cbd5e1', background: '#f8fafc',
+                  color: '#0f172a', fontSize: 13.5, fontFamily: "'Sarabun',sans-serif",
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {/* Quick Date Chips */}
+              <div style={{ display: 'flex', gap: 5, marginTop: 6 }}>
+                {[
+                  { label: 'วันนี้', val: today },
+                  { label: 'พรุ่งนี้', val: tomorrow },
+                  { label: 'มะรืนนี้', val: dayAfter },
+                ].map(item => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => setDate(item.val)}
+                    style={{
+                      padding: '2px 8px', borderRadius: 6, fontSize: 10.5, fontWeight: 700,
+                      border: date === item.val ? '1px solid var(--crimson-500)' : '1px solid #e2e8f0',
+                      background: date === item.val ? 'rgba(198,36,25,0.08)' : '#f8fafc',
+                      color: date === item.val ? 'var(--crimson-500)' : '#64748b',
+                      cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Time */}
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                  เวลาเริ่มรอบ *
+                </label>
+              </div>
+              <input
+                type="time"
+                value={time}
+                onChange={e => setTime(e.target.value)}
+                style={{
+                  width: '100%', padding: '9px 12px', borderRadius: 10,
+                  border: '1px solid #cbd5e1', background: '#f8fafc',
+                  color: '#0f172a', fontSize: 13.5, fontFamily: "'Sarabun',sans-serif",
+                  outline: 'none', boxSizing: 'border-box',
+                }}
+              />
+              {/* Quick Time Chips */}
+              <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+                {QUICK_TIMES.map(t => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setTime(t)}
+                    style={{
+                      padding: '2px 7px', borderRadius: 6, fontSize: 10.5, fontWeight: 700,
+                      border: time === t ? '1px solid #2563eb' : '1px solid #e2e8f0',
+                      background: time === t ? 'rgba(37,99,235,0.08)' : '#f8fafc',
+                      color: time === t ? '#2563eb' : '#64748b',
+                      cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: Game / Event Name */}
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.07em' }}>ห้อง *</label>
-            <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, flexWrap: 'wrap', gap: 6 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                ชื่อเกม / รายละเอียดการบล็อก
+              </label>
+              {/* Mode Toggle */}
+              <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 2, borderRadius: 8, border: '1px solid #e2e8f0' }}>
+                <button
+                  type="button"
+                  onClick={() => setGameMode('select')}
+                  style={{
+                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    border: 'none', cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
+                    background: gameMode === 'select' ? 'var(--crimson-500)' : 'transparent',
+                    color: gameMode === 'select' ? '#fff' : '#64748b',
+                  }}
+                >
+                  <i className="fas fa-dice" style={{ marginRight: 4 }} /> เลือกเกมในร้าน ({allGames.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGameMode('custom')}
+                  style={{
+                    padding: '3px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                    border: 'none', cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
+                    background: gameMode === 'custom' ? 'var(--crimson-500)' : 'transparent',
+                    color: gameMode === 'custom' ? '#fff' : '#64748b',
+                  }}
+                >
+                  <i className="fas fa-pen" style={{ marginRight: 4 }} /> ระบุชื่อเอง / งานส่วนตัว
+                </button>
+              </div>
+            </div>
+
+            {gameMode === 'select' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {allGames.length > 8 && (
+                  <input
+                    type="text"
+                    placeholder="พิมพ์ค้นหาชื่อเกมในคลัง..."
+                    value={gameSearch}
+                    onChange={e => setGameSearch(e.target.value)}
+                    style={{
+                      width: '100%', padding: '7px 12px', borderRadius: 8,
+                      border: '1px solid #cbd5e1', background: '#f8fafc',
+                      color: '#0f172a', fontSize: 12.5, fontFamily: "'Sarabun',sans-serif",
+                      outline: 'none', boxSizing: 'border-box',
+                    }}
+                  />
+                )}
+                <select
+                  value={selectedGameId}
+                  onChange={e => setSelectedGameId(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 12px', borderRadius: 10,
+                    border: '1px solid #cbd5e1', background: '#f8fafc',
+                    color: '#0f172a', fontSize: 13.5, fontFamily: "'Sarabun',sans-serif",
+                    outline: 'none', boxSizing: 'border-box', cursor: 'pointer',
+                  }}
+                >
+                  <option value="">-- เลือกเกมจากคลัง --</option>
+                  {filteredGames.map(g => (
+                    <option key={g.id} value={g.id}>
+                      {g.title || g.name} {g.players ? `(${g.players} คน)` : ''}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Selected Game Preview */}
+                {selectedGame && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', gap: 12, padding: '8px 12px',
+                    borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0',
+                  }}>
+                    {(selectedGame.image || selectedGame.coverUrl) && (
+                      <img
+                        src={selectedGame.image || selectedGame.coverUrl}
+                        alt=""
+                        style={{ width: 36, height: 48, objectFit: 'cover', borderRadius: 4 }}
+                      />
+                    )}
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedGame.title}
+                      </div>
+                      <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                        {selectedGame.players ? `${selectedGame.players} คน` : ''} · {selectedGame.difficulty || 'ปกติ'} · ฿{selectedGame.price || selectedGame.fullPrice || 0}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="เช่น งานส่วนตัว, ปิดห้องจัดเลี้ยง, Walk-in หน้าร้าน..."
+                  value={customGameName}
+                  onChange={e => setCustomGameName(e.target.value)}
+                  style={{
+                    width: '100%', padding: '9px 12px', borderRadius: 10,
+                    border: '1px solid #cbd5e1', background: '#f8fafc',
+                    color: '#0f172a', fontSize: 13.5, fontFamily: "'Sarabun',sans-serif",
+                    outline: 'none', boxSizing: 'border-box',
+                  }}
+                />
+                {/* Quick preset chips */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {QUICK_PRESETS.map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setCustomGameName(preset)}
+                      style={{
+                        padding: '4px 9px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        border: '1px solid #e2e8f0', background: '#f8fafc',
+                        color: '#475569', cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
+                      }}
+                    >
+                      {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Row 3: Room Selection */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <label style={{ fontSize: 11, fontWeight: 700, color: '#475569', textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+                ห้องที่ต้องการบล็อก *
+              </label>
+              {room && (
+                <span style={{ fontSize: 11, fontWeight: 800, color: ROOM_COLORS_ADM[room] || 'var(--crimson-500)' }}>
+                  เลือก: {room} ✓
+                </span>
+              )}
+            </div>
+
+            {/* Room Grid */}
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))',
+              gap: 8, maxHeight: 180, overflowY: 'auto', padding: '2px',
+            }}>
               {ALL_ROOMS_ADMIN.map(r => {
-                const rc = ROOM_COLORS_ADM[r] || '#888' /* ds-allow-hardcode: room data-viz */
+                const rc = ROOM_COLORS_ADM[r] || '#888'
                 const sel = room === r
                 return (
-                  <button key={r} onClick={() => setRoom(r)}
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRoom(r)}
                     style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 700,
-                      border: sel ? `1.5px solid ${rc}` : '1px solid var(--border-default)',
-                      background: sel ? rc + '22' : 'var(--surface-page)',
-                      color: sel ? rc : 'var(--text-secondary)',
-                      cursor: 'pointer', transition: 'all 0.14s', fontFamily: "'Sarabun',sans-serif",
-                    }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: rc, flexShrink: 0 }} />
-                    {r}
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '8px 10px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      border: sel ? `1.5px solid ${rc}` : '1px solid #e2e8f0',
+                      background: sel ? rc + '18' : '#f8fafc',
+                      color: sel ? rc : '#1e293b',
+                      cursor: 'pointer', transition: 'all 0.12s', fontFamily: "'Sarabun',sans-serif",
+                      textAlign: 'left',
+                    }}
+                  >
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: rc, flexShrink: 0 }} />
+                    <span style={{ flex: 1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {r}
+                    </span>
+                    {sel && <i className="fas fa-check" style={{ fontSize: 10, color: rc }} />}
                   </button>
                 )
               })}
             </div>
           </div>
 
-          {/* Note */}
+          {/* Row 4: Note */}
           <div>
-            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>หมายเหตุ</label>
-            <textarea value={note} onChange={e => setNote(e.target.value)} rows={2}
-              placeholder="เช่น งานส่วนตัว, ปิดห้อง"
-              style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid var(--border-default)', background: 'var(--surface-page)', color: 'var(--text-primary)', fontSize: 13, fontFamily: "'Sarabun',sans-serif", outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#475569', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.07em' }}>
+              หมายเหตุเพิ่มเติม (Admin Note)
+            </label>
+            <textarea
+              rows={2}
+              placeholder="เช่น ผู้ติดต่อ, เบอร์โทร, เหตุผลการบล็อกห้อง หรือข้อความถึงทีมงาน..."
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              style={{
+                width: '100%', padding: '9px 12px', borderRadius: 10,
+                border: '1px solid #cbd5e1', background: '#f8fafc',
+                color: '#0f172a', fontSize: 13, fontFamily: "'Sarabun',sans-serif",
+                outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+              }}
+            />
           </div>
 
-          {/* Actions */}
-          <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={onClose}
-              style={{ flex: 1, padding: '13px', borderRadius: 10, border: '1px solid var(--border-default)', background: 'none', color: 'var(--text-secondary)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Sarabun',sans-serif" }}>
-              ยกเลิก
-            </button>
-            <button onClick={handleSubmit} disabled={saving || !date || !room}
-              style={{ flex: 2, padding: '13px', borderRadius: 10, border: 'none', background: date && room ? 'var(--crimson-500)' : 'var(--border-default)', color: date && room ? '#fff' : 'var(--text-tertiary)', cursor: saving || !date || !room ? 'default' : 'pointer', fontSize: 14, fontWeight: 800, fontFamily: "'Sarabun',sans-serif", display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'background 0.15s' }}>
-              {saving
-                ? <><div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> กำลังบันทึก...</>
-                : <><i className="fas fa-plus" /> เพิ่ม Mock Block</>}
-            </button>
-          </div>
+        </div>
+
+        {/* Modal Actions */}
+        <div style={{
+          padding: '16px 22px', borderTop: '1px solid #f1f5f9',
+          display: 'flex', alignItems: 'center', gap: 10, background: '#ffffff',
+        }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              flex: 1, padding: '12px', borderRadius: 10,
+              border: '1px solid #cbd5e1', background: '#ffffff',
+              color: '#475569', cursor: 'pointer',
+              fontSize: 13, fontWeight: 700, fontFamily: "'Sarabun',sans-serif",
+            }}
+          >
+            ยกเลิก
+          </button>
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={saving || !date || !room}
+            style={{
+              flex: 2, padding: '12px', borderRadius: 10, border: 'none',
+              background: date && room ? 'var(--crimson-500)' : '#e2e8f0',
+              color: date && room ? '#fff' : '#94a3b8',
+              cursor: saving || !date || !room ? 'default' : 'pointer',
+              fontSize: 13.5, fontWeight: 800, fontFamily: "'Sarabun',sans-serif",
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+              transition: 'all 0.15s',
+              boxShadow: date && room ? '0 4px 16px rgba(198,36,25,0.25)' : 'none',
+            }}
+          >
+            {saving ? (
+              <>
+                <div style={{ width: 14, height: 14, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                กำลังบันทึก...
+              </>
+            ) : (
+              <>
+                <i className="fas fa-lock" /> ยืนยันและบล็อกห้อง (สถานะยืนยันแล้ว)
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -3300,7 +4577,7 @@ function EditBookingModal({ booking, onClose, showToast }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)', zIndex:9900, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:'var(--surface-elevated)', borderRadius:'20px 20px 0 0', width:'100%', maxWidth:520, maxHeight:'92vh', overflowY:'auto', border:'1px solid var(--border-default)', borderBottom:'none', boxShadow:'0 -8px 48px rgba(0,0,0,0.45)', fontFamily:"'Sarabun',sans-serif", animation:'slideUp 0.28s cubic-bezier(0.22,1,0.36,1)' }}>
+      <div style={{ background:'var(--surface-elevated, #ffffff)', borderRadius:'20px 20px 0 0', width:'100%', maxWidth:520, maxHeight:'92vh', overflowY:'auto', border:'1px solid var(--border-default)', borderBottom:'none', boxShadow:'0 -8px 48px rgba(0,0,0,0.45)', fontFamily:"'Sarabun',sans-serif", animation:'slideUp 0.28s cubic-bezier(0.22,1,0.36,1)' }}>
         <div style={{ display:'flex', justifyContent:'center', paddingTop:14, paddingBottom:4 }}>
           <div style={{ width:40, height:4, borderRadius:2, background:'var(--border-strong)' }} />
         </div>
@@ -3425,7 +4702,7 @@ const ROOM_COLORS_ADM = {
   'Yang':'#ec4899','Chinese DM':'#c62419','Thai DM':'#d97706',
 }
 
-function RoomGrid({ bookings }) {
+function RoomGrid({ bookings, onSelectBooking }) {
   const today = new Date()
   const todayStr = today.toISOString().slice(0, 10)
   const days = Array.from({ length: 14 }, (_, i) => {
@@ -3510,27 +4787,28 @@ function RoomGrid({ bookings }) {
                     const isToday = d === todayStr
                     const isMockOccupied = b?.isMock
                     const statusColor = b
-                      ? (isMockOccupied ? '#64748b' : (STATUS_COLORS_B[b.status] || '#888')) /* ds-allow-hardcode: status data-viz */
+                      ? (isMockOccupied ? (STATUS_COLORS_B[b.status] || '#f59e0b') : (STATUS_COLORS_B[b.status] || '#888'))
                       : null
                     return (
                       <div
                         key={d}
-                        title={b ? `${isMockOccupied ? 'Mock Block' : (b.gameName || '-')} · ${STATUS_LABELS_B[b.status] || b.status}` : 'ว่าง'}
+                        onClick={() => b && onSelectBooking && onSelectBooking(b)}
+                        title={b ? `${b.isMock ? `[Mock Block] ${b.gameName || 'บล็อกห้อง'}` : (b.gameName || '-')} ${b.time ? `(${b.time})` : ''} · ${STATUS_LABELS_B[b.status] || b.status}` : 'ว่าง'}
                         style={{
                           height: CELL_H, borderRadius: 6,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                           background: statusColor
-                            ? (isMockOccupied ? statusColor + '22' : roomColor + '40')
+                            ? (isMockOccupied ? 'rgba(245,158,11,0.22)' : roomColor + '40')
                             : isToday ? 'rgba(198,36,25,0.05)' : 'var(--surface-card)',
                           border: `1px solid ${statusColor
-                            ? (isMockOccupied ? statusColor + '66' : roomColor + '66')
+                            ? (isMockOccupied ? '#f59e0b' : roomColor + '66')
                             : isToday ? 'rgba(198,36,25,0.22)' : 'var(--border-default)'}`,
                           borderLeft: isToday ? '2px solid var(--crimson-500)' : undefined,
                           cursor: b ? 'pointer' : 'default',
-                          transition: 'opacity 0.12s',
+                          transition: 'opacity 0.12s, transform 0.1s',
                         }}>
                         {isMockOccupied && (
-                          <i className="fas fa-lock" style={{ fontSize: 7, color: statusColor }} />
+                          <i className="fas fa-lock" style={{ fontSize: 7, color: '#f59e0b' }} />
                         )}
                         {b && !isMockOccupied && (
                           <span style={{ width: 6, height: 6, borderRadius: '50%', background: roomColor, flexShrink: 0 }} />
@@ -3563,7 +4841,7 @@ function RoomGrid({ bookings }) {
   )
 }
 
-function BookingsTab({ showToast, adminUser }) {
+function BookingsTab({ showToast, adminUser, allGames = [] }) {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
@@ -3652,7 +4930,7 @@ function BookingsTab({ showToast, adminUser }) {
       `}</style>
 
       {/* Room availability grid */}
-      <RoomGrid bookings={bookings} />
+      <RoomGrid bookings={bookings} onSelectBooking={setEditModal} />
 
       {/* ── Pending urgency section ── */}
       {pendingBookings.length > 0 && (
@@ -3799,13 +5077,13 @@ function BookingsTab({ showToast, adminUser }) {
         <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600 }}>
           {filtered.length} รายการ
         </span>
-        {/* Mock Block — outlined utility button, intentionally dim */}
+        {/* Mock Block — prominent amber utility button */}
         <button
           onClick={() => setMockModal(true)}
-          style={{ padding: '6px 13px', borderRadius: 8, border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer', fontSize: 11, fontWeight: 600, fontFamily: "'Sarabun',sans-serif", display: 'flex', alignItems: 'center', gap: 5, transition: 'border-color 0.15s, color 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-secondary)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}>
-          <i className="fas fa-plus" /> Mock Block
+          style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: "'Sarabun',sans-serif", display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
+          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.18)' }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.08)' }}>
+          <i className="fas fa-lock" /> + Mock Block (ล็อกห้อง)
         </button>
       </div>
 
@@ -3839,7 +5117,7 @@ function BookingsTab({ showToast, adminUser }) {
           {filtered.map(b => {
             const paidCount = b.members?.filter(m => m.paidDeposit).length || 0
             const totalMembers = b.members?.length || 0
-            const statusColor = b.isMock ? '#64748b' : (STATUS_COLORS_B[b.status] || '#888') /* ds-allow-hardcode: status data-viz */
+            const statusColor = STATUS_COLORS_B[b.status] || (b.isMock ? '#f59e0b' : '#888') /* ds-allow-hardcode: status data-viz */
             const pendingSlips = (b.members || []).filter(m => m.slipStatus === 'pending_verification' && !m.paidDeposit)
             return (
               <div key={b.id} style={{
@@ -3853,15 +5131,14 @@ function BookingsTab({ showToast, adminUser }) {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     {/* Game name + status badge on same row */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                        {b.isMock
-                          ? <><i className="fas fa-lock" style={{ fontSize: 11, marginRight: 5, color: 'var(--text-tertiary)' }} />Mock Block</>
-                          : b.gameName || '-'}
+                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                        {b.isMock && <i className="fas fa-lock" style={{ fontSize: 11, color: '#f59e0b' }} title="Mock Block" />}
+                        {b.gameName || (b.isMock ? 'Mock Block' : '-')}
                       </span>
                       <BookingStatusBadge status={b.status} />
                       {b.isMock && (
-                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'rgba(100,116,139,0.12)', color: '#64748b', fontWeight: 700, border: '1px solid rgba(100,116,139,0.25)' }}> {/* ds-allow-hardcode */}
-                          MOCK
+                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'rgba(245,158,11,0.14)', color: '#f59e0b', fontWeight: 800, border: '1px solid rgba(245,158,11,0.3)' }}>
+                          MOCK BLOCK
                         </span>
                       )}
                     </div>
@@ -4002,6 +5279,7 @@ function BookingsTab({ showToast, adminUser }) {
           adminUser={adminUser}
           onClose={() => setMockModal(false)}
           showToast={showToast}
+          allGames={allGames}
         />
       )}
     </div>
@@ -4545,6 +5823,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
               {tab === 'members'   && (
                 <MembersTab
                   members={members}
+                  allGames={allGames}
                   showToast={showToast}
                   onViewMemberHistory={(m) => {
                     setHistoryInitialMember(m)
@@ -4553,11 +5832,11 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
                 />
               )}
               {tab === 'menu'      && <MenuTab showToast={showToast} />}
-              {tab === 'bookings'  && <BookingsTab showToast={showToast} adminUser={isAdmin} />}
+              {tab === 'bookings'  && <BookingsTab showToast={showToast} adminUser={isAdmin} allGames={allGames} />}
               {tab === 'random'    && <RandomWheelTab showToast={showToast} members={members} />}
               {tab === 'payment'   && <PaymentTab showToast={showToast} />}
               {tab === 'receipt'   && <ReceiptSettingsTab showToast={showToast} />}
-              {tab === 'promotion' && <PromotionTab showToast={showToast} />}
+              {tab === 'promotion' && <PromotionTab showToast={showToast} allGames={allGames} />}
               {tab === 'data'      && <DataTab showToast={showToast} />}
             </div>
           </main>

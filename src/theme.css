@@ -86,6 +86,7 @@
   --surface-page:      #ffffff;           /* white catalog register */
   --surface-card:      var(--void-50);    /* #f8f8fc — cold white, not cream */
   --surface-raised:    #ffffff;
+  --surface-elevated:  #ffffff;
   --surface-sunken:    var(--void-100);
   --surface-dark-hero: var(--void-950);   /* dark hero register */
   --surface-dark-card: var(--void-900);
@@ -217,6 +218,7 @@
   --surface-page:    var(--void-950);
   --surface-card:    var(--void-900);
   --surface-raised:  var(--void-800);
+  --surface-elevated: var(--void-800);
   --surface-sunken:  #030308;
 
   /* Border */

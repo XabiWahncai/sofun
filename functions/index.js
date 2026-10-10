@@ -203,7 +203,7 @@ async function callEasySlip(payload, amount, apiKey) {
 // ── Main callable: verify slip on upload ──────────────────────────────────────
 
 exports.verifySlip = onCall({ region: 'asia-southeast1', cors: true }, async (req) => {
-  const { slipUrl, amount, orderId, uid, name } = req.data
+  const { slipUrl, amount, orderId, uid, name, isDeposit } = req.data
   if (!slipUrl || !orderId || !uid) return { success: false, code: 'MISSING_PARAMS' }
 
   const db = getFirestore()
@@ -211,6 +211,11 @@ exports.verifySlip = onCall({ region: 'asia-southeast1', cors: true }, async (re
   const settingsData = settingsSnap.data() || {}
   const apiKey = settingsData.easySlipApiKey
   const promptPayPhone = settingsData.promptPayPhone || ''
+  const depositPromptPayPhone = settingsData.depositPromptPayPhone || ''
+
+  const isBookingDeposit = Boolean(isDeposit || (typeof orderId === 'string' && orderId.startsWith('booking_')))
+  const expectedPhone = isBookingDeposit ? (depositPromptPayPhone || promptPayPhone) : promptPayPhone
+
   if (!apiKey) return { success: false, code: 'NO_API_KEY' }
 
   // Download image
@@ -249,26 +254,28 @@ exports.verifySlip = onCall({ region: 'asia-southeast1', cors: true }, async (re
 
   // If Bangkok Bank / other bank is still settling — save full entry + payload for background retry
   if (!json.success && json.error?.code === 'SLIP_PENDING') {
-    await db.doc(`orders/${orderId}`).update({
-      [`memberPayments.${uid}.paidAt`]: new Date().toISOString(),
-      [`memberPayments.${uid}.amount`]: amount ? Number(amount) : null,
-      [`memberPayments.${uid}.slipUrl`]: slipUrl || '',
-      [`memberPayments.${uid}.name`]: name || '',
-      [`memberPayments.${uid}.verified`]: false,
-      [`memberPayments.${uid}.pendingAdminReview`]: false,
-      [`memberPayments.${uid}.easyslipPending`]: true,
-      [`memberPayments.${uid}.easyslipPayload`]: payload,
-      [`memberPayments.${uid}.easyslipPendingSince`]: new Date().toISOString(),
-    })
+    if (!isBookingDeposit) {
+      await db.doc(`orders/${orderId}`).update({
+        [`memberPayments.${uid}.paidAt`]: new Date().toISOString(),
+        [`memberPayments.${uid}.amount`]: amount ? Number(amount) : null,
+        [`memberPayments.${uid}.slipUrl`]: slipUrl || '',
+        [`memberPayments.${uid}.name`]: name || '',
+        [`memberPayments.${uid}.verified`]: false,
+        [`memberPayments.${uid}.pendingAdminReview`]: false,
+        [`memberPayments.${uid}.easyslipPending`]: true,
+        [`memberPayments.${uid}.easyslipPayload`]: payload,
+        [`memberPayments.${uid}.easyslipPendingSince`]: new Date().toISOString(),
+      })
+    }
     return { success: false, code: 'SLIP_PENDING' }
   }
 
   // Validate receiver account matches our PromptPay
-  if (json.success && promptPayPhone) {
+  if (json.success && expectedPhone) {
     const receiverAccount = json.data?.rawSlip?.receiver?.account?.value || ''
     const norm = p => { const d = p.replace(/\D/g, ''); if (d.startsWith('0066')) return '66' + d.slice(4); if (d.startsWith('0')) return '66' + d.slice(1); return d }
-    if (receiverAccount && norm(receiverAccount) !== norm(promptPayPhone)) {
-      console.log(`Receiver mismatch: slip=${receiverAccount} expected=${promptPayPhone}`)
+    if (receiverAccount && norm(receiverAccount) !== norm(expectedPhone)) {
+      console.log(`Receiver mismatch: slip=${receiverAccount} expected=${expectedPhone} (isBookingDeposit=${isBookingDeposit})`)
       return { success: false, code: 'WRONG_RECEIVER' }
     }
     console.log(`Receiver OK: ${receiverAccount}`)

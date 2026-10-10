@@ -7,6 +7,9 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  updateDoc,
+  serverTimestamp,
+  Timestamp,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import {
@@ -53,6 +56,18 @@ const calcDuration = (start, end) => {
   const mins = totalMins % 60
   if (hrs > 0) return `${hrs} ชม. ${mins > 0 ? `${mins} น.` : ''}`
   return `${mins} นาที`
+}
+
+const toDatetimeLocal = (v) => {
+  const d = toDateObj(v)
+  if (!d) return ''
+  const pad = (n) => String(n).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const MM = pad(d.getMonth() + 1)
+  const dd = pad(d.getDate())
+  const hh = pad(d.getHours())
+  const mm = pad(d.getMinutes())
+  return `${yyyy}-${MM}-${dd}T${hh}:${mm}`
 }
 
 export const getCleanGrandTotal = (p) => {
@@ -356,7 +371,7 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
 }
 
 // ── Member History Drawer / Modal Component ──────────────────────────────────
-export function MemberHistoryModal({ member, payments = [], receiptSettings, onClose, onOpenSlip, showToast }) {
+export function MemberHistoryModal({ member, payments = [], receiptSettings, onClose, onOpenSlip, onEditPayment, showToast }) {
   if (!member) return null
 
   const memberName = member.nickname || `${member.firstname || ''} ${member.lastname || ''}`.trim() || 'สมาชิก'
@@ -487,6 +502,20 @@ export function MemberHistoryModal({ member, payments = [], receiptSettings, onC
                     </div>
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4, paddingTop: 8, borderTop: '1px solid var(--border-default)' }}>
+                      {onEditPayment && (
+                        <button
+                          type="button"
+                          className="adm-btn-outline"
+                          style={{ padding: '6px 12px', fontSize: 12 }}
+                          onClick={() => {
+                            onClose?.()
+                            onEditPayment(p)
+                          }}
+                          title="แก้ไขข้อมูลย้อนหลัง"
+                        >
+                          <i className="fas fa-edit" style={{ color: 'var(--crimson-500)', marginRight: 4 }} /> แก้ไข
+                        </button>
+                      )}
                       <button
                         type="button"
                         className="adm-btn-outline"
@@ -501,6 +530,626 @@ export function MemberHistoryModal({ member, payments = [], receiptSettings, onC
               })}
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Edit Payment Modal Component (Retroactive Data Editing) ──────────────────
+export function EditPaymentModal({
+  payment,
+  allGames = [],
+  availableMembers = [],
+  dmOptions = [],
+  onClose,
+  showToast,
+}) {
+  if (!payment) return null
+
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState(() => {
+    const rawPaid = payment.paidAt || payment.openAt || new Date()
+    return {
+      scriptTitle: payment.scriptTitle || '',
+      scriptId: payment.scriptId || '',
+      room: payment.room || '',
+      dm: payment.dm || '',
+      npc: payment.npc || '',
+      ending: payment.ending || '',
+      paidAt: toDatetimeLocal(rawPaid),
+      gameTotal: payment.gameTotal ?? (payment.grandTotal || 0),
+      discountApplied: payment.discount?.applied ?? 0,
+      grandTotal: getCleanGrandTotal(payment),
+      notes: payment.notes || '',
+      members: (payment.members || []).map(m => ({
+        uid: m.uid || '',
+        name: m.name || '',
+        character: m.character || '',
+        avatar: m.avatar || '',
+      })),
+    }
+  })
+
+  // Adding new player state
+  const [addMode, setAddMode] = useState('select') // 'select' | 'custom'
+  const [selectedAddUid, setSelectedAddUid] = useState('')
+  const [customAddName, setCustomAddName] = useState('')
+  const [customAddChar, setCustomAddChar] = useState('')
+
+  // Presets
+  const ROOM_PRESETS = ['Ghost Room', 'Cyberpunk Room', 'Medieval Room', 'Room 1', 'Room 2', 'Room 3', 'โต๊ะ 1', 'โต๊ะ 2']
+  const ENDING_PRESETS = ['good-ending', 'bad-ending', 'true-ending', 'ฆาตกรชนะ', 'นักสืบชนะ', 'เสมอ', 'คดีปิดไม่ลง']
+  const DEFAULT_DMS = ['Smooth Operator', 'DM Palm', 'DM Max', 'DM Ice', 'DM Film']
+  const effectiveDmPresets = useMemo(() => {
+    const set = new Set([...DEFAULT_DMS, ...dmOptions])
+    return Array.from(set).filter(Boolean)
+  }, [dmOptions])
+
+  const handleGameChange = (e) => {
+    const title = e.target.value
+    const found = allGames.find(g => g.title === title)
+    setForm(prev => ({
+      ...prev,
+      scriptTitle: title,
+      scriptId: found ? (found.id || found.slug || '') : prev.scriptId,
+    }))
+  }
+
+  const handleAddPlayer = () => {
+    if (addMode === 'select') {
+      if (!selectedAddUid) return
+      const found = availableMembers.find(m => (m.id || m.uid) === selectedAddUid)
+      if (!found) return
+      const name = found.nickname || `${found.firstname || ''} ${found.lastname || ''}`.trim() || 'สมาชิก'
+      setForm(prev => ({
+        ...prev,
+        members: [
+          ...prev.members,
+          {
+            uid: found.id || found.uid || '',
+            name,
+            character: customAddChar.trim(),
+            avatar: found.pictureUrl || '',
+          },
+        ],
+      }))
+      setSelectedAddUid('')
+      setCustomAddChar('')
+    } else {
+      if (!customAddName.trim()) return
+      setForm(prev => ({
+        ...prev,
+        members: [
+          ...prev.members,
+          {
+            uid: '',
+            name: customAddName.trim(),
+            character: customAddChar.trim(),
+            avatar: '',
+          },
+        ],
+      }))
+      setCustomAddName('')
+      setCustomAddChar('')
+    }
+  }
+
+  const handleRemoveMember = (idx) => {
+    setForm(prev => ({
+      ...prev,
+      members: prev.members.filter((_, i) => i !== idx),
+    }))
+  }
+
+  const handleMemberFieldChange = (idx, field, val) => {
+    setForm(prev => {
+      const next = [...prev.members]
+      next[idx] = { ...next[idx], [field]: val }
+      return { ...prev, members: next }
+    })
+  }
+
+  const handleAutoRecalc = () => {
+    const foodTotal = payment.foodTotal !== undefined && payment.foodTotal !== null
+      ? payment.foodTotal
+      : (payment.foodItems || []).reduce((s, f) => s + (f.price || 0) * (f.qty || 1), 0)
+    const newGrand = Math.max(0, (Number(form.gameTotal) || 0) + foodTotal - (Number(form.discountApplied) || 0))
+    setForm(prev => ({ ...prev, grandTotal: newGrand }))
+  }
+
+  const handleSave = async (e) => {
+    e?.preventDefault()
+    setSaving(true)
+    try {
+      const dtObj = form.paidAt ? new Date(form.paidAt) : new Date()
+      const validDate = isNaN(dtObj.getTime()) ? new Date() : dtObj
+      const updatedMemberUids = form.members.map(m => m.uid).filter(Boolean)
+
+      // Sync memberBills if array exists
+      let updatedMemberBills = payment.memberBills || []
+      if (Array.isArray(updatedMemberBills) && updatedMemberBills.length > 0) {
+        updatedMemberBills = updatedMemberBills.map(mb => {
+          const matched = form.members.find(m => m.uid && m.uid === mb.uid)
+          if (matched) {
+            return {
+              ...mb,
+              name: matched.name || mb.name,
+              character: matched.character || mb.character,
+            }
+          }
+          return mb
+        })
+      }
+
+      const patch = {
+        scriptTitle: form.scriptTitle.trim(),
+        scriptId: form.scriptId || '',
+        room: form.room.trim(),
+        dm: form.dm.trim(),
+        npc: form.npc.trim(),
+        ending: form.ending.trim(),
+        paidAt: Timestamp.fromDate(validDate),
+        members: form.members,
+        memberUids: updatedMemberUids,
+        memberBills: updatedMemberBills,
+        gameTotal: Number(form.gameTotal) || 0,
+        discount: {
+          ...(payment.discount || {}),
+          applied: Number(form.discountApplied) || 0,
+          value: Number(form.discountApplied) || 0,
+        },
+        grandTotal: Number(form.grandTotal) || 0,
+        notes: form.notes.trim(),
+        updatedAt: serverTimestamp(),
+        updatedBy: 'admin',
+      }
+
+      await updateDoc(doc(db, 'payments', payment.id), patch)
+
+      // If linked with active or archived order
+      if (payment.orderId) {
+        try {
+          await updateDoc(doc(db, 'orders', payment.orderId), {
+            scriptTitle: patch.scriptTitle,
+            scriptId: patch.scriptId,
+            room: patch.room,
+            dm: patch.dm,
+            npc: patch.npc,
+            ending: patch.ending,
+            members: patch.members,
+            memberUids: patch.memberUids,
+            discount: patch.discount,
+            paidTotal: patch.grandTotal,
+            updatedAt: serverTimestamp(),
+          })
+        } catch (err) {
+          console.warn('Sync order document failed (may not exist):', err)
+        }
+      }
+
+      showToast?.('อัปเดตข้อมูลประวัติการเล่นและบิลย้อนหลังเรียบร้อยแล้ว ✓')
+      onClose()
+    } catch (err) {
+      console.error('Failed to update payment:', err)
+      showToast?.('เกิดข้อผิดพลาดในการบันทึก: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const serialStr = payment.serial ? `#${payment.serial}` : ''
+
+  return (
+    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="adm-edit-modal" style={{ maxWidth: 680, width: '95%' }}>
+        {/* Header */}
+        <div className="adm-edit-modal-header" style={{ borderBottom: '1px solid var(--border-default)', padding: '16px 20px' }}>
+          <div className="adm-edit-modal-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 38, height: 38, borderRadius: 10, background: 'rgba(198,36,25,0.1)', color: 'var(--crimson-500)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+              <i className="fas fa-edit" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 16, color: 'var(--text-primary)' }}>
+                แก้ไขข้อมูลประวัติการเล่น / บิลย้อนหลัง {serialStr}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                ปรับปรุงห้อง, DM, ผลเกม, บทละคร, วันเวลา และรายชื่อผู้เล่นเพื่ออัปเดตประวัติของสมาชิก
+              </div>
+            </div>
+          </div>
+          <button className="modal-close-btn" onClick={onClose}><i className="fas fa-times" /></button>
+        </div>
+
+        {/* Modal Body */}
+        <div className="adm-edit-modal-body" style={{ maxHeight: '72vh', overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+          
+          {/* 1. General Game & Session Info */}
+          <div style={{ background: 'var(--surface-page)', borderRadius: 12, padding: 14, border: '1px solid var(--border-default)' }}>
+            <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <i className="fas fa-dice" style={{ color: 'var(--crimson-500)' }} /> ข้อมูลรอบเล่น & สคริปต์
+            </div>
+
+            {/* Script / Game */}
+            <div className="adm-field" style={{ marginBottom: 12 }}>
+              <label className="adm-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>ชื่อบทละคร / เกม *</span>
+                {allGames.length > 0 && (
+                  <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 400 }}>
+                    เลือกจากคลังหรือพิมพ์ใหม่
+                  </span>
+                )}
+              </label>
+              <div style={{ display: 'grid', gridTemplateColumns: allGames.length > 0 ? '1fr 1fr' : '1fr', gap: 8 }}>
+                {allGames.length > 0 && (
+                  <select
+                    className="adm-input"
+                    value={allGames.some(g => g.title === form.scriptTitle) ? form.scriptTitle : ''}
+                    onChange={handleGameChange}
+                  >
+                    <option value="">-- เลือกจากคลังเกม ({allGames.length}) --</option>
+                    {allGames.map(g => (
+                      <option key={g.id || g.title} value={g.title}>{g.title}</option>
+                    ))}
+                  </select>
+                )}
+                <input
+                  type="text"
+                  className="adm-input"
+                  placeholder="หรือพิมพ์ชื่อเกม..."
+                  value={form.scriptTitle}
+                  onChange={e => setForm(p => ({ ...p, scriptTitle: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Date & Time */}
+            <div className="adm-field" style={{ marginBottom: 12 }}>
+              <label className="adm-label">วันและเวลาที่เล่น / ปิดบิล *</label>
+              <input
+                type="datetime-local"
+                className="adm-input"
+                value={form.paidAt}
+                onChange={e => setForm(p => ({ ...p, paidAt: e.target.value }))}
+              />
+            </div>
+
+            {/* Room & Table */}
+            <div className="adm-field" style={{ marginBottom: 12 }}>
+              <label className="adm-label">ห้อง / โต๊ะ</label>
+              <input
+                type="text"
+                className="adm-input"
+                placeholder="เช่น Ghost Room, โต๊ะ 1"
+                value={form.room}
+                onChange={e => setForm(p => ({ ...p, room: e.target.value }))}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {ROOM_PRESETS.map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    style={{
+                      background: form.room === r ? 'var(--crimson-500)' : 'var(--surface-elevated)',
+                      color: form.room === r ? '#fff' : 'var(--text-secondary)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 14,
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      fontWeight: form.room === r ? 700 : 500,
+                    }}
+                    onClick={() => setForm(p => ({ ...p, room: r }))}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* DM & NPC */}
+            <div className="adm-field-row" style={{ marginBottom: 12 }}>
+              <div className="adm-field" style={{ flex: 1 }}>
+                <label className="adm-label">DM (ผู้คุมเกม)</label>
+                <input
+                  type="text"
+                  className="adm-input"
+                  placeholder="เช่น Smooth Operator"
+                  value={form.dm}
+                  onChange={e => setForm(p => ({ ...p, dm: e.target.value }))}
+                />
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                  {effectiveDmPresets.slice(0, 5).map(d => (
+                    <button
+                      key={d}
+                      type="button"
+                      style={{
+                        background: form.dm === d ? '#ec4899' : 'var(--surface-elevated)',
+                        color: form.dm === d ? '#fff' : 'var(--text-secondary)',
+                        border: '1px solid var(--border-default)',
+                        borderRadius: 14,
+                        padding: '2px 8px',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                        fontWeight: form.dm === d ? 700 : 500,
+                      }}
+                      onClick={() => setForm(p => ({ ...p, dm: d }))}
+                    >
+                      {d}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="adm-field" style={{ flex: 1 }}>
+                <label className="adm-label">NPC / ผู้ช่วย (ถ้ามี)</label>
+                <input
+                  type="text"
+                  className="adm-input"
+                  placeholder="เช่น เมด, ผู้ช่วยสารวัตร"
+                  value={form.npc}
+                  onChange={e => setForm(p => ({ ...p, npc: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            {/* Game Ending */}
+            <div className="adm-field">
+              <label className="adm-label">ผลเกม (Ending)</label>
+              <input
+                type="text"
+                className="adm-input"
+                placeholder="เช่น bad-ending, ฆาตกรชนะ"
+                value={form.ending}
+                onChange={e => setForm(p => ({ ...p, ending: e.target.value }))}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                {ENDING_PRESETS.map(ed => (
+                  <button
+                    key={ed}
+                    type="button"
+                    style={{
+                      background: form.ending === ed ? '#b45309' : 'var(--surface-elevated)',
+                      color: form.ending === ed ? '#fff' : 'var(--text-secondary)',
+                      border: '1px solid var(--border-default)',
+                      borderRadius: 14,
+                      padding: '2px 8px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      fontWeight: form.ending === ed ? 700 : 500,
+                    }}
+                    onClick={() => setForm(p => ({ ...p, ending: ed }))}
+                  >
+                    {ed}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          </div>
+
+          {/* 2. Members & Characters in Party */}
+          <div style={{ background: 'var(--surface-page)', borderRadius: 12, padding: 14, border: '1px solid var(--border-default)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="fas fa-users" style={{ color: '#3b82f6' }} /> ผู้เล่นและบทละคร ({form.members.length} คน)
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                ซิงค์ประวัติไปยัง QR Code ของสมาชิกอัตโนมัติ
+              </span>
+            </div>
+
+            {/* Player list */}
+            {form.members.length === 0 ? (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 13, background: 'var(--surface-card)', borderRadius: 8 }}>
+                ยังไม่มีรายชื่อผู้เล่นในรอบนี้
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+                {form.members.map((m, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      background: 'var(--surface-card)',
+                      borderRadius: 10,
+                      padding: '8px 12px',
+                      border: '1px solid var(--border-default)',
+                    }}
+                  >
+                    <div style={{ width: 28, height: 28, borderRadius: '50%', background: m.uid ? 'var(--crimson-500)' : 'var(--text-tertiary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 700, flexShrink: 0, overflow: 'hidden' }}>
+                      {m.avatar ? <img src={m.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} /> : (m.name || '?')[0]}
+                    </div>
+
+                    <div style={{ flex: 1.2 }}>
+                      <input
+                        type="text"
+                        className="adm-input"
+                        style={{ padding: '6px 8px', fontSize: 12 }}
+                        placeholder="ชื่อผู้เล่น"
+                        value={m.name}
+                        onChange={e => handleMemberFieldChange(idx, 'name', e.target.value)}
+                      />
+                    </div>
+
+                    <div style={{ flex: 1.2 }}>
+                      <input
+                        type="text"
+                        className="adm-input"
+                        style={{ padding: '6px 8px', fontSize: 12 }}
+                        placeholder="บทบาท / ตัวละคร"
+                        value={m.character}
+                        onChange={e => handleMemberFieldChange(idx, 'character', e.target.value)}
+                      />
+                    </div>
+
+                    {m.uid && (
+                      <span title="สมาชิกที่มีในระบบ" style={{ fontSize: 10, color: '#10b981', background: 'rgba(16,185,129,0.1)', padding: '2px 6px', borderRadius: 4, fontWeight: 700, whiteSpace: 'nowrap' }}>
+                        <i className="fas fa-id-badge" /> สมาชิก
+                      </span>
+                    )}
+
+                    <button
+                      type="button"
+                      style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', padding: 6, fontSize: 13 }}
+                      onClick={() => handleRemoveMember(idx)}
+                      title="ลบผู้เล่นคนนี้ออกจากรอบ"
+                    >
+                      <i className="fas fa-trash-alt" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Player Box */}
+            <div style={{ background: 'var(--surface-elevated)', borderRadius: 10, padding: 10, border: '1px dashed var(--border-strong)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-secondary)' }}>+ เพิ่มผู้เล่น:</span>
+                <label style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                  <input
+                    type="radio"
+                    name="addMode"
+                    checked={addMode === 'select'}
+                    onChange={() => setAddMode('select')}
+                  />
+                  เลือกสมาชิกในระบบ
+                </label>
+                <label style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer', color: 'var(--text-secondary)' }}>
+                  <input
+                    type="radio"
+                    name="addMode"
+                    checked={addMode === 'custom'}
+                    onChange={() => setAddMode('custom')}
+                  />
+                  ลูกค้าทั่วไป / Walk-in
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {addMode === 'select' ? (
+                  <select
+                    className="adm-input"
+                    style={{ flex: 1.5, minWidth: 160, padding: '6px 8px', fontSize: 12 }}
+                    value={selectedAddUid}
+                    onChange={e => setSelectedAddUid(e.target.value)}
+                  >
+                    <option value="">-- เลือกสมาชิก ({availableMembers.length}) --</option>
+                    {availableMembers.map(m => {
+                      const mName = m.nickname || `${m.firstname || ''} ${m.lastname || ''}`.trim() || 'สมาชิก'
+                      return (
+                        <option key={m.id || m.uid} value={m.id || m.uid}>
+                          {mName} {m.tel_no ? `(${m.tel_no})` : ''}
+                        </option>
+                      )
+                    })}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    className="adm-input"
+                    style={{ flex: 1.5, minWidth: 160, padding: '6px 8px', fontSize: 12 }}
+                    placeholder="ชื่อลูกค้า..."
+                    value={customAddName}
+                    onChange={e => setCustomAddName(e.target.value)}
+                  />
+                )}
+
+                <input
+                  type="text"
+                  className="adm-input"
+                  style={{ flex: 1.2, minWidth: 130, padding: '6px 8px', fontSize: 12 }}
+                  placeholder="บทละคร / ตัวละคร..."
+                  value={customAddChar}
+                  onChange={e => setCustomAddChar(e.target.value)}
+                />
+
+                <button
+                  type="button"
+                  className="adm-btn-outline"
+                  style={{ padding: '6px 12px', fontSize: 12, whiteSpace: 'nowrap' }}
+                  onClick={handleAddPlayer}
+                >
+                  <i className="fas fa-plus" /> เพิ่ม
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* 3. Financial Adjustments */}
+          <div style={{ background: 'var(--surface-page)', borderRadius: 12, padding: 14, border: '1px solid var(--border-default)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="fas fa-coins" style={{ color: '#10b981' }} /> ปรับยอดเงิน & ส่วนลด
+              </div>
+              <button
+                type="button"
+                style={{ background: 'none', border: 'none', color: 'var(--crimson-500)', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                onClick={handleAutoRecalc}
+              >
+                <i className="fas fa-calculator" /> คำนวณยอดสุทธิใหม่อัตโนมัติ
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
+              <div className="adm-field">
+                <label className="adm-label">ค่าเกมรวม (฿)</label>
+                <input
+                  type="number"
+                  className="adm-input"
+                  value={form.gameTotal}
+                  onChange={e => setForm(p => ({ ...p, gameTotal: e.target.value }))}
+                />
+              </div>
+
+              <div className="adm-field">
+                <label className="adm-label">ส่วนลด (฿)</label>
+                <input
+                  type="number"
+                  className="adm-input"
+                  value={form.discountApplied}
+                  onChange={e => setForm(p => ({ ...p, discountApplied: e.target.value }))}
+                />
+              </div>
+
+              <div className="adm-field">
+                <label className="adm-label">ยอดสุทธิ Grand Total (฿) *</label>
+                <input
+                  type="number"
+                  className="adm-input"
+                  style={{ fontWeight: 800, color: 'var(--crimson-500)' }}
+                  value={form.grandTotal}
+                  onChange={e => setForm(p => ({ ...p, grandTotal: e.target.value }))}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* 4. Notes */}
+          <div className="adm-field">
+            <label className="adm-label">หมายเหตุเพิ่มเติม / Audit Note</label>
+            <textarea
+              className="adm-input"
+              rows={2}
+              placeholder="ระบุเหตุผลในการแก้ไขข้อมูล เช่น ลูกค้าเปลี่ยนชื่อตัวละคร, แก้ไข DM..."
+              value={form.notes}
+              onChange={e => setForm(p => ({ ...p, notes: e.target.value }))}
+            />
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="adm-edit-modal-footer" style={{ padding: '14px 20px', borderTop: '1px solid var(--border-default)', display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+          <button type="button" className="btn-secondary" onClick={onClose} disabled={saving}>
+            ยกเลิก
+          </button>
+          <button type="button" className="adm-btn-red" onClick={handleSave} disabled={saving} style={{ minWidth: 140 }}>
+            {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกการแก้ไข</>}
+          </button>
         </div>
       </div>
     </div>
@@ -530,6 +1179,7 @@ export default function HistoryTab({
 
   // Modals state
   const [slipModalPayment, setSlipModalPayment] = useState(null)
+  const [editingPayment, setEditingPayment] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [expandedIds, setExpandedIds] = useState(new Set())
 
@@ -1097,6 +1747,15 @@ export default function HistoryTab({
                         type="button"
                         className="adm-btn-outline"
                         style={{ padding: '6px 12px', fontSize: 12 }}
+                        onClick={() => setEditingPayment(p)}
+                        title="แก้ไขข้อมูลย้อนหลัง"
+                      >
+                        <i className="fas fa-edit" style={{ color: 'var(--crimson-500)', marginRight: 4 }} /> แก้ไขข้อมูล
+                      </button>
+                      <button
+                        type="button"
+                        className="adm-btn-outline"
+                        style={{ padding: '6px 12px', fontSize: 12 }}
                         onClick={() => setSlipModalPayment(p)}
                         title="ดูสลีปและพิมพ์ใบเสร็จ"
                       >
@@ -1145,6 +1804,27 @@ export default function HistoryTab({
                       <i className="fas fa-tag" /> ส่วนลด ฿{p.discount.applied}
                     </span>
                   )}
+
+                  {/* Retroactive Edit button tag in the row */}
+                  <button
+                    type="button"
+                    className="qr-history-tag"
+                    style={{
+                      background: 'rgba(198,36,25,0.08)',
+                      color: 'var(--crimson-500)',
+                      border: '1px solid rgba(198,36,25,0.25)',
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      transition: '0.15s',
+                    }}
+                    onClick={() => setEditingPayment(p)}
+                    title="แก้ไขข้อมูลรอบเล่นนี้ (ห้อง, DM, ผลเกม, ผู้เล่น, ยอดเงิน)"
+                  >
+                    <i className="fas fa-edit" /> แก้ไขข้อมูลย้อนหลัง
+                  </button>
 
                   <button
                     type="button"
@@ -1274,8 +1954,16 @@ export default function HistoryTab({
                       )}
                     </div>
 
-                    {/* Delete button (Admin dangerous action) */}
-                    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'flex-end' }}>
+                    {/* Action buttons (Edit & Delete) */}
+                    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                      <button
+                        type="button"
+                        className="adm-btn-outline"
+                        style={{ padding: '6px 14px', fontSize: 12 }}
+                        onClick={() => setEditingPayment(p)}
+                      >
+                        <i className="fas fa-edit" style={{ marginRight: 6, color: 'var(--crimson-500)' }} /> แก้ไขข้อมูลบิล / รอบเล่นนี้ย้อนหลัง
+                      </button>
                       <button
                         type="button"
                         style={{
@@ -1311,6 +1999,18 @@ export default function HistoryTab({
           payment={slipModalPayment}
           receiptSettings={receiptSettings}
           onClose={() => setSlipModalPayment(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── Edit Payment Modal (Retroactive Data Editing) ── */}
+      {editingPayment && (
+        <EditPaymentModal
+          payment={editingPayment}
+          allGames={allGames}
+          availableMembers={members}
+          dmOptions={dmOptions}
+          onClose={() => setEditingPayment(null)}
           showToast={showToast}
         />
       )}

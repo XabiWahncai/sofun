@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, query, orderBy, getDoc
@@ -141,6 +141,35 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
   const [selectedRoomFilter, setSelectedRoomFilter] = useState('all')
+  const [viewModeOverride, setViewModeOverride] = useState('auto') // 'auto' | 'bars' | 'cards'
+  const calendarRef = useRef(null)
+  const [containerWidth, setContainerWidth] = useState(700)
+
+  useEffect(() => {
+    if (!calendarRef.current) return
+    const updateWidth = () => {
+      if (calendarRef.current) {
+        setContainerWidth(calendarRef.current.offsetWidth)
+      }
+    }
+    updateWidth()
+
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          if (entry.contentRect.width > 0) {
+            setContainerWidth(entry.contentRect.width)
+          }
+        }
+      })
+      ro.observe(calendarRef.current)
+      return () => ro.disconnect()
+    }
+  }, [])
+
+  const cellWidth = (containerWidth - 2) / 7
+  const isNarrow = cellWidth < 85 || containerWidth < 580
+  const useBarMode = viewModeOverride === 'bars' || (viewModeOverride === 'auto' && isNarrow)
 
   const prevMonth = () => {
     if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1) }
@@ -173,71 +202,258 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontFamily: 'Sarabun, sans-serif' }}>
+  // Total bookings in this month for stats
+  const totalMonthBookings = Object.entries(bookingsByDate).reduce((acc, [d, list]) => {
+    if (d.startsWith(`${viewYear}-${pad2(viewMonth + 1)}`)) return acc + list.length
+    return acc
+  }, 0)
 
-      {/* ── Header: Month + Nav ─────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.02em', margin: 0 }}>
-          {MONTH_NAMES[viewMonth]}{' '}
-          <span style={{ color: 'var(--text-secondary)', fontWeight: 700 }}>{viewYear + 543}</span>
-        </h2>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <button onClick={goToday} style={{ padding: '6px 14px', borderRadius: '8px', border: '1px solid var(--border-default)', background: '#fff', color: 'var(--text-secondary)', fontSize: '12px', fontWeight: 700, cursor: 'pointer', transition: 'border-color 0.15s, color 0.15s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.color='var(--crimson-500)' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border-default)'; e.currentTarget.style.color='var(--text-secondary)' }}>
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: 'Sarabun, sans-serif' }}>
+
+      {/* ── Header: Month + Navigation ─────────────────────────────────── */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '12px',
+        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+        padding: '14px 18px',
+        borderRadius: '16px',
+        border: '1px solid rgba(0,0,0,0.06)',
+        boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{
+            width: '40px', height: '40px', borderRadius: '12px',
+            background: 'linear-gradient(135deg, rgba(198,36,25,0.12), rgba(198,36,25,0.04))',
+            border: '1px solid rgba(198,36,25,0.2)',
+            color: 'var(--crimson-500)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '17px', flexShrink: 0,
+          }}>
+            <i className="far fa-calendar-alt" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+              <h2 style={{
+                fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)',
+                letterSpacing: '-0.01em', margin: 0,
+              }}>
+                {MONTH_NAMES[viewMonth]}
+              </h2>
+              <span style={{
+                fontSize: '15px', fontWeight: 800, color: 'var(--crimson-500)',
+                background: 'rgba(198,36,25,0.08)', padding: '1px 8px', borderRadius: '6px',
+              }}>
+                {viewYear + 543}
+              </span>
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>ตารางจองเดือนนี้</span>
+              {totalMonthBookings > 0 && (
+                <span style={{
+                  background: 'rgba(34,197,94,0.1)', color: '#16a34a',
+                  padding: '0 6px', borderRadius: '10px', fontWeight: 700, fontSize: '10px',
+                }}>
+                  {totalMonthBookings} รอบ
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation Controls + View Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          {/* Toggle View Mode: Bars vs Detail Cards */}
+          <button
+            type="button"
+            onClick={() => setViewModeOverride(m => {
+              if (m === 'auto') return useBarMode ? 'cards' : 'bars'
+              return m === 'bars' ? 'cards' : 'bars'
+            })}
+            title={useBarMode ? 'สลับเป็นมุมมองแสดงการ์ดข้อความ' : 'สลับเป็นมุมมองแท่งสีห้อง'}
+            style={{
+              padding: '7px 12px', borderRadius: '10px',
+              border: '1px solid rgba(0,0,0,0.08)',
+              background: useBarMode ? 'rgba(198,36,25,0.08)' : '#fff',
+              color: useBarMode ? 'var(--crimson-500)' : 'var(--text-secondary)',
+              fontSize: '12px', fontWeight: 800, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            }}
+          >
+            <i className={useBarMode ? "fas fa-bars" : "fas fa-th-large"} style={{ fontSize: '11px' }} />
+            <span>{useBarMode ? 'แท่งสีห้อง' : 'การ์ดข้อความ'}</span>
+          </button>
+
+          <button
+            onClick={goToday}
+            style={{
+              padding: '7px 14px', borderRadius: '10px',
+              border: '1px solid rgba(0,0,0,0.08)',
+              background: '#fff', color: 'var(--text-secondary)',
+              fontSize: '12px', fontWeight: 800, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: '6px',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = 'var(--crimson-500)'
+              e.currentTarget.style.color = 'var(--crimson-500)'
+              e.currentTarget.style.background = 'rgba(198,36,25,0.04)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'
+              e.currentTarget.style.color = 'var(--text-secondary)'
+              e.currentTarget.style.background = '#fff'
+            }}
+          >
+            <i className="fas fa-bullseye" style={{ fontSize: '11px', color: 'var(--crimson-500)' }} />
             วันนี้
           </button>
-          <div style={{ display: 'flex', alignItems: 'center', border: '1px solid var(--border-default)', borderRadius: '8px', overflow: 'hidden' }}>
-            {[{fn:prevMonth,icon:'fa-chevron-left'},{fn:nextMonth,icon:'fa-chevron-right'}].map(({fn,icon},i) => (
-              <button key={icon} onClick={fn} style={{ width: '32px', height: '32px', border: 'none', borderLeft: i===1 ? '1px solid var(--border-default)' : 'none', background: '#fff', color: 'var(--text-secondary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.background='rgba(0,0,0,0.04)'}
-                onMouseLeave={e => e.currentTarget.style.background='#fff'}>
-                <i className={`fas ${icon}`} style={{ fontSize: '10px' }} />
-              </button>
-            ))}
+          <div style={{
+            display: 'flex', alignItems: 'center',
+            background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
+            borderRadius: '10px', overflow: 'hidden',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+          }}>
+            <button
+              onClick={prevMonth}
+              title="เดือนก่อนหน้า"
+              style={{
+                width: '34px', height: '34px', border: 'none', background: 'transparent',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <i className="fas fa-chevron-left" style={{ fontSize: '11px' }} />
+            </button>
+            <div style={{ width: '1px', height: '18px', background: 'rgba(0,0,0,0.08)' }} />
+            <button
+              onClick={nextMonth}
+              title="เดือนถัดไป"
+              style={{
+                width: '34px', height: '34px', border: 'none', background: 'transparent',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <i className="fas fa-chevron-right" style={{ fontSize: '11px' }} />
+            </button>
           </div>
         </div>
       </div>
 
       {/* ── Room Filter Chips ─────────────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
-        <button onClick={() => setSelectedRoomFilter('all')} style={{ flexShrink: 0, padding: '4px 14px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: '1px solid', transition: 'all 0.15s', background: selectedRoomFilter === 'all' ? 'var(--crimson-500)' : '#fff', borderColor: selectedRoomFilter === 'all' ? 'var(--crimson-500)' : 'var(--border-default)', color: selectedRoomFilter === 'all' ? '#fff' : 'var(--text-secondary)' }}>
-          ทุกห้อง
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '6px',
+        overflowX: 'auto', paddingBottom: '4px',
+        scrollbarWidth: 'none',
+      }}>
+        <button
+          onClick={() => setSelectedRoomFilter('all')}
+          style={{
+            flexShrink: 0, padding: '5px 14px', borderRadius: '20px',
+            fontSize: '11px', fontWeight: 800, cursor: 'pointer',
+            border: selectedRoomFilter === 'all' ? '1px solid var(--crimson-500)' : '1px solid rgba(0,0,0,0.08)',
+            background: selectedRoomFilter === 'all' ? 'var(--crimson-500)' : '#fff',
+            color: selectedRoomFilter === 'all' ? '#fff' : 'var(--text-secondary)',
+            boxShadow: selectedRoomFilter === 'all' ? '0 2px 8px rgba(198,36,25,0.25)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          ทั้งหมด
         </button>
         {ALL_ROOMS.map(r => {
           const isSel = selectedRoomFilter === r
           const rc = ROOM_COLORS[r] || '#64748b'
           return (
-            <button key={r} onClick={() => setSelectedRoomFilter(curr => curr === r ? 'all' : r)} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '5px', padding: '4px 11px', borderRadius: '20px', fontSize: '11px', fontWeight: 700, cursor: 'pointer', border: `1px solid ${isSel ? rc : 'var(--border-default)'}`, background: isSel ? `${rc}12` : '#fff', color: isSel ? rc : 'var(--text-secondary)', transition: 'all 0.15s' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rc, flexShrink: 0 }} />
+            <button
+              key={r}
+              onClick={() => setSelectedRoomFilter(curr => curr === r ? 'all' : r)}
+              style={{
+                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 800,
+                cursor: 'pointer',
+                border: `1px solid ${isSel ? rc : 'rgba(0,0,0,0.08)'}`,
+                background: isSel ? `${rc}18` : '#fff',
+                color: isSel ? rc : 'var(--text-secondary)',
+                boxShadow: isSel ? `0 2px 8px ${rc}30` : 'none',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span style={{
+                width: '7px', height: '7px', borderRadius: '50%',
+                background: rc, flexShrink: 0,
+                boxShadow: isSel ? `0 0 6px ${rc}` : 'none',
+              }} />
               {r}
             </button>
           )
         })}
       </div>
 
-      {/* ── Monthly Grid ─────────────────────────────────────────────── */}
-      <div style={{ borderRadius: '16px', border: '1px solid var(--border-default)', overflow: 'hidden', background: '#fff' }}>
+      {/* ── Monthly Grid Card (Locked Cell Dimensions) ───────────────── */}
+      <div
+        ref={calendarRef}
+        style={{
+          borderRadius: '18px',
+          border: '1px solid rgba(0,0,0,0.08)',
+          overflow: 'hidden',
+          background: '#fff',
+          boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 6px -1px rgba(0,0,0,0.02)',
+        }}
+      >
         {/* Day-of-week header */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
-          {DAY_NAMES_FULL.map((d, i) => (
-            <div key={d} style={{ padding: '10px 4px', textAlign: 'center', fontSize: '11px', fontWeight: 700, color: i === 0 ? 'var(--crimson-500)' : 'var(--text-tertiary)', borderBottom: '1px solid var(--border-default)', background: 'rgba(0,0,0,0.015)', letterSpacing: '0.01em' }}>
-              {d}
-            </div>
-          ))}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(7,1fr)',
+          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
+          borderBottom: '1px solid rgba(0,0,0,0.07)',
+        }}>
+          {DAY_NAMES_FULL.map((d, i) => {
+            const isSun = i === 0
+            const isSat = i === 6
+            const headerColor = isSun ? 'var(--crimson-500)' : isSat ? '#2563eb' : '#475569'
+            return (
+              <div
+                key={d}
+                style={{
+                  padding: '10px 2px', textAlign: 'center',
+                  fontSize: '11px', fontWeight: 800,
+                  color: headerColor,
+                  letterSpacing: '0.02em',
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
+                }}
+              >
+                <span>{d}</span>
+                <span style={{ fontSize: '9px', opacity: 0.65, fontWeight: 700 }}>
+                  {DAY_NAMES[i]}
+                </span>
+              </div>
+            )
+          })}
         </div>
 
-        {/* Calendar cells */}
+        {/* Calendar cells: STRICTLY LOCKED 92px HEIGHT */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
           {cells.map((day, idx) => {
             const col = idx % 7
             const isSun = col === 0
+            const isSat = col === 6
             const isLastCol = col === 6
             const isLastRow = idx >= cells.length - 7
 
-            const borderRight = isLastCol ? 'none' : '1px solid var(--border-default)'
-            const borderBottom = isLastRow ? 'none' : '1px solid var(--border-default)'
+            const borderRight = isLastCol ? 'none' : '1px solid rgba(0,0,0,0.05)'
+            const borderBottom = isLastRow ? 'none' : '1px solid rgba(0,0,0,0.05)'
 
             if (!day) {
               return (
@@ -253,21 +469,67 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
             const isSel = activeDateStr === dateStr
             const isPast = dateStr < todayStr
 
-            const cellBg = isSel ? 'rgba(198,36,25,0.04)' : isToday ? 'rgba(245,158,11,0.04)' : isPast ? 'rgba(0,0,0,0.018)' : '#fff'
-            const numColor = isToday ? '#fff' : isSel ? 'var(--crimson-500)' : isSun ? 'var(--crimson-500)' : isPast ? 'var(--text-tertiary)' : 'var(--text-primary)'
-            const numBg = isToday ? 'var(--crimson-500)' : isSel ? 'rgba(198,36,25,0.1)' : 'transparent'
+            const cellBg = isSel
+              ? 'rgba(198,36,25,0.04)'
+              : isToday
+              ? 'rgba(245,158,11,0.03)'
+              : isPast
+              ? '#fcfcfd'
+              : '#ffffff'
 
             return (
               <div
                 key={day}
                 onClick={() => onDayClick(dateStr)}
-                style={{ height: '110px', overflow: 'hidden', padding: '8px 6px 6px', display: 'flex', flexDirection: 'column', gap: '3px', cursor: 'pointer', background: cellBg, borderRight, borderBottom, transition: 'background 0.12s', position: 'relative' }}
+                style={{ height: '110px', overflow: 'hidden', padding: '8px 6px 6px', display: 'flex', flexDirection: 'column', gap: '3px', cursor: 'pointer', background: cellBg, borderRight, borderBottom, transition: 'background 0.12s', position: 'relative', boxShadow: isSel ? 'inset 0 0 0 2px var(--crimson-500)' : 'none' }}
                 onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0,0,0,0.025)' }}
                 onMouseLeave={e => e.currentTarget.style.background = cellBg}
               >
-                {/* Day number — top right */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '2px' }}>
-                  <span style={{ width: '24px', height: '24px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px', fontWeight: 700, color: numColor, background: numBg, flexShrink: 0 }}>
+                {/* Cell Header: Date Number & Indicator */}
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  marginBottom: '2px', flexShrink: 0,
+                }}>
+                  {/* Left tag if today */}
+                  {isToday ? (
+                    <span style={{
+                      fontSize: '8.5px', fontWeight: 900,
+                      color: 'var(--crimson-500)',
+                      letterSpacing: '0.02em',
+                      textTransform: 'uppercase',
+                    }}>
+                      วันนี้
+                    </span>
+                  ) : dayBookingsSorted.length > 0 ? (
+                    <span style={{
+                      width: '5px', height: '5px', borderRadius: '50%',
+                      background: 'var(--crimson-500)', opacity: 0.8,
+                    }} />
+                  ) : <span />}
+
+                  {/* Day Number badge */}
+                  <span style={{
+                    width: '21px', height: '21px', borderRadius: '50%',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '11.5px', fontWeight: 800, flexShrink: 0,
+                    color: isToday
+                      ? '#fff'
+                      : isSel
+                      ? 'var(--crimson-500)'
+                      : isSun
+                      ? 'var(--crimson-500)'
+                      : isSat
+                      ? '#2563eb'
+                      : isPast
+                      ? '#94a3b8'
+                      : '#1e293b',
+                    background: isToday
+                      ? 'linear-gradient(135deg, var(--crimson-500), #e11d48)'
+                      : isSel
+                      ? 'rgba(198,36,25,0.14)'
+                      : 'transparent',
+                    boxShadow: isToday ? '0 2px 5px rgba(198,36,25,0.35)' : 'none',
+                  }}>
                     {day}
                   </span>
                 </div>
@@ -315,23 +577,107 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
         </div>
       </div>
 
-      {/* ── Selected Day Action Bar ───────────────────────────────────── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', padding: '14px 18px', borderRadius: '14px', background: '#fff', border: '1px solid var(--border-default)' }}>
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: '13px', fontWeight: 800, color: 'var(--text-primary)', marginBottom: '2px' }}>
-            {activeDateStr === todayStr ? 'วันนี้' : fmtDate(activeDateStr)}
+      {/* ── Selected Day Action Bar (Clicking any day shows full details) ─ */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        flexWrap: 'wrap', gap: '14px',
+        padding: '14px 18px', borderRadius: '16px',
+        background: 'linear-gradient(135deg, #ffffff 0%, #fbfbfd 100%)',
+        border: '1px solid rgba(0,0,0,0.08)',
+        boxShadow: '0 4px 16px -2px rgba(0,0,0,0.04)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0, flex: 1 }}>
+          <div style={{
+            width: '38px', height: '38px', borderRadius: '10px',
+            background: activeDateStr === todayStr ? 'rgba(198,36,25,0.1)' : 'rgba(0,0,0,0.04)',
+            color: activeDateStr === todayStr ? 'var(--crimson-500)' : 'var(--text-secondary)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '15px', flexShrink: 0, marginTop: '2px',
+          }}>
+            <i className={activeDateStr === todayStr ? 'fas fa-star' : 'far fa-calendar-check'} />
           </div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-            {selectedDayBookings.length > 0 ? `${selectedDayBookings.length} รอบ — ${selectedDayBookings.map(b => b.room || b.gameName).slice(0,2).join(', ')}${selectedDayBookings.length > 2 ? ' ...' : ''}` : 'ยังไม่มีรอบ — เปิดตี้แรกได้เลย'}
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{
+              fontSize: '14px', fontWeight: 900, color: 'var(--text-primary)',
+              display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+            }}>
+              <span>{activeDateStr === todayStr ? 'วันนี้ · ' + fmtDate(activeDateStr) : fmtDate(activeDateStr)}</span>
+              {selectedDayBookings.length > 0 && (
+                <span style={{ fontSize: '11px', fontWeight: 800, padding: '1px 8px', borderRadius: '20px', background: 'rgba(198,36,25,0.08)', color: 'var(--crimson-500)' }}>
+                  {selectedDayBookings.length} รอบเล่น
+                </span>
+              )}
+            </div>
+
+            {selectedDayBookings.length > 0 ? (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {selectedDayBookings.map(b => {
+                  const rc = ROOM_COLORS[b.room] || '#64748b'
+                  return (
+                    <button
+                      key={b.id}
+                      onClick={() => onEventClick?.(b)}
+                      title={`คลิกเพื่อดูรายละเอียดรอบ ${b.room || ''}`}
+                      style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '6px',
+                        padding: '4px 10px', borderRadius: '8px',
+                        background: `${rc}12`, border: `1px solid ${rc}35`,
+                        cursor: 'pointer', transition: 'all 0.15s ease',
+                        fontFamily: 'Sarabun, sans-serif',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = `${rc}24`
+                        e.currentTarget.style.borderColor = rc
+                        e.currentTarget.style.transform = 'translateY(-1px)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = `${rc}12`
+                        e.currentTarget.style.borderColor = `${rc}35`
+                        e.currentTarget.style.transform = 'translateY(0)'
+                      }}
+                    >
+                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: rc, flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a' }}>{b.room || 'ห้องเล่น'}</span>
+                      {b.status === 'locked' && (
+                        <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                          <i className="fas fa-lock" style={{ fontSize: '8px' }} />ล็อก
+                        </span>
+                      )}
+                      {b.time && <span style={{ fontSize: '10.5px', color: rc, fontWeight: 800 }}>{b.time}</span>}
+                      {b.gameName && <span style={{ fontSize: '10px', color: '#64748b' }}>({b.gameName})</span>}
+                    </button>
+                  )
+                })}
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                ยังไม่มีรอบเล่นในวันนี้ — สามารถเปิดตี้แรกได้เลย
+              </div>
+            )}
           </div>
         </div>
+
         <button
           onClick={() => onBookToday?.(activeDateStr)}
-          style={{ flexShrink: 0, padding: '9px 18px', borderRadius: '10px', background: 'var(--crimson-500)', border: 'none', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '7px', transition: 'background 0.15s, transform 0.1s', whiteSpace: 'nowrap' }}
-          onMouseEnter={e => { e.currentTarget.style.background='var(--crimson-600)'; e.currentTarget.style.transform='translateY(-1px)' }}
-          onMouseLeave={e => { e.currentTarget.style.background='var(--crimson-500)'; e.currentTarget.style.transform='translateY(0)' }}
+          style={{
+            flexShrink: 0, padding: '10px 22px', borderRadius: '12px',
+            background: 'linear-gradient(135deg, var(--crimson-500), #e11d48)',
+            border: 'none', color: '#fff', fontSize: '13px', fontWeight: 800,
+            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
+            boxShadow: '0 4px 14px rgba(198,36,25,0.3)',
+            transition: 'all 0.15s ease', whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.transform = 'translateY(-1px)'
+            e.currentTarget.style.boxShadow = '0 6px 18px rgba(198,36,25,0.4)'
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.transform = 'translateY(0)'
+            e.currentTarget.style.boxShadow = '0 4px 14px rgba(198,36,25,0.3)'
+          }}
         >
-          <i className="fas fa-plus" style={{ fontSize: '10px' }} />จองวันนี้
+          <i className="fas fa-plus" style={{ fontSize: '11px' }} />
+          จองรอบวันนี้
         </button>
       </div>
     </div>
@@ -890,6 +1236,8 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
 // ── Deposit Payment & Slip Modal ──────────────────────────────────────────────
 function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated }) {
   const [promptPayPhone, setPromptPayPhone] = useState('')
+  const [accountName, setAccountName] = useState('')
+  const [bankName, setBankName] = useState('')
   const [step, setStep] = useState('qr') // 'qr' | 'upload' | 'done'
   const [slipFile, setSlipFile] = useState(null)
   const [slipPreview, setSlipPreview] = useState('')
@@ -897,7 +1245,12 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'payment')).then(snap => {
-      if (snap.exists()) setPromptPayPhone(snap.data().promptPayPhone || '')
+      if (snap.exists()) {
+        const d = snap.data()
+        setPromptPayPhone(d.depositPromptPayPhone || d.promptPayPhone || '')
+        setAccountName(d.depositAccountName || d.paymentAccountName || '')
+        setBankName(d.depositBankName || d.paymentBankName || '')
+      }
     })
   }, [])
 
@@ -948,7 +1301,14 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
       let slipCode = null
       try {
         const verifySlip = httpsCallable(appFunctions, 'verifySlip')
-        const result = await verifySlip({ slipUrl, amount, orderId: `booking_${booking.id}`, uid: lineUser.uid, name: lineUser.name })
+        const result = await verifySlip({
+          slipUrl,
+          amount,
+          orderId: `booking_${booking.id}`,
+          uid: lineUser.uid,
+          name: lineUser.name,
+          isDeposit: true,
+        })
         const json = result.data
         slipCode = json?.code || null
         if (json?.success) {
@@ -1106,10 +1466,17 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                     <QRCodeCanvas id="dp-deposit-qr-canvas" value={qrPayload} size={200} bgColor="#ffffff" fgColor={INK} level="M" includeMargin={true} />
                   </div>
                   <div className="text-center">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.4)', marginBottom: 4 }}>PromptPay</p>
-                    <p className="font-black tracking-wider" style={{ fontSize: 16, color: INK, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+                    <span className="inline-block text-[10px] font-black uppercase tracking-[0.16em] px-2.5 py-0.5 rounded-full mb-1.5" style={{ background: `${C}12`, color: C }}>
+                      บัญชีโอนมัดจำ
+                    </span>
+                    <p className="font-black tracking-wider" style={{ fontSize: 17, color: INK, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
                       {promptPayPhone}
                     </p>
+                    {(accountName || bankName) && (
+                      <p className="text-[12px] mt-1 font-medium" style={{ color: 'rgba(26,26,26,0.65)' }}>
+                        {accountName}{bankName ? ` (${bankName})` : ''}
+                      </p>
+                    )}
                   </div>
                   <button
                     type="button"
@@ -1316,9 +1683,11 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
   const [rejectingUid, setRejectingUid] = useState(null)
   const [showDepositPay, setShowDepositPay] = useState(false)
 
-  const isMember = booking.members?.some(m => m.uid === lineUser?.uid)
+  const isMember = booking.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
   const isLeader = booking.leaderId === lineUser?.uid
-  const myMember = booking.members?.find(m => m.uid === lineUser?.uid)
+  const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
+  const isLockedRestricted = booking.status === 'locked' && !isMember && !isLeader && !isAdmin
+  const myMember = booking.members?.find(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
   const myRequest = booking.joinRequests?.some(r => r.uid === lineUser?.uid)
   const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
   const total = booking.members?.length || 0
@@ -1468,6 +1837,71 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
 
   const C = '#c62419'
   const INK = '#1a1a1a'
+
+  if (isLockedRestricted) {
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(26,26,26,0.65)', backdropFilter: 'blur(10px)' }}
+        onClick={e => e.target === e.currentTarget && onClose()}
+      >
+        <div
+          style={{
+            background: '#ffffff',
+            borderRadius: 24,
+            padding: '36px 28px',
+            maxWidth: 420,
+            width: '100%',
+            textAlign: 'center',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+            fontFamily: "'Sarabun', sans-serif",
+            border: '1px solid #e2e8f0',
+          }}
+        >
+          <div style={{
+            width: 60, height: 60, borderRadius: 20,
+            background: 'rgba(198,36,25,0.08)', color: 'var(--crimson-500)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 26, margin: '0 auto 18px',
+            border: '1px solid rgba(198,36,25,0.2)',
+          }}>
+            <i className="fas fa-lock" />
+          </div>
+
+          <span style={{
+            display: 'inline-block',
+            fontSize: 11, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
+            color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.08)',
+            padding: '3px 10px', borderRadius: 20, marginBottom: 12,
+          }}>
+            LOCKED ROOM · ล็อกห้องแล้ว
+          </span>
+
+          <h3 style={{ fontSize: 19, fontWeight: 900, color: '#0f172a', margin: '0 0 10px', letterSpacing: '-0.01em' }}>
+            ห้องนี้ถูกล็อกแล้ว
+          </h3>
+
+          <p style={{ fontSize: 13.5, color: '#64748b', lineHeight: 1.6, margin: '0 0 24px' }}>
+            ตตี้นี้ได้รับการยืนยันและล็อกห้องเรียบร้อยแล้ว เฉพาะ<strong>สมาชิกในตี้</strong> หรือ <strong>แอดมิน</strong> เท่านั้นที่สามารถเข้าดูรายละเอียดได้
+          </p>
+
+          <button
+            onClick={onClose}
+            style={{
+              width: '100%', padding: '12px', borderRadius: 12,
+              background: '#0f172a', color: '#ffffff',
+              fontSize: 13.5, fontWeight: 700, border: 'none',
+              cursor: 'pointer', transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#1e293b' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#0f172a' }}
+          >
+            เข้าใจแล้ว / ปิดหน้าต่าง
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
@@ -1929,9 +2363,19 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
     const bid = params.get('booking')
     if (bid) {
       const found = bookings.find(b => b.id === bid)
-      if (found) setDetailBooking(found)
+      if (found) {
+        const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
+        const isMember = found.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
+        const isLeader = found.leaderId === lineUser?.uid
+        if (found.status === 'locked' && !isAdmin && !isMember && !isLeader) {
+          showToast('ตี้ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
+          window.history.replaceState({}, '', '/booking')
+          return
+        }
+        setDetailBooking(found)
+      }
     }
-  }, [bookings])
+  }, [bookings, lineUser, showToast])
 
   // Keep detail modal updated with Firestore changes
   useEffect(() => {
@@ -1941,7 +2385,17 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
     }
   }, [bookings])
 
-  const openDetail = useCallback((b) => setDetailBooking(b), [])
+  const openDetail = useCallback((b) => {
+    if (!b) return
+    const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
+    const isMember = b.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
+    const isLeader = b.leaderId === lineUser?.uid
+    if (b.status === 'locked' && !isAdmin && !isMember && !isLeader) {
+      showToast('ตี้ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
+      return
+    }
+    setDetailBooking(b)
+  }, [lineUser, showToast])
   const closeDetail = useCallback(() => {
     setDetailBooking(null)
     const params = new URLSearchParams(window.location.search)
@@ -2041,7 +2495,7 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
                 <button onClick={() => handleStartBooking()} style={{ padding: '12px 28px', borderRadius: '12px', background: 'var(--crimson-500)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '8px', transition: 'background 0.15s, transform 0.1s' }}
                   onMouseEnter={e => { e.currentTarget.style.background='var(--crimson-600)'; e.currentTarget.style.transform='translateY(-1px)' }}
                   onMouseLeave={e => { e.currentTarget.style.background='var(--crimson-500)'; e.currentTarget.style.transform='translateY(0)' }}>
-                  <i className="fas fa-plus" style={{ fontSize: '11px' }} />+ จองเกมใหม่
+                  <i className="fas fa-plus" style={{ fontSize: '11px' }} /> จองเกมใหม่
                 </button>
               ) : (
                 <button onClick={onLogin} style={{ padding: '12px 28px', borderRadius: '12px', background: 'var(--line-green)', border: 'none', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '10px', transition: 'opacity 0.15s, transform 0.1s' }}
@@ -2072,7 +2526,7 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
                 <button onClick={() => handleStartBooking()} style={{ fontSize: '12px', fontWeight: 700, color: 'var(--crimson-500)', background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', transition: 'color 0.15s' }}
                   onMouseEnter={e => e.currentTarget.style.color='var(--crimson-600)'}
                   onMouseLeave={e => e.currentTarget.style.color='var(--crimson-500)'}>
-                  <i className="fas fa-plus" style={{ fontSize: '10px' }} />+ สร้างตี้
+                  <i className="fas fa-plus" style={{ fontSize: '10px' }} /> สร้างตี้
                 </button>
               </div>
 

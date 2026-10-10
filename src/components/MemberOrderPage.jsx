@@ -365,7 +365,7 @@ function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembe
   )
 }
 
-function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, lineUser, allMembers, promptPayPhone, memberPayments, onClose, showToast, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, getGroupMemberBill, activeOrder }) {
+function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, lineUser, allMembers, promptPayPhone, paymentAccountName, paymentBankName, memberPayments, onClose, showToast, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, getGroupMemberBill, activeOrder }) {
   const myPayment = memberPayments?.[lineUser.uid]
   const [step, setStep] = useState(() =>
     myPayment?.verified || myPayment?.easyslipPending ? 'done'
@@ -545,6 +545,11 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
                   <QRCodeCanvas id="mo-pay-qr-canvas" value={qrValue} size={220} bgColor="#fff" fgColor="#1a1a1a" level="M" includeMargin={true} />
                 </div>
                 <div className="mo-pay-phone">{promptPayPhone}</div>
+                {(paymentAccountName || paymentBankName) && (
+                  <div style={{ fontSize: '12px', color: '#888888', marginTop: '2px', textAlign: 'center' }}>
+                    {paymentAccountName}{paymentBankName ? ` (${paymentBankName})` : ''}
+                  </div>
+                )}
                 <button className="mo-pay-save-btn" onClick={saveQR}>
                   <i className="fas fa-download" /> บันทึก QR
                 </button>
@@ -614,6 +619,8 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
   const cartRef = useRef(null)
   const [cartHeight, setCartHeight] = useState(0)
   const [promptPayPhone, setPromptPayPhone] = useState('')
+  const [paymentAccountName, setPaymentAccountName] = useState('')
+  const [paymentBankName, setPaymentBankName] = useState('')
   const [showPaySheet, setShowPaySheet] = useState(false)
   const [payForAll, setPayForAll] = useState(false)
   const [showGroupSelect, setShowGroupSelect] = useState(false)
@@ -632,7 +639,12 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'payment')).then(snap => {
-      if (snap.exists()) setPromptPayPhone(snap.data().promptPayPhone || '')
+      if (snap.exists()) {
+        const d = snap.data()
+        setPromptPayPhone(d.promptPayPhone || '')
+        setPaymentAccountName(d.paymentAccountName || '')
+        setPaymentBankName(d.paymentBankName || '')
+      }
     })
   }, [])
 
@@ -1167,6 +1179,8 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
           lineUser={lineUser}
           allMembers={activeOrder.members || []}
           promptPayPhone={promptPayPhone}
+          paymentAccountName={paymentAccountName}
+          paymentBankName={paymentBankName}
           memberPayments={activeOrder.memberPayments || {}}
           paidItems={payForAll ? (activeOrder.foodItems || []) : myHistoryItems}
           onClose={() => { setShowPaySheet(false); setPayGroupMembers([]) }}

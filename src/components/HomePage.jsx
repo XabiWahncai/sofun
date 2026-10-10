@@ -1,7 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useLang } from '../LangContext';
 import { db } from '../firebase';
-import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import Footer from './Footer';
 
 /* ── Design tokens ─────────────────────────────────────── */
@@ -51,11 +51,34 @@ const PLACEHOLDER = Array.from({ length: 12 }, (_, i) => ({
   price: [0,299,399,499,0,349,399,299,0,349,399,0][i],
 }));
 
-export default function HomePage({ allGames = [], allParties = [], showPage, lineUser }) {
+export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser }) {
   const { t } = useLang();
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
+  const [promoSettings, setPromoSettings] = useState(null);
   const revealRoot = useRef(null);
+
+  /* Load Promotion & Spotlight Settings */
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'promotion'), (snap) => {
+      if (snap.exists()) {
+        setPromoSettings(snap.data());
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  /* 3 New Games to display */
+  const newGames = useMemo(() => {
+    if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds) && promoSettings.newGameIds.length > 0) {
+      const mapped = promoSettings.newGameIds
+        .map(id => allGames.find(g => g.id === id))
+        .filter(Boolean);
+      if (mapped.length > 0) return mapped.slice(0, 3);
+    }
+    // Fallback to latest 3 games
+    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 3);
+  }, [promoSettings?.newGameIds, allGames]);
 
   /* hero slideshow */
   useEffect(() => {
@@ -219,6 +242,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
         .mm-steps-grid{display:grid;grid-template-columns:1fr}
         @media(min-width:640px){.mm-steps-grid{grid-template-columns:repeat(3,1fr)}}
 
+        .mm-promo-split{display:grid;grid-template-columns:1fr;gap:24px}
+        @media(min-width:960px){.mm-promo-split{grid-template-columns:1.06fr 0.94fr;gap:28px}}
         .mm-footer-split{display:grid;grid-template-columns:1fr}
         @media(min-width:768px){.mm-footer-split{grid-template-columns:1fr 1fr}}
 
@@ -442,14 +467,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
         <div className="mm-hero-text" style={{ position: 'relative', zIndex: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
 
 
-            {/* Eyebrow */}
-            <div className="mm-r1" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 22 }}>
-              <div style={{ width: 28, height: 2, background: C }} />
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.28em', textTransform: 'uppercase', color: C }}>
-                Script Murder Platform · Thailand
-              </span>
-            </div>
-
             {/* Headline */}
             <h1 className="mm-r2" style={{
               fontFamily: "'Bebas Neue', sans-serif",
@@ -560,10 +577,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
             <div className="mm-reveal-l">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <div style={{ width: 16, height: 2, background: C }} />
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.26em', textTransform: 'uppercase', color: C }}>{t('home','catalogEyebrow')}</span>
-              </div>
               <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,80px)', lineHeight: 0.88, textTransform: 'uppercase', color: '#111', margin: 0 }}>
                 {t('home','catalogHeading')}
               </h2>
@@ -688,12 +701,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
       <section style={{ background: '#060606', color: '#fff', padding: 'clamp(64px,8vw,104px) clamp(24px,5vw,64px)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
 
-          <div className="mm-reveal" style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 56 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.28em', textTransform: 'uppercase', color: C }}>Script Murder</span>
-            <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.06)' }} />
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.28em', textTransform: 'uppercase', color: 'rgba(255,255,255,.22)' }}>{t('home','statsPride')}</span>
-          </div>
-
           <div className="mm-stats-grid">
             {[
               { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
@@ -734,11 +741,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
       ══════════════════════════════════════════ */}
       <section style={{ background: '#0a0a0a', color: '#fff', padding: 'clamp(72px,9vw,120px) clamp(24px,5vw,64px)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-
           <div className="mm-reveal" style={{ marginBottom: 64 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-              <div style={{ width: 20, height: 2, background: C }} />
-              <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.28em', textTransform: 'uppercase', color: C }}>{t('home','howStartEyebrow')}</span>
             </div>
             <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(48px,7vw,96px)', lineHeight: 0.88, textTransform: 'uppercase', color: '#fff', margin: 0 }}>
               {t('home','howStartHeading')}
@@ -837,73 +841,374 @@ export default function HomePage({ allGames = [], allParties = [], showPage, lin
       )}
 
       {/* ══════════════════════════════════════════
-          8. FOOTER
+          8. PROMOTION & NEW GAMES SPOTLIGHT
       ══════════════════════════════════════════ */}
-      <footer style={{ background: '#060606', color: '#fff' }}>
+      {/* ══════════════════════════════════════════
+          8. PROMOTION & NEW GAMES SPOTLIGHT (PRO UX/UI REDESIGN)
+      ══════════════════════════════════════════ */}
+      <section style={{
+        background: 'radial-gradient(ellipse 70% 60% at 20% 30%, rgba(198,36,25,0.08) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 85% 70%, rgba(200,160,80,0.06) 0%, transparent 60%), #07070b',
+        color: '#fff',
+        position: 'relative',
+        overflow: 'hidden',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        borderBottom: '1px solid rgba(255,255,255,0.06)',
+        padding: 'clamp(64px, 8vw, 104px) clamp(20px, 4vw, 48px)',
+      }}>
+        {/* Subtle Ambient Decorative Glows */}
+        <div aria-hidden style={{ position: 'absolute', top: '-10%', left: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(198,36,25,0.12) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
+        <div aria-hidden style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(200,160,80,0.09) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
 
-        <div className="mm-footer-split" style={{ borderBottom: '1px solid rgba(255,255,255,.06)' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          <div className="mm-promo-split">
 
-          {/* Left: big CTA heading */}
-          <div className="mm-reveal" style={{
-            padding: 'clamp(64px,9vw,120px) clamp(32px,5vw,72px)',
-            borderRight: '1px solid rgba(255,255,255,.06)',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            <div aria-hidden style={{ position: 'absolute', bottom: -24, left: -24, fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(80px,14vw,200px)', fontWeight: 900, color: 'transparent', WebkitTextStroke: '1px rgba(198,36,25,.06)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>
-              SOFUN
-            </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-                <div style={{ width: 20, height: 2, background: C }} />
-                <span style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.24em', textTransform: 'uppercase', color: C }}>{t('home','footerReadyEyebrow')}</span>
+            {/* ── LEFT: PROMOTION DOSSIER CARD ── */}
+            <div className="mm-reveal" style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.038) 0%, rgba(255,255,255,0.012) 100%)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderRadius: 24,
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 24px 56px rgba(0,0,0,0.45)',
+              padding: 'clamp(28px, 4vw, 48px)',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}>
+              {/* Subtle top ambient red gradient bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--crimson-500), transparent 70%)' }} />
+
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                {/* Eyebrow Pill */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999,
+                  background: 'rgba(198,36,25,0.12)', border: '1px solid rgba(198,36,25,0.3)',
+                  color: 'var(--crimson-400)', fontSize: 11, fontWeight: 800, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', marginBottom: 18, width: 'fit-content',
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--crimson-500)', boxShadow: '0 0 8px var(--crimson-500)', display: 'inline-block' }} />
+                  <span>PROMOTION · {promoSettings?.month || 'สิทธิพิเศษประจำเดือน'}</span>
+                </div>
+
+                {/* Title */}
+                <h2 style={{
+                  fontFamily: "'Bebas Neue',sans-serif",
+                  fontSize: 'clamp(38px,5vw,62px)',
+                  lineHeight: 0.92,
+                  textTransform: 'uppercase',
+                  color: '#fff',
+                  margin: '0 0 16px 0',
+                  letterSpacing: '-0.01em',
+                }}>
+                  {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
+                </h2>
+
+                {/* Discount Ticket / Voucher Stamp */}
+                {promoSettings?.discountAmount && (
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14,
+                    padding: '14px 18px', background: 'linear-gradient(135deg, rgba(198,36,25,0.16) 0%, rgba(198,36,25,0.05) 100%)',
+                    border: '1px solid rgba(198,36,25,0.32)', borderRadius: 16, marginBottom: 20,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 10, background: 'rgba(198,36,25,0.22)', color: 'var(--crimson-400)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>
+                        <i className="fas fa-ticket-alt" />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+                          สิทธิ์ส่วนลดพิเศษ
+                        </div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', marginTop: 2 }}>
+                          {promoSettings.discountType === 'person' ? 'ลดต่อคนทันทีในรอบเล่น' : 'ส่วนลดรอบเล่นทั้งปาร์ตี้'}
+                        </div>
+                      </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                        <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--crimson-400)' }}>฿</span>
+                        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 36, lineHeight: 1, color: '#fff' }}>
+                          {promoSettings.discountAmount}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: 9.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+                        padding: '4px 10px', borderRadius: 999, background: C, color: '#fff',
+                      }}>
+                        {promoSettings.discountType === 'person' ? 'ลดต่อคน' : 'ลดทั้งตี้'}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Banner Image Frame */}
+                {promoSettings?.bannerUrl && (
+                  <div style={{
+                    borderRadius: 16, overflow: 'hidden', marginBottom: 20,
+                    border: '1px solid rgba(255,255,255,0.12)', aspectRatio: '16/9', maxHeight: 220, background: '#111',
+                    boxShadow: '0 10px 28px rgba(0,0,0,0.4)', position: 'relative',
+                  }}>
+                    <img
+                      src={convertImageUrl(promoSettings.bannerUrl, 800)}
+                      alt={promoSettings?.heading || 'โปรโมชั่น'}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                      onError={e => e.currentTarget.parentElement.style.display = 'none'}
+                    />
+                  </div>
+                )}
+
+                {/* Description */}
+                <p style={{
+                  fontSize: 'clamp(13.5px,1.4vw,15px)', color: 'rgba(255,255,255,0.74)',
+                  lineHeight: 1.75, margin: '0 0 20px 0', maxWidth: '44ch',
+                }}>
+                  {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
+                </p>
+
+                {/* Feature Tags */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 28 }}>
+                  {([promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean).length > 0
+                    ? [promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean)
+                    : ['🎭 สคริปต์ยอดฮิต', '⚡ ส่วนลดพิเศษ', '🔥 จำนวนจำกัด']
+                  ).map((b, i) => (
+                    <span key={i} style={{
+                      fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
+                      padding: '5px 12px', borderRadius: 20,
+                      background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)',
+                      color: 'rgba(255,255,255,0.85)',
+                    }}>
+                      {b}
+                    </span>
+                  ))}
+                </div>
               </div>
-              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(52px,8vw,108px)', lineHeight: 0.86, textTransform: 'uppercase', color: '#fff', margin: 0 }}>
-                {t('home','footerReadyHeading')}
-              </h2>
-            </div>
-          </div>
 
-          {/* Right: crimson */}
-          <div className="mm-reveal-r" style={{
-            background: C, padding: 'clamp(64px,9vw,120px) clamp(32px,5vw,72px)',
-            display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            position: 'relative', overflow: 'hidden',
-          }}>
-            <div aria-hidden style={{ position: 'absolute', bottom: -24, right: -24, fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(80px,14vw,200px)', fontWeight: 900, color: 'transparent', WebkitTextStroke: '1px rgba(255,255,255,.1)', lineHeight: 1, userSelect: 'none', pointerEvents: 'none' }}>
-              CLUB
-            </div>
-            <div style={{ position: 'relative', zIndex: 1 }}>
-              <p style={{ fontSize: 'clamp(15px,1.8vw,20px)', color: 'rgba(255,255,255,.85)', lineHeight: 1.65, marginBottom: 36, maxWidth: '36ch' }}>
-                {t('home','footerDesc')}
-              </p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <button onClick={() => showPage('games')} style={{
-                  background: '#fff', color: '#111', border: 'none', cursor: 'pointer',
-                  fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
-                  fontFamily: "'Sarabun',sans-serif", padding: '18px 40px', borderRadius: 6,
-                  transition: 'background .22s, color .22s', textAlign: 'center',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.background = '#111'; e.currentTarget.style.color = '#fff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = '#fff'; e.currentTarget.style.color = '#111'; }}>
-                  {t('home','startPlaying')}
-                </button>
-                <button onClick={() => showPage('qr')} style={{
-                  background: 'transparent', color: 'rgba(255,255,255,.7)',
-                  border: '1.5px solid rgba(255,255,255,.35)',
-                  cursor: 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
-                  textTransform: 'uppercase', fontFamily: "'Sarabun',sans-serif",
-                  padding: '16px 40px', borderRadius: 6, transition: 'border-color .2s, color .2s',
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#fff'; e.currentTarget.style.color = '#fff'; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,.35)'; e.currentTarget.style.color = 'rgba(255,255,255,.7)'; }}>
-                  {t('home','registerLine')}
+              {/* Action Button */}
+              <div style={{ paddingTop: 8 }}>
+                <button
+                  onClick={() => showPage(promoSettings?.buttonLink || 'booking')}
+                  style={{
+                    background: 'linear-gradient(135deg, var(--crimson-500) 0%, var(--crimson-600) 100%)',
+                    color: '#fff', border: 'none', cursor: 'pointer',
+                    fontSize: 12.5, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase',
+                    fontFamily: "'Sarabun',sans-serif", padding: '16px 36px', borderRadius: 12,
+                    transition: 'all 0.22s ease', textAlign: 'center', width: 'fit-content',
+                    display: 'inline-flex', alignItems: 'center', gap: 10,
+                    boxShadow: '0 8px 24px rgba(198,36,25,0.4)',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px)';
+                    e.currentTarget.style.boxShadow = '0 12px 30px rgba(198,36,25,0.55)';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(198,36,25,0.4)';
+                  }}
+                >
+                  <span>{promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย'}</span>
+                  <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
                 </button>
               </div>
             </div>
+
+            {/* ── RIGHT: NEW GAMES SPOTLIGHT CARD ── */}
+            <div className="mm-reveal-r" style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.038) 0%, rgba(255,255,255,0.012) 100%)',
+              backdropFilter: 'blur(20px)',
+              WebkitBackdropFilter: 'blur(20px)',
+              borderRadius: 24,
+              border: '1px solid rgba(255,255,255,0.08)',
+              boxShadow: '0 24px 56px rgba(0,0,0,0.45)',
+              padding: 'clamp(28px, 4vw, 48px)',
+              position: 'relative',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+            }}>
+              {/* Subtle top ambient gold gradient bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--case-amber), transparent 70%)' }} />
+
+              <div style={{ position: 'relative', zIndex: 1 }}>
+                {/* Eyebrow Pill */}
+                <div style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8, padding: '5px 14px', borderRadius: 999,
+                  background: 'rgba(200,160,80,0.12)', border: '1px solid rgba(200,160,80,0.3)',
+                  color: 'var(--case-amber)', fontSize: 11, fontWeight: 800, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', marginBottom: 18, width: 'fit-content',
+                }}>
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--case-amber)', boxShadow: '0 0 8px var(--case-amber)', display: 'inline-block' }} />
+                  <span>NEW RELEASES · สคริปต์มาใหม่ล่าสุด</span>
+                </div>
+
+                {/* Title */}
+                <h2 style={{
+                  fontFamily: "'Bebas Neue',sans-serif",
+                  fontSize: 'clamp(38px,5vw,62px)',
+                  lineHeight: 0.92,
+                  textTransform: 'uppercase',
+                  color: '#fff',
+                  margin: '0 0 8px 0',
+                  letterSpacing: '-0.01em',
+                }}>
+                  3 คดีใหม่ล่าสุด
+                </h2>
+                <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', margin: '0 0 20px 0', lineHeight: 1.5 }}>
+                  คัดสรรสคริปต์ส่งตรงสู่เลานจ์ พร้อมเปิดแฟ้มสืบสวนทุกสัปดาห์
+                </p>
+
+                {/* 3 Game Dossier Rows */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 24 }}>
+                  {newGames.map((game, idx) => {
+                    const customCover = promoSettings?.customCovers?.[game.id];
+                    const rawImg = customCover || game.image || game.coverUrl;
+                    const imgSrc = rawImg ? convertImageUrl(rawImg, 300) : null;
+                    const displayPrice = game.fullPrice ?? game.price;
+
+                    const diffColors = {
+                      'ง่าย': { bg: 'rgba(34,197,94,0.12)', text: '#4ade80', border: 'rgba(34,197,94,0.25)' },
+                      'ปานกลาง': { bg: 'rgba(59,130,246,0.12)', text: '#60a5fa', border: 'rgba(59,130,246,0.25)' },
+                      'ยาก': { bg: 'rgba(245,158,11,0.12)', text: '#fbbf24', border: 'rgba(245,158,11,0.25)' },
+                      'ยากมาก': { bg: 'rgba(198,36,25,0.16)', text: '#f87171', border: 'rgba(198,36,25,0.3)' },
+                    }[game.difficulty] || { bg: 'rgba(255,255,255,0.08)', text: 'rgba(255,255,255,0.7)', border: 'rgba(255,255,255,0.12)' };
+
+                    return (
+                      <div
+                        key={game.id || idx}
+                        role="button" tabIndex={0}
+                        onClick={() => showDetail ? showDetail(game.id) : showPage('games')}
+                        onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (showDetail ? showDetail(game.id) : showPage('games'))}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px',
+                          borderRadius: 14, background: 'rgba(255,255,255,0.035)',
+                          border: '1px solid rgba(255,255,255,0.08)', cursor: 'pointer',
+                          transition: 'all 0.2s ease', position: 'relative',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+                          e.currentTarget.style.borderColor = 'rgba(198,36,25,0.45)';
+                          e.currentTarget.style.transform = 'translateX(4px)';
+                          e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.35)';
+                          const chev = e.currentTarget.querySelector('.mm-game-chev');
+                          if (chev) { chev.style.background = 'var(--crimson-500)'; chev.style.color = '#fff'; chev.style.transform = 'translateX(2px)'; }
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'rgba(255,255,255,0.035)';
+                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                          e.currentTarget.style.transform = 'translateX(0)';
+                          e.currentTarget.style.boxShadow = 'none';
+                          const chev = e.currentTarget.querySelector('.mm-game-chev');
+                          if (chev) { chev.style.background = 'rgba(255,255,255,0.06)'; chev.style.color = 'rgba(255,255,255,0.45)'; chev.style.transform = 'translateX(0)'; }
+                        }}
+                      >
+                        {/* Cover */}
+                        <div style={{ width: 50, height: 70, borderRadius: 8, overflow: 'hidden', flexShrink: 0, position: 'relative', background: '#111', boxShadow: '0 4px 12px rgba(0,0,0,0.4)' }}>
+                          {imgSrc ? (
+                            <img src={imgSrc} alt={game.title || game.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.2)' }}>
+                              <i className="fas fa-scroll" />
+                            </div>
+                          )}
+                          <span style={{
+                            position: 'absolute', top: 3, left: 3,
+                            background: C, color: '#fff', fontSize: 8, fontWeight: 900,
+                            padding: '2px 5px', borderRadius: 3, letterSpacing: '0.06em',
+                            textTransform: 'uppercase', lineHeight: 1,
+                          }}>
+                            NEW
+                          </span>
+                        </div>
+
+                        {/* Info */}
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{
+                            fontSize: 14.5, fontWeight: 800, color: '#fff',
+                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            lineHeight: 1.3, marginBottom: 6,
+                          }}>
+                            {game.title || game.name}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11.5, color: 'rgba(255,255,255,0.5)' }}>
+                            {game.players && (
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                                <i className="fas fa-users" style={{ fontSize: 9.5, opacity: 0.6 }} />
+                                {game.players} คน
+                              </span>
+                            )}
+                            {game.difficulty && (
+                              <span style={{
+                                padding: '2px 7px', borderRadius: 4, fontSize: 9.5, fontWeight: 800,
+                                textTransform: 'uppercase',
+                                background: diffColors.bg,
+                                color: diffColors.text,
+                                border: `1px solid ${diffColors.border}`,
+                              }}>
+                                {game.difficulty}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Price & Arrow */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+                          {displayPrice !== undefined && (
+                            <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, color: displayPrice === 0 ? AMBER : '#fff', letterSpacing: '0.02em', lineHeight: 1 }}>
+                              {displayPrice === 0 ? 'FREE' : `฿${displayPrice}`}
+                            </div>
+                          )}
+                          <div
+                            className="mm-game-chev"
+                            style={{
+                              width: 30, height: 30, borderRadius: '50%',
+                              background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.45)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 10, transition: 'all 0.2s ease',
+                            }}
+                          >
+                            <i className="fas fa-chevron-right" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* View all games button */}
+              <div style={{ paddingTop: 8 }}>
+                <button
+                  onClick={() => showPage('games')}
+                  style={{
+                    width: '100%',
+                    background: 'rgba(255,255,255,0.04)', color: 'rgba(255,255,255,0.85)',
+                    border: '1.5px solid rgba(255,255,255,0.14)', cursor: 'pointer',
+                    fontSize: 11.5, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+                    fontFamily: "'Sarabun',sans-serif", padding: '15px 24px', borderRadius: 12,
+                    transition: 'all 0.2s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.borderColor = '#fff';
+                    e.currentTarget.style.color = '#111';
+                    e.currentTarget.style.background = '#fff';
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.14)';
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.85)';
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+                  }}
+                >
+                  <span>ดูคลังสคริปต์ทั้งหมด ({allGames.length})</span>
+                  <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
+                </button>
+              </div>
+            </div>
+
           </div>
         </div>
 
-      </footer>
+      </section>
 
       {/* ── Contact / Info Footer ── */}
       <Footer />
