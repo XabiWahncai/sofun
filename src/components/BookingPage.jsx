@@ -85,12 +85,23 @@ const DAY_NAMES = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
 
 function pad2(n) { return String(n).padStart(2, '0') }
 function toDateStr(d) { return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}` }
-function fmtDate(str) {
+export function fmtDate(str) {
   if (!str) return ''
   const [y, m, d] = str.split('-')
   return `${parseInt(d)} ${MONTH_NAMES[parseInt(m) - 1]} ${parseInt(y) + 543}`
 }
-function formatCountdown(isoStr) {
+export function fmtDateTime(isoStr) {
+  if (!isoStr) return ''
+  const d = new Date(isoStr)
+  if (isNaN(d.getTime())) return ''
+  const day = d.getDate()
+  const month = MONTH_NAMES[d.getMonth()]
+  const year = d.getFullYear() + 543
+  const hrs = pad2(d.getHours())
+  const mins = pad2(d.getMinutes())
+  return `${day} ${month} ${year} เวลา ${hrs}:${mins} น.`
+}
+export function formatCountdown(isoStr) {
   if (!isoStr) return ''
   const diff = new Date(isoStr) - new Date()
   if (diff <= 0) return 'หมดเวลา'
@@ -100,6 +111,42 @@ function formatCountdown(isoStr) {
   const mins = Math.floor((diff % 3600000) / 60000)
   if (hrs > 0) return `${hrs}ชม ${mins}น`
   return `${mins}น`
+}
+
+export function calculateDepositDeadline(booking, paidCountOverride) {
+  if (!booking) return ''
+  const confirmedMs = booking.confirmedAt
+    ? new Date(booking.confirmedAt).getTime()
+    : booking.createdAt?.toMillis
+      ? booking.createdAt.toMillis()
+      : booking.createdAt
+        ? new Date(booking.createdAt).getTime()
+        : Date.now()
+
+  const paidCount = paidCountOverride !== undefined
+    ? paidCountOverride
+    : (booking.members?.filter(m => m.paidDeposit).length || 0)
+
+  // 3 days initial window, extends by +3 days per paid member (5 paid = 15 days)
+  const days = Math.max(3, paidCount * 3)
+  const rawDeadlineMs = confirmedMs + (days * 86400000)
+  let targetMs = rawDeadlineMs
+
+  // Cap: cannot exceed 1 day before play date ("และต้องจองก่อนเล่น 1 วัน")
+  if (booking.date) {
+    const playDateStr = `${booking.date}T${booking.time || '12:00'}:00`
+    const playMs = new Date(playDateStr).getTime()
+    if (!isNaN(playMs)) {
+      const capMs = playMs - 24 * 3600000
+      if (capMs > confirmedMs) {
+        targetMs = Math.min(rawDeadlineMs, capMs)
+      } else {
+        targetMs = Math.max(confirmedMs + 3600000, capMs)
+      }
+    }
+  }
+
+  return new Date(targetMs).toISOString()
 }
 
 const toWsrv = (id, w = 400) =>
@@ -688,13 +735,15 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
 function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
   const total = booking.members?.length || 0
+  const max = booking.maxMembers || total || 1
   const isLeader = booking.leaderId === lineUser?.uid
   const pendingRequests = booking.joinRequests?.length || 0
   const imgSrc = booking.gameImage ? convertImg(booking.gameImage, 400) : null
   const countdown = booking.status === 'confirmed' && booking.depositDeadline ? formatCountdown(booking.depositDeadline) : null
   const isUrgent = countdown && new Date(booking.depositDeadline) - new Date() < 24 * 3600000
-  const paidPct = total > 0 ? (paidCount / total) * 100 : 0
-  const allPaid = paidCount === total && total > 0
+  const isLocked = booking.status === 'locked' || (paidCount >= max && max > 0)
+  const allPaid = paidCount >= max
+  const paidPct = (paidCount / max) * 100
   const rc = ROOM_COLORS[booking.room] || '#64748b'
   const isCollapsed = booking.status === 'collapsed'
 
@@ -754,11 +803,13 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-default)' }}>
           <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600 }}>
-              <span>สมาชิก {total}/{booking.maxMembers || '?'}</span>
-              <span style={{ color: allPaid ? '#047857' : 'var(--text-tertiary)' }}>มัดจำ {paidCount}/{total}</span>
+              <span>สมาชิก {total}/{max}</span>
+              <span style={{ color: isLocked || allPaid ? '#047857' : 'var(--text-tertiary)' }}>
+                {isLocked ? 'ล็อกห้องแล้ว' : `มัดจำ ${paidCount}/${max}`}
+              </span>
             </div>
             <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.min(100, Math.max(5, paidPct))}%`, background: allPaid ? '#10b981' : 'var(--crimson-500)', borderRadius: '6px', transition: 'width 0.3s ease-out' }} />
+              <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, paidPct))}%`, background: isLocked || allPaid ? '#10b981' : 'var(--crimson-500)', borderRadius: '6px', transition: 'width 0.3s ease-out' }} />
             </div>
           </div>
 
@@ -821,8 +872,14 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
     !search || g.title?.toLowerCase().includes(search.toLowerCase())
   )
 
+  const tomorrowStr = toDateStr(new Date(Date.now() + 86400000))
+
   const handleSubmit = async () => {
     if (!selectedGame || !selectedDate || !finalTime) return
+    if (selectedDate < tomorrowStr) {
+      showToast('ต้องจองล่วงหน้าก่อนวันเล่นอย่างน้อย 1 วัน', 'error')
+      return
+    }
     if (lockedSlotIds.has(selectedGame.id)) {
       showToast('เกมนี้ถูกล็อกในวันเวลานี้แล้ว — กรุณาเลือกวันหรือเวลาอื่น', 'error')
       return
@@ -946,7 +1003,7 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                 </div>
                 <input
                   type="date"
-                  min={toDateStr(new Date())}
+                  min={tomorrowStr}
                   value={selectedDate}
                   onChange={e => { setSelectedDate(e.target.value); setSelectedTime('') }}
                   className="w-full px-5 text-[15px] font-semibold outline-none transition-all"
@@ -961,6 +1018,10 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
                   onFocus={e => { e.target.style.borderColor = C; e.target.style.boxShadow = `0 0 0 4px ${C}14` }}
                   onBlur={e => { e.target.style.borderColor = selectedDate ? C : 'rgba(26,26,26,0.08)'; e.target.style.boxShadow = 'none' }}
                 />
+                <p className="text-[11.5px] font-medium" style={{ color: 'rgba(26,26,26,0.55)' }}>
+                  <i className="fas fa-calendar-check mr-1.5" style={{ color: C }} />
+                  ระบบกำหนดให้จองล่วงหน้าก่อนวันเล่นอย่างน้อย 1 วัน
+                </p>
                 {selectedDate && activeDateBookings.length > 0 && (
                   <div className="flex items-start gap-3 px-4 py-3 text-[12px]" style={{ background: '#faf7f5', borderRadius: 12 }}>
                     <i className="fas fa-info-circle mt-0.5 shrink-0 text-[13px]" style={{ color: C }} />
@@ -1344,13 +1405,16 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
           : m
       )
       const payload = { members: updatedMembers, updatedAt: serverTimestamp() }
-      // If verified → extend deadline +3 days & lock when full
+      // If verified → extend deadline +3 days per payer (capped at 1 day before play) & lock when full
       if (verified) {
-        const baseMs = Math.max(new Date(data.depositDeadline || 0).getTime(), Date.now())
-        payload.depositDeadline = new Date(baseMs + 3 * 86400000).toISOString()
-        const allPaid = updatedMembers.every(m => m.paidDeposit)
-        const isFull = updatedMembers.length >= (data.maxMembers || 1)
-        if (allPaid && isFull && data.status === 'confirmed') payload.status = 'locked'
+        payload.depositDeadline = calculateDepositDeadline({
+          ...data,
+          members: updatedMembers,
+        })
+        const paidCount = updatedMembers.filter(m => m.paidDeposit).length
+        const maxMembers = data.maxMembers || 6
+        const isFullAndPaid = paidCount >= maxMembers
+        if (isFullAndPaid && data.status === 'confirmed') payload.status = 'locked'
       }
       await updateDoc(ref, payload)
 
@@ -1683,20 +1747,28 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
   const [rejectingUid, setRejectingUid] = useState(null)
   const [showDepositPay, setShowDepositPay] = useState(false)
 
+  const maxMembers = booking.maxMembers || 6
+  const total = booking.members?.length || 0
+  const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
   const isMember = booking.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
   const isLeader = booking.leaderId === lineUser?.uid
   const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
+  const isLocked = booking.status === 'locked' || (paidCount >= maxMembers && maxMembers > 0)
   const isLockedRestricted = booking.status === 'locked' && !isMember && !isLeader && !isAdmin
   const myMember = booking.members?.find(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
   const myRequest = booking.joinRequests?.some(r => r.uid === lineUser?.uid)
-  const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
-  const total = booking.members?.length || 0
   const imgSrc = booking.gameImage ? convertImg(booking.gameImage, 800) : null
   const countdown = booking.status === 'confirmed' && booking.depositDeadline ? formatCountdown(booking.depositDeadline) : null
   const isUrgent = booking.depositDeadline && new Date(booking.depositDeadline) - new Date() < 24 * 3600000
-  const paidPct = total > 0 ? (paidCount / total) * 100 : 0
-  const allPaid = paidCount === total && total > 0
+  const remainingToLock = Math.max(0, maxMembers - paidCount)
+  const paidPct = Math.min(100, Math.round((paidCount / maxMembers) * 100))
   const rc = ROOM_COLORS[booking.room] || '#64748b'
+
+  const addedDays = paidCount * 3
+  const playDateObj = booking.date ? new Date(`${booking.date}T${booking.time || '12:00'}:00`) : null
+  const maxCapDate = playDateObj ? new Date(playDateObj.getTime() - 24 * 3600000) : null
+  const maxCapStr = maxCapDate ? fmtDateTime(maxCapDate.toISOString()) : ''
+  const deadlineStr = booking.depositDeadline ? fmtDateTime(booking.depositDeadline) : ''
 
   const handleRequestJoin = async () => {
     if (!lineUser) { showToast('กรุณาเข้าสู่ระบบก่อน', 'error'); return }
@@ -1882,7 +1954,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
           </h3>
 
           <p style={{ fontSize: 13.5, color: '#64748b', lineHeight: 1.6, margin: '0 0 24px' }}>
-            ตตี้นี้ได้รับการยืนยันและล็อกห้องเรียบร้อยแล้ว เฉพาะ<strong>สมาชิกในตี้</strong> หรือ <strong>แอดมิน</strong> เท่านั้นที่สามารถเข้าดูรายละเอียดได้
+            ปาร์ตี้นี้ได้รับการยืนยันและล็อกห้องเรียบร้อยแล้ว เฉพาะ<strong>สมาชิกในตี้</strong> หรือ <strong>แอดมิน</strong> เท่านั้นที่สามารถเข้าดูรายละเอียดได้
           </p>
 
           <button
@@ -1989,34 +2061,109 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
           {/* ── BODY ── */}
           <div className="overflow-y-auto flex-1 flex flex-col" style={{ gap: 0 }}>
 
-            {/* Countdown / warning */}
-            {countdown && booking.status === 'confirmed' && (
-              <div className={`mt-5 flex items-center gap-3.5 ${isUrgent ? 'animate-pulse' : ''}`}
-                style={{
-                  marginLeft: 28, marginRight: 28,
-                  padding: '16px 18px', borderRadius: 16,
-                  background: isUrgent ? `${C}0c` : '#faf7f5',
-                  border: `1px solid ${isUrgent ? `${C}38` : 'rgba(26,26,26,0.07)'}`,
-                  color: isUrgent ? C : INK,
-                }}>
-                <i className={`fas fa-${isUrgent ? 'exclamation-triangle' : 'clock'} shrink-0`} style={{ fontSize: 15, color: C }} />
-                <div className="min-w-0">
-                  <div className="font-black text-[14px]">ต้องชำระมัดจำภายใน {countdown}</div>
-                  <div className="text-[12px] mt-0.5" style={{ color: 'rgba(26,26,26,0.5)' }}>เมื่อจ่ายครบ ระบบล็อกห้องทันที</div>
+            {/* ── STATUS & LOCK REQUIREMENT BANNERS ── */}
+
+            {/* Case: Locked (Room fully secured 100%) */}
+            {isLocked && (
+              <div className="mt-5 mx-7 p-4 rounded-2xl border" style={{ background: '#f0fdf4', borderColor: '#bbf7d0', color: '#166534' }}>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: '#dcfce7', color: '#15803d' }}>
+                    <i className="fas fa-lock text-base" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-[15px] text-emerald-950">ล็อกห้องสำเร็จแล้ว (สิทธิ์สมบูรณ์ 100%)</span>
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                        ล็อกเรียบร้อย
+                      </span>
+                    </div>
+                    <p className="text-[12.5px] mt-1 text-emerald-800 leading-relaxed font-medium">
+                      สมาชิกชำระมัดจำครบตามจำนวนคนสูงสุดของเกม ({paidCount}/{maxMembers} คน) ระบบทำการล็อกห้อง <strong>{booking.room || 'ที่เลือก'}</strong> วันที่ <strong>{fmtDate(booking.date)}</strong> เวลา <strong>{booking.time} น.</strong> สำหรับตี้ของคุณเรียบร้อยแล้ว
+                    </p>
+                  </div>
                 </div>
               </div>
             )}
 
-            {booking.status === 'collapsed' && (
-              <div className="mt-5 flex items-center justify-between gap-3"
+            {/* Case: Confirmed (Active deposit window - Room NOT yet locked) */}
+            {!isLocked && booking.status === 'confirmed' && (
+              <div className="mt-5 mx-7 rounded-2xl overflow-hidden border"
                 style={{
-                  marginLeft: 28, marginRight: 28,
-                  padding: '14px 18px', borderRadius: 16,
-                  background: `${C}0c`, border: `1px solid ${C}30`, color: C,
-                }}>
-                <div className="flex items-center gap-2.5 text-[13px] font-semibold">
+                  background: '#faf7f5',
+                  borderColor: isUrgent ? `${C}55` : 'rgba(26,26,26,0.1)',
+                }}
+              >
+                {/* Countdown & Deadline bar */}
+                <div className="px-4 py-3 flex items-center justify-between gap-3 border-b"
+                  style={{
+                    background: isUrgent ? `${C}12` : '#ffffff',
+                    borderColor: 'rgba(26,26,26,0.06)',
+                  }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <i className={`fas fa-${isUrgent ? 'exclamation-circle' : 'clock'} shrink-0 text-sm`} style={{ color: C }} />
+                    <div className="min-w-0">
+                      <span className="font-black text-[13.5px]" style={{ color: isUrgent ? C : INK }}>
+                        {countdown ? `ต้องชำระมัดจำภายใน ${countdown}` : 'รอการชำระมัดจำ'}
+                      </span>
+                      {deadlineStr && (
+                        <div className="text-[11px] font-medium" style={{ color: 'rgba(26,26,26,0.5)' }}>
+                          กำหนดสิ้นสุด: {deadlineStr}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0"
+                    style={{ background: `${C}12`, color: C, border: `1px solid ${C}25` }}>
+                    {isUrgent ? 'ใกล้หมดเวลา' : 'เปิดรับมัดจำ'}
+                  </span>
+                </div>
+
+                {/* Main Lock Requirement Notice */}
+                <div className="p-4 flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 mt-0.5"
+                      style={{ background: 'rgba(200,160,80,0.15)', color: '#854d0e', border: '1px solid rgba(200,160,80,0.35)' }}>
+                      <i className="fas fa-door-closed text-sm" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-black text-[14px]" style={{ color: INK }}>
+                        ห้องยังไม่ล็อก — ต้องชำระมัดจำให้ครบ {maxMembers} คน
+                      </div>
+                      <p className="text-[12px] mt-1 leading-relaxed" style={{ color: 'rgba(26,26,26,0.7)' }}>
+                        ระบบจะทำการล็อกห้อง <strong>{booking.room || 'ที่เลือก'}</strong> วันที่ <strong>{fmtDate(booking.date)}</strong> รอบ <strong>{booking.time} น.</strong> ให้ตี้ของคุณอัตโนมัติทันที เมื่อสมาชิกชำระมัดจำครบตามจำนวนคนสูงสุดของเกม (<strong>{paidCount}/{maxMembers} คน</strong>)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* 2 Rules Mini-Cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t" style={{ borderColor: 'rgba(26,26,26,0.06)' }}>
+                    <div className="p-2.5 rounded-xl bg-white border border-black/5 flex items-start gap-2">
+                      <i className="fas fa-calendar-plus text-xs mt-1 shrink-0" style={{ color: C }} />
+                      <div className="text-[11.5px] leading-snug" style={{ color: 'rgba(26,26,26,0.75)' }}>
+                        <strong className="block text-[12px]" style={{ color: INK }}>ขยายเวลาทีละ +3 วัน</strong>
+                        ชำระภายใน 3 วันหลังยืนยัน และเพิ่มทีละ 3 วันตามจำนวนคนที่จ่าย (จ่ายแล้ว {paidCount} คน = ขยาย {addedDays} วัน)
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-white border border-black/5 flex items-start gap-2">
+                      <i className="fas fa-hourglass-end text-xs mt-1 shrink-0" style={{ color: C }} />
+                      <div className="text-[11.5px] leading-snug" style={{ color: 'rgba(26,26,26,0.75)' }}>
+                        <strong className="block text-[12px]" style={{ color: INK }}>เพดานสิ้นสุดก่อนเล่น 1 วัน</strong>
+                        เวลาชำระจะไม่เพิ่มเกินวันเล่นจริง {maxCapDate ? `(เดดไลน์สูงสุดคือ 1 วันก่อนเล่น)` : ''}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Case: Collapsed */}
+            {booking.status === 'collapsed' && (
+              <div className="mt-5 mx-7 p-4 rounded-2xl flex items-center justify-between gap-3"
+                style={{ background: `${C}0c`, border: `1px solid ${C}30`, color: C }}>
+                <div className="flex items-center gap-2.5 text-[13px] font-bold">
                   <i className="fas fa-exclamation-triangle shrink-0" />
-                  <span>หมดเวลาชำระมัดจำ — ปาร์ตี้ล่ม</span>
+                  <span>หมดเวลาชำระมัดจำ — ปาร์ตี้ล่มเนื่องจากชำระไม่ครบตามกำหนดเวลา</span>
                 </div>
                 {isLeader && (
                   <button onClick={handleCloseBooking} disabled={closing}
@@ -2025,6 +2172,21 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                     {closing ? 'กำลังปิด...' : 'ปิดตี้'}
                   </button>
                 )}
+              </div>
+            )}
+
+            {/* Case: Pending Admin Confirmation */}
+            {booking.status === 'pending' && (
+              <div className="mt-5 mx-7 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900">
+                <div className="flex items-start gap-3">
+                  <i className="fas fa-hourglass-half text-amber-600 mt-1" />
+                  <div>
+                    <div className="font-black text-sm">รอแอดมินยืนยันการจองตี้</div>
+                    <div className="text-xs mt-1 text-amber-800">
+                      เมื่อแอดมินยืนยันตี้แล้ว ระบบจะเริ่มนับเวลาชำระมัดจำ 3 วันแรก และเริ่มเปิดรับการชำระมัดจำทันที
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -2064,22 +2226,54 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               </div>
             )}
 
-            {/* Members section */}
+            {/* ── Quota Progress & Members section ── */}
             <div className="flex flex-col" style={{ padding: '24px 28px', gap: 16 }}>
 
-              {/* Header */}
+              {/* Quota Header */}
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.45)' }}>สมาชิก</span>
-                  <span className="text-[11px] font-black" style={{ padding: '3px 10px', borderRadius: 999, background: '#f5f1ef', color: INK }}>{total}/{booking.maxMembers || 6}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.45)' }}>
+                    ความคืบหน้าการล็อกห้อง
+                  </span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[12px] font-bold" style={{ color: allPaid && total > 0 ? C : 'rgba(26,26,26,0.4)' }}>มัดจำ {paidCount}/{total}</span>
-                  {allPaid && total > 0 && <i className="fas fa-check-circle text-xs" style={{ color: C }} />}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-black px-2.5 py-1 rounded-full"
+                    style={{
+                      background: isLocked ? '#dcfce7' : '#f5f1ef',
+                      color: isLocked ? '#15803d' : INK,
+                    }}>
+                    {isLocked ? 'ล็อกห้องแล้ว 100%' : `ยังขาดอีก ${remainingToLock} คน`}
+                  </span>
                 </div>
               </div>
 
-              {/* Avatar overview row */}
+              {/* Progress Bar Container */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between text-[12.5px] font-bold">
+                  <span style={{ color: INK }}>
+                    ชำระมัดจำแล้ว <strong style={{ color: isLocked ? '#15803d' : C }}>{paidCount}</strong> จาก {maxMembers} คน
+                  </span>
+                  <span style={{ color: 'rgba(26,26,26,0.5)' }}>
+                    (สมาชิกเข้าร่วม {total}/{maxMembers} คน)
+                  </span>
+                </div>
+                <div className="h-2 rounded-full overflow-hidden" style={{ background: '#f0ebe9' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-700"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, paidPct))}%`,
+                      background: isLocked ? '#16a34a' : C,
+                      boxShadow: isLocked ? '0 0 10px rgba(22,163,74,0.35)' : `0 0 10px ${C}55`,
+                    }}
+                  />
+                </div>
+                <div className="flex justify-between items-center text-[11px] font-semibold" style={{ color: 'rgba(26,26,26,0.45)' }}>
+                  <span>มัดจำ ฿{booking.depositAmount || 0} / คน</span>
+                  <span>เป้าหมาย {maxMembers} คนเพื่อล็อกห้อง</span>
+                </div>
+              </div>
+
+              {/* Avatar Overview Row */}
               <div className="flex items-center gap-2.5 flex-wrap">
                 {(booking.members || []).map(m => (
                   <div key={m.uid} className="relative shrink-0" title={m.name}
@@ -2089,20 +2283,20 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                     {m.avatar
                       ? <img src={m.avatar} alt={m.name} className="w-11 h-11 rounded-full object-cover"
                           style={m.paidDeposit
-                            ? { outline: `2.5px solid ${C}`, outlineOffset: 2 }
+                            ? { outline: `2.5px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 2 }
                             : m.slipStatus === 'pending_verification'
                               ? { outline: `2.5px solid ${C}45`, outlineOffset: 2 }
                               : { outline: '2px solid rgba(26,26,26,0.08)', outlineOffset: 2 }} />
                       : <div className="w-11 h-11 rounded-full flex items-center justify-center font-black text-sm"
                           style={m.paidDeposit
-                            ? { background: `${C}14`, color: C, outline: `2.5px solid ${C}`, outlineOffset: 2 }
+                            ? { background: `${C}14`, color: C, outline: `2.5px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 2 }
                             : { background: '#f5f1ef', color: 'rgba(26,26,26,0.5)', outline: '2px solid rgba(26,26,26,0.06)', outlineOffset: 2 }}>
                           {(m.name || '?')[0]}
                         </div>
                     }
                     {m.paidDeposit && (
                       <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
-                        style={{ background: C, border: '1.5px solid #ffffff' }}>
+                        style={{ background: isLocked ? '#16a34a' : C, border: '1.5px solid #ffffff' }}>
                         <i className="fas fa-check" style={{ fontSize: 7, color: '#fff' }} />
                       </div>
                     )}
@@ -2114,38 +2308,30 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                     )}
                   </div>
                 ))}
-                {Array.from({ length: Math.max(0, (booking.maxMembers || 0) - total) }).map((_, i) => (
+                {Array.from({ length: Math.max(0, maxMembers - total) }).map((_, i) => (
                   <div key={`ea-${i}`} className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
-                    style={{ border: '1.5px dashed rgba(26,26,26,0.14)', color: 'rgba(26,26,26,0.22)' }}>
+                    style={{ border: '1.5px dashed rgba(26,26,26,0.14)', color: 'rgba(26,26,26,0.22)' }}
+                    title={`ที่ว่าง ${total + i + 1}/${maxMembers}`}
+                  >
                     <i className="fas fa-plus" style={{ fontSize: 10 }} />
                   </div>
                 ))}
               </div>
 
-              {/* Progress bar */}
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: '#f0ebe9' }}>
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, paidPct))}%`,
-                    background: C,
-                    boxShadow: `0 0 10px ${C}55`,
-                  }} />
-              </div>
-
-              {/* Member detail list */}
+              {/* Member Detail List */}
               <div className="flex flex-col gap-2.5">
                 {(booking.members || []).map(m => (
                   <div key={m.uid} className="flex items-center justify-between gap-3"
                     style={{
                       padding: '12px 14px', borderRadius: 16,
-                      background: m.paidDeposit ? `${C}08` : m.slipStatus === 'pending_verification' ? `${C}05` : '#faf7f5',
-                      border: `1px solid ${m.paidDeposit ? `${C}22` : m.slipStatus === 'pending_verification' ? `${C}14` : 'rgba(26,26,26,0.06)'}`,
+                      background: m.paidDeposit ? (isLocked ? '#f0fdf4' : `${C}08`) : m.slipStatus === 'pending_verification' ? `${C}05` : '#faf7f5',
+                      border: `1px solid ${m.paidDeposit ? (isLocked ? '#bbf7d0' : `${C}22`) : m.slipStatus === 'pending_verification' ? `${C}14` : 'rgba(26,26,26,0.06)'}`,
                     }}>
                     <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => openProfile(m.uid)}>
                       <div className="shrink-0">
                         {m.avatar
                           ? <img src={m.avatar} alt="" className="w-10 h-10 rounded-full object-cover"
-                              style={m.paidDeposit ? { outline: `2px solid ${C}`, outlineOffset: 1.5 } : {}} />
+                              style={m.paidDeposit ? { outline: `2px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 1.5 } : {}} />
                           : <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-sm"
                               style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.5)' }}>
                               {(m.name || '?')[0]}
@@ -2168,7 +2354,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                           </div>
                         )}
                         {m.paidDeposit && (
-                          <div className="text-[11px] mt-0.5 font-bold" style={{ color: C }}>
+                          <div className="text-[11px] mt-0.5 font-bold" style={{ color: isLocked ? '#16a34a' : C }}>
                             <i className="fas fa-check-circle mr-1 text-[9px]" />ชำระมัดจำแล้ว
                           </div>
                         )}
@@ -2185,7 +2371,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                       <span className="text-[11px] font-bold"
                         style={{
                           padding: '5px 11px', borderRadius: 999,
-                          background: m.paidDeposit ? C : m.slipStatus === 'pending_verification' ? `${C}0c` : '#ffffff',
+                          background: m.paidDeposit ? (isLocked ? '#16a34a' : C) : m.slipStatus === 'pending_verification' ? `${C}0c` : '#ffffff',
                           color: m.paidDeposit ? '#fff' : m.slipStatus === 'pending_verification' ? C : 'rgba(26,26,26,0.4)',
                           border: m.paidDeposit ? 'none' : `1px solid ${m.slipStatus === 'pending_verification' ? `${C}2c` : 'rgba(26,26,26,0.1)'}`,
                         }}>
@@ -2195,13 +2381,57 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   </div>
                 ))}
 
-                {Array.from({ length: Math.max(0, (booking.maxMembers || 0) - total) }).map((_, i) => (
-                  <div key={`es-${i}`} className="text-center text-[12px] font-medium"
-                    style={{ padding: '14px 12px', borderRadius: 16, background: '#faf7f5', border: '1px dashed rgba(26,26,26,0.1)', color: 'rgba(26,26,26,0.35)' }}>
-                    ที่ว่าง — รอสมาชิกเข้าร่วม
+                {/* Unfilled Slots with Clear Instructions */}
+                {Array.from({ length: Math.max(0, maxMembers - total) }).map((_, i) => (
+                  <div key={`es-${i}`} className="flex items-center justify-between gap-3 text-[12px] font-medium"
+                    style={{
+                      padding: '12px 14px', borderRadius: 16,
+                      background: '#faf7f5', border: '1px dashed rgba(26,26,26,0.12)',
+                      color: 'rgba(26,26,26,0.45)',
+                    }}>
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                        style={{ border: '1.5px dashed rgba(26,26,26,0.2)', color: 'rgba(26,26,26,0.3)' }}>
+                        <i className="fas fa-user-plus text-[10px]" />
+                      </div>
+                      <span>ที่ว่าง ช่องที่ {total + i + 1} จาก {maxMembers}</span>
+                    </div>
+                    <span className="text-[11px] font-bold" style={{ color: 'rgba(26,26,26,0.35)' }}>
+                      รอเข้าร่วมและชำระ
+                    </span>
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* ── Policy & Rules Card ── */}
+            <div style={{ marginLeft: 28, marginRight: 28, marginBottom: 16, padding: '16px 18px', borderRadius: 16, background: '#faf7f5', border: '1px solid rgba(26,26,26,0.08)', fontSize: '12.5px', lineHeight: 1.6, color: 'rgba(26,26,26,0.75)' }}>
+              <div className="font-black text-[11px] uppercase tracking-[0.14em] mb-2 flex items-center gap-1.5" style={{ color: C }}>
+                <i className="fas fa-shield-alt text-[10px]" />
+                กติกาการล็อกห้องและชำระมัดจำ
+              </div>
+              <ul className="flex flex-col gap-1.5 pl-0 m-0 list-none text-[12px]">
+                <li className="flex items-start gap-2">
+                  <span className="font-bold shrink-0" style={{ color: INK }}>1.</span>
+                  <span><strong>การล็อกห้อง:</strong> ระบบจะล็อกห้อง {booking.room ? `"${booking.room}"` : ''} ในวันและเวลาดังกล่าวให้ตี้ของคุณทันที เมื่อมีผู้ชำระมัดจำครบตามจำนวนคนสูงสุดของเกม ({maxMembers} คน)</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold shrink-0" style={{ color: INK }}>2.</span>
+                  <span><strong>กำหนดชำระเริ่มต้น:</strong> ต้องชำระมัดจำภายใน 3 วันหลังจากแอดมินยืนยันการจองตี้</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold shrink-0" style={{ color: INK }}>3.</span>
+                  <span><strong>การขยายเวลาชำระ:</strong> ทุกๆ 1 คนที่ชำระมัดจำสำเร็จ (+1 คน) ระบบจะขยายเวลาชำระมัดจำให้ตี้เพิ่มอีกคนละ +3 วัน</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold shrink-0" style={{ color: INK }}>4.</span>
+                  <span><strong>เพดานวันสิ้นสุด:</strong> เวลาชำระจะไม่เพิ่มเกินวันเล่นจริง โดยต้องชำระเสร็จสิ้นก่อนวันเล่นอย่างน้อย 1 วัน</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="font-bold shrink-0" style={{ color: INK }}>5.</span>
+                  <span><strong>การจองล่วงหน้า:</strong> ระบบเปิดให้จองรอบเกมล่วงหน้าก่อนวันเล่นอย่างน้อย 1 วัน</span>
+                </li>
+              </ul>
             </div>
 
             {/* Admin note */}
@@ -2240,18 +2470,36 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 </div>
               )}
 
-              {/* Pay deposit */}
+              {/* Pay deposit button */}
               {isMember && booking.status === 'confirmed' && !myMember?.paidDeposit && myMember?.slipStatus !== 'pending_verification' && (
-                <button onClick={() => setShowDepositPay(true)}
-                  className="w-full font-black flex items-center justify-center gap-3 transition-all"
-                  style={{
-                    padding: '18px 20px', borderRadius: 16, fontSize: 15, letterSpacing: '0.01em',
-                    background: C, color: '#fff',
-                    boxShadow: `0 10px 28px ${C}3f`,
-                  }}>
-                  <i className="fas fa-qrcode text-base" />
-                  <span>จ่ายมัดจำ ฿{booking.depositAmount} / แนบสลิป</span>
-                </button>
+                <div className="flex flex-col gap-1.5">
+                  <button onClick={() => setShowDepositPay(true)}
+                    className="w-full font-black flex items-center justify-center gap-3 transition-all"
+                    style={{
+                      padding: '18px 20px', borderRadius: 16, fontSize: 15, letterSpacing: '0.01em',
+                      background: C, color: '#fff',
+                      boxShadow: `0 10px 28px ${C}3f`,
+                    }}>
+                    <i className="fas fa-qrcode text-base" />
+                    <span>จ่ายมัดจำ ฿{booking.depositAmount} / แนบสลิป</span>
+                  </button>
+                  <div className="text-[11px] text-center font-medium" style={{ color: 'rgba(26,26,26,0.5)' }}>
+                    ชำระแล้วจะช่วยขยายเวลาให้ตี้ +3 วัน และเมื่อครบ {maxMembers} คน ระบบจะล็อกห้องทันที
+                  </div>
+                </div>
+              )}
+
+              {/* Already paid deposit confirmation */}
+              {isMember && myMember?.paidDeposit && (
+                <div className="flex items-center justify-center gap-2 p-3.5 rounded-2xl"
+                  style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#15803d' }}>
+                  <i className="fas fa-check-circle" />
+                  <span className="text-[13px] font-black">
+                    {isLocked
+                      ? 'คุณชำระมัดจำแล้ว — ล็อกห้องเรียบร้อย 100%'
+                      : `คุณชำระมัดจำแล้ว (รอเพื่อนในตี้อีก ${remainingToLock} คนเพื่อล็อกห้อง)`}
+                  </span>
+                </div>
               )}
 
               {/* Slip submitted */}
@@ -2278,7 +2526,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   onMouseLeave={e => e.currentTarget.style.background = '#f5f1ef'}
                 >
                   <i className={`fas fa-${copied ? 'check' : 'share-alt'}`} />
-                  <span>{copied ? 'คัดลอกแล้ว' : 'แชร์ชวนเพื่อน'}</span>
+                  <span>{copied ? 'คัดลอกแล้ว' : `แชร์ชวนเพื่อน (${total}/${maxMembers})`}</span>
                 </button>
 
                 {isMember && !isLeader && (
@@ -2341,7 +2589,7 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
       const all = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       setBookings(all)
       setLoading(false)
-      // Auto-collapse check for expired confirmed bookings
+      // Auto-collapse check for expired confirmed bookings & auto-lock when maxMembers paid
       all.forEach(async b => {
         if (b.status === 'confirmed' && b.depositDeadline && new Date() > new Date(b.depositDeadline)) {
           try {
@@ -2350,6 +2598,17 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
               updatedAt: serverTimestamp()
             })
           } catch {}
+        } else if (b.status === 'confirmed') {
+          const max = b.maxMembers || 6
+          const paidCount = b.members?.filter(m => m.paidDeposit).length || 0
+          if (max > 0 && paidCount >= max) {
+            try {
+              await updateDoc(doc(db, 'bookings', b.id), {
+                status: 'locked',
+                updatedAt: serverTimestamp()
+              })
+            } catch {}
+          }
         }
       })
     }, () => setLoading(false))

@@ -12,6 +12,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
+import { calculateDepositDeadline } from './BookingPage'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
@@ -6603,12 +6604,19 @@ function ConfirmBookingModal({ booking, adminUser, onClose, showToast }) {
     if (!room) { showToast('กรุณาเลือกห้อง', 'error'); return }
     setSaving(true)
     try {
+      const baseConfirmedAt = new Date().toISOString()
+      const newDeadline = calculateDepositDeadline({
+        ...booking,
+        room,
+        confirmedAt: baseConfirmedAt,
+        members: booking.members || [],
+      })
       await updateDoc(doc(db, 'bookings', booking.id), {
         status: 'confirmed',
         room,
         adminNote,
-        depositDeadline: new Date(Date.now() + 3 * 86400000).toISOString(),
-        confirmedAt: new Date().toISOString(),
+        depositDeadline: newDeadline,
+        confirmedAt: baseConfirmedAt,
         confirmedBy: adminUser?.name || adminUser?.email || 'admin',
         updatedAt: serverTimestamp(),
       })
@@ -7535,19 +7543,21 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
           ? { ...m, paidDeposit: true, paidAt: new Date().toISOString(), slipStatus: 'verified' }
           : m
       )
-      const allPaid = updatedMembers.every(m => m.paidDeposit)
-      const isFull = updatedMembers.length >= (data.maxMembers || 1)
-      // Extend deadline by +3 days from max(current, now)
-      const baseMs = Math.max(new Date(data.depositDeadline || 0).getTime(), Date.now())
-      const newDeadline = new Date(baseMs + 3 * 86400000).toISOString()
+      const paidCount = updatedMembers.filter(m => m.paidDeposit).length
+      const maxMembers = data.maxMembers || 6
+      const isFullAndPaid = paidCount >= maxMembers
+      const newDeadline = calculateDepositDeadline({
+        ...data,
+        members: updatedMembers,
+      })
       const payload = {
         members: updatedMembers,
         depositDeadline: newDeadline,
         updatedAt: serverTimestamp(),
       }
-      if (allPaid && isFull && data.status === 'confirmed') payload.status = 'locked'
+      if (isFullAndPaid && data.status === 'confirmed') payload.status = 'locked'
       await updateDoc(ref, payload)
-      showToast(allPaid && isFull ? 'ครบแล้ว — ล็อกห้องอัตโนมัติ' : 'ยืนยันสลิปสำเร็จ · ขยายเดดไลน์ +3 วัน')
+      showToast(isFullAndPaid ? 'ครบแล้ว — ล็อกห้องอัตโนมัติ' : 'ยืนยันสลิปสำเร็จ · ปรับเดดไลน์ตามเงื่อนไข')
     } catch (e) { showToast('เกิดข้อผิดพลาด: ' + e.message, 'error') }
   }
 
