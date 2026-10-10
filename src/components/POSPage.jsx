@@ -17,6 +17,7 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
   const [result, setResult] = useState(null)
   const scannerRef = useRef(null)
   const startedRef = useRef(false)
+  const manualVerifiedRef = useRef(false)
 
   useEffect(() => () => {
     if (scannerRef.current) scannerRef.current.stop().catch(() => {})
@@ -42,11 +43,13 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
         body: JSON.stringify(body),
       })
       const json = await res.json()
+      if (manualVerifiedRef.current) return // Admin already manually verified
       if (json.success) {
         const slip = json.data?.rawSlip || {}
         await updateDoc(doc(db, 'orders', orderId), {
           [`memberPayments.${member.uid}.verified`]: true,
           [`memberPayments.${member.uid}.pendingAdminReview`]: false,
+          [`memberPayments.${member.uid}.easyslipPending`]: false,
           [`memberPayments.${member.uid}.verifiedAt`]: new Date().toISOString(),
           [`memberPayments.${member.uid}.transRef`]: slip.transRef || '',
           [`memberPayments.${member.uid}.bank`]: slip.sender?.bank?.short || '',
@@ -68,7 +71,9 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
         setResult({ ok: false, msg: msgs[code] || `EasySlip: ${code}` })
       }
     } catch (e) {
-      setResult({ ok: false, msg: 'เชื่อมต่อ EasySlip ล้มเหลว: ' + (e.message || e) })
+      if (!manualVerifiedRef.current) {
+        setResult({ ok: false, msg: 'เชื่อมต่อ EasySlip ล้มเหลว: ' + (e.message || e) })
+      }
     } finally {
       setVerifying(false)
     }
@@ -76,15 +81,18 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
 
   const manualVerify = async () => {
     if (!window.confirm(`ยืนยันสลิปของ ${member.name} ด้วยตนเอง?`)) return
+    manualVerifiedRef.current = true
+    setVerifying(false)
     setManualVerifying(true)
     try {
       await updateDoc(doc(db, 'orders', orderId), {
         [`memberPayments.${member.uid}.verified`]: true,
         [`memberPayments.${member.uid}.pendingAdminReview`]: false,
+        [`memberPayments.${member.uid}.easyslipPending`]: false,
         [`memberPayments.${member.uid}.verifiedAt`]: new Date().toISOString(),
         [`memberPayments.${member.uid}.manualVerify`]: true,
       })
-      setResult({ ok: true, msg: 'ยืนยันสลิปด้วยตนเองสำเร็จ ✓' })
+      setResult({ ok: true, msg: 'ยืนยันสลิปด้วยตนเองสำเร็จ (Admin อนุมัติ) ✓' })
       showToast(`${member.name} จ่ายแล้ว ✓`)
       onVerified(member.uid)
     } catch (e) {
@@ -132,6 +140,12 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
           <div className="slip-verify-amount">ยอดที่ควรโอน: <strong>฿{Number(payment.amount).toLocaleString()}</strong></div>
         )}
 
+        {payment?.easyslipPending && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="fas fa-hourglass-half" /> กำลังรอตรวจ EasySlip / ธนาคาร — หากเช็คนานหรือติดขัด Admin กดยืนยันเองได้ทันที
+          </div>
+        )}
+
         {payment?.slipUrl && (
           <div className="slip-verify-img-wrap">
             <img src={payment.slipUrl} alt="สลิป" className="slip-verify-img" />
@@ -152,8 +166,13 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
         )}
 
         {verifying && (
-          <div className="slip-verify-loading">
-            <i className="fas fa-spinner fa-spin" /> กำลังตรวจสอบกับ EasySlip...
+          <div className="slip-verify-loading" style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', padding: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a1a1a', fontWeight: 600 }}>
+              <i className="fas fa-spinner fa-spin" /> กำลังตรวจสอบกับ EasySlip...
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>
+              หากเช็คนานหรือเกิด Error แอดมินสามารถกดยืนยันสลิปเองได้ทันทีด้านล่าง
+            </div>
           </div>
         )}
 
@@ -163,30 +182,51 @@ function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, 
           </div>
         )}
 
-        <div className="slip-verify-actions">
+        <div className="slip-verify-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Admin manual verify button — ALWAYS accessible while not verified yet */}
+          {!result?.ok && !manualVerifying && (
+            <button
+              type="button"
+              className="pos-confirm-btn"
+              style={{ width: '100%', padding: '12px', fontSize: 13, background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
+              onClick={manualVerify}
+            >
+              <i className="fas fa-check-circle" /> ยืนยันสลิปด้วยตนเอง (Admin อนุมัติ)
+            </button>
+          )}
+
           {!scanning && !verifying && !manualVerifying && !result?.ok && (
-            <>
-              <button className="pos-pay-btn" style={{ flex: 1 }} onClick={startScanner}>
-                <i className="fas fa-camera" /> สแกน QR
+            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+              <button type="button" className="pos-pay-btn" style={{ flex: 1 }} onClick={startScanner}>
+                <i className="fas fa-camera" /> สแกน QR บนสลิป
               </button>
-              {payment?.slipUrl && (
-                <button className="pos-confirm-btn" style={{ flex: 1 }} onClick={manualVerify}>
-                  <i className="fas fa-check-circle" /> ยืนยันสลิป
+              {payment?.easyslipPayload && (
+                <button
+                  type="button"
+                  className="pos-pay-btn"
+                  style={{ flex: 1, background: '#f59e0b', borderColor: '#d97706', color: '#fff' }}
+                  onClick={() => verifyPayload(payment.easyslipPayload)}
+                >
+                  <i className="fas fa-redo" /> ตรวจ EasySlip ซ้ำ
                 </button>
               )}
-            </>
-          )}
-          {manualVerifying && (
-            <div className="slip-verify-loading">
-              <i className="fas fa-spinner fa-spin" /> กำลังบันทึก...
             </div>
           )}
+
+          {manualVerifying && (
+            <div className="slip-verify-loading">
+              <i className="fas fa-spinner fa-spin" /> กำลังบันทึกการยืนยัน...
+            </div>
+          )}
+
           {result?.ok ? (
-            <button className="pos-confirm-btn" style={{ flex: 1 }} onClick={() => { stopScanner(); onClose() }}>
+            <button type="button" className="pos-confirm-btn" style={{ width: '100%' }} onClick={() => { stopScanner(); onClose() }}>
               <i className="fas fa-check" /> ปิด
             </button>
           ) : (
-            <button className="pos-cancel-btn" style={{ flex: 1 }} onClick={() => { stopScanner(); onClose() }}>ปิด</button>
+            <button type="button" className="pos-cancel-btn" style={{ width: '100%' }} onClick={() => { stopScanner(); onClose() }}>
+              ปิด
+            </button>
           )}
         </div>
       </div>
@@ -881,6 +921,25 @@ export default function POSPage({
       showToast(`รับชำระรวม ${selectedUids.length} คน ✓`)
     } catch (e) { showToast('บันทึกล้มเหลว: ' + e.message, 'error') }
     finally { setGroupPaySaving(false) }
+  }
+
+  const confirmZeroMember = async (m) => {
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) { showToast('กรุณายืนยันออเดอร์ก่อน', 'error'); return }
+    if (!window.confirm(`ยืนยันยอด ฿0 ของ ${m.name} โดยไม่ต้องใช้สลิป?`)) return
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        [`memberPayments.${m.uid}.verified`]: true,
+        [`memberPayments.${m.uid}.amount`]: 0,
+        [`memberPayments.${m.uid}.zeroAmount`]: true,
+        [`memberPayments.${m.uid}.verifiedAt`]: new Date().toISOString(),
+        [`memberPayments.${m.uid}.pendingAdminReview`]: false,
+        [`memberPayments.${m.uid}.easyslipPending`]: false,
+      })
+      showToast(`${m.name} ยืนยันยอด ฿0 เรียบร้อย ✓`)
+    } catch (e) {
+      showToast('บันทึกล้มเหลว: ' + e.message, 'error')
+    }
   }
 
   const assignBillOwner = async (key, member) => {
@@ -2030,19 +2089,37 @@ export default function POSPage({
                             <i className="fas fa-circle-exclamation" style={{ fontSize: 8 }} /> ราคาเต็ม ฿{fmtCurrency(gameFullPrice)}
                           </span>
                         )}
-                        {memberPayments[m.uid]?.easyslipPending && (
-                          <span className="pos-member-pending-badge" title="รอ Bangkok Bank ยืนยันอัตโนมัติ">
-                            <i className="fas fa-hourglass-half" /> รอ BK
+                        {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.easyslipPending && (
+                          <span
+                            className="pos-member-pending-badge"
+                            onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
+                            title="EasySlip กำลังตรวจ — คลิกดูสลิป / แอดมินยืนยันเอง"
+                            role="button"
+                            style={{ cursor: 'pointer', background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309' }}
+                          >
+                            <i className="fas fa-hourglass-half" /> รอตรวจ EasySlip
                           </span>
                         )}
-                        {memberPayments[m.uid]?.pendingAdminReview && (
+                        {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.pendingAdminReview && (
                           <span
                             className="pos-member-slip-badge"
                             onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
-                            title="คลิกตรวจสลิป EasySlip"
+                            title="สลิปรอแอดมินยืนยัน — คลิกเพื่อตรวจหรืออนุมัติ"
                             role="button"
+                            style={{ cursor: 'pointer' }}
                           >
                             <i className="fas fa-camera" /> ตรวจสลิป
+                          </span>
+                        )}
+                        {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.slipUrl && !memberPayments[m.uid]?.pendingAdminReview && !memberPayments[m.uid]?.easyslipPending && (
+                          <span
+                            className="pos-member-slip-badge"
+                            onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
+                            title="มีสลิป — คลิกตรวจสลิป"
+                            role="button"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-receipt" /> ดูสลิป
                           </span>
                         )}
                       </div>
@@ -2207,6 +2284,91 @@ export default function POSPage({
                             <i className="fas fa-circle-exclamation" /> ยังไม่ได้จ่ายมัดจำ (คิดราคาเต็ม ฿{fmtCurrency(gameFullPrice)})
                           </div>
                         )
+                      )}
+
+                      {/* Slip preview & manual approve section if slip submitted or pending */}
+                      {!memberPayments[m.uid]?.verified && (memberPayments[m.uid]?.slipUrl || memberPayments[m.uid]?.pendingAdminReview || memberPayments[m.uid]?.easyslipPending) && (
+                        <div style={{
+                          background: '#fffbeb',
+                          border: '1.5px solid #fde68a',
+                          borderRadius: 10,
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                            {memberPayments[m.uid]?.slipUrl ? (
+                              <a href={memberPayments[m.uid].slipUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
+                                <img
+                                  src={memberPayments[m.uid].slipUrl}
+                                  alt="สลิป"
+                                  style={{ width: 38, height: 38, objectFit: 'cover', borderRadius: 8, border: '1px solid rgba(0,0,0,0.12)', flexShrink: 0 }}
+                                />
+                              </a>
+                            ) : (
+                              <div style={{ width: 38, height: 38, borderRadius: 8, background: 'rgba(180,83,9,0.1)', color: '#b45309', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <i className="fas fa-receipt" />
+                              </div>
+                            )}
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                {memberPayments[m.uid]?.easyslipPending ? 'EasySlip กำลังตรวจ (รอนาน/เกิด error ยืนยันเองได้)' : 'ส่งสลิปแล้ว (รอแอดมินยืนยัน)'}
+                              </div>
+                              <div style={{ fontSize: 11, color: '#b45309' }}>
+                                ยอดในสลิป: ฿{fmtCurrency(memberPayments[m.uid]?.amount || bill)}
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setSlipVerifyMember(m)}
+                            style={{
+                              padding: '8px 12px',
+                              borderRadius: 8,
+                              background: '#c62419',
+                              color: '#fff',
+                              border: 'none',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              flexShrink: 0,
+                              fontFamily: "'Sarabun', sans-serif",
+                            }}
+                          >
+                            <i className="fas fa-check-circle" /> ตรวจ/ยืนยันสลิป
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Zero-baht quick confirm button if bill is 0 and not yet verified */}
+                      {bill <= 0 && !memberPayments[m.uid]?.verified && activeSession.confirmedOrderId && (
+                        <button
+                          type="button"
+                          onClick={() => confirmZeroMember(m)}
+                          style={{
+                            padding: '9px 12px',
+                            borderRadius: 10,
+                            background: 'rgba(22,163,74,0.1)',
+                            border: '1.5px solid #16a34a',
+                            color: '#16a34a',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            fontFamily: "'Sarabun', sans-serif",
+                            transition: 'all 0.14s',
+                          }}
+                        >
+                          <i className="fas fa-check-circle" /> ยืนยันยอด ฿0 (ไม่ต้องใช้สลิป)
+                        </button>
                       )}
 
                       {/* Remove member */}

@@ -153,7 +153,7 @@ function EvaluationCard({ order, lineUser, showToast, isCompact = false }) {
         }
       })
 
-      showToast('ขอบคุณสำหรับแบบประเมินความพึงพอใจ! ⭐')
+      showToast('ขอบคุณสำหรับแบบประเมินความพึงพอใจ!')
       setEditing(false)
     } catch (err) {
       console.error('Submit evaluation error:', err)
@@ -373,13 +373,64 @@ function MemberReceipt({ payment, amount, paidItems, scriptTitle, room, numMembe
 
 function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, lineUser, allMembers, promptPayPhone, paymentAccountName, paymentBankName, memberPayments, onClose, showToast, paidItems, scriptTitle, room, numMembers, createdAt, myGameFee, getGroupMemberBill, activeOrder }) {
   const myPayment = memberPayments?.[lineUser.uid]
+  const isZeroAmount = Number(amount) <= 0
   const [step, setStep] = useState(() =>
     myPayment?.verified || myPayment?.easyslipPending ? 'done'
     : myPayment?.pendingAdminReview ? 'slip'
+    : isZeroAmount ? 'zero'
     : 'qr'
   )
   const [loadMsg, setLoadMsg] = useState('')
+  const [zeroSubmitting, setZeroSubmitting] = useState(false)
   const qrValue = promptPayPhone ? buildPromptPayQR(promptPayPhone, amount) : ''
+
+  const handleZeroConfirm = async () => {
+    setZeroSubmitting(true)
+    try {
+      const entry = {
+        paidAt: new Date().toISOString(),
+        amount: 0,
+        verified: true,
+        zeroAmount: true,
+        pendingAdminReview: false,
+        easyslipPending: false,
+        name: lineUser.name,
+      }
+      const updates = {}
+      if (forAll) {
+        allMembers.forEach(m => {
+          updates[`memberPayments.${m.uid}`] = {
+            ...entry,
+            name: m.name,
+            amount: 0,
+            forAll: true,
+            paidByProxy: m.uid === lineUser.uid ? null : lineUser.uid,
+          }
+        })
+      } else if (forGroup && groupMembers.length >= 2) {
+        const groupUids = groupMembers.map(m => m.uid)
+        groupMembers.forEach(m => {
+          updates[`memberPayments.${m.uid}`] = {
+            ...entry,
+            name: m.name,
+            amount: 0,
+            groupPay: true,
+            groupWith: groupUids.filter(u => u !== m.uid),
+            paidByProxy: m.uid === lineUser.uid ? null : lineUser.uid,
+          }
+        })
+      } else {
+        updates[`memberPayments.${lineUser.uid}`] = entry
+      }
+      await updateDoc(doc(db, 'orders', orderId), updates)
+      showToast('ยืนยันชำระยอด ฿0 เรียบร้อย ✓')
+      setStep('done')
+    } catch (err) {
+      showToast(err?.message || 'ยืนยันไม่สำเร็จ', 'error')
+    } finally {
+      setZeroSubmitting(false)
+    }
+  }
 
   const saveQR = () => {
     const canvas = document.getElementById('mo-pay-qr-canvas')
@@ -480,8 +531,8 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
         <div className="mo-bill-handle" />
         <div className="mo-bill-header">
           <span className="mo-bill-title">
-            <i className={`fas fa-${step === 'done' ? (myPayment?.verified ? 'check-circle' : myPayment?.easyslipPending ? 'hourglass-half' : 'clock') : 'qrcode'}`} />
-            {' '}{step === 'done' ? (myPayment?.verified ? 'ชำระเงินแล้ว' : myPayment?.easyslipPending ? 'รอยืนยันธนาคาร' : 'ส่งสลิปแล้ว') : forAll ? 'จ่ายทั้งตี้' : forGroup ? `จ่ายรวม ${groupMembers.length} คน` : 'จ่ายของฉัน'}
+            <i className={`fas fa-${step === 'done' ? (myPayment?.verified ? 'check-circle' : myPayment?.easyslipPending ? 'hourglass-half' : 'clock') : isZeroAmount || step === 'zero' ? 'check-circle' : 'qrcode'}`} />
+            {' '}{step === 'done' ? (myPayment?.verified ? 'ชำระเงินแล้ว' : myPayment?.easyslipPending ? 'รอยืนยันธนาคาร' : 'ส่งสลิปแล้ว') : isZeroAmount || step === 'zero' ? 'ยอดชำระ ฿0' : forAll ? 'จ่ายทั้งตี้' : forGroup ? `จ่ายรวม ${groupMembers.length} คน` : 'จ่ายของฉัน'}
           </span>
           <button className="modal-close" onClick={onClose}><i className="fas fa-times" /></button>
         </div>
@@ -521,6 +572,37 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
             <button className="mo-pay-verify-btn" style={{ marginTop: 8, background: 'transparent', border: '1px solid #555555', color: '#555555' }} onClick={onClose}>ปิด</button>
           </div>
           )
+        ) : (isZeroAmount || step === 'zero') ? (
+          <div className="mo-pay-section" style={{ textAlign: 'center', padding: '24px 16px' }}>
+            <div style={{
+              width: 60, height: 60, borderRadius: '50%',
+              background: 'rgba(22,163,74,0.1)', color: '#16a34a',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 26, margin: '0 auto 14px'
+            }}>
+              <i className="fas fa-check-circle" />
+            </div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 4 }}>
+              ยอดชำระ
+            </div>
+            <div className="mo-pay-amount" style={{ color: '#16a34a', fontSize: 32, marginBottom: 8 }}>
+              ฿0
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--text-secondary)', lineHeight: 1.6, maxWidth: 300, margin: '0 auto 20px' }}>
+              ยอดบิลของคุณเป็น 0 บาท ไม่ต้องโอนเงินและไม่ต้องส่งสลิป สามารถกดยืนยันชำระเงินได้ทันที
+            </div>
+            <button
+              className="mo-pay-verify-btn"
+              style={{ background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
+              onClick={handleZeroConfirm}
+              disabled={zeroSubmitting}
+            >
+              {zeroSubmitting
+                ? <><i className="fas fa-spinner fa-spin" /> กำลังยืนยัน...</>
+                : <><i className="fas fa-check" /> ยืนยันยอด ฿0 ได้เลย</>
+              }
+            </button>
+          </div>
         ) : step === 'slip' ? (
           <div className="mo-pay-section">
             <div className="mo-pay-step-nav">
@@ -821,6 +903,40 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const tableTotalDiscount = nDisc > 0 ? (dMode === 'split' ? rawD : rawD * nDisc) : 0
   const tablePersonalDiscounts = (activeOrder.members || []).reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const tableTotal = Math.max(0, tableConfirmedTotal + tablePendingTotal + tableGameTotal - tableTotalDiscount - tablePersonalDiscounts)
+
+  const handleZeroPayment = async (forAllFlag = false) => {
+    if (!window.confirm(forAllFlag ? 'ยอดรวมทั้งตี้ ฿0 ยืนยันชำระโดยไม่ต้องส่งสลิป?' : 'ยอดชำระของคุณ ฿0 ยืนยันชำระโดยไม่ต้องส่งสลิป?')) return
+    try {
+      const entry = {
+        paidAt: new Date().toISOString(),
+        amount: 0,
+        verified: true,
+        zeroAmount: true,
+        pendingAdminReview: false,
+        easyslipPending: false,
+        name: lineUser.name,
+      }
+      const updates = {}
+      if (forAllFlag) {
+        (activeOrder.members || []).forEach(m => {
+          updates[`memberPayments.${m.uid}`] = {
+            ...entry,
+            name: m.name,
+            amount: 0,
+            forAll: true,
+            paidByProxy: m.uid === lineUser.uid ? null : lineUser.uid,
+          }
+        })
+      } else {
+        updates[`memberPayments.${lineUser.uid}`] = entry
+      }
+      await updateDoc(doc(db, 'orders', activeOrder.id), updates)
+      showToast('ยืนยันชำระยอด ฿0 เรียบร้อย ✓')
+      setShowBill(false)
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
+    }
+  }
 
   return (
     <div id="member-order-page">
@@ -1147,6 +1263,17 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                   if (p?.verified) return <div className="mo-pay-status paid"><i className="fas fa-check-circle" /> ชำระแล้ว ฿{fmtCurrency(p.amount || 0)}{p.bankName && <span className="mo-pay-meta"> · {p.bankName}</span>}</div>
                   if (p?.easyslipPending) return <div className="mo-pay-status pending-review" style={{ color: 'var(--feedback-info-icon)' }}><i className="fas fa-hourglass-half" /> รอ Bangkok Bank ยืนยัน — ระบบจะอัปเดตอัตโนมัติ</div>
                   if (p?.pendingAdminReview) return <div className="mo-pay-status pending-review"><i className="fas fa-clock" /> ส่งสลิปแล้ว — EasySlip ตรวจสอบไม่สำเร็จ รอแอดมิน<button className="mo-pay-reupload-btn" onClick={() => { setShowBill(false); setPayForAll(false); setShowPaySheet(true) }}><i className="fas fa-upload" /> ลองใหม่</button></div>
+                  if (myTotal <= 0) {
+                    return (
+                      <button
+                        className="mo-pay-cta-btn"
+                        style={{ background: '#16a34a', color: '#fff' }}
+                        onClick={() => handleZeroPayment(false)}
+                      >
+                        <i className="fas fa-check-circle" /> ยืนยันยอด ฿0 (ไม่ต้องส่งสลิป)
+                      </button>
+                    )
+                  }
                   return <button className="mo-pay-cta-btn" onClick={() => { setShowBill(false); setPayForAll(false); setShowPaySheet(true) }}><i className="fas fa-qrcode" /> จ่ายของฉัน ฿{fmtCurrency(myTotal)}</button>
                 })()}
               </>
@@ -1213,9 +1340,19 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                 </div>
                 {tablePendingTotal > 0 && <div className="mo-bill-note">* รวมรายการรอยืนยัน ยอดจริงอาจเปลี่ยนแปลง</div>}
                 {activeOrder.status !== 'paid' && (
-                  <button className="mo-pay-cta-btn" style={{ margin: '10px 16px 4px' }} onClick={() => { setShowBill(false); setPayForAll(true); setShowPaySheet(true) }}>
-                    <i className="fas fa-qrcode" /> จ่ายทั้งตี้ ฿{tableTotal.toLocaleString()}
-                  </button>
+                  tableTotal <= 0 ? (
+                    <button
+                      className="mo-pay-cta-btn"
+                      style={{ margin: '10px 16px 4px', background: '#16a34a', color: '#fff' }}
+                      onClick={() => handleZeroPayment(true)}
+                    >
+                      <i className="fas fa-check-circle" /> ยืนยันทั้งตี้ ฿0 (ไม่ต้องส่งสลิป)
+                    </button>
+                  ) : (
+                    <button className="mo-pay-cta-btn" style={{ margin: '10px 16px 4px' }} onClick={() => { setShowBill(false); setPayForAll(true); setShowPaySheet(true) }}>
+                      <i className="fas fa-qrcode" /> จ่ายทั้งตี้ ฿{tableTotal.toLocaleString()}
+                    </button>
+                  )
                 )}
               </>
             )}

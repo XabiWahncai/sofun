@@ -337,7 +337,19 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
 
           {/* PromptPay QR */}
           <div className="pay-qr-section">
-            {promptPayPhone ? (
+            {activeAmt <= 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, margin: '0 auto 12px' }}>
+                  <i className="fas fa-check-circle" />
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a', marginBottom: 4 }}>
+                  ยอดชำระ ฿0
+                </div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  ไม่มีรายการต้องชำระ (หรือได้รับส่วนลดเต็มจำนวน) ไม่ต้องสแกนจ่าย สามารถกดยืนยันปิดบิลได้ทันที
+                </div>
+              </div>
+            ) : promptPayPhone ? (
               <>
                 <div className="pay-qr-label">
                   <i className="fas fa-qrcode" /> QR PromptPay
@@ -384,9 +396,11 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
         {/* Footer */}
         <div className="pay-footer">
           <button className="pos-cancel-btn" style={{ flex: 1 }} onClick={onClose}>ยกเลิก</button>
-          <button className="pay-confirm-btn" onClick={handleConfirmPayment} disabled={saving}>
+          <button className="pay-confirm-btn" onClick={handleConfirmPayment} disabled={saving} style={activeAmt <= 0 ? { background: '#16a34a', borderColor: '#16a34a' } : undefined}>
             {saving
               ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+              : activeAmt <= 0
+              ? <><i className="fas fa-check-circle" /> ยืนยันปิดบิล (฿0)</>
               : <><i className="fas fa-check-circle" /> ยืนยันรับเงิน</>
             }
           </button>
