@@ -327,7 +327,7 @@ function DashboardTab({ allGames, members, onGoTab }) {
                 เกม: <strong style={{ color: '#f59e0b' }}>⭐ {evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.gameRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
               </span>
               <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
-                DM: <strong style={{ color: '#ec4899' }}>👑 {evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.dmRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
+                DM: <strong style={{ color: '#ec4899' }}><i className="fas fa-crown" style={{ fontSize: 11, marginRight: 4 }} />{evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.dmRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
               </span>
             </div>
           </div>
@@ -659,7 +659,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
             <input
               type="text"
               className="adm-input"
-              placeholder="🔍 ค้นหาชื่อสคริปต์, จำนวนคน, แท็ก, ราคา..."
+              placeholder="ค้นหาชื่อสคริปต์, จำนวนคน, แท็ก, ราคา..."
               value={search}
               onChange={e => setSearch(e.target.value)}
               style={{ paddingLeft: 34, paddingRight: search ? 32 : 12, width: '100%', boxSizing: 'border-box', height: 38 }}
@@ -683,11 +683,11 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
             value={difficultyFilter}
             onChange={e => setDifficultyFilter(e.target.value)}
           >
-            <option value="ALL">🎯 ทุกความยาก</option>
-            <option value="Beginner">🟢 Beginner</option>
-            <option value="Normal">🔵 Normal</option>
-            <option value="Hard">🟡 Hard</option>
-            <option value="Expert">🔴 Expert</option>
+            <option value="ALL">ทุกความยาก</option>
+            <option value="Beginner">Beginner</option>
+            <option value="Normal">Normal</option>
+            <option value="Hard">Hard</option>
+            <option value="Expert">Expert</option>
           </select>
 
           {/* Player Count Dropdown */}
@@ -697,7 +697,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
             value={playerFilter}
             onChange={e => setPlayerFilter(e.target.value)}
           >
-            <option value="ALL">👥 ทุกจำนวนคน</option>
+            <option value="ALL">ทุกจำนวนคน</option>
             <option value="2">2 คน</option>
             <option value="4">4 คน</option>
             <option value="5">5 คน</option>
@@ -715,7 +715,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
               value={tagFilter}
               onChange={e => setTagFilter(e.target.value)}
             >
-              <option value="ALL">🏷️ ทุกแนวเกม ({allTags.length})</option>
+              <option value="ALL">ทุกแนวเกม ({allTags.length})</option>
               {allTags.map(t => (
                 <option key={t} value={t}>{t}</option>
               ))}
@@ -729,13 +729,13 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
             value={sortBy}
             onChange={e => setSortBy(e.target.value)}
           >
-            <option value="default">↕️ เรียง: ค่าเริ่มต้น</option>
-            <option value="name_asc">🔤 ชื่อ (A-Z / ก-ฮ)</option>
-            <option value="name_desc">🔤 ชื่อ (Z-A / ฮ-ก)</option>
-            <option value="price_asc">💵 ราคา (น้อย ➔ มาก)</option>
-            <option value="price_desc">💵 ราคา (มาก ➔ น้อย)</option>
-            <option value="players_asc">👥 จำนวนคน (น้อย ➔ มาก)</option>
-            <option value="players_desc">👥 จำนวนคน (มาก ➔ น้อย)</option>
+            <option value="default">เรียง: ค่าเริ่มต้น</option>
+            <option value="name_asc">ชื่อ (A-Z / ก-ฮ)</option>
+            <option value="name_desc">ชื่อ (Z-A / ฮ-ก)</option>
+            <option value="price_asc">ราคา (น้อย ไป มาก)</option>
+            <option value="price_desc">ราคา (มาก ไป น้อย)</option>
+            <option value="players_asc">จำนวนคน (น้อย ไป มาก)</option>
+            <option value="players_desc">จำนวนคน (มาก ไป น้อย)</option>
           </select>
         </div>
 
@@ -817,7 +817,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
           sortedGames.map(g => (
             <div key={g.id} className="adm-script-row">
               <div className="adm-script-img">
-                {g.image || g.coverUrl ? <img src={g.image || g.coverUrl} alt="" /> : '🎭'}
+                {g.image || g.coverUrl ? <img src={g.image || g.coverUrl} alt="" /> : <i className="fas fa-scroll" style={{ color: '#888' }} />}
               </div>
               <div className="adm-list-info">
                 <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -912,7 +912,7 @@ function EditMemberModal({ member, onClose, showToast }) {
         achievement:  form.achievements.includes('golden') ? 'golden' : null,
         updatedAt:    serverTimestamp(),
       })
-      showToast('บันทึกข้อมูลสำเร็จ ✓')
+      showToast('บันทึกข้อมูลสำเร็จ')
       onClose()
     } catch (e) {
       showToast('บันทึกล้มเหลว: ' + e.message, 'error')
@@ -1069,11 +1069,11 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
         </div>
         <input
           className="adm-search"
-          placeholder="🔍 ค้นหาชื่อหรืออีเมล..."
+          placeholder="ค้นหาชื่อหรืออีเมล..."
           value={search}
           onChange={e => setSearch(e.target.value)}
         />
-        <div className="adm-members-hint">กด 🧾 เพื่อดูประวัติการเล่นและบิลย้อนหลัง · กด ✏️ เพื่อแก้ไขข้อมูล</div>
+        <div className="adm-members-hint"><i className="fas fa-receipt" style={{ marginRight: 4 }} /> ดูประวัติการเล่นและบิลย้อนหลัง · <i className="fas fa-edit" style={{ margin: '0 4px' }} /> แก้ไขข้อมูล</div>
 
         {filtered.map(m => {
           const name  = m.nickname || `${m.firstname || ''} ${m.lastname || ''}`.trim() || 'ไม่มีชื่อ'
@@ -1085,7 +1085,7 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
                   ? <img src={m.pictureUrl} alt="" onError={e => e.currentTarget.style.display = 'none'} />
                   : <span>{name[0]}</span>
                 }
-                {isAdm && <div className="adm-crown">👑</div>}
+                {isAdm && <div className="adm-crown"><i className="fas fa-crown" /></div>}
               </div>
               <div className="adm-list-info">
                 <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
@@ -1222,10 +1222,10 @@ function MenuEditModal({ item, onClose, showToast }) {
       }
       if (item?.id) {
         await updateDoc(doc(db, 'menuItems', item.id), data)
-        showToast('อัปเดตเมนูสำเร็จ ✓')
+        showToast('อัปเดตเมนูสำเร็จ')
       } else {
         await addDoc(collection(db, 'menuItems'), { ...data, available: true, createdAt: serverTimestamp() })
-        showToast('เพิ่มเมนูสำเร็จ ✓')
+        showToast('เพิ่มเมนูสำเร็จ')
       }
       onClose()
     } catch (e) { showToast('บันทึกล้มเหลว: ' + e.message, 'error') }
@@ -1440,7 +1440,7 @@ function PaymentTab({ showToast }) {
         easySlipApiKey: easySlipApiKey.trim(),
         updatedAt: serverTimestamp(),
       })
-      showToast('บันทึกสำเร็จ ✓')
+      showToast('บันทึกสำเร็จ')
     } catch { showToast('บันทึกล้มเหลว', 'error') }
     finally { setSaving(false) }
   }
@@ -1611,7 +1611,7 @@ function ReceiptSettingsTab({ showToast }) {
         ...settings,
         updatedAt: serverTimestamp(),
       })
-      showToast('บันทึกการตั้งค่าบิลสำเร็จ ✓')
+      showToast('บันทึกการตั้งค่าบิลสำเร็จ')
     } catch (err) {
       console.error('Save receipt settings error:', err)
       showToast('บันทึกล้มเหลว: ' + err.message, 'error')
@@ -2497,10 +2497,10 @@ function PromotionTab({ showToast, allGames = [] }) {
     heading: 'โปรเปิดตี้สืบคดีสุดคุ้ม',
     month: 'ประจำเดือนนี้',
     description: 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร รับสิทธิพิเศษส่วนลดทันทีเมื่อเปิดตี้หรือจองรอบเล่นล่วงหน้า',
-    promoTag: '🔥 SPECIAL PROMOTION',
-    badge1: '🎭 สคริปต์ยอดฮิต',
-    badge2: '⚡ ส่วนลดพิเศษ',
-    badge3: '🔥 จำนวนจำกัด',
+    promoTag: 'SPECIAL PROMOTION',
+    badge1: 'สคริปต์ยอดฮิต',
+    badge2: 'ส่วนลดพิเศษ',
+    badge3: 'จำนวนจำกัด',
     bannerUrl: '',
     discountAmount: '100',
     discountType: 'party', // 'party' (ลดทั้งตี้) | 'person' (ลดต่อคน)
@@ -2553,7 +2553,7 @@ function PromotionTab({ showToast, allGames = [] }) {
         newGameIds: (promo.newGameIds || []).slice(0, 3),
         updatedAt: serverTimestamp(),
       })
-      showToast('บันทึกโปรโมชั่นและเกมใหม่สำเร็จ ✓')
+      showToast('บันทึกโปรโมชั่นและเกมใหม่สำเร็จ')
     } catch (err) {
       console.error(err)
       showToast('บันทึกล้มเหลว', 'error')
@@ -2574,7 +2574,7 @@ function PromotionTab({ showToast, allGames = [] }) {
       const snap = await uploadBytes(r, file)
       const url = await getDownloadURL(snap.ref)
       setPromo(p => ({ ...p, bannerUrl: url }))
-      showToast('อัพโหลดรูปโปรโมชั่นสำเร็จ ✓')
+      showToast('อัพโหลดรูปโปรโมชั่นสำเร็จ')
     } catch (err) {
       console.error(err)
       showToast('อัพโหลดรูปล้มเหลว', 'error')
@@ -2598,7 +2598,7 @@ function PromotionTab({ showToast, allGames = [] }) {
         ...p,
         customCovers: { ...(p.customCovers || {}), [gameId]: url }
       }))
-      showToast('อัพโหลดปกเกมสำเร็จ ✓')
+      showToast('อัพโหลดปกเกมสำเร็จ')
     } catch (err) {
       console.error(err)
       showToast('อัพโหลดปกเกมล้มเหลว', 'error')
@@ -2775,7 +2775,7 @@ function PromotionTab({ showToast, allGames = [] }) {
         {field('คำอธิบายโปรโมชั่น', 'description', 'รายละเอียดและเงื่อนไขโปรโมชั่น...', 'textarea')}
 
         <div className="adm-field-row">
-          {field('ป้ายกำกับด้านบน (Badge Tag)', 'promoTag', '🔥 SPECIAL PROMOTION')}
+          {field('ป้ายกำกับด้านบน (Badge Tag)', 'promoTag', 'SPECIAL PROMOTION')}
           {field('ข้อความปุ่ม CTA', 'buttonText', 'จองรอบรับสิทธิ์เลย →')}
           <div className="adm-field">
             <label className="adm-label">ปุ่มลิงก์ไปยังหน้า</label>
@@ -2784,17 +2784,17 @@ function PromotionTab({ showToast, allGames = [] }) {
               value={promo.buttonLink || 'booking'}
               onChange={e => setPromo(p => ({ ...p, buttonLink: e.target.value }))}
             >
-              <option value="booking">📅 หน้าจองห้อง / ปฏิทิน (Booking)</option>
-              <option value="games">🎲 หน้าคลังเกม (Games)</option>
-              <option value="party">👥 หน้าร่วมตี้ (Party)</option>
+              <option value="booking">หน้าจองห้อง / ปฏิทิน (Booking)</option>
+              <option value="games">หน้าคลังเกม (Games)</option>
+              <option value="party">หน้าร่วมตี้ (Party)</option>
             </select>
           </div>
         </div>
 
         <div className="adm-field-row">
-          {field('จุดเด่น 1', 'badge1', '🎭 สคริปต์ยอดฮิต')}
-          {field('จุดเด่น 2', 'badge2', '⚡ ส่วนลดพิเศษ')}
-          {field('จุดเด่น 3', 'badge3', '🔥 จำนวนจำกัด')}
+          {field('จุดเด่น 1', 'badge1', 'สคริปต์ยอดฮิต')}
+          {field('จุดเด่น 2', 'badge2', 'ส่วนลดพิเศษ')}
+          {field('จุดเด่น 3', 'badge3', 'จำนวนจำกัด')}
         </div>
       </div>
 
@@ -3351,7 +3351,7 @@ function RandomWheelTab({ showToast, members = [] }) {
         oneShotLock: config.oneShotLock !== false,
         updatedAt: serverTimestamp(),
       })
-      showToast(selectedLockedId ? '🔒 บันทึกการล็อคผลเรียบร้อยแล้ว' : 'ปลดล็อคการสุ่มแล้ว')
+      showToast(selectedLockedId ? 'บันทึกการล็อคผลเรียบร้อยแล้ว' : 'ปลดล็อคการสุ่มแล้ว')
     } catch (e) {
       showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
     } finally {
@@ -3413,7 +3413,7 @@ function RandomWheelTab({ showToast, members = [] }) {
         },
         updatedAt: serverTimestamp(),
       })
-      showToast('ส่งคำสั่งหมุนวงล้อเรียบร้อยแล้ว 🎯')
+      showToast('ส่งคำสั่งหมุนวงล้อเรียบร้อยแล้ว')
     } catch (e) {
       showToast('ส่งคำสั่งไม่สำเร็จ: ' + e.message, 'error')
     } finally {
@@ -3464,7 +3464,7 @@ function RandomWheelTab({ showToast, members = [] }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 14 }}>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 20 }}>🎲</span>
+              <i className="fas fa-dice" style={{ fontSize: 20, color: 'var(--crimson-500)' }} />
               <h2 style={{ fontSize: 20, fontWeight: 900, margin: 0, color: 'var(--text-primary)' }}>
                 วงล้อสุ่มผู้โชคดี (Lucky Wheel)
               </h2>
@@ -3521,7 +3521,7 @@ function RandomWheelTab({ showToast, members = [] }) {
             border: `1px solid ${config.lockedWinnerId ? 'rgba(239,68,68,0.35)' : 'rgba(34,197,94,0.35)'}`,
             color: config.lockedWinnerId ? '#ef4444' : '#22c55e',
           }}>
-            {config.lockedWinnerId ? '🔴 มีการล็อคผล' : '🟢 สุ่มตามธรรมชาติ (Fair)'}
+            {config.lockedWinnerId ? 'มีการล็อคผล' : 'สุ่มตามธรรมชาติ (Fair)'}
           </span>
         </div>
 
@@ -3546,7 +3546,7 @@ function RandomWheelTab({ showToast, members = [] }) {
               </div>
               <div>
                 <div style={{ fontSize: 14, fontWeight: 800, color: '#ef4444' }}>
-                  🔒 ล็อคให้: {lockedCandidate?.name || config.lockedWinnerId}
+                  <i className="fas fa-lock" style={{ marginRight: 4, color: '#ef4444' }} /> ล็อคให้: {lockedCandidate?.name || config.lockedWinnerId}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
                   การหมุนรอบถัดไปจะตกที่คนนี้แน่นอน (สิทธิ์: {lockedCandidate?.tickets || 0} ครั้ง, โอกาส: {lockedCandidate?.chance || 0}%)
@@ -3592,7 +3592,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                 <option value="">-- ไม่ล็อคผล (สุ่มตามปกติ) --</option>
                 {activeCandidates.map(c => (
                   <option key={c.id} value={c.id}>
-                    🔒 {c.name} ({c.tickets} ครั้ง · {c.chance}%)
+                    <i className="fas fa-lock" style={{ marginRight: 4, color: '#ef4444' }} /> {c.name} ({c.tickets} ครั้ง · {c.chance}%)
                   </option>
                 ))}
               </select>
@@ -3791,7 +3791,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                         padding: '3px 8px', borderRadius: 6,
                         background: 'rgba(200,160,80,0.12)', color: '#c8a050',
                       }}>
-                        🎟️ {c.tickets} ครั้ง
+                        <i className="fas fa-ticket-alt" style={{ marginRight: 4, color: '#fbbf24' }} /> {c.tickets} ครั้ง
                       </span>
                     </td>
                     <td style={{ padding: '10px 12px', fontWeight: 800, color: 'var(--text-secondary)' }}>
@@ -3800,7 +3800,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                     <td style={{ padding: '10px 12px' }}>
                       {config.lockedWinnerId === c.id ? (
                         <span style={{ fontSize: 11, fontWeight: 800, color: '#ef4444', background: 'rgba(239,68,68,0.15)', padding: '2px 7px', borderRadius: 6 }}>
-                          🔒 ล็อครอบนี้
+                          <i className="fas fa-lock" style={{ marginRight: 4 }} /> ล็อครอบนี้
                         </span>
                       ) : (
                         <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>ปกติ</span>
@@ -3822,7 +3822,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                             display: 'flex', alignItems: 'center', gap: 4,
                           }}
                         >
-                          📜 ประวัติ
+                          <i className="fas fa-history" style={{ marginRight: 4 }} /> ประวัติ
                         </button>
                         <button
                           onClick={() => {
@@ -3830,7 +3830,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                             updateDoc(doc(db, 'wheelSettings', 'config'), {
                               lockedWinnerId: c.id,
                               updatedAt: serverTimestamp(),
-                            }).then(() => showToast(`🔒 ล็อคผลให้ ${c.name} แล้ว`))
+                            }).then(() => showToast(`ล็อคผลให้ ${c.name} แล้ว`))
                           }}
                           title="ล็อคให้คนนี้ชนะรอบต่อไป"
                           style={{
@@ -3890,7 +3890,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: 14 }}>👑</span>
+                    <i className="fas fa-crown" style={{ fontSize: 14, color: '#f59e0b' }} />
                     <strong style={{ color: 'var(--text-primary)' }}>{w.winnerName}</strong>
                     <span style={{ color: 'var(--text-tertiary)' }}>({w.tickets} สิทธิ์ · {w.chance}%)</span>
                   </div>
@@ -3966,7 +3966,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                 onClick={() => setShowHistoryModal(false)}
                 style={{ background: 'none', border: 'none', color: 'var(--text-tertiary, #888)', fontSize: 18, cursor: 'pointer' }}
               >
-                ✕
+                <i className="fas fa-times" />
               </button>
             </div>
 
@@ -4032,7 +4032,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
                         <strong style={{ color: 'var(--text-primary, #fff)', fontSize: 13 }}>
-                          🎮 {item.scriptTitle}
+                          <i className="fas fa-gamepad" style={{ marginRight: 4, color: '#60a5fa' }} /> {item.scriptTitle}
                         </strong>
                         <span style={{
                           fontSize: 10, padding: '2px 6px', borderRadius: 4,
@@ -4048,7 +4048,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                         {item.room && <span>ห้อง: {item.room}</span>}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--text-tertiary, #777)' }}>
-                        🕒 {dStr}
+                        <i className="fas fa-clock" style={{ marginRight: 4, color: '#a78bfa' }} /> {dStr}
                       </div>
                     </div>
                   )
@@ -4106,7 +4106,7 @@ function DataTab({ showToast }) {
       if (target === 'payments'    || target === 'all') total += await deleteCollection('payments')
       if (target === 'orders'      || target === 'all') total += await deleteCollection('orders')
       if (target === 'playHistory' || target === 'all') total += await deleteCollection('playHistory')
-      showToast(`ลบแล้ว ${total} รายการ ✓`)
+      showToast(`ลบแล้ว ${total} รายการ`)
     } catch (e) {
       showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
     } finally {
@@ -4397,11 +4397,11 @@ function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
 
   const QUICK_TIMES = ['13:00', '14:00', '15:30', '18:00', '19:30', '21:00']
   const QUICK_PRESETS = [
-    '🔒 ปิดห้องส่วนตัว (Private)',
-    '🎉 งานวันเกิด / ปาร์ตี้',
-    '🛠️ ปิดซ่อมบำรุงห้อง',
-    '🚶 Walk-in หน้าร้าน',
-    '📹 ถ่ายทำ / กองถ่าย',
+    'ปิดห้องส่วนตัว (Private)',
+    'งานวันเกิด / ปาร์ตี้',
+    'ปิดซ่อมบำรุงห้อง',
+    'Walk-in หน้าร้าน',
+    'ถ่ายทำ / กองถ่าย',
   ]
 
   const handleSubmit = async () => {
@@ -4745,7 +4745,7 @@ function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
               </label>
               {room && (
                 <span style={{ fontSize: 11, fontWeight: 800, color: ROOM_COLORS_ADM[room] || 'var(--crimson-500)' }}>
-                  เลือก: {room} ✓
+                  เลือก: {room}
                 </span>
               )}
             </div>
@@ -5208,7 +5208,7 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
       }
       if (allPaid && isFull && data.status === 'confirmed') payload.status = 'locked'
       await updateDoc(ref, payload)
-      showToast(allPaid && isFull ? 'ครบแล้ว — ล็อกห้องอัตโนมัติ ✓' : 'ยืนยันสลิปสำเร็จ · ขยายเดดไลน์ +3 วัน')
+      showToast(allPaid && isFull ? 'ครบแล้ว — ล็อกห้องอัตโนมัติ' : 'ยืนยันสลิปสำเร็จ · ขยายเดดไลน์ +3 วัน')
     } catch (e) { showToast('เกิดข้อผิดพลาด: ' + e.message, 'error') }
   }
 
@@ -5837,7 +5837,7 @@ function EvaluationsTab({ showToast, allGames = [] }) {
               value={selectedGame}
               onChange={e => setSelectedGame(e.target.value)}
             >
-              <option value="ALL">🎮 ทุกเกม</option>
+              <option value="ALL">ทุกเกม</option>
               {gameOptions.map(g => (
                 <option key={g} value={g}>{g}</option>
               ))}
@@ -5848,7 +5848,7 @@ function EvaluationsTab({ showToast, allGames = [] }) {
               value={selectedDm}
               onChange={e => setSelectedDm(e.target.value)}
             >
-              <option value="ALL">👑 ทุก DM</option>
+              <option value="ALL">ทุก DM</option>
               {dmOptions.map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -5863,7 +5863,7 @@ function EvaluationsTab({ showToast, allGames = [] }) {
               <option value="5">⭐⭐⭐⭐⭐ 5 ดาว</option>
               <option value="4+">⭐ 4 ดาวขึ้นไป</option>
               <option value="3+">⭐ 3 ดาวขึ้นไป</option>
-              <option value="low">⚠️ น้อยกว่า 3 ดาว</option>
+              <option value="low">น้อยกว่า 3 ดาว</option>
             </select>
           </div>
         </div>
@@ -6023,7 +6023,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
     if (!email || !password) { showToast('กรุณากรอกข้อมูล', 'error'); return }
     try {
       await signInWithEmailAndPassword(auth, email, password)
-      showToast('เข้าสู่ระบบสำเร็จ ✓')
+      showToast('เข้าสู่ระบบสำเร็จ')
     } catch { showToast('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error') }
   }
 

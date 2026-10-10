@@ -39,7 +39,7 @@ export default function ScanModal({ scannedUid, adminUser, allGames, onClose, sh
         playedAt: serverTimestamp(),
         recordedBy: adminUser?.name || adminUser?.uid || 'admin',
       })
-      showToast('บันทึกประวัติสำเร็จ ✓')
+      showToast('บันทึกประวัติสำเร็จ')
       onClose()
     } catch (e) {
       showToast('บันทึกล้มเหลว: ' + e.message, 'error')

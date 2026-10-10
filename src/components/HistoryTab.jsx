@@ -172,7 +172,7 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
           win.print()
         }, 300)
       }
-      showToast?.('ส่งคำสั่งพิมพ์เรียบร้อย ✓')
+      showToast?.('ส่งคำสั่งพิมพ์เรียบร้อย')
     } catch (e) {
       showToast?.('เกิดข้อผิดพลาดในการพิมพ์: ' + e.message, 'error')
     } finally {
@@ -728,7 +728,7 @@ export function EditPaymentModal({
         }
       }
 
-      showToast?.('อัปเดตข้อมูลประวัติการเล่นและบิลย้อนหลังเรียบร้อยแล้ว ✓')
+      showToast?.('อัปเดตข้อมูลประวัติการเล่นและบิลย้อนหลังเรียบร้อยแล้ว')
       onClose()
     } catch (err) {
       console.error('Failed to update payment:', err)
@@ -1348,7 +1348,7 @@ export default function HistoryTab({
     setDeletingId(p.id)
     try {
       await deleteDoc(doc(db, 'payments', p.id))
-      showToast?.('ลบบิลเรียบร้อยแล้ว ✓')
+      showToast?.('ลบบิลเรียบร้อยแล้ว')
     } catch (e) {
       showToast?.('เกิดข้อผิดพลาดในการลบ: ' + e.message, 'error')
     } finally {
@@ -1386,7 +1386,7 @@ export default function HistoryTab({
           win.print()
         }, 300)
       }
-      showToast?.('ส่งคำสั่งพิมพ์เรียบร้อย ✓')
+      showToast?.('ส่งคำสั่งพิมพ์เรียบร้อย')
     } catch (e) {
       showToast?.('พิมพ์ล้มเหลว: ' + e.message, 'error')
     }
@@ -1498,7 +1498,7 @@ export default function HistoryTab({
               type="text"
               className="adm-input"
               style={{ paddingLeft: 36 }}
-              placeholder="🔍 ค้นหาชื่อลูกค้า, ตัวละคร, ชื่อเกม, DM, โต๊ะ, เลข Serial..."
+              placeholder="ค้นหาชื่อลูกค้า, ตัวละคร, ชื่อเกม, DM, โต๊ะ, เลข Serial..."
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
@@ -1555,7 +1555,7 @@ export default function HistoryTab({
               value={selectedGameFilter}
               onChange={e => setSelectedGameFilter(e.target.value)}
             >
-              <option value="all">🎮 ทุกสคริปต์/เกม</option>
+              <option value="all">ทุกสคริปต์/เกม</option>
               {gameOptions.map(g => (
                 <option key={g} value={g}>{g}</option>
               ))}
@@ -1570,7 +1570,7 @@ export default function HistoryTab({
               value={selectedDmFilter}
               onChange={e => setSelectedDmFilter(e.target.value)}
             >
-              <option value="all">👑 ทุก DM</option>
+              <option value="all">ทุก DM</option>
               {dmOptions.map(d => (
                 <option key={d} value={d}>{d}</option>
               ))}
@@ -1599,7 +1599,7 @@ export default function HistoryTab({
               value={selectedMemberFilter}
               onChange={e => setSelectedMemberFilter(e.target.value)}
             >
-              <option value="all">👥 สมาชิกทุกคน</option>
+              <option value="all">สมาชิกทุกคน</option>
               {members.map(m => {
                 const name = m.nickname || `${m.firstname || ''} ${m.lastname || ''}`.trim() || 'สมาชิก'
                 return <option key={m.id} value={m.id}>{name}</option>
@@ -1707,7 +1707,7 @@ export default function HistoryTab({
                       {poster ? (
                         <img src={poster} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                       ) : (
-                        <span>🎭</span>
+                        <i className="fas fa-theater-masks" style={{ color: '#888' }} />
                       )}
                     </div>
 

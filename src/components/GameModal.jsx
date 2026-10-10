@@ -47,12 +47,12 @@ const QUICK_PLAYER_PRESETS = ['4-6 คน', '5-7 คน', '6-8 คน', '7 ค�
 const QUICK_TIME_PRESETS = ['2-3 ชั่วโมง', '3-4 ชั่วโมง', '4-5 ชั่วโมง', '5-6 ชั่วโมง', '6-7 ชั่วโมง', '7-9 ชั่วโมง']
 
 const TRIGGER_PRESETS = [
-  '⚠️ มีเนื้อหาความรุนแรง',
-  '🩸 มีฉากเลือด / การชันสูตร',
-  '👻 ธีมสยองขวัญ / ผี',
-  '💔 มีเนื้อหากระทบกระเทือนจิตใจ / ดราม่าหนัก',
-  '🔞 เนื้อหาสำหรับผู้ใหญ่ (18+)',
-  '⚡ มีแสงไฟกะพริบ / แฟลช'
+  'มีเนื้อหาความรุนแรง',
+  'มีฉากเลือด / การชันสูตร',
+  'ธีมสยองขวัญ / ผี',
+  'มีเนื้อหากระทบกระเทือนจิตใจ / ดราม่าหนัก',
+  'เนื้อหาสำหรับผู้ใหญ่ (18+)',
+  'มีแสงไฟกะพริบ / แฟลช'
 ]
 
 const TABS = [
@@ -300,11 +300,11 @@ export default function GameModal({ editingGame, onClose, showToast }) {
       }
       if (editingGame) {
         await updateDoc(doc(db, 'scripts', editingGame.id), data)
-        showToast('อัปเดตสคริปต์สำเร็จ ✓')
+        showToast('อัปเดตสคริปต์สำเร็จ')
       } else {
         data.createdAt = serverTimestamp()
         await addDoc(collection(db, 'scripts'), data)
-        showToast('เพิ่มสคริปต์ใหม่สำเร็จ ✓')
+        showToast('เพิ่มสคริปต์ใหม่สำเร็จ')
       }
       onClose()
     } catch (e) {
@@ -1403,7 +1403,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                   {tags.map(t => (
                     <span key={t} className="sc-tag-pill">
                       #{t}
-                      <span className="sc-tag-del" onClick={(e) => { e.stopPropagation(); removeTag(t); }}>✕</span>
+                      <span className="sc-tag-del" onClick={(e) => { e.stopPropagation(); removeTag(t); }}><i className="fas fa-times" style={{ fontSize: 10 }} /></span>
                     </span>
                   ))}
                   <input
@@ -1429,7 +1429,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                           color: tags.includes(t) ? '#fff' : undefined
                         }}
                       >
-                        {tags.includes(t) ? '✓ ' : '+'} {t}
+                        {tags.includes(t) ? '' : '+ '} {t}
                       </button>
                     ))}
                   </div>
@@ -1928,7 +1928,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                           style={{ color: '#ef4444' }}
                           onClick={() => { setVideoFile(null); setVideoPreview(''); setCurrentVideoUrl(''); }}
                         >
-                          ✕ นำวิดีโอออก
+                          นำวิดีโอออก
                         </button>
                       </div>
                       <div className="sc-media-preview-card" style={{ background: '#000' }}>
