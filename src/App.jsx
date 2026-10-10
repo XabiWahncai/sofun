@@ -338,9 +338,12 @@ export default function App() {
     }, () => setActiveMemberOrder(null))
   }, [lineUser?.uid, isEffectiveAdmin])
 
-  // ── Redirect to QR if order closes while on order page ─────────────
+  // ── Auto-sync between QR and Order page based on active order ─────────────
   useEffect(() => {
-    if (currentPage === 'order' && !activeMemberOrder) {
+    if (currentPage === 'qr' && activeMemberOrder) {
+      setCurrentPage('order')
+      window.history.replaceState({ page: 'order' }, '', '/order')
+    } else if (currentPage === 'order' && !activeMemberOrder) {
       setCurrentPage('qr')
       window.history.replaceState({ page: 'qr' }, '', '/qr')
     }

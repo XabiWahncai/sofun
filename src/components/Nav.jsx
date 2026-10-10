@@ -38,9 +38,15 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
             <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />จอง
           </button>
           {lineUser && !effectiveAdmin && (
-            <button className={`nav-btn${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
-              <i className="fas fa-qrcode" style={{ marginRight: '5px', fontSize: '11px' }} />QR
-            </button>
+            hasActiveOrder ? (
+              <button className={`nav-btn${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
+                <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />สั่งอาหาร
+              </button>
+            ) : (
+              <button className={`nav-btn${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
+                <i className="fas fa-qrcode" style={{ marginRight: '5px', fontSize: '11px' }} />QR
+              </button>
+            )
           )}
 
           {/* Language toggle */}
@@ -71,6 +77,11 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
                   <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                     <i className="fas fa-users" /> {t('nav', 'myParty')}
                   </button>
+                  {hasActiveOrder && !effectiveAdmin && (
+                    <button className="nav-user-menu-item" onClick={() => handleNav('order')}>
+                      <i className="fas fa-utensils" /> สั่งอาหาร
+                    </button>
+                  )}
                   <button className="nav-user-menu-item logout" onClick={() => { onLogout(); setUserMenuOpen(false) }}>
                     <i className="fas fa-sign-out-alt" /> {t('nav', 'logout')}
                   </button>
@@ -96,7 +107,7 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
                 <i className="fas fa-dharmachakra" /> วงล้อ
               </button>
               <button className="nav-admin-btn" onClick={() => handleNav('admin')}>
-                ⚙ Admin
+                <i className="fas fa-cog" /> Admin
               </button>
             </>
           )}
@@ -124,6 +135,11 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
                   <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                     <i className="fas fa-users" /> {t('nav', 'myParty')}
                   </button>
+                  {hasActiveOrder && !effectiveAdmin && (
+                    <button className="nav-user-menu-item" onClick={() => handleNav('order')}>
+                      <i className="fas fa-utensils" /> สั่งอาหาร
+                    </button>
+                  )}
                   {effectiveAdmin && (
                     <>
                       <button className="nav-user-menu-item" onClick={() => handleNav('random')}>
@@ -169,17 +185,18 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
           <i className="fas fa-calendar-check" />
           <span>จอง</span>
         </button>
-        {lineUser && !hasActiveOrder && !effectiveAdmin && (
-          <button className={`bottom-nav-item${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
-            <i className="fas fa-qrcode" />
-            <span>QR</span>
-          </button>
-        )}
-        {lineUser && hasActiveOrder && lineUser.role !== 'admin' && (
-          <button className={`bottom-nav-item bottom-nav-order${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
-            <i className="fas fa-utensils" />
-            <span>สั่งอาหาร</span>
-          </button>
+        {lineUser && !effectiveAdmin && (
+          hasActiveOrder ? (
+            <button className={`bottom-nav-item bottom-nav-order${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
+              <i className="fas fa-utensils" />
+              <span>สั่งอาหาร</span>
+            </button>
+          ) : (
+            <button className={`bottom-nav-item${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
+              <i className="fas fa-qrcode" />
+              <span>QR</span>
+            </button>
+          )
         )}
         {effectiveAdmin && (
           <button className={`bottom-nav-item${currentPage === 'pos' ? ' active' : ''}`} onClick={() => handleNav('pos')}>
