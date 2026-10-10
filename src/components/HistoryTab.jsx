@@ -1733,6 +1733,9 @@ export default function HistoryTab({
                         )}
                         <span>· Serial: {serialStr} (CHK: {chkStr})</span>
                         {p.confirmedBy && <span>· บันทึกโดย: {p.confirmedBy}</span>}
+                        {p.room && <span>· ห้อง: {p.room}</span>}
+                        {p.dm && <span>· DM: {p.dm}</span>}
+                        {members.length > 0 && <span>· {members.length} ผู้เล่น</span>}
                       </div>
                     </div>
                   </div>
@@ -1742,7 +1745,7 @@ export default function HistoryTab({
                     <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--crimson-500)' }}>
                       ฿{getCleanGrandTotal(p).toLocaleString()}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <button
                         type="button"
                         className="adm-btn-outline"
@@ -1759,7 +1762,7 @@ export default function HistoryTab({
                         onClick={() => setSlipModalPayment(p)}
                         title="ดูสลีปและพิมพ์ใบเสร็จ"
                       >
-                        <i className="fas fa-receipt" /> ดูสลีป
+                        <i className="fas fa-receipt" style={{ marginRight: 4 }} /> ดูสลีป
                       </button>
                       <button
                         type="button"
@@ -1768,224 +1771,227 @@ export default function HistoryTab({
                         onClick={() => handleQuickPrint(p)}
                         title="พิมพ์ใบเสร็จออกเครื่องพิมพ์ทันที"
                       >
-                        <i className="fas fa-print" /> พิมพ์บิล
+                        <i className="fas fa-print" style={{ marginRight: 4 }} /> พิมพ์บิล
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* ── Metadata Tags ── */}
-                <div style={{ padding: '10px 20px', background: 'var(--surface-page)', borderTop: '1px solid var(--border-default)', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  {p.room && (
-                    <span className="qr-history-tag">
-                      <i className="fas fa-door-open" /> โต๊ะ/ห้อง: {p.room}
-                    </span>
-                  )}
-                  {p.dm && (
-                    <span className="qr-history-tag">
-                      <i className="fas fa-crown" style={{ color: '#ec4899' }} /> DM: {p.dm}
-                    </span>
-                  )}
-                  {p.npc && (
-                    <span className="qr-history-tag">
-                      <i className="fas fa-theater-masks" style={{ color: '#8b5cf6' }} /> NPC: {p.npc}
-                    </span>
-                  )}
-                  {p.ending && (
-                    <span className="qr-history-tag" style={{ background: 'rgba(245,158,11,0.12)', color: '#b45309', fontWeight: 700 }}>
-                      <i className="fas fa-flag-checkered" /> ผลเกม: {p.ending}
-                    </span>
-                  )}
-                  <span className="qr-history-tag">
-                    <i className="fas fa-users" /> {members.length} ผู้เล่น
-                  </span>
-                  {p.discount?.applied > 0 && (
-                    <span className="qr-history-tag" style={{ background: 'rgba(16,185,129,0.1)', color: '#047857' }}>
-                      <i className="fas fa-tag" /> ส่วนลด ฿{p.discount.applied}
-                    </span>
-                  )}
-
-                  {/* Retroactive Edit button tag in the row */}
-                  <button
-                    type="button"
-                    className="qr-history-tag"
-                    style={{
-                      background: 'rgba(198,36,25,0.08)',
-                      color: 'var(--crimson-500)',
-                      border: '1px solid rgba(198,36,25,0.25)',
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 5,
-                      transition: '0.15s',
-                    }}
-                    onClick={() => setEditingPayment(p)}
-                    title="แก้ไขข้อมูลรอบเล่นนี้ (ห้อง, DM, ผลเกม, ผู้เล่น, ยอดเงิน)"
-                  >
-                    <i className="fas fa-edit" /> แก้ไขข้อมูลย้อนหลัง
-                  </button>
-
-                  <button
-                    type="button"
-                    style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
-                    onClick={() => toggleExpand(p.id)}
-                  >
-                    <span>{isExpanded ? 'ย่อรายละเอียด' : 'ดูรายละเอียดทั้งหมด'}</span>
-                    <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`} />
-                  </button>
-                </div>
-
-                {/* ── Players Chips Row ── */}
-                {members.length > 0 && (
-                  <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-default)', background: 'var(--surface-card)' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
-                      ผู้เล่นในรอบนี้:
-                    </div>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                      {members.map((m, idx) => {
-                        const myBill = p.memberBills?.find(b => b.uid === m.uid)
-                        const myPayment = p.memberPayments?.[m.uid]
-                        const myAmount = myBill?.total || (myPayment?.amount ? Number(myPayment.amount) : null)
-
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: 8,
-                              padding: '5px 10px',
-                              borderRadius: 20,
-                              background: 'var(--surface-page)',
-                              border: '1px solid var(--border-default)',
-                              fontSize: 12,
-                            }}
-                          >
-                            <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--crimson-500)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, overflow: 'hidden' }}>
-                              {m.avatar ? <img src={m.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} /> : (m.name || '?')[0]}
-                            </div>
-                            <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{m.name}</span>
-                            {m.character && (
-                              <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>({m.character})</span>
-                            )}
-                            {myAmount !== null && (
-                              <span style={{ fontWeight: 800, color: 'var(--crimson-500)', fontSize: 11, marginLeft: 2 }}>
-                                ฿{Math.round(myAmount)}
-                              </span>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* ── Expanded Full Breakdown (Games + Foods + Member Bills) ── */}
-                {isExpanded && (
-                  <div style={{ padding: '16px 20px', background: 'var(--surface-page)', borderTop: '1px solid var(--border-default)' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
-                      {/* Left: Items breakdown */}
-                      <div style={{ background: 'var(--surface-card)', borderRadius: 10, padding: 14, border: '1px solid var(--border-default)' }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                          <i className="fas fa-list" style={{ marginRight: 6 }} /> รายการในบิล
-                        </div>
-                        <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
-                          <tbody>
-                            {p.gameTotal > 0 && (
-                              <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                <td style={{ padding: '6px 0' }}>ค่าเกม: {p.scriptTitle || 'เกม'} ×{members.length}</td>
-                                <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 700 }}>฿{p.gameTotal.toLocaleString()}</td>
-                              </tr>
-                            )}
-                            {(p.foodItems || []).map((fi, fiIdx) => {
-                              const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name || a).join(', ')})` : ''
-                              return (
-                                <tr key={fiIdx} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
-                                  <td style={{ padding: '6px 0' }}>{fi.name}{addStr} ×{fi.qty || 1}</td>
-                                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 700 }}>฿{((fi.price || 0) * (fi.qty || 1)).toLocaleString()}</td>
-                                </tr>
-                              )
-                            })}
-                            {p.discount?.applied > 0 && (
-                              <tr style={{ color: '#16a34a' }}>
-                                <td style={{ padding: '6px 0' }}><i className="fas fa-tag" /> ส่วนลด</td>
-                                <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 700 }}>-฿{p.discount.applied.toLocaleString()}</td>
-                              </tr>
-                            )}
-                            <tr style={{ fontWeight: 800, fontSize: 14, borderTop: '1px solid var(--border-default)' }}>
-                              <td style={{ paddingTop: 8 }}>ยอดสุทธิ (Grand Total):</td>
-                              <td style={{ paddingTop: 8, textAlign: 'right', color: 'var(--crimson-500)' }}>฿{getCleanGrandTotal(p).toLocaleString()}</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-
-                      {/* Right: Individual Member Bills (if available) */}
-                      {p.memberBills?.length > 0 && (
-                        <div style={{ background: 'var(--surface-card)', borderRadius: 10, padding: 14, border: '1px solid var(--border-default)' }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
-                            <i className="fas fa-user-friends" style={{ marginRight: 6 }} /> ยอดแยกรายบุคคล
-                          </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {p.memberBills.map((mb, mbIdx) => (
-                              <div
-                                key={mbIdx}
-                                style={{
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                  fontSize: 12,
-                                  padding: '4px 0',
-                                  borderBottom: '1px solid rgba(0,0,0,0.04)',
-                                }}
-                              >
-                                <div>
-                                  <span style={{ fontWeight: 700 }}>{mb.name}</span>
-                                  {mb.character && <span style={{ color: 'var(--text-tertiary)', marginLeft: 4 }}>({mb.character})</span>}
-                                </div>
-                                <span style={{ fontWeight: 800, color: 'var(--crimson-500)' }}>
-                                  ฿{(mb.total || 0).toLocaleString()}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action buttons (Edit & Delete) */}
-                    <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
                       <button
                         type="button"
                         className="adm-btn-outline"
-                        style={{ padding: '6px 14px', fontSize: 12 }}
-                        onClick={() => setEditingPayment(p)}
-                      >
-                        <i className="fas fa-edit" style={{ marginRight: 6, color: 'var(--crimson-500)' }} /> แก้ไขข้อมูลบิล / รอบเล่นนี้ย้อนหลัง
-                      </button>
-                      <button
-                        type="button"
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#ef4444',
-                          cursor: 'pointer',
+                          padding: '6px 12px',
                           fontSize: 12,
                           fontWeight: 700,
-                          display: 'flex',
+                          cursor: 'pointer',
+                          display: 'inline-flex',
                           alignItems: 'center',
                           gap: 6,
-                          opacity: deletingId === p.id ? 0.5 : 1,
+                          borderColor: isExpanded ? 'var(--crimson-500)' : 'var(--border-default)',
+                          color: isExpanded ? 'var(--crimson-500)' : 'var(--text-secondary)',
+                          background: isExpanded ? 'rgba(198,36,25,0.06)' : 'transparent',
                         }}
-                        disabled={deletingId === p.id}
-                        onClick={() => handleDeletePayment(p)}
+                        onClick={() => toggleExpand(p.id)}
+                        title={isExpanded ? 'ย่อรายละเอียด' : 'ดูรายละเอียดเพิ่มเติม'}
                       >
-                        <i className={`fas ${deletingId === p.id ? 'fa-spinner fa-spin' : 'fa-trash-alt'}`} />
-                        ลบบิลนี้ออกจากระบบ
+                        <span>{isExpanded ? 'ย่อรายละเอียด' : 'ดูรายละเอียด'}</span>
+                        <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`} />
                       </button>
                     </div>
                   </div>
+                </div>
+
+                {/* ── Expanded Content (Metadata + Players + Breakdown) ── */}
+                {isExpanded && (
+                  <>
+                    {/* ── Metadata Tags ── */}
+                    <div style={{ padding: '10px 20px', background: 'var(--surface-page)', borderTop: '1px solid var(--border-default)', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+                      {p.room && (
+                        <span className="qr-history-tag">
+                          <i className="fas fa-door-open" /> โต๊ะ/ห้อง: {p.room}
+                        </span>
+                      )}
+                      {p.dm && (
+                        <span className="qr-history-tag">
+                          <i className="fas fa-crown" style={{ color: '#ec4899' }} /> DM: {p.dm}
+                        </span>
+                      )}
+                      {p.npc && (
+                        <span className="qr-history-tag">
+                          <i className="fas fa-theater-masks" style={{ color: '#8b5cf6' }} /> NPC: {p.npc}
+                        </span>
+                      )}
+                      {p.ending && (
+                        <span className="qr-history-tag" style={{ background: 'rgba(245,158,11,0.12)', color: '#b45309', fontWeight: 700 }}>
+                          <i className="fas fa-flag-checkered" /> ผลเกม: {p.ending}
+                        </span>
+                      )}
+                      <span className="qr-history-tag">
+                        <i className="fas fa-users" /> {members.length} ผู้เล่น
+                      </span>
+                      {p.discount?.applied > 0 && (
+                        <span className="qr-history-tag" style={{ background: 'rgba(16,185,129,0.1)', color: '#047857' }}>
+                          <i className="fas fa-tag" /> ส่วนลด ฿{p.discount.applied}
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        style={{ marginLeft: 'auto', background: 'none', border: 'none', color: 'var(--text-secondary)', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}
+                        onClick={() => toggleExpand(p.id)}
+                      >
+                        <span>ย่อรายละเอียด</span>
+                        <i className="fas fa-chevron-up" />
+                      </button>
+                    </div>
+
+                    {/* ── Players Chips Row ── */}
+                    {members.length > 0 && (
+                      <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border-default)', background: 'var(--surface-card)' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', marginBottom: 8 }}>
+                          ผู้เล่นในรอบนี้:
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {members.map((m, idx) => {
+                            const myBill = p.memberBills?.find(b => b.uid === m.uid)
+                            const myPayment = p.memberPayments?.[m.uid]
+                            const myAmount = myBill?.total || (myPayment?.amount ? Number(myPayment.amount) : null)
+
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '5px 10px',
+                                  borderRadius: 20,
+                                  background: 'var(--surface-page)',
+                                  border: '1px solid var(--border-default)',
+                                  fontSize: 12,
+                                }}
+                              >
+                                <div style={{ width: 22, height: 22, borderRadius: '50%', background: 'var(--crimson-500)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, overflow: 'hidden' }}>
+                                  {m.avatar ? <img src={m.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} /> : (m.name || '?')[0]}
+                                </div>
+                                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{m.name}</span>
+                                {m.character && (
+                                  <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>({m.character})</span>
+                                )}
+                                {myAmount !== null && (
+                                  <span style={{ fontWeight: 800, color: 'var(--crimson-500)', fontSize: 11, marginLeft: 2 }}>
+                                    ฿{Math.round(myAmount)}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* ── Expanded Full Breakdown (Games + Foods + Member Bills) ── */}
+                    <div style={{ padding: '16px 20px', background: 'var(--surface-page)', borderTop: '1px solid var(--border-default)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+                        {/* Left: Items breakdown */}
+                        <div style={{ background: 'var(--surface-card)', borderRadius: 10, padding: 14, border: '1px solid var(--border-default)' }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                            <i className="fas fa-list" style={{ marginRight: 6 }} /> รายการในบิล
+                          </div>
+                          <table style={{ width: '100%', fontSize: 13, borderCollapse: 'collapse' }}>
+                            <tbody>
+                              {p.gameTotal > 0 && (
+                                <tr style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                                  <td style={{ padding: '6px 0' }}>ค่าเกม: {p.scriptTitle || 'เกม'} ×{members.length}</td>
+                                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 700 }}>฿{p.gameTotal.toLocaleString()}</td>
+                                </tr>
+                              )}
+                              {(p.foodItems || []).map((fi, fiIdx) => {
+                                const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name || a).join(', ')})` : ''
+                                return (
+                                  <tr key={fiIdx} style={{ borderBottom: '1px solid rgba(0,0,0,0.05)' }}>
+                                    <td style={{ padding: '6px 0' }}>{fi.name}{addStr} ×{fi.qty || 1}</td>
+                                    <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 700 }}>฿{((fi.price || 0) * (fi.qty || 1)).toLocaleString()}</td>
+                                  </tr>
+                                )
+                              })}
+                              {p.discount?.applied > 0 && (
+                                <tr style={{ color: '#16a34a' }}>
+                                  <td style={{ padding: '6px 0' }}><i className="fas fa-tag" /> ส่วนลด</td>
+                                  <td style={{ padding: '6px 0', textAlign: 'right', fontWeight: 700 }}>-฿{p.discount.applied.toLocaleString()}</td>
+                                </tr>
+                              )}
+                              <tr style={{ fontWeight: 800, fontSize: 14, borderTop: '1px solid var(--border-default)' }}>
+                                <td style={{ paddingTop: 8 }}>ยอดสุทธิ (Grand Total):</td>
+                                <td style={{ paddingTop: 8, textAlign: 'right', color: 'var(--crimson-500)' }}>฿{getCleanGrandTotal(p).toLocaleString()}</td>
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+
+                        {/* Right: Individual Member Bills (if available) */}
+                        {p.memberBills?.length > 0 && (
+                          <div style={{ background: 'var(--surface-card)', borderRadius: 10, padding: 14, border: '1px solid var(--border-default)' }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 8 }}>
+                              <i className="fas fa-user-friends" style={{ marginRight: 6 }} /> ยอดแยกรายบุคคล
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                              {p.memberBills.map((mb, mbIdx) => (
+                                <div
+                                  key={mbIdx}
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    fontSize: 12,
+                                    padding: '4px 0',
+                                    borderBottom: '1px solid rgba(0,0,0,0.04)',
+                                  }}
+                                >
+                                  <div>
+                                    <span style={{ fontWeight: 700 }}>{mb.name}</span>
+                                    {mb.character && <span style={{ color: 'var(--text-tertiary)', marginLeft: 4 }}>({mb.character})</span>}
+                                  </div>
+                                  <span style={{ fontWeight: 800, color: 'var(--crimson-500)' }}>
+                                    ฿{(mb.total || 0).toLocaleString()}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action buttons (Edit & Delete) */}
+                      <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                        <button
+                          type="button"
+                          className="adm-btn-outline"
+                          style={{ padding: '6px 14px', fontSize: 12 }}
+                          onClick={() => setEditingPayment(p)}
+                        >
+                          <i className="fas fa-edit" style={{ marginRight: 6, color: 'var(--crimson-500)' }} /> แก้ไขข้อมูลบิล / รอบเล่นนี้ย้อนหลัง
+                        </button>
+                        <button
+                          type="button"
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            opacity: deletingId === p.id ? 0.5 : 1,
+                          }}
+                          disabled={deletingId === p.id}
+                          onClick={() => handleDeletePayment(p)}
+                        >
+                          <i className={`fas ${deletingId === p.id ? 'fa-spinner fa-spin' : 'fa-trash-alt'}`} />
+                          ลบบิลนี้ออกจากระบบ
+                        </button>
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
             )
