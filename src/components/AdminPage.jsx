@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import {
   DEFAULT_RECEIPT_SETTINGS, AVAILABLE_FONTS, SEPARATOR_STYLES,
@@ -2459,37 +2459,63 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
 function MenuEditModal({ item, onClose, showToast }) {
   const [name, setName] = useState(item?.name || '')
   const [price, setPrice] = useState(item?.price ?? '')
-  const [category, setCategory] = useState(item?.category || '')
+  const [category, setCategory] = useState(item?.category || 'ของว่าง')
+  const [available, setAvailable] = useState(item?.available !== false)
   const [imageFile, setImageFile] = useState(null)
   const [imagePreview, setImagePreview] = useState(item?.imageUrl || item?.image || '')
   const [addons, setAddons] = useState(item?.addons || [])
   const [addonName, setAddonName] = useState('')
   const [addonPrice, setAddonPrice] = useState('')
   const [saving, setSaving] = useState(false)
+  const fileInputRef = useRef(null)
+
+  // Close on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
 
   const handleImageChange = (e) => {
-    const file = e.target.files[0]
+    const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 5 * 1024 * 1024) { showToast('ไฟล์ใหญ่เกินไป', 'error'); return }
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('ไฟล์ขนาดใหญ่เกิน 5MB กรุณาเลือกรูปอื่น', 'error')
+      return
+    }
     setImageFile(file)
     const reader = new FileReader()
     reader.onload = ev => setImagePreview(ev.target.result)
     reader.readAsDataURL(file)
   }
 
+  const handleRemoveImage = (e) => {
+    e.stopPropagation()
+    e.preventDefault()
+    setImageFile(null)
+    setImagePreview('')
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
   const addAddon = () => {
     if (!addonName.trim()) return
     setAddons(prev => [...prev, { name: addonName.trim(), price: parseFloat(addonPrice) || 0 }])
-    setAddonName(''); setAddonPrice('')
+    setAddonName('')
+    setAddonPrice('')
   }
 
   const removeAddon = (i) => setAddons(prev => prev.filter((_, idx) => idx !== i))
 
   const handleSave = async () => {
-    if (!name.trim()) { showToast('กรุณากรอกชื่อเมนู', 'error'); return }
+    if (!name.trim()) {
+      showToast('กรุณากรอกชื่อเมนูอาหาร', 'error')
+      return
+    }
     setSaving(true)
     try {
-      let imageUrl = item?.imageUrl || item?.image || ''
+      let imageUrl = imagePreview ? (item?.imageUrl || item?.image || '') : ''
       if (imageFile) {
         const { ref: storageRef, uploadBytes, getDownloadURL } = await import('firebase/storage')
         const { storage } = await import('../firebase')
@@ -2500,8 +2526,9 @@ function MenuEditModal({ item, onClose, showToast }) {
       const data = {
         name: name.trim(),
         price: parseFloat(price) || 0,
-        category: category.trim() || 'อื่นๆ',
+        category: category.trim() || 'ของว่าง',
         imageUrl,
+        available: Boolean(available),
         addons,
         updatedAt: serverTimestamp(),
       }
@@ -2509,88 +2536,633 @@ function MenuEditModal({ item, onClose, showToast }) {
         await updateDoc(doc(db, 'menuItems', item.id), data)
         showToast('อัปเดตเมนูสำเร็จ')
       } else {
-        await addDoc(collection(db, 'menuItems'), { ...data, available: true, createdAt: serverTimestamp() })
+        await addDoc(collection(db, 'menuItems'), {
+          ...data,
+          createdAt: serverTimestamp(),
+        })
         showToast('เพิ่มเมนูสำเร็จ')
       }
       onClose()
-    } catch (e) { showToast('บันทึกล้มเหลว: ' + e.message, 'error') }
-    finally { setSaving(false) }
+    } catch (e) {
+      showToast('บันทึกล้มเหลว: ' + e.message, 'error')
+    } finally {
+      setSaving(false)
+    }
   }
 
+  const CATEGORY_PRESETS = [
+    'ของว่าง',
+    'ของหวาน',
+    'อาหาร',
+    'เครื่องดื่ม',
+    'แอลกอฮอล์',
+    'กับแกล้ม',
+    'เพิ่มเติม',
+  ]
+
   return (
-    <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="modal" style={{ maxWidth: 520 }}>
-        <div className="modal-header">
-          <div className="modal-title">{item?.id ? 'แก้ไขเมนู' : 'เพิ่มเมนูใหม่'}</div>
-          <button className="modal-close" onClick={onClose}><i className="fas fa-times" /></button>
+    <div className="adm-menu-backdrop" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="adm-menu-modal">
+        <style>{`
+          .adm-menu-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 3100;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: scFadeIn 0.2s ease-out;
+          }
+          .adm-menu-modal {
+            background: #ffffff;
+            color: #0f172a;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 20px;
+            width: 100%;
+            max-width: 640px;
+            max-height: 92vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.25);
+            animation: scSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+            font-family: 'Google Sans', 'Sarabun', sans-serif;
+          }
+          .adm-menu-header {
+            padding: 18px 24px 16px;
+            background: #ffffff;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-shrink: 0;
+          }
+          .adm-menu-title-box {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+          }
+          .adm-menu-icon-badge {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background: #fef2f2;
+            border: 1px solid #fee2e2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ef4444;
+            font-size: 18px;
+            flex-shrink: 0;
+          }
+          .adm-menu-close-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+          .adm-menu-close-btn:hover {
+            background: #fee2e2;
+            color: #ef4444;
+            border-color: #fca5a5;
+          }
+          .adm-menu-body {
+            padding: 22px 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            flex: 1;
+          }
+          .adm-menu-grid-top {
+            display: grid;
+            grid-template-columns: 130px 1fr;
+            gap: 18px;
+            align-items: start;
+          }
+          @media (max-width: 580px) {
+            .adm-menu-grid-top {
+              grid-template-columns: 1fr;
+            }
+          }
+          .adm-menu-img-card {
+            width: 100%;
+            height: 130px;
+            border-radius: 14px;
+            border: 2px dashed #cbd5e1;
+            background: #f8fafc;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 10px;
+            transition: all 0.2s ease;
+          }
+          .adm-menu-img-card:hover {
+            border-color: #ef4444;
+            background: #fef2f2;
+          }
+          .adm-menu-img-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.6);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: #ffffff;
+            font-size: 12px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+          }
+          .adm-menu-img-card:hover .adm-menu-img-overlay {
+            opacity: 1;
+          }
+          .adm-menu-label {
+            font-size: 13px;
+            font-weight: 600;
+            color: #334155;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+          }
+          .adm-menu-input {
+            width: 100%;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 9px 13px;
+            font-size: 14px;
+            color: #0f172a;
+            outline: none;
+            transition: all 0.15s ease;
+            box-sizing: border-box;
+          }
+          .adm-menu-input:focus {
+            border-color: #ef4444;
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+          }
+          .adm-menu-input::placeholder {
+            color: #94a3b8;
+          }
+          .adm-menu-section {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
+            padding: 14px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+          .adm-menu-pill {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #475569;
+            transition: all 0.15s ease;
+          }
+          .adm-menu-pill:hover {
+            border-color: #94a3b8;
+            color: #0f172a;
+          }
+          .adm-menu-pill.active {
+            background: #fee2e2;
+            border-color: #f87171;
+            color: #b91c1c;
+          }
+          .adm-menu-addon-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 5px 8px 5px 12px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: #1e293b;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+          }
+          .adm-menu-addon-remove {
+            background: transparent;
+            border: none;
+            color: #94a3b8;
+            cursor: pointer;
+            padding: 3px 6px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s ease;
+          }
+          .adm-menu-addon-remove:hover {
+            color: #ef4444;
+            background: #fee2e2;
+          }
+          .adm-menu-footer {
+            padding: 16px 24px;
+            background: #f8fafc;
+            border-top: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+          }
+          .adm-menu-btn-cancel {
+            padding: 9px 18px;
+            border-radius: 10px;
+            border: 1px solid #cbd5e1;
+            background: #ffffff;
+            color: #475569;
+            font-size: 13.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+          }
+          .adm-menu-btn-cancel:hover {
+            background: #f1f5f9;
+            color: #0f172a;
+          }
+          .adm-menu-btn-save {
+            padding: 9px 22px;
+            border-radius: 10px;
+            border: none;
+            background: #ef4444;
+            color: #ffffff;
+            font-size: 13.5px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 2px 8px rgba(239, 68, 68, 0.25);
+            transition: all 0.15s ease;
+          }
+          .adm-menu-btn-save:hover:not(:disabled) {
+            background: #dc2626;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+          }
+          .adm-menu-btn-save:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+          }
+        `}</style>
+
+        {/* Header */}
+        <div className="adm-menu-header">
+          <div className="adm-menu-title-box">
+            <div className="adm-menu-icon-badge">
+              <i className="fas fa-utensils" />
+            </div>
+            <div>
+              <div style={{ fontWeight: 800, fontSize: 17, color: '#0f172a' }}>
+                {item?.id ? 'แก้ไขข้อมูลเมนูอาหาร' : 'เพิ่มเมนูอาหารใหม่'}
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                {item?.id ? `รหัสอ้างอิง: ${item.id}` : 'กำหนดชื่อ ราคา หมวดหมู่ และตัวเลือกเพิ่มเติม'}
+              </div>
+            </div>
+          </div>
+          <button type="button" className="adm-menu-close-btn" onClick={onClose} title="ปิด (Esc)">
+            <i className="fas fa-times" />
+          </button>
         </div>
-        <div className="modal-body">
-          {/* Image */}
-          <div className="form-group">
-            <label className="form-label">รูปภาพเมนู</label>
-            <label className="menu-img-upload">
-              <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handleImageChange} />
-              {imagePreview
-                ? <img src={imagePreview} alt="" className="menu-img-preview" />
-                : <div className="menu-img-placeholder"><i className="fas fa-camera" /><span>เพิ่มรูป</span></div>
-              }
-              <div className="menu-img-overlay"><i className="fas fa-camera" /></div>
-            </label>
-          </div>
 
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">ชื่อเมนู *</label>
-              <input className="form-input" placeholder="เช่น กระเพราหมูข้าว" value={name} onChange={e => setName(e.target.value)} />
-            </div>
-            <div className="form-group" style={{ maxWidth: 110 }}>
-              <label className="form-label">ราคา (฿)</label>
-              <input className="form-input" type="number" placeholder="0" value={price} onChange={e => setPrice(e.target.value)} />
-            </div>
-          </div>
-          <div className="form-group">
-            <label className="form-label">หมวดหมู่</label>
-            <input className="form-input" placeholder="เช่น อาหาร, เครื่องดื่ม" value={category} onChange={e => setCategory(e.target.value)} />
-          </div>
-
-          {/* Add-ons */}
-          <div className="form-group">
-            <label className="form-label">Add-on (ตัวเลือกเพิ่มเติม)</label>
-            <div className="menu-addon-list">
-              {addons.map((a, i) => (
-                <div key={i} className="menu-addon-chip">
-                  <span>{a.name}{a.price > 0 ? ` +฿${a.price}` : ' ฟรี'}</span>
-                  <button onClick={() => removeAddon(i)}><i className="fas fa-times" /></button>
+        {/* Body */}
+        <div className="adm-menu-body">
+          {/* Top Grid: Image + Main details */}
+          <div className="adm-menu-grid-top">
+            {/* Image Upload Box */}
+            <div>
+              <label className="adm-menu-label">
+                <i className="fas fa-image" style={{ color: '#64748b' }} /> รูปภาพเมนู
+              </label>
+              <div
+                className="adm-menu-img-card"
+                onClick={() => fileInputRef.current?.click()}
+                title="คลิกเพื่ออัปโหลดรูปภาพ"
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleImageChange}
+                />
+                {imagePreview ? (
+                  <>
+                    <img
+                      src={imagePreview}
+                      alt="Menu Preview"
+                      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    />
+                    <div className="adm-menu-img-overlay">
+                      <i className="fas fa-camera" style={{ fontSize: 20 }} />
+                      <span>เปลี่ยนรูปภาพ</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-cloud-arrow-up" style={{ fontSize: 26, color: '#94a3b8', marginBottom: 6 }} />
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#475569' }}>เพิ่มรูปภาพ</span>
+                    <span style={{ fontSize: 10.5, color: '#94a3b8', marginTop: 2 }}>ไม่เกิน 5MB</span>
+                  </>
+                )}
+              </div>
+              {imagePreview && (
+                <div style={{ marginTop: 6, textAlign: 'center' }}>
+                  <button
+                    type="button"
+                    onClick={handleRemoveImage}
+                    style={{
+                      background: 'transparent',
+                      border: 'none',
+                      color: '#ef4444',
+                      fontSize: 11.5,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '2px 6px',
+                    }}
+                  >
+                    <i className="fas fa-trash-can" /> ลบรูปภาพ
+                  </button>
                 </div>
+              )}
+            </div>
+
+            {/* Inputs: Name, Price, Status */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div>
+                <label className="adm-menu-label">
+                  <i className="fas fa-bowl-food" style={{ color: '#64748b' }} /> ชื่อเมนูอาหาร *
+                </label>
+                <input
+                  className="adm-menu-input"
+                  placeholder="เช่น ข้าวกะเพราหมูกรอบ, ไก่ทอดไร้กระดูก"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label className="adm-menu-label">
+                    <i className="fas fa-tag" style={{ color: '#64748b' }} /> ราคาขาย (฿) *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      style={{
+                        position: 'absolute',
+                        left: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#94a3b8',
+                        fontWeight: 700,
+                        fontSize: 14,
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      ฿
+                    </span>
+                    <input
+                      className="adm-menu-input"
+                      type="number"
+                      min="0"
+                      step="any"
+                      placeholder="0"
+                      style={{ paddingLeft: 28 }}
+                      value={price}
+                      onChange={e => setPrice(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="adm-menu-label">
+                    <i className="fas fa-toggle-on" style={{ color: '#64748b' }} /> สถานะการขาย
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setAvailable(v => !v)}
+                    style={{
+                      width: '100%',
+                      padding: '9px 12px',
+                      borderRadius: 10,
+                      border: '1px solid',
+                      borderColor: available ? '#a7f3d0' : '#fecdd3',
+                      background: available ? '#ecfdf5' : '#fff1f2',
+                      color: available ? '#065f46' : '#9f1239',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      transition: 'all 0.15s ease',
+                      height: 40,
+                    }}
+                    title="คลิกเพื่อสลับสถานะ"
+                  >
+                    <i className={available ? 'fas fa-circle-check' : 'fas fa-circle-pause'} />
+                    {available ? 'พร้อมเสิร์ฟ' : 'พักการขาย'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Category Section */}
+          <div className="adm-menu-section">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label className="adm-menu-label" style={{ margin: 0 }}>
+                <i className="fas fa-tags" style={{ color: '#64748b' }} /> หมวดหมู่อาหาร *
+              </label>
+              <span style={{ fontSize: 11.5, color: '#64748b' }}>คลิกเพื่อเลือกหมวดหมู่อย่างรวดเร็ว</span>
+            </div>
+            <input
+              className="adm-menu-input"
+              placeholder="เช่น ของว่าง, เครื่องดื่ม, กับแกล้ม"
+              value={category}
+              onChange={e => setCategory(e.target.value)}
+            />
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {CATEGORY_PRESETS.map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  className={`adm-menu-pill ${category.trim() === cat ? 'active' : ''}`}
+                  onClick={() => setCategory(cat)}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
-            <div className="menu-addon-input-row">
+          </div>
+
+          {/* Add-ons Section */}
+          <div className="adm-menu-section">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label className="adm-menu-label" style={{ margin: 0 }}>
+                <i className="fas fa-layer-group" style={{ color: '#64748b' }} /> ตัวเลือกเสริม / Add-ons ({addons.length})
+              </label>
+              <span style={{ fontSize: 11.5, color: '#64748b' }}>เช่น เพิ่มไข่ดาว, ท็อปปิ้ง, ระดับความหวาน</span>
+            </div>
+
+            {/* List of Add-ons */}
+            {addons.length > 0 ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {addons.map((a, i) => (
+                  <div key={i} className="adm-menu-addon-chip">
+                    <span>{a.name}</span>
+                    <span
+                      style={{
+                        padding: '1px 6px',
+                        borderRadius: 6,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        background: a.price > 0 ? '#ecfdf5' : '#f1f5f9',
+                        color: a.price > 0 ? '#047857' : '#64748b',
+                        border: `1px solid ${a.price > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                      }}
+                    >
+                      {a.price > 0 ? `+฿${a.price}` : 'ฟรี'}
+                    </span>
+                    <button
+                      type="button"
+                      className="adm-menu-addon-remove"
+                      onClick={() => removeAddon(i)}
+                      title="ลบตัวเลือกนี้"
+                    >
+                      <i className="fas fa-times" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '10px 0', fontSize: 12.5, color: '#94a3b8' }}>
+                <i className="fas fa-cubes-stacked" style={{ marginRight: 6 }} /> ยังไม่มีตัวเลือกเสริมสำหรับเมนูนี้
+              </div>
+            )}
+
+            {/* Add Add-on Inline Row */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <input
-                className="form-input"
-                placeholder="ชื่อ add-on เช่น ไข่ดาว"
+                className="adm-menu-input"
+                placeholder="ชื่อตัวเลือกเสริม เช่น ไข่ดาว, เพิ่มชีส"
                 value={addonName}
                 onChange={e => setAddonName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && addAddon()}
+                style={{ flex: 1 }}
               />
-              <input
-                className="form-input"
-                type="number" placeholder="ราคา (฿)"
-                style={{ maxWidth: 100 }}
-                value={addonPrice}
-                onChange={e => setAddonPrice(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addAddon()}
-              />
-              <button className="menu-addon-add-btn" onClick={addAddon}>
-                <i className="fas fa-plus" />
+              <div style={{ position: 'relative', width: 105, flexShrink: 0 }}>
+                <span
+                  style={{
+                    position: 'absolute',
+                    left: 10,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: '#94a3b8',
+                    fontWeight: 700,
+                    fontSize: 13,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  ฿
+                </span>
+                <input
+                  className="adm-menu-input"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0"
+                  value={addonPrice}
+                  onChange={e => setAddonPrice(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && addAddon()}
+                  style={{ paddingLeft: 24 }}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={addAddon}
+                disabled={!addonName.trim()}
+                style={{
+                  background: addonName.trim() ? '#0f172a' : '#cbd5e1',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: 10,
+                  padding: '9px 14px',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: addonName.trim() ? 'pointer' : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  height: 40,
+                  flexShrink: 0,
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <i className="fas fa-plus" /> เพิ่ม
               </button>
             </div>
           </div>
         </div>
-        <div className="modal-footer">
-          <button className="btn-outline-red" onClick={onClose}>ยกเลิก</button>
-          <button className="btn-full-red" onClick={handleSave} disabled={saving}>
-            {saving ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</> : <><i className="fas fa-save" /> บันทึก</>}
-          </button>
+
+        {/* Footer */}
+        <div className="adm-menu-footer">
+          <span style={{ fontSize: 12, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <i className="fas fa-circle-info" style={{ color: '#94a3b8' }} /> เมนูจะซิงค์กับระบบสั่งอาหารทันทีหลังบันทึก
+          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <button type="button" className="adm-menu-btn-cancel" onClick={onClose}>
+              ยกเลิก
+            </button>
+            <button
+              type="button"
+              className="adm-menu-btn-save"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" /> กำลังบันทึก...
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-floppy-disk" /> บันทึกข้อมูล
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
