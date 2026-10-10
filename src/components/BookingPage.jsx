@@ -241,8 +241,62 @@ function MemberAvatar({
 
 const DAY_NAMES_FULL = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสฯ', 'ศุกร์', 'เสาร์']
 
+// ── Locked Room & Privacy Helpers ──────────────────────────────────────────────
+export function isRoomLocked(b) {
+  if (!b) return false
+  if (b.status === 'locked') return true
+  if (b.isMock) return true
+  const max = b.maxMembers || 0
+  const paid = b.members?.filter(m => m.paidDeposit).length || 0
+  if (max > 0 && paid >= max) return true
+  return false
+}
+
+export function canViewBookingDetail(b, user) {
+  if (!b) return false
+  const locked = isRoomLocked(b)
+  if (!locked) return true // Open / pending / recruiting bookings can be viewed to join
+  const isAdmin = user?.role === 'admin' || user?.isAdmin
+  const isLeader = b.leaderId === user?.uid
+  const isMember = b.members?.some(m => m.uid === user?.uid || m.id === user?.uid)
+  return Boolean(isAdmin || isLeader || isMember)
+}
+
+export function getPublicGameName(b, user) {
+  if (!b) return ''
+  const canView = canViewBookingDetail(b, user)
+  if (isRoomLocked(b) && !canView) {
+    return 'ล็อกห้องแล้ว'
+  }
+  if (b.isMock) {
+    if (b.gameName && b.gameName !== 'Mock Block' && !b.gameName.toLowerCase().includes('mock')) {
+      return b.gameName
+    }
+    return (user?.role === 'admin' || user?.isAdmin) ? 'ปิดรอบส่วนตัว (Admin Block)' : 'ปิดรอบส่วนตัว'
+  }
+  if (b.gameName && b.gameName.toLowerCase().includes('mock')) {
+    return 'ปิดรอบส่วนตัว'
+  }
+  return b.gameName || 'การจองห้อง'
+}
+
+export function getEventTitle(b, user) {
+  if (!b) return ''
+  const locked = isRoomLocked(b)
+  const canView = canViewBookingDetail(b, user)
+  const roomName = b.room || 'ห้องเล่น'
+  const timeStr = b.time ? ` — ${b.time}` : ''
+
+  if (locked && !canView) {
+    return `${roomName}${timeStr} (ล็อกห้องแล้ว)`
+  }
+
+  const name = getPublicGameName(b, user)
+  return `${name || roomName}${timeStr}`
+}
+
 // ── Google-Calendar-style Monthly Grid ────────────────────────────────────────
-function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onBookToday }) {
+function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEventClick, onBookToday }) {
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
@@ -648,7 +702,7 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
                       <div
                         key={b.id}
                         onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
-                        title={`${b.gameName || b.room} — ${b.time || ''}`}
+                        title={getEventTitle(b, lineUser)}
                         style={{ height: '7px', borderRadius: '99px', background: rc, cursor: 'pointer', flexShrink: 0, opacity: 0.85, transition: 'opacity 0.12s' }}
                         onMouseEnter={e => e.currentTarget.style.opacity = '1'}
                         onMouseLeave={e => e.currentTarget.style.opacity = '0.85'}
@@ -658,17 +712,21 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
                 ) : (
                   dayBookingsSorted.map(b => {
                     const rc = ROOM_COLORS[b.room] || '#64748b'
+                    const locked = isRoomLocked(b)
                     return (
                       <button
                         key={b.id}
                         onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
-                        title={`${b.gameName || b.room} — ${b.time || ''}`}
+                        title={getEventTitle(b, lineUser)}
                         style={{ width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: '6px', border: 'none', background: `${rc}18`, borderLeft: `3px solid ${rc}`, cursor: 'pointer', transition: 'opacity 0.12s', minWidth: 0 }}
                         onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
                         onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
-                          {b.room || b.gameName || 'รอบ'}
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.room || 'ห้อง'}</span>
+                          {locked && (
+                            <i className="fas fa-lock" style={{ fontSize: '8px', opacity: 0.65, flexShrink: 0 }} />
+                          )}
                         </div>
                         {b.time && (
                           <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', lineHeight: 1.2 }}>{b.time}</div>
@@ -719,11 +777,14 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
                 {selectedDayBookings.map(b => {
                   const rc = ROOM_COLORS[b.room] || '#64748b'
+                  const locked = isRoomLocked(b)
+                  const canView = canViewBookingDetail(b, lineUser)
+                  const publicName = getPublicGameName(b, lineUser)
                   return (
                     <button
                       key={b.id}
                       onClick={() => onEventClick?.(b)}
-                      title={`คลิกเพื่อดูรายละเอียดรอบ ${b.room || ''}`}
+                      title={getEventTitle(b, lineUser)}
                       style={{
                         display: 'inline-flex', alignItems: 'center', gap: '6px',
                         padding: '4px 10px', borderRadius: '8px',
@@ -744,13 +805,13 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
                     >
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: rc, flexShrink: 0 }} />
                       <span style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a' }}>{b.room || 'ห้องเล่น'}</span>
-                      {b.status === 'locked' && (
+                      {locked && (
                         <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                           <i className="fas fa-lock" style={{ fontSize: '8px' }} />ล็อก
                         </span>
                       )}
                       {b.time && <span style={{ fontSize: '10.5px', color: rc, fontWeight: 800 }}>{b.time}</span>}
-                      {b.gameName && <span style={{ fontSize: '10px', color: '#64748b' }}>({b.gameName})</span>}
+                      {canView && publicName && <span style={{ fontSize: '10px', color: '#64748b' }}>({publicName})</span>}
                     </button>
                   )
                 })}
@@ -797,10 +858,12 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   const max = booking.maxMembers || total || 1
   const isLeader = booking.leaderId === lineUser?.uid
   const pendingRequests = booking.joinRequests?.length || 0
-  const imgSrc = booking.gameImage ? convertImg(booking.gameImage, 400) : null
+  const isLocked = isRoomLocked(booking)
+  const canView = canViewBookingDetail(booking, lineUser)
+  const publicGameName = getPublicGameName(booking, lineUser)
+  const imgSrc = (!isLocked || canView) && booking.gameImage ? convertImg(booking.gameImage, 400) : null
   const countdown = booking.status === 'confirmed' && booking.depositDeadline ? formatCountdown(booking.depositDeadline) : null
   const isUrgent = countdown && new Date(booking.depositDeadline) - new Date() < 24 * 3600000
-  const isLocked = booking.status === 'locked' || (paidCount >= max && max > 0)
   const allPaid = paidCount >= max
   const paidPct = (paidCount / max) * 100
   const rc = ROOM_COLORS[booking.room] || '#64748b'
@@ -823,7 +886,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
       <div style={{ width: '72px', flexShrink: 0, position: 'relative', overflow: 'hidden', background: 'var(--surface-sunken)' }}>
         {imgSrc
           ? <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.75) contrast(1.1)', display: 'block' }} />
-          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)', fontSize: '22px' }}><i className="fas fa-scroll" /></div>
+          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)', fontSize: '22px' }}><i className={isLocked && !canView ? "fas fa-lock" : "fas fa-scroll"} /></div>
         }
         <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: rc }} />
       </div>
@@ -833,9 +896,9 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
         {/* Title + Status */}
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '5px' }}>
           <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
-            {booking.gameName || 'การจองห้อง'}
+            {publicGameName}
           </div>
-          <StatusBadge status={booking.status} label={booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined} />
+          <StatusBadge status={isLocked ? 'locked' : booking.status} label={isLocked && !canView ? 'ล็อกห้องแล้ว' : (booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined)} />
         </div>
 
         {/* Meta chips */}
@@ -860,19 +923,31 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
 
         {/* Progress footer */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-default)' }}>
-          <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600 }}>
-              <span>สมาชิก {total}/{max}</span>
-              <span style={{ color: isLocked || allPaid ? '#047857' : 'var(--text-tertiary)' }}>
-                {isLocked ? 'ล็อกห้องแล้ว' : `มัดจำ ${paidCount}/${max}`}
-              </span>
+          {isLocked && !canView ? (
+            <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#047857', fontWeight: 700 }}>
+                <span><i className="fas fa-lock" style={{ marginRight: '4px' }} />ห้องนี้ถูกล็อกแล้ว</span>
+                <span>เฉพาะสมาชิกในตี้</span>
+              </div>
+              <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: '100%', background: '#10b981', borderRadius: '6px' }} />
+              </div>
             </div>
-            <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, paidPct))}%`, background: isLocked || allPaid ? '#10b981' : 'var(--crimson-500)', borderRadius: '6px', transition: 'width 0.3s ease-out' }} />
+          ) : (
+            <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+                <span>สมาชิก {total}/{max}</span>
+                <span style={{ color: isLocked || allPaid ? '#047857' : 'var(--text-tertiary)' }}>
+                  {isLocked ? 'ล็อกห้องแล้ว' : `มัดจำ ${paidCount}/${max}`}
+                </span>
+              </div>
+              <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, paidPct))}%`, background: isLocked || allPaid ? '#10b981' : 'var(--crimson-500)', borderRadius: '6px', transition: 'width 0.3s ease-out' }} />
+              </div>
             </div>
-          </div>
+          )}
 
-          {countdown && (
+          {(!isLocked || canView) && countdown && (
             <div style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: isUrgent ? '#ef4444' : '#d97706', border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.25)'}` }}>
               <i className="fas fa-clock" style={{ fontSize: '9px' }} />{countdown}
             </div>
@@ -1812,8 +1887,8 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
   const isMember = booking.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
   const isLeader = booking.leaderId === lineUser?.uid
   const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
-  const isLocked = booking.status === 'locked' || (paidCount >= maxMembers && maxMembers > 0)
-  const isLockedRestricted = booking.status === 'locked' && !isMember && !isLeader && !isAdmin
+  const isLocked = isRoomLocked(booking)
+  const isLockedRestricted = isLocked && !canViewBookingDetail(booking, lineUser)
   const myMember = booking.members?.find(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
   const myRequest = booking.joinRequests?.some(r => r.uid === lineUser?.uid)
   const imgSrc = booking.gameImage ? convertImg(booking.gameImage, 800) : null
@@ -2857,11 +2932,8 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
     if (bid) {
       const found = bookings.find(b => b.id === bid)
       if (found) {
-        const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
-        const isMember = found.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
-        const isLeader = found.leaderId === lineUser?.uid
-        if (found.status === 'locked' && !isAdmin && !isMember && !isLeader) {
-          showToast('ตี้ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
+        if (!canViewBookingDetail(found, lineUser)) {
+          showToast('ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
           window.history.replaceState({}, '', '/booking')
           return
         }
@@ -2880,11 +2952,8 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
 
   const openDetail = useCallback((b) => {
     if (!b) return
-    const isAdmin = lineUser?.role === 'admin' || lineUser?.isAdmin
-    const isMember = b.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
-    const isLeader = b.leaderId === lineUser?.uid
-    if (b.status === 'locked' && !isAdmin && !isMember && !isLeader) {
-      showToast('ตี้ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
+    if (!canViewBookingDetail(b, lineUser)) {
+      showToast('ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
       return
     }
     setDetailBooking(b)
@@ -3121,6 +3190,7 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
             </div>
             <BookingCalendar
               bookings={bookings}
+              lineUser={lineUser}
               onDayClick={date => setCalendarDate(d => d === date ? '' : date)}
               selectedDate={calendarDate}
               onEventClick={openDetail}

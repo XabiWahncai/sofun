@@ -7,7 +7,7 @@ import {
   serverTimestamp, arrayUnion, onSnapshot,
   query, orderBy, limit, where
 } from 'firebase/firestore'
-import { BookingDetailModal } from './BookingPage'
+import { BookingDetailModal, isRoomLocked, canViewBookingDetail, getPublicGameName } from './BookingPage'
 import { useOpenProfile } from '../UserProfileContext'
 
 const toWsrv = (fileId) =>
@@ -754,8 +754,9 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
   const isLeader    = booking.leaderId === user?.uid
   const isAdmin     = user?.role === 'admin' || user?.isAdmin
   const isFull      = members.length >= maxMembers
-  const isLocked    = booking.status === 'locked'
-  const isLockedRestricted = isLocked && !isMember && !isLeader && !isAdmin
+  const isLocked    = isRoomLocked(booking)
+  const canView     = canViewBookingDetail(booking, user)
+  const isLockedRestricted = isLocked && !canView
   const hasPending  = booking.joinRequests?.some(r => r.uid === user?.uid)
 
   const statusBg    = isLockedRestricted ? 'rgba(15,23,42,0.85)' : (isLocked || isFull) ? 'rgba(198,36,25,0.85)' : 'rgba(0,0,0,0.55)'
@@ -773,10 +774,10 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
     >
       {/* Image */}
       <div style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0 }}>
-        {booking.gameImage
+        {!isLockedRestricted && booking.gameImage
           ? <img src={convertImageUrl(booking.gameImage)} alt={booking.gameName} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="fas fa-theater-masks" style={{ fontSize: '36px', color: 'var(--text-tertiary)' }} />
+              <i className={isLockedRestricted ? "fas fa-lock" : "fas fa-theater-masks"} style={{ fontSize: '36px', color: 'var(--text-tertiary)' }} />
             </div>
         }
         <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 40%, rgba(0,0,0,0.45))' }} />
@@ -806,7 +807,7 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
 
         {/* Game name */}
         <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-          {booking.gameName || 'ไม่ระบุเกม'}
+          {isLockedRestricted ? 'ล็อกห้องแล้ว' : (booking.gameName || 'ไม่ระบุเกม')}
         </div>
 
         {/* Deposit countdown */}
@@ -818,51 +819,69 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
         )}
 
         {/* Leader */}
-        <div
-          onClick={e => { e.stopPropagation(); booking.leaderId && openProfile(booking.leaderId) }}
-          style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: booking.leaderId ? 'pointer' : 'default' }}
-        >
-          {booking.leaderAvatar
-            ? <img src={booking.leaderAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-            : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className="fas fa-user" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
-              </div>
-          }
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{booking.leaderName || 'ไม่ระบุหัวหน้า'}</span>
-        </div>
+        {isLockedRestricted ? (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+            <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <i className="fas fa-lock" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
+            </div>
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ห้องส่วนตัว / ล็อกแล้ว</span>
+          </div>
+        ) : (
+          <div
+            onClick={e => { e.stopPropagation(); booking.leaderId && openProfile(booking.leaderId) }}
+            style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: booking.leaderId ? 'pointer' : 'default' }}
+          >
+            {booking.leaderAvatar
+              ? <img src={booking.leaderAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
+              : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <i className="fas fa-user" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
+                </div>
+            }
+            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{booking.leaderName || 'ไม่ระบุหัวหน้า'}</span>
+          </div>
+        )}
 
-        {booking.depositAmount > 0 && (
+        {booking.depositAmount > 0 && !isLockedRestricted && (
           <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>มัดจำ ฿{booking.depositAmount}/คน</div>
         )}
 
         {/* Members + progress */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <div style={{ display: 'flex' }}>
-              {members.slice(0, 5).map((m, i) => (
-                <div
-                  key={i} title={m.name}
-                  onClick={e => { e.stopPropagation(); m.uid && openProfile(m.uid) }}
-                  style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
-                >
-                  {m.avatar
-                    ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-                    : <span>{(m.name || '?')[0]}</span>
-                  }
-                </div>
-              ))}
-              {members.length > 5 && (
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', marginLeft: '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-tertiary)' }}>
-                  +{members.length - 5}
-                </div>
-              )}
+        {isLockedRestricted ? (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
+            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
+              <i className="fas fa-user-lock" /> เฉพาะสมาชิกในตี้
+            </span>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#047857' }}>ล็อกแล้ว</span>
+          </div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+              <div style={{ display: 'flex' }}>
+                {members.slice(0, 5).map((m, i) => (
+                  <div
+                    key={i} title={m.name}
+                    onClick={e => { e.stopPropagation(); m.uid && openProfile(m.uid) }}
+                    style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
+                  >
+                    {m.avatar
+                      ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
+                      : <span>{(m.name || '?')[0]}</span>
+                    }
+                  </div>
+                ))}
+                {members.length > 5 && (
+                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', marginLeft: '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-tertiary)' }}>
+                    +{members.length - 5}
+                  </div>
+                )}
+              </div>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>{members.length}/{maxMembers} คน</span>
             </div>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>{members.length}/{maxMembers} คน</span>
+            <div style={{ height: '4px', borderRadius: '2px', background: 'var(--surface-sunken)' }}>
+              <div style={{ height: '100%', background: fillColor, width: '100%', transform: `scaleX(${fillPct / 100})`, transformOrigin: 'left center', transition: 'transform 0.3s ease-out' }} />
+            </div>
           </div>
-          <div style={{ height: '4px', borderRadius: '2px', background: 'var(--surface-sunken)' }}>
-            <div style={{ height: '100%', background: fillColor, width: '100%', transform: `scaleX(${fillPct / 100})`, transformOrigin: 'left center', transition: 'transform 0.3s ease-out' }} />
-          </div>
-        </div>
+        )}
 
         {/* Action */}
         <div style={{ marginTop: 'auto', paddingTop: '2px' }}>
@@ -1051,7 +1070,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
       where('status', 'in', ['confirmed', 'locked'])
     )
     return onSnapshot(q, snap => {
-      setBookings(snap.docs.map(d => ({ id: d.id, _type: 'booking', ...d.data() })))
+      setBookings(snap.docs.map(d => ({ id: d.id, _type: 'booking', ...d.data() })).filter(b => !b.isMock))
     }, () => {})
   }, [])
 
@@ -1293,11 +1312,8 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
                     user={user}
                     onRequestJoin={handleBookingRequestJoin}
                     onOpen={() => {
-                      const isMember = item.members?.some(m => m.uid === user?.uid || m.id === user?.uid)
-                      const isLeader = item.leaderId === user?.uid
-                      const isAdmin = user?.role === 'admin' || user?.isAdmin
-                      if (item.status === 'locked' && !isMember && !isLeader && !isAdmin) {
-                        showToast?.('ตี้ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
+                      if (!canViewBookingDetail(item, user)) {
+                        showToast?.('ห้องนี้ถูกล็อกแล้ว เฉพาะสมาชิกในตี้หรือแอดมินเท่านั้นที่สามารถดูรายละเอียดได้', 'warning')
                         return
                       }
                       setDetailBooking(item)

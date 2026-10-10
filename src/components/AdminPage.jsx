@@ -6755,7 +6755,7 @@ function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
     if (!date) { showToast('กรุณาเลือกวันที่', 'error'); return }
     if (!room) { showToast('กรุณาเลือกห้องที่ต้องการบล็อก', 'error'); return }
 
-    const finalGameName = (gameMode === 'select' ? selectedGame?.title : customGameName) || customGameName || note || 'Mock Block'
+    const finalGameName = (gameMode === 'select' ? selectedGame?.title : customGameName) || customGameName || note || 'ปิดรอบส่วนตัว'
     const finalGameImage = (gameMode === 'select' ? (selectedGame?.image || selectedGame?.coverUrl) : '') || ''
     const finalGameId = (gameMode === 'select' ? selectedGameId : '') || ''
 
@@ -6768,7 +6768,7 @@ function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
         date,
         time: time || '13:00',
         room,
-        status: 'confirmed', // สถานะยืนยันแล้วทันที!
+        status: 'locked', // ล็อกห้องทันที
         isMock: true,
         mockNote: note || '',
         adminNote: note || '',
