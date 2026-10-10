@@ -42,16 +42,36 @@ function buildPromptPayQR(phoneOrId, amount) {
   return s + crc16(s).toString(16).toUpperCase().padStart(4, '0')
 }
 
+const fmtCurrency = (val) => {
+  const n = Number(val) || 0
+  return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
-export default function PaymentModal({ session, selectedGame, onClose, onPaid, showToast, adminUser, memberPayments }) {
+export default function PaymentModal({
+  session,
+  selectedGame,
+  onClose,
+  onPaid,
+  showToast,
+  adminUser,
+  memberPayments = {},
+  getMemberBill: propGetMemberBill,
+  grandTotal: propGrandTotal,
+  remainingAmount: propRemainingAmount,
+  totalDiscount: propTotalDiscount = 0,
+  totalPersonalDiscounts: propTotalPersonalDiscounts = 0,
+  gameUnitPay: propGameUnitPay,
+  gameFullPrice: propGameFullPrice,
+  discountEffectiveIds: propDiscountEffectiveIds = [],
+  discountPerDiscounted: propDiscountPerDiscounted = 0,
+}) {
   const [promptPayPhone, setPromptPayPhone] = useState('')
   const [paymentAccountName, setPaymentAccountName] = useState('')
   const [paymentBankName, setPaymentBankName] = useState('')
-  const [discountType, setDiscountType] = useState('amount') // 'amount' | 'percent'
-  const [discountValue, setDiscountValue] = useState('')
   const [splitMode, setSplitMode] = useState(false)
   const [activeMember, setActiveMember] = useState(null)
-  const [memberFoodKeys, setMemberFoodKeys] = useState({}) // uid → Set of food keys
+  const [localMemberPayments, setLocalMemberPayments] = useState({})
   const [saving, setSaving] = useState(false)
   const [slipData, setSlipData] = useState(null)
 
@@ -66,67 +86,117 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
     })
   }, [])
 
-  // Init split food assignment: every member gets all food items
-  useEffect(() => {
-    if (!splitMode) return
-    const allKeys = orderArr.map(x => x.key)
-    const init = {}
-    session.members.forEach(m => { init[m.uid] = new Set(allKeys) })
-    setMemberFoodKeys(init)
-    setActiveMember(session.members[0]?.uid || null)
-  }, [splitMode])
+  const currentPayments = { ...memberPayments, ...localMemberPayments }
+  const sessionMembers = Array.isArray(session?.members) ? session.members : []
+  const orderArr = Array.isArray(session?.order) ? session.order : []
+  const n = sessionMembers.length
 
-  const orderArr = Array.isArray(session.order) ? session.order : []
-  const gameUnitPrice = selectedGame?.price || 0
-  const n = session.members.length
+  const gameUnit = (session?.customPrice !== '' && session?.customPrice !== undefined)
+    ? Number(session.customPrice) || 0
+    : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
+  const gameFull = selectedGame
+    ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (gameUnit + (Number(selectedGame.deposit) || 0)))
+    : gameUnit
 
-  const rawFoodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-  const rawGameTotal = n * gameUnitPrice
+  const getMemberBill = (m) => {
+    if (propGetMemberBill) return propGetMemberBill(m)
+    const myFood = orderArr
+      .filter(x => x.orderedBy?.uid === m.uid)
+      .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+    const myBaseGame = m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)
+    const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m.uid)
+    const myDisc = isMemberDiscounted ? (propDiscountPerDiscounted || 0) : 0
+    return Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+  }
+
+  const rawFoodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+  const rawGameTotal = sessionMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)), 0)
   const rawTotal = rawFoodTotal + rawGameTotal
 
-  // Members already paid via EasySlip
-  const alreadyPaidMembers = session.members.filter(m => (memberPayments || {})[m.uid]?.verified)
-  const alreadyPaid = alreadyPaidMembers.reduce((s, m) => s + (Number((memberPayments || {})[m.uid]?.amount) || 0), 0)
+  const alreadyPaidMembers = sessionMembers.filter(m => currentPayments[m.uid]?.verified)
+  const alreadyPaid = alreadyPaidMembers.reduce((s, m) => s + (Number(currentPayments[m.uid]?.amount) || 0), 0)
 
-  const discNum = Math.max(0, parseFloat(discountValue) || 0)
-  const discountAmt = discountType === 'amount'
-    ? Math.min(discNum, rawTotal)
-    : Math.min((rawTotal * Math.min(discNum, 100)) / 100, rawTotal)
-  const grandTotal = Math.max(0, rawTotal - alreadyPaid - discountAmt)
+  const calcGrandTotal = propGrandTotal ?? Math.max(0, rawTotal - propTotalDiscount - propTotalPersonalDiscounts)
+  const tableRemaining = propRemainingAmount ?? Math.max(0, calcGrandTotal - alreadyPaid)
 
-  // Per-member total in split mode
-  const getMemberTotal = (uid) => {
-    const keys = memberFoodKeys[uid] || new Set()
-    const myFood = orderArr
-      .filter(x => keys.has(x.key))
-      .reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const myDiscount = n > 0 ? discountAmt / n : 0
-    return Math.max(0, gameUnitPrice + myFood - myDiscount)
-  }
+  const isAllMembersPaid = sessionMembers.length > 0 && sessionMembers.every(m => currentPayments[m.uid]?.verified)
 
-  const toggleFood = (uid, key) => {
-    setMemberFoodKeys(prev => {
-      const s = new Set(prev[uid] || [])
-      s.has(key) ? s.delete(key) : s.add(key)
-      return { ...prev, [uid]: s }
-    })
-  }
+  // Initialize or maintain active member in split mode
+  useEffect(() => {
+    if (splitMode && sessionMembers.length > 0) {
+      if (!activeMember || !sessionMembers.some(m => m.uid === activeMember)) {
+        const firstUnpaid = sessionMembers.find(m => !currentPayments[m.uid]?.verified)
+        setActiveMember((firstUnpaid || sessionMembers[0]).uid)
+      }
+    }
+  }, [splitMode, sessionMembers, currentPayments, activeMember])
 
-  const activeAmt = splitMode && activeMember ? getMemberTotal(activeMember) : grandTotal
-  const qrPayload = buildPromptPayQR(promptPayPhone, activeAmt)
+  const activeMemberObj = sessionMembers.find(m => m.uid === activeMember) || sessionMembers[0] || null
+  const activeAmt = splitMode && activeMemberObj
+    ? getMemberBill(activeMemberObj)
+    : tableRemaining
+  const isSelectedMemberPaid = activeMemberObj ? Boolean(currentPayments[activeMemberObj.uid]?.verified) : false
 
-  // ── Confirm payment ──────────────────────────────────────────────────────
-  const handleConfirmPayment = async () => {
+  // ── Confirm single member payment (DOES NOT close party/session) ───────────
+  const handleConfirmSingleMember = async () => {
     if (!session.confirmedOrderId) {
-      showToast('กรุณาบันทึกออเดอร์ก่อน (กดยืนยันออเดอร์)', 'error'); return
+      showToast('กรุณาบันทึกออเดอร์ก่อน', 'error'); return
+    }
+    if (!activeMemberObj) return
+    const targetUid = activeMemberObj.uid
+    const amt = Math.round(activeAmt * 100) / 100
+
+    setSaving(true)
+    try {
+      const updates = {
+        [`memberPayments.${targetUid}.verified`]: true,
+        [`memberPayments.${targetUid}.amount`]: amt,
+        [`memberPayments.${targetUid}.verifiedAt`]: new Date().toISOString(),
+        [`memberPayments.${targetUid}.paidByAdmin`]: true,
+        [`memberPayments.${targetUid}.pendingAdminReview`]: false,
+        [`memberPayments.${targetUid}.easyslipPending`]: false,
+      }
+      if (amt <= 0) updates[`memberPayments.${targetUid}.zeroAmount`] = true
+
+      await updateDoc(doc(db, 'orders', session.confirmedOrderId), updates)
+
+      setLocalMemberPayments(prev => ({
+        ...prev,
+        [targetUid]: {
+          verified: true,
+          amount: amt,
+          verifiedAt: new Date().toISOString(),
+          paidByAdmin: true,
+          zeroAmount: amt <= 0,
+        }
+      }))
+
+      showToast(`บันทึกรับเงินของ ${activeMemberObj.name} สำเร็จ ✓`)
+
+      // Auto-advance to next unpaid member
+      const nextUnpaid = sessionMembers.find(
+        m => m.uid !== targetUid && !currentPayments[m.uid]?.verified
+      )
+      if (nextUnpaid) {
+        setActiveMember(nextUnpaid.uid)
+      }
+    } catch (e) {
+      showToast('บันทึกล้มเหลว: ' + e.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // ── Confirm full table payment (marks all unpaid as paid & closes party) ────
+  const handleConfirmFullPayment = async () => {
+    if (!session.confirmedOrderId) {
+      showToast('กรุณาบันทึกออเดอร์ก่อน', 'error'); return
     }
     setSaving(true)
     try {
-      // Fetch order openAt time
       const orderSnap = await getDoc(doc(db, 'orders', session.confirmedOrderId))
       const openAt = orderSnap.data()?.createdAt?.toDate() || null
 
-      // Atomic serial counter
       const counterRef = doc(db, 'settings', 'counter')
       let serial = 1
       await runTransaction(db, async tx => {
@@ -135,18 +205,22 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
         tx.set(counterRef, { slipSerial: serial }, { merge: true })
       })
 
-      const memberBills = session.members.map(m => {
-        const keys = memberFoodKeys[m.uid] || new Set()
-        const food = orderArr.filter(x => keys.has(x.key))
-        return {
-          uid: m.uid,
-          name: m.name,
-          character: m.character || '',
-          avatar: m.avatar || '',
-          scanInAt: m.scanInAt || null,
-          gamePrice: gameUnitPrice,
-          foodItems: food.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
-          total: splitMode ? getMemberTotal(m.uid) : (grandTotal / (n || 1)),
+      const updates = {
+        status: 'paid',
+        paidAt: serverTimestamp(),
+        paidTotal: calcGrandTotal,
+        serial,
+      }
+
+      sessionMembers.forEach(m => {
+        if (!currentPayments[m.uid]?.verified) {
+          const mBill = getMemberBill(m)
+          updates[`memberPayments.${m.uid}.verified`] = true
+          updates[`memberPayments.${m.uid}.amount`] = Math.round(mBill * 100) / 100
+          updates[`memberPayments.${m.uid}.verifiedAt`] = new Date().toISOString()
+          updates[`memberPayments.${m.uid}.paidByAdmin`] = true
+          updates[`memberPayments.${m.uid}.pendingAdminReview`] = false
+          updates[`memberPayments.${m.uid}.easyslipPending`] = false
         }
       })
 
@@ -157,24 +231,21 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
         scriptTitle: selectedGame?.title || '',
         dm: session.dm,
         room: session.room,
-        members: session.members.map(m => ({
+        members: sessionMembers.map(m => ({
           uid: m.uid, name: m.name,
           character: m.character || '',
           avatar: m.avatar || '',
           scanInAt: m.scanInAt || null,
         })),
-        memberUids: session.members.map(m => m.uid),
-        gameUnitPrice,
+        memberUids: sessionMembers.map(m => m.uid),
+        gameUnitPrice: propGameUnitPay ?? gameUnit,
         gameTotal: rawGameTotal,
         foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
         foodTotal: rawFoodTotal,
-        discount: { type: discountType, value: discNum, applied: discountAmt },
+        discount: { applied: propTotalDiscount || 0 },
         alreadyPaid,
-        alreadyPaidMembers: alreadyPaidMembers.map(m => ({ uid: m.uid, name: m.name, amount: (memberPayments || {})[m.uid]?.amount || 0 })),
-        fullTotal: rawTotal,
-        grandTotal,
-        splitMode,
-        memberBills,
+        fullTotal: calcGrandTotal,
+        grandTotal: calcGrandTotal,
         serial,
         openAt,
         printCount: 0,
@@ -183,13 +254,7 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
       }
 
       const payRef = await addDoc(collection(db, 'payments'), payData)
-      await updateDoc(doc(db, 'orders', session.confirmedOrderId), {
-        status: 'paid',
-        paidAt: serverTimestamp(),
-        paidTotal: grandTotal,
-        discount: payData.discount,
-        serial,
-      })
+      await updateDoc(doc(db, 'orders', session.confirmedOrderId), updates)
 
       showToast('บันทึกการชำระเงินสำเร็จ ✓')
       setSlipData({ payData: { ...payData, openAt }, serial, paymentDocId: payRef.id })
@@ -200,7 +265,17 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
     }
   }
 
-  const activeMemberObj = session.members.find(m => m.uid === activeMember)
+  // Active member breakdown values
+  const memberFood = activeMemberObj ? orderArr.filter(x => x.orderedBy?.uid === activeMemberObj.uid) : []
+  const isUnpaidDep = activeMemberObj ? Boolean(activeMemberObj.unpaidDeposit) : false
+  const memberGameFee = activeMemberObj
+    ? (isUnpaidDep ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit))
+    : 0
+  const isDisc = activeMemberObj ? (propDiscountEffectiveIds || []).includes(activeMemberObj.uid) : false
+  const memberDisc = isDisc ? (propDiscountPerDiscounted || 0) : 0
+  const memberPersonalDisc = activeMemberObj ? (Number(activeMemberObj.personalDiscount) || 0) : 0
+
+  const qrPayload = buildPromptPayQR(promptPayPhone, activeAmt)
 
   return (
     <>
@@ -215,195 +290,313 @@ export default function PaymentModal({ session, selectedGame, onClose, onPaid, s
 
         <div className="pay-body">
 
-          {/* Order summary */}
-          <div className="pay-summary-block">
-            {selectedGame && (
-              <div className="pay-summary-row">
-                <span><i className="fas fa-scroll" style={{ color: '#c62419', marginRight: 4 }} />{selectedGame.title} × {n} คน</span>
-                <span>฿{rawGameTotal.toLocaleString()}</span>
-              </div>
-            )}
-            {orderArr.map(x => (
-              <div key={x.key} className="pay-summary-row">
-                <span>
-                  {x.name}{x.addons?.length > 0 ? ` (${x.addons.map(a => a.name).join(', ')})` : ''} × {x.qty}
-                </span>
-                <span>฿{(x.totalPrice * x.qty).toLocaleString()}</span>
-              </div>
-            ))}
-            <div className="pay-summary-sub">
-              <span>รวม</span><span>฿{rawTotal.toLocaleString()}</span>
-            </div>
-            {alreadyPaid > 0 && (
-              <div className="pay-already-paid-row">
-                <span>
-                  <i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)', marginRight: 4 }} />
-                  จ่ายแล้ว ({alreadyPaidMembers.map(m => m.name.split(' ')[0]).join(', ')})
-                </span>
-                <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{alreadyPaid.toLocaleString()}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Discount */}
-          <div className="pay-discount-row">
-            <span className="pay-disc-label"><i className="fas fa-tag" /> ส่วนลด</span>
-            <div className="pay-disc-controls">
-              <button
-                className={`pay-disc-type${discountType === 'amount' ? ' active' : ''}`}
-                onClick={() => { setDiscountType('amount'); setDiscountValue('') }}>฿</button>
-              <button
-                className={`pay-disc-type${discountType === 'percent' ? ' active' : ''}`}
-                onClick={() => { setDiscountType('percent'); setDiscountValue('') }}>%</button>
-              <input
-                className="pay-disc-input" type="number"
-                min="0" max={discountType === 'percent' ? 100 : rawTotal}
-                placeholder="0" value={discountValue}
-                onChange={e => {
-                  const v = parseFloat(e.target.value)
-                  if (isNaN(v) || v < 0) { setDiscountValue(''); return }
-                  if (discountType === 'percent' && v > 100) { setDiscountValue('100'); return }
-                  if (discountType === 'amount' && v > rawTotal) { setDiscountValue(String(rawTotal)); return }
-                  setDiscountValue(e.target.value)
-                }}
-              />
-            </div>
-            {discountAmt > 0 && (
-              <span className="pay-disc-applied">-฿{discountAmt.toLocaleString()}</span>
-            )}
-          </div>
-
-          {/* Grand total */}
-          <div className="pay-grand">
-            <span>{alreadyPaid > 0 ? 'ยอดคงค้าง' : 'ยอดชำระ'}</span>
-            <span className="pay-grand-amount">฿{grandTotal.toLocaleString()}</span>
-          </div>
-
-          {/* Split toggle */}
+          {/* Split Mode Toggle */}
           {n > 1 && (
             <div className="pay-split-toggle">
-              <button className={`pay-split-btn${!splitMode ? ' active' : ''}`} onClick={() => setSplitMode(false)}>
-                <i className="fas fa-receipt" /> รวมบิล
+              <button
+                className={`pay-split-btn${!splitMode ? ' active' : ''}`}
+                onClick={() => setSplitMode(false)}
+              >
+                <i className="fas fa-receipt" /> รวมบิล (ทั้งโต๊ะ)
               </button>
-              <button className={`pay-split-btn${splitMode ? ' active' : ''}`} onClick={() => setSplitMode(true)}>
-                <i className="fas fa-cut" /> แยกบิล
+              <button
+                className={`pay-split-btn${splitMode ? ' active' : ''}`}
+                onClick={() => setSplitMode(true)}
+              >
+                <i className="fas fa-cut" /> แยกบิล (รายคน)
               </button>
             </div>
           )}
 
-          {/* Split: member tabs */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── MODE: รวมบิล (ทั้งโต๊ะ) ────────────────────────────────────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {!splitMode && (
+            <>
+              {/* Order summary */}
+              <div className="pay-summary-block">
+                {selectedGame && (
+                  <div className="pay-summary-row">
+                    <span>
+                      <i className="fas fa-scroll" style={{ color: '#c62419', marginRight: 4 }} />
+                      {selectedGame.title} × {n} คน
+                    </span>
+                    <span>฿{rawGameTotal.toLocaleString()}</span>
+                  </div>
+                )}
+                {orderArr.map((x, idx) => (
+                  <div key={x.key || idx} className="pay-summary-row">
+                    <span>
+                      {x.name}{x.addons?.length > 0 ? ` (${x.addons.map(a => a.name).join(', ')})` : ''} × {x.qty}
+                      {x.orderedBy?.name && <span style={{ color: '#888', fontSize: 11, marginLeft: 4 }}>({x.orderedBy.name.split(' ')[0]})</span>}
+                    </span>
+                    <span>฿{((x.totalPrice || 0) * (x.qty || 1)).toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="pay-summary-sub">
+                  <span>รวมรายการทั้งหมด</span>
+                  <span>฿{rawTotal.toLocaleString()}</span>
+                </div>
+                {propTotalDiscount > 0 && (
+                  <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
+                    <span><i className="fas fa-tag" style={{ marginRight: 4 }} />ส่วนลดโปรโมชั่น</span>
+                    <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{propTotalDiscount.toLocaleString()}</span>
+                  </div>
+                )}
+                {propTotalPersonalDiscounts > 0 && (
+                  <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
+                    <span><i className="fas fa-user-tag" style={{ marginRight: 4 }} />ส่วนลดพิเศษ</span>
+                    <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{propTotalPersonalDiscounts.toLocaleString()}</span>
+                  </div>
+                )}
+                {alreadyPaid > 0 && (
+                  <div className="pay-already-paid-row">
+                    <span>
+                      <i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)', marginRight: 4 }} />
+                      จ่ายแล้ว ({alreadyPaidMembers.map(m => m.name.split(' ')[0]).join(', ')})
+                    </span>
+                    <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{alreadyPaid.toLocaleString()}</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Grand total */}
+              <div className="pay-grand">
+                <span>{alreadyPaid > 0 ? 'ยอดคงค้างทั้งโต๊ะ' : 'ยอดชำระทั้งโต๊ะ'}</span>
+                <span className="pay-grand-amount">฿{tableRemaining.toLocaleString()}</span>
+              </div>
+            </>
+          )}
+
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── MODE: แยกบิล (รายคน) ────────────────────────────────────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
           {splitMode && (
-            <div className="pay-member-tabs">
-              {session.members.map(m => (
-                <button
-                  key={m.uid}
-                  className={`pay-member-tab${activeMember === m.uid ? ' active' : ''}`}
-                  onClick={() => setActiveMember(m.uid)}
-                >
-                  <span className="pay-member-tab-name">{m.name.split(' ')[0]}</span>
-                  <span className="pay-member-tab-amt">฿{getMemberTotal(m.uid).toLocaleString()}</span>
-                </button>
-              ))}
-            </div>
+            <>
+              {/* Member Tabs */}
+              <div className="pay-member-tabs">
+                {sessionMembers.map(m => {
+                  const isPaid = Boolean(currentPayments[m.uid]?.verified)
+                  const mBill = getMemberBill(m)
+                  const isActive = activeMember === m.uid
+                  return (
+                    <button
+                      key={m.uid}
+                      type="button"
+                      className={`pay-member-tab${isActive ? ' active' : ''}${isPaid ? ' paid' : ''}`}
+                      onClick={() => setActiveMember(m.uid)}
+                      style={{
+                        borderColor: isActive ? (isPaid ? '#16a34a' : 'var(--red)') : (isPaid ? '#86efac' : '#e0e0e0'),
+                        background: isActive ? (isPaid ? '#f0fdf4' : 'rgba(198,36,25,0.06)') : (isPaid ? '#f0fdf4' : 'none'),
+                        position: 'relative',
+                      }}
+                    >
+                      <span className="pay-member-tab-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {isPaid && <i className="fas fa-check-circle" style={{ color: '#16a34a', fontSize: 11 }} />}
+                        {m.name.split(' ')[0]}
+                      </span>
+                      <span className="pay-member-tab-amt" style={{ color: isPaid ? '#16a34a' : 'var(--red)' }}>
+                        {isPaid ? 'จ่ายแล้ว' : `฿${mBill.toLocaleString()}`}
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* All members paid banner */}
+              {isAllMembersPaid && (
+                <div style={{ textAlign: 'center', padding: '14px 16px', background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: 14 }}>
+                  <div style={{ fontSize: 22, color: '#16a34a', marginBottom: 4 }}>
+                    <i className="fas fa-check-double" />
+                  </div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#166534' }}>
+                    ทุกคนในตี้จ่ายเงินครบแล้ว
+                  </div>
+                  <div style={{ fontSize: 12, color: '#15803d', marginTop: 3 }}>
+                    ปิดหน้านี้แล้วกดปุ่ม <strong>"ตี้นี้เล่นเสร็จแล้ว"</strong> ที่หน้าหลักเพื่อเลือกฉากจบและปิดตี้ได้ตามขั้นตอน
+                  </div>
+                </div>
+              )}
+
+              {/* Active member's individual breakdown */}
+              {activeMemberObj && (
+                <div className="pay-summary-block">
+                  <div style={{ fontSize: 11, fontWeight: 800, color: '#888', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>
+                      <i className="fas fa-user" style={{ marginRight: 5 }} />
+                      รายการของ {activeMemberObj.name} {activeMemberObj.character ? `(${activeMemberObj.character})` : ''}
+                    </span>
+                    {isSelectedMemberPaid ? (
+                      <span style={{ color: '#16a34a', fontWeight: 700 }}><i className="fas fa-check-circle" /> ชำระแล้ว</span>
+                    ) : (
+                      <span style={{ color: 'var(--red)', fontWeight: 700 }}>รอชำระ</span>
+                    )}
+                  </div>
+
+                  {/* Game Fee */}
+                  {memberGameFee > 0 && (
+                    <div className="pay-summary-row">
+                      <span>
+                        <i className="fas fa-scroll" style={{ color: '#c62419', marginRight: 5 }} />
+                        {selectedGame?.title || 'ค่าเกม'}{isUnpaidDep ? ' (ราคาเต็ม)' : ''}
+                      </span>
+                      <span>฿{memberGameFee.toLocaleString()}</span>
+                    </div>
+                  )}
+
+                  {/* Food Items ordered specifically by this member */}
+                  {memberFood.map((x, idx) => (
+                    <div key={x.key || idx} className="pay-summary-row">
+                      <span>
+                        {x.name}{x.addons?.length > 0 ? ` (${x.addons.map(a => a.name).join(', ')})` : ''} × {x.qty}
+                      </span>
+                      <span>฿{((x.totalPrice || 0) * (x.qty || 1)).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  {memberFood.length === 0 && memberGameFee <= 0 && (
+                    <div style={{ fontSize: 12, color: '#999', padding: '4px 0' }}>ไม่มีรายการอาหารหรือค่าเกม</div>
+                  )}
+
+                  {/* Promo discount */}
+                  {memberDisc > 0 && (
+                    <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
+                      <span><i className="fas fa-tag" style={{ marginRight: 5 }} />ส่วนลดโปรโมชั่น</span>
+                      <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(memberDisc)}</span>
+                    </div>
+                  )}
+
+                  {/* Personal discount */}
+                  {memberPersonalDisc > 0 && (
+                    <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
+                      <span><i className="fas fa-user-tag" style={{ marginRight: 5 }} />{activeMemberObj.personalDiscountNote || 'ส่วนลดพิเศษ'}</span>
+                      <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(memberPersonalDisc)}</span>
+                    </div>
+                  )}
+
+                  <div className="pay-summary-sub">
+                    <span>ยอดของคนนี้</span>
+                    <span style={{ color: isSelectedMemberPaid ? '#16a34a' : 'var(--red)', fontSize: 16, fontWeight: 800 }}>
+                      ฿{activeAmt.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </>
           )}
 
-          {/* Split: food assignment for active member */}
-          {splitMode && activeMember && orderArr.length > 0 && (
-            <div className="pay-food-assign">
-              <div className="pay-food-assign-label">
-                รายการอาหารของ <strong>{activeMemberObj?.name}</strong>
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {/* ── PromptPay QR / Status ───────────────────────────────────────── */}
+          {/* ═════════════════════════════════════════════════════════════════ */}
+          {splitMode && isSelectedMemberPaid ? (
+            <div style={{ textAlign: 'center', padding: '24px 16px', background: '#f0fdf4', borderRadius: 16, border: '1px solid #bbf7d0' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, margin: '0 auto 8px' }}>
+                <i className="fas fa-check" />
               </div>
-              {orderArr.map(x => (
-                <label key={x.key} className="pay-food-check">
-                  <input
-                    type="checkbox"
-                    checked={(memberFoodKeys[activeMember] || new Set()).has(x.key)}
-                    onChange={() => toggleFood(activeMember, x.key)}
-                  />
-                  <span>
-                    {x.name}{x.addons?.length > 0 ? ` (${x.addons.map(a=>a.name).join(',')})` : ''}
-                    {' '}× {x.qty} — ฿{(x.totalPrice * x.qty).toLocaleString()}
-                  </span>
-                </label>
-              ))}
-              <div className="pay-food-assign-total">
-                ค่าเกม ฿{gameUnitPrice.toLocaleString()} + อาหาร ฿{
-                  orderArr.filter(x => (memberFoodKeys[activeMember]||new Set()).has(x.key))
-                    .reduce((s,x)=>s+x.totalPrice*x.qty,0).toLocaleString()
-                } = <strong>฿{getMemberTotal(activeMember).toLocaleString()}</strong>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#166534', marginBottom: 2 }}>
+                {activeMemberObj?.name} ชำระเงินเรียบร้อยแล้ว
+              </div>
+              <div style={{ fontSize: 13, color: '#15803d', fontWeight: 600 }}>
+                ยอด ฿{Number(currentPayments[activeMemberObj?.uid]?.amount ?? activeAmt).toLocaleString()}
               </div>
             </div>
+          ) : activeAmt <= 0 ? (
+            <div style={{ textAlign: 'center', padding: '20px 12px', background: '#f0fdf4', borderRadius: 16, border: '1px solid #bbf7d0' }}>
+              <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, margin: '0 auto 8px' }}>
+                <i className="fas fa-check-circle" />
+              </div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: '#16a34a', marginBottom: 4 }}>
+                ยอดชำระ ฿0
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                ไม่มีรายการต้องชำระ (หรือได้รับส่วนลดเต็มจำนวน) ไม่ต้องสแกนจ่าย สามารถกดยืนยันได้ทันที
+              </div>
+            </div>
+          ) : promptPayPhone ? (
+            <div className="pay-qr-section">
+              <div className="pay-qr-label">
+                <i className="fas fa-qrcode" /> QR PromptPay
+                {splitMode && activeMemberObj && <span> — {activeMemberObj.name}</span>}
+              </div>
+              <div className="pay-qr-amount">฿{activeAmt.toLocaleString()}</div>
+              <div className="pay-qr-wrap">
+                <QRCodeSVG
+                  value={qrPayload}
+                  size={190} bgColor="#fff" fgColor="#1a1a1a"
+                  level="M" includeMargin={true}
+                />
+              </div>
+              <div className="pay-qr-phone">{promptPayPhone}</div>
+              {(paymentAccountName || paymentBankName) && (
+                <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px', fontWeight: 500, textAlign: 'center' }}>
+                  {paymentAccountName}{paymentBankName ? ` (${paymentBankName})` : ''}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="pay-no-phone">
+              <i className="fas fa-exclamation-circle" />
+              <div>ยังไม่ได้ตั้งค่าเบอร์ PromptPay</div>
+              <div className="pay-no-phone-hint">ตั้งค่าได้ที่ Admin → การชำระเงิน</div>
+            </div>
           )}
-
-          {/* PromptPay QR */}
-          <div className="pay-qr-section">
-            {activeAmt <= 0 ? (
-              <div style={{ textAlign: 'center', padding: '24px 12px' }}>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(22,163,74,0.1)', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, margin: '0 auto 12px' }}>
-                  <i className="fas fa-check-circle" />
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: '#16a34a', marginBottom: 4 }}>
-                  ยอดชำระ ฿0
-                </div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
-                  ไม่มีรายการต้องชำระ (หรือได้รับส่วนลดเต็มจำนวน) ไม่ต้องสแกนจ่าย สามารถกดยืนยันปิดบิลได้ทันที
-                </div>
-              </div>
-            ) : promptPayPhone ? (
-              <>
-                <div className="pay-qr-label">
-                  <i className="fas fa-qrcode" /> QR PromptPay
-                  {splitMode && activeMemberObj && <span> — {activeMemberObj.name}</span>}
-                </div>
-                <div className="pay-qr-amount">฿{activeAmt.toLocaleString()}</div>
-                <div className="pay-qr-wrap">
-                  <QRCodeSVG
-                    value={qrPayload}
-                    size={200} bgColor="#fff" fgColor="#1a1a1a"
-                    level="M" includeMargin={true}
-                  />
-                </div>
-                <div className="pay-qr-phone">{promptPayPhone}</div>
-                {(paymentAccountName || paymentBankName) && (
-                  <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px', fontWeight: 500, textAlign: 'center' }}>
-                    {paymentAccountName}{paymentBankName ? ` (${paymentBankName})` : ''}
-                  </div>
-                )}
-                {splitMode && n > 1 && (
-                  <div className="pay-split-nav">
-                    {session.members.map((m, i) => (
-                      <button
-                        key={m.uid}
-                        className={`pay-split-nav-dot${activeMember === m.uid ? ' active' : ''}`}
-                        onClick={() => setActiveMember(m.uid)}
-                        title={m.name}
-                      />
-                    ))}
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="pay-no-phone">
-                <i className="fas fa-exclamation-circle" />
-                <div>ยังไม่ได้ตั้งค่าเบอร์ PromptPay</div>
-                <div className="pay-no-phone-hint">ตั้งค่าได้ที่ Admin → การชำระเงิน</div>
-              </div>
-            )}
-          </div>
 
         </div>
 
         {/* Footer */}
         <div className="pay-footer">
-          <button className="pos-cancel-btn" style={{ flex: 1 }} onClick={onClose}>ยกเลิก</button>
-          <button className="pay-confirm-btn" onClick={handleConfirmPayment} disabled={saving} style={activeAmt <= 0 ? { background: '#16a34a', borderColor: '#16a34a' } : undefined}>
-            {saving
-              ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-              : activeAmt <= 0
-              ? <><i className="fas fa-check-circle" /> ยืนยันปิดบิล (฿0)</>
-              : <><i className="fas fa-check-circle" /> ยืนยันรับเงิน</>
-            }
+          <button className="pos-cancel-btn" style={{ flex: 1 }} onClick={onClose}>
+            {isAllMembersPaid ? 'ปิด' : 'ยกเลิก'}
           </button>
+
+          {splitMode ? (
+            isSelectedMemberPaid ? (
+              <button
+                className="pay-confirm-btn"
+                style={{ background: '#16a34a', borderColor: '#16a34a' }}
+                onClick={() => {
+                  if (isAllMembersPaid) onClose()
+                  else {
+                    const nextUnpaid = sessionMembers.find(m => !currentPayments[m.uid]?.verified)
+                    if (nextUnpaid) setActiveMember(nextUnpaid.uid)
+                  }
+                }}
+              >
+                {isAllMembersPaid ? (
+                  <><i className="fas fa-check-double" /> ครบทุกคนแล้ว (ปิดหน้าต่าง)</>
+                ) : (
+                  <><i className="fas fa-arrow-right" /> สมาชิกคนถัดไป</>
+                )}
+              </button>
+            ) : (
+              <button
+                className="pay-confirm-btn"
+                onClick={handleConfirmSingleMember}
+                disabled={saving}
+                style={activeAmt <= 0 ? { background: '#16a34a', borderColor: '#16a34a' } : undefined}
+              >
+                {saving
+                  ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                  : activeAmt <= 0
+                  ? <><i className="fas fa-check-circle" /> ยืนยันยอด ฿0 ({activeMemberObj?.name?.split(' ')[0]})</>
+                  : <><i className="fas fa-check-circle" /> ยืนยันรับเงิน ({activeMemberObj?.name?.split(' ')[0]}) ฿{activeAmt.toLocaleString()}</>
+                }
+              </button>
+            )
+          ) : (
+            <button
+              className="pay-confirm-btn"
+              onClick={handleConfirmFullPayment}
+              disabled={saving || tableRemaining < 0}
+              style={tableRemaining <= 0 ? { background: '#16a34a', borderColor: '#16a34a' } : undefined}
+            >
+              {saving
+                ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                : tableRemaining <= 0
+                ? <><i className="fas fa-check-circle" /> ยืนยันปิดบิลทั้งโต๊ะ (฿0)</>
+                : <><i className="fas fa-check-circle" /> ยืนยันรับเงินทั้งโต๊ะ ฿{tableRemaining.toLocaleString()}</>
+              }
+            </button>
+          )}
         </div>
       </div>
     </div>

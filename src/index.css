@@ -1157,6 +1157,10 @@ nav {
   transition: all 0.15s;
 }
 .pay-member-tab.active { border-color: var(--red); background: #f5f5f5; }
+.pay-member-tab.paid { border-color: #86efac; background: #f0fdf4; }
+.pay-member-tab.paid .pay-member-tab-name { color: #166534; }
+.pay-member-tab.paid .pay-member-tab-amt { color: #16a34a; }
+.pay-member-tab.paid.active { border-color: #16a34a; background: #dcfce7; }
 .pay-member-tab-name { font-size: 13px; font-weight: 600; color: #1a1a1a; }
 .pay-member-tab-amt { font-size: 11px; color: var(--red); font-weight: 700; }
 /* Food assignment */

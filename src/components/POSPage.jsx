@@ -3270,6 +3270,15 @@ export default function POSPage({
           adminUser={adminUser}
           showToast={showToast}
           memberPayments={memberPayments}
+          getMemberBill={getMemberBill}
+          grandTotal={grandTotal}
+          remainingAmount={remainingAmount}
+          totalDiscount={totalDiscount}
+          totalPersonalDiscounts={totalPersonalDiscounts}
+          gameUnitPay={gameUnitPay}
+          gameFullPrice={gameFullPrice}
+          discountEffectiveIds={discountEffectiveIds}
+          discountPerDiscounted={discountPerDiscounted}
           onClose={() => setShowPayment(false)}
           onPaid={() => {
             setShowPayment(false)
