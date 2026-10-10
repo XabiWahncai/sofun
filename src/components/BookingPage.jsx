@@ -241,7 +241,7 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
 
             if (!day) {
               return (
-                <div key={`e-${idx}`} style={{ minHeight: '110px', background: 'rgba(0,0,0,0.018)', borderRight, borderBottom }} />
+                <div key={`e-${idx}`} style={{ height: '110px', background: 'rgba(0,0,0,0.018)', borderRight, borderBottom }} />
               )
             }
 
@@ -261,7 +261,7 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
               <div
                 key={day}
                 onClick={() => onDayClick(dateStr)}
-                style={{ minHeight: '110px', padding: '8px 6px 6px', display: 'flex', flexDirection: 'column', gap: '3px', cursor: 'pointer', background: cellBg, borderRight, borderBottom, transition: 'background 0.12s', position: 'relative' }}
+                style={{ height: '110px', overflow: 'hidden', padding: '8px 6px 6px', display: 'flex', flexDirection: 'column', gap: '3px', cursor: 'pointer', background: cellBg, borderRight, borderBottom, transition: 'background 0.12s', position: 'relative' }}
                 onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0,0,0,0.025)' }}
                 onMouseLeave={e => e.currentTarget.style.background = cellBg}
               >
@@ -273,28 +273,41 @@ function BookingCalendar({ bookings, onDayClick, selectedDate, onEventClick, onB
                 </div>
 
                 {/* Event bars */}
-                {dayBookingsSorted.slice(0, 3).map(b => {
-                  const rc = ROOM_COLORS[b.room] || '#64748b'
-                  return (
-                    <button
-                      key={b.id}
-                      onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
-                      title={`${b.gameName || b.room} — ${b.time || ''}`}
-                      style={{ width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: '6px', border: 'none', background: `${rc}18`, borderLeft: `3px solid ${rc}`, cursor: 'pointer', transition: 'opacity 0.12s', minWidth: 0 }}
-                      onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
-                      onMouseLeave={e => e.currentTarget.style.opacity = '1'}
-                    >
-                      <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
-                        {b.gameName || b.room || 'รอบ'}
-                      </div>
-                      {b.time && (
-                        <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', lineHeight: 1.2 }}>{b.time}</div>
-                      )}
-                    </button>
-                  )
-                })}
-                {dayBookingsSorted.length > 3 && (
-                  <div style={{ fontSize: '10px', fontWeight: 600, color: 'var(--text-tertiary)', paddingLeft: '4px' }}>+{dayBookingsSorted.length - 3} เพิ่มเติม</div>
+                {dayBookingsSorted.length > 2 ? (
+                  dayBookingsSorted.map(b => {
+                    const rc = ROOM_COLORS[b.room] || '#64748b'
+                    return (
+                      <div
+                        key={b.id}
+                        onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
+                        title={`${b.gameName || b.room} — ${b.time || ''}`}
+                        style={{ height: '7px', borderRadius: '99px', background: rc, cursor: 'pointer', flexShrink: 0, opacity: 0.85, transition: 'opacity 0.12s' }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
+                        onMouseLeave={e => e.currentTarget.style.opacity = '0.85'}
+                      />
+                    )
+                  })
+                ) : (
+                  dayBookingsSorted.map(b => {
+                    const rc = ROOM_COLORS[b.room] || '#64748b'
+                    return (
+                      <button
+                        key={b.id}
+                        onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
+                        title={`${b.gameName || b.room} — ${b.time || ''}`}
+                        style={{ width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: '6px', border: 'none', background: `${rc}18`, borderLeft: `3px solid ${rc}`, cursor: 'pointer', transition: 'opacity 0.12s', minWidth: 0 }}
+                        onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
+                        onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                      >
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3 }}>
+                          {b.room || b.gameName || 'รอบ'}
+                        </div>
+                        {b.time && (
+                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', lineHeight: 1.2 }}>{b.time}</div>
+                        )}
+                      </button>
+                    )
+                  })
                 )}
               </div>
             )
