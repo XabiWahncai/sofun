@@ -711,7 +711,6 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const [paymentBankName, setPaymentBankName] = useState('')
   const [showPaySheet, setShowPaySheet] = useState(false)
   const [payForAll, setPayForAll] = useState(false)
-  const [showGroupSelect, setShowGroupSelect] = useState(false)
   const [groupPayUids, setGroupPayUids] = useState(new Set())
   const [payGroupMembers, setPayGroupMembers] = useState([])
 
@@ -1125,9 +1124,18 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
               <button className={`mo-bill-tab${billTab === 'table' ? ' active' : ''}`} onClick={() => setBillTab('table')}>
                 <i className="fas fa-users" /> ทั้งตี้
               </button>
+              <button
+                className={`mo-bill-tab${billTab === 'group' ? ' active' : ''}`}
+                onClick={() => {
+                  setBillTab('group')
+                  setGroupPayUids(prev => prev.size > 0 ? prev : new Set([lineUser.uid]))
+                }}
+              >
+                <i className="fas fa-object-group" /> รวมบิลกับเพื่อน
+              </button>
             </div>
 
-            {billTab === 'me' ? (
+            {billTab === 'me' && (
               <>
                 {myHistoryItems.length > 0 && (
                   <>
@@ -1202,84 +1210,10 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                   return <button className="mo-pay-cta-btn" onClick={() => { setShowBill(false); setPayForAll(false); setShowPaySheet(true) }}><i className="fas fa-qrcode" /> จ่ายของฉัน ฿{fmtCurrency(myTotal)}</button>
                 })()}
 
-                {/* ── Group pay accordion ── */}
-                {activeOrder.status !== 'paid' &&
-                 !activeOrder.memberPayments?.[lineUser.uid]?.verified &&
-                 !activeOrder.memberPayments?.[lineUser.uid]?.easyslipPending &&
-                 (activeOrder.members || []).filter(m => m.uid !== lineUser.uid && !activeOrder.memberPayments?.[m.uid]?.verified).length > 0 && (
-                  <div style={{ margin: '10px 16px 8px', borderRadius: 14, border: '1.5px solid var(--border-default)', overflow: 'hidden' }}>
-                    <button onClick={() => {
-                      setGroupPayUids(prev => prev.size > 0 ? prev : new Set([lineUser.uid]))
-                      setShowGroupSelect(v => !v)
-                    }} style={{
-                      width: '100%', padding: '13px 16px', background: showGroupSelect ? 'rgba(198,36,25,0.05)' : 'var(--surface-card)',
-                      border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
-                    }}>
-                      <span style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>
-                        <i className="fas fa-object-group" style={{ color: 'var(--crimson-500)' }} /> รวมบิลกับเพื่อน
-                      </span>
-                      <i className={`fas fa-chevron-${showGroupSelect ? 'up' : 'down'}`} style={{ fontSize: 11, color: 'var(--text-tertiary)' }} />
-                    </button>
-
-                    {showGroupSelect && (
-                      <div style={{ padding: '0 12px 12px', background: 'var(--surface-card)' }}>
-                        {(activeOrder.members || [])
-                          .filter(m => !activeOrder.memberPayments?.[m.uid]?.verified)
-                          .map(m => {
-                            const isSelf = m.uid === lineUser.uid
-                            const sel = groupPayUids.has(m.uid)
-                            const bill = getGroupMemberBill(m)
-                            return (
-                              <button key={m.uid} onClick={() => {
-                                if (isSelf) return
-                                setGroupPayUids(prev => {
-                                  const s = new Set(prev); s.has(m.uid) ? s.delete(m.uid) : s.add(m.uid); return s
-                                })
-                              }} style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                width: '100%', padding: '10px 10px', marginBottom: 6, borderRadius: 10,
-                                background: sel ? 'rgba(198,36,25,0.07)' : 'rgba(0,0,0,0.03)',
-                                border: `1.5px solid ${sel ? 'var(--crimson-500)' : 'var(--border-default)'}`,
-                                cursor: isSelf ? 'default' : 'pointer', fontFamily: "'Sarabun',sans-serif", textAlign: 'left',
-                              }}>
-                                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                  <i className={`fas fa-${sel ? 'check-square' : 'square'}`} style={{ color: sel ? 'var(--crimson-500)' : 'var(--border-strong)', fontSize: 14 }} />
-                                  <span style={{ fontSize: 14, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>
-                                    {m.name.split(' ')[0]}{isSelf ? ' (ฉัน)' : ''}
-                                  </span>
-                                </span>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>฿{bill.toLocaleString()}</span>
-                              </button>
-                            )
-                          })}
-                        {groupPayUids.size >= 2 && (
-                          <div style={{ background: 'rgba(198,36,25,0.06)', border: '1px solid rgba(198,36,25,0.2)', borderRadius: 10, padding: '10px 12px', display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>รวม {groupPayUids.size} คน</span>
-                            <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--crimson-500)' }}>฿{groupPayTotal.toLocaleString()}</span>
-                          </div>
-                        )}
-                        <button disabled={groupPayUids.size < 2} onClick={() => {
-                          const members = (activeOrder.members || []).filter(m => groupPayUids.has(m.uid))
-                          setPayGroupMembers(members)
-                          setShowGroupSelect(false)
-                          setPayForAll(false)
-                          setShowBill(false)
-                          setShowPaySheet(true)
-                        }} style={{
-                          width: '100%', padding: '12px', borderRadius: 10, border: 'none',
-                          background: groupPayUids.size >= 2 ? 'var(--crimson-500)' : 'var(--border-default)',
-                          color: '#fff', cursor: groupPayUids.size >= 2 ? 'pointer' : 'default',
-                          fontSize: 14, fontWeight: 700, fontFamily: "'Sarabun',sans-serif",
-                        }}>
-                          <i className="fas fa-qrcode" /> {groupPayUids.size >= 2 ? `จ่ายรวม ฿${groupPayTotal.toLocaleString()}` : 'เลือกอย่างน้อย 2 คน'}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
               </>
-            ) : (
+            )}
+
+            {billTab === 'table' && (
               <>
                 {confirmedItems.length > 0 && (
                   <>
@@ -1356,6 +1290,112 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                     </button>
                   )
                 )}
+              </>
+            )}
+
+            {billTab === 'group' && (
+              <>
+                <div className="mo-bill-section">
+                  <span className="mo-bill-section-label">
+                    <i className="fas fa-object-group" style={{ marginRight: 5 }} />
+                    เลือกเพื่อนที่ต้องการรวมบิล
+                  </span>
+                </div>
+
+                {(() => {
+                  if (activeOrder.status === 'paid') {
+                    return <div className="mo-pay-status paid"><i className="fas fa-check-circle" /> ตี้ปิดแล้ว</div>
+                  }
+                  if (activeOrder.memberPayments?.[lineUser.uid]?.verified) {
+                    return <div className="mo-pay-status paid"><i className="fas fa-check-circle" /> คุณชำระเงินเรียบร้อยแล้ว</div>
+                  }
+                  if (activeOrder.memberPayments?.[lineUser.uid]?.easyslipPending) {
+                    return (
+                      <div className="mo-pay-status pending-review" style={{ color: 'var(--feedback-info-icon)' }}>
+                        <i className="fas fa-hourglass-half" /> รอ Bangkok Bank ยืนยันสลิปของคุณ
+                      </div>
+                    )
+                  }
+
+                  const unpaidMembers = (activeOrder.members || []).filter(m => !activeOrder.memberPayments?.[m.uid]?.verified)
+                  const otherUnpaid = unpaidMembers.filter(m => m.uid !== lineUser.uid)
+
+                  if (otherUnpaid.length === 0) {
+                    return <div className="mo-bill-empty">ไม่มีเพื่อนที่ค้างชำระในตี้</div>
+                  }
+
+                  return (
+                    <div style={{ padding: '4px 16px 12px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
+                        {unpaidMembers.map(m => {
+                          const isSelf = m.uid === lineUser.uid
+                          const sel = groupPayUids.has(m.uid)
+                          const bill = getGroupMemberBill(m)
+                          return (
+                            <button
+                              key={m.uid}
+                              type="button"
+                              onClick={() => {
+                                if (isSelf) return
+                                setGroupPayUids(prev => {
+                                  const s = new Set(prev)
+                                  s.has(m.uid) ? s.delete(m.uid) : s.add(m.uid)
+                                  return s
+                                })
+                              }}
+                              style={{
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                width: '100%', padding: '12px 14px', borderRadius: 12,
+                                background: sel ? 'rgba(198,36,25,0.07)' : 'rgba(0,0,0,0.03)',
+                                border: `1.5px solid ${sel ? 'var(--crimson-500)' : 'var(--border-default)'}`,
+                                cursor: isSelf ? 'default' : 'pointer', fontFamily: "'Sarabun',sans-serif", textAlign: 'left',
+                                transition: 'all 0.15s',
+                              }}
+                            >
+                              <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <i className={`fas fa-${sel ? 'check-square' : 'square'}`} style={{ color: sel ? 'var(--crimson-500)' : 'var(--border-strong)', fontSize: 16 }} />
+                                <span style={{ fontSize: 14, fontWeight: sel ? 700 : 500, color: 'var(--text-primary)' }}>
+                                  {m.name.split(' ')[0]}{isSelf ? ' (ฉัน)' : ''}
+                                </span>
+                              </span>
+                              <span style={{ fontSize: 14, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>
+                                ฿{bill.toLocaleString()}
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+
+                      <div className="mo-bill-divider" style={{ margin: '14px 0 10px' }} />
+
+                      <div className="mo-bill-total-row" style={{ padding: '0 0 10px' }}>
+                        <span>รวม {groupPayUids.size} คน</span>
+                        <span className="mo-bill-grand-total">฿{groupPayTotal.toLocaleString()}</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={groupPayUids.size < 2}
+                        onClick={() => {
+                          const members = (activeOrder.members || []).filter(m => groupPayUids.has(m.uid))
+                          setPayGroupMembers(members)
+                          setShowBill(false)
+                          setPayForAll(false)
+                          setShowPaySheet(true)
+                        }}
+                        className="mo-pay-cta-btn"
+                        style={{
+                          width: '100%',
+                          margin: '6px 0 0',
+                          background: groupPayUids.size >= 2 ? 'var(--crimson-500)' : 'var(--border-default)',
+                          cursor: groupPayUids.size >= 2 ? 'pointer' : 'default',
+                        }}
+                      >
+                        <i className="fas fa-qrcode" /> {groupPayUids.size >= 2 ? `จ่ายรวม ฿${groupPayTotal.toLocaleString()}` : 'เลือกอย่างน้อย 2 คน'}
+                      </button>
+                    </div>
+                  )
+                })()}
               </>
             )}
           </div>
