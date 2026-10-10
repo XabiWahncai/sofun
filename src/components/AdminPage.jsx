@@ -5879,7 +5879,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                 fontWeight: 900, fontSize: 14, overflow: 'hidden',
               }}>
                 {lockedCandidate?.avatar ? (
-                  <img src={lockedCandidate.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  <img src={lockedCandidate.avatar} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
                   (lockedCandidate?.name || '?')[0]
                 )}
@@ -6113,7 +6113,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                           fontSize: 11, fontWeight: 900, overflow: 'hidden', flexShrink: 0,
                         }}>
                           {c.avatar ? (
-                            <img src={c.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            <img src={c.avatar} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                           ) : (
                             c.name[0]
                           )}
@@ -6285,7 +6285,7 @@ function RandomWheelTab({ showToast, members = [] }) {
                   fontSize: 14, fontWeight: 900, color: '#fff',
                 }}>
                   {selectedUserForHistory.avatar ? (
-                    <img src={selectedUserForHistory.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={selectedUserForHistory.avatar} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
                     (selectedUserForHistory.name || 'U')[0]
                   )}

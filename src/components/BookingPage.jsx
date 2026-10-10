@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, query, orderBy, getDoc
@@ -177,6 +177,65 @@ function StatusBadge({ status, label }) {
       <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'currentColor' }} />
       {label || STATUS_LABELS[status] || status}
     </span>
+  )
+}
+
+// ── Robust Member Avatar Component ─────────────────────────────────────────────
+function MemberAvatar({
+  src,
+  name,
+  size = 40,
+  style = {},
+  imgStyle = {},
+  className = '',
+  title = '',
+  onClick = null,
+  badge = null,
+}) {
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  const initial = (name || '?')[0].toUpperCase()
+
+  const resolvedSrc = useMemo(() => {
+    if (!src || failed) return null
+    return convertImg(src, size * 2)
+  }, [src, failed, size])
+
+  return (
+    <div
+      className={`relative shrink-0 select-none ${onClick ? 'cursor-pointer' : ''} ${className}`}
+      onClick={onClick}
+      title={title || name}
+      style={{ width: size, height: size, ...style }}
+    >
+      {resolvedSrc ? (
+        <img
+          src={resolvedSrc}
+          alt={name || ''}
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+          className="w-full h-full rounded-full object-cover"
+          style={imgStyle}
+        />
+      ) : (
+        <div
+          className="w-full h-full rounded-full flex items-center justify-center font-black"
+          style={{
+            background: '#f5f1ef',
+            color: 'rgba(26,26,26,0.6)',
+            fontSize: Math.max(10, Math.round(size * 0.36)),
+            ...imgStyle,
+          }}
+        >
+          {initial}
+        </div>
+      )}
+      {badge}
+    </div>
   )
 }
 
@@ -1764,6 +1823,35 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
   const paidPct = Math.min(100, Math.round((paidCount / maxMembers) * 100))
   const rc = ROOM_COLORS[booking.room] || '#64748b'
 
+  const [memberProfiles, setMemberProfiles] = useState({})
+
+  useEffect(() => {
+    if (!booking?.members?.length && !booking?.joinRequests?.length && !booking?.leaderId) return
+    const uids = [
+      ...(booking.members || []).map(m => m.uid || m.id),
+      ...(booking.joinRequests || []).map(r => r.uid),
+      booking.leaderId,
+    ].filter(Boolean)
+    const uniqueUids = Array.from(new Set(uids))
+    if (uniqueUids.length === 0) return
+
+    let cancelled = false
+    Promise.all(uniqueUids.map(uid => getDoc(doc(db, 'members', uid)).catch(() => null)))
+      .then(snaps => {
+        if (cancelled) return
+        const map = {}
+        snaps.forEach(snap => {
+          if (snap && snap.exists()) {
+            map[snap.id] = snap.data()
+          }
+        })
+        setMemberProfiles(map)
+      })
+      .catch(() => {})
+
+    return () => { cancelled = true }
+  }, [booking?.id, booking?.members, booking?.joinRequests, booking?.leaderId])
+
   const addedDays = paidCount * 3
   const playDateObj = booking.date ? new Date(`${booking.date}T${booking.time || '12:00'}:00`) : null
   const maxCapDate = playDateObj ? new Date(playDateObj.getTime() - 24 * 3600000) : null
@@ -1983,78 +2071,202 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
         onClick={e => e.target === e.currentTarget && onClose()}
       >
         <div
-          className="w-full sm:max-w-xl overflow-hidden max-h-[94dvh] flex flex-col"
+          className="w-full sm:max-w-xl overflow-hidden max-h-[94dvh] flex flex-col rounded-t-[28px] sm:rounded-b-[28px]"
           style={{
             background: '#ffffff',
             color: INK,
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            borderBottomLeftRadius: 'env(safe-area-inset-bottom)' ? 0 : 28,
-            boxShadow: '0 50px 120px rgba(26,26,26,0.25)',
+            boxShadow: '0 50px 120px rgba(0,0,0,0.3)',
           }}
         >
 
           {/* Drag handle */}
-          <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden shrink-0" style={{ background: 'rgba(26,26,26,0.12)' }} />
+          <div className="w-11 h-[5px] rounded-full mx-auto mt-3 mb-0 sm:hidden shrink-0 z-20 relative" style={{ background: 'rgba(255,255,255,0.3)' }} />
 
-          {/* ── HERO (white editorial) ── */}
-          <div className="relative overflow-hidden shrink-0" style={{ minHeight: 'clamp(180px,26vw,230px)', background: '#faf7f5' }}>
-            {/* Blurred bg (subtle color wash) */}
-            {imgSrc && (
-              <img src={imgSrc} aria-hidden alt="" className="absolute inset-0 w-full h-full object-cover"
-                style={{ filter: 'blur(32px) brightness(1.15) saturate(0.55) opacity(0.28)', transform: 'scale(1.18)' }} />
+          {/* ── HERO (Cinematic Immersive Header) ── */}
+          <div
+            className="relative overflow-hidden shrink-0 select-none"
+            style={{
+              background: '#0d1117',
+              minHeight: 'clamp(195px, 28vw, 240px)',
+              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+            }}
+          >
+            {/* Ambient game backdrop */}
+            {imgSrc ? (
+              <img
+                src={imgSrc}
+                aria-hidden
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover"
+                style={{
+                  filter: 'blur(18px) brightness(0.55) saturate(1.35)',
+                  transform: 'scale(1.18)',
+                  opacity: 0.65,
+                }}
+              />
+            ) : (
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: 'linear-gradient(135deg, #111827 0%, #1e293b 100%)',
+                }}
+              />
             )}
 
-            {/* Soft crimson glow */}
-            <div className="absolute inset-0" style={{ background: `radial-gradient(ellipse 60% 55% at 78% 18%, ${C}10 0%, transparent 65%)` }} />
+            {/* Dynamic Room Accent Glow */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background: `radial-gradient(ellipse 65% 60% at 85% 15%, ${rc}44 0%, transparent 68%)`,
+              }}
+            />
 
-            {/* Bottom fade to card bg */}
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.6) 55%, #ffffff 100%)' }} />
+            {/* Cinematic dark vignette & bottom shadow */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  'linear-gradient(180deg, rgba(13,17,23,0.3) 0%, rgba(13,17,23,0.65) 55%, #0d1117 100%)',
+              }}
+            />
 
-            {/* Content */}
-            <div className="absolute inset-0 flex items-end gap-5 pt-14" style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 22 }}>
-
-              {/* Poster thumbnail */}
+            {/* Content Container */}
+            <div
+              className="relative z-10 h-full flex items-end gap-4 sm:gap-5 pt-12 pb-5 px-5 sm:px-7"
+              style={{ minHeight: 'clamp(195px, 28vw, 240px)' }}
+            >
+              {/* Poster 3D thumbnail */}
               {imgSrc && (
-                <div className="shrink-0 self-end" style={{ width: 'clamp(76px,17vw,100px)' }}>
-                  <div className="overflow-hidden" style={{ aspectRatio: '2/3', borderRadius: 14, boxShadow: '0 18px 44px rgba(26,26,26,0.22), 0 0 0 1px rgba(26,26,26,0.06)' }}>
-                    <img src={imgSrc} alt={booking.gameName} className="w-full h-full object-cover" />
+                <div
+                  className="shrink-0 self-end"
+                  style={{ width: 'clamp(84px, 19vw, 108px)' }}
+                >
+                  <div
+                    className="overflow-hidden"
+                    style={{
+                      aspectRatio: '2/3',
+                      borderRadius: 16,
+                      boxShadow: '0 20px 40px -10px rgba(0,0,0,0.7), 0 0 0 1.5px rgba(255,255,255,0.18)',
+                      background: '#161b22',
+                    }}
+                  >
+                    <img
+                      src={imgSrc}
+                      alt={booking.gameName}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 </div>
               )}
 
-              {/* Title block */}
+              {/* Title & Metadata block */}
               <div className="flex-1 min-w-0 pb-1">
-                <StatusBadge status={booking.status} />
-                <h2 className="font-black mt-2.5 leading-[1.1] tracking-tight" style={{ color: INK, fontSize: 'clamp(22px,5.2vw,30px)' }}>
+                <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                  <StatusBadge status={booking.status} />
+                  {booking.room && (
+                    <span
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '2px 9px',
+                        borderRadius: '20px',
+                        fontSize: '10px',
+                        fontWeight: 700,
+                        background: `${rc}22`,
+                        color: '#ffffff',
+                        border: `1px solid ${rc}60`,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      <span
+                        style={{
+                          width: '5px',
+                          height: '5px',
+                          borderRadius: '50%',
+                          background: rc,
+                          boxShadow: `0 0 6px ${rc}`,
+                        }}
+                      />
+                      {booking.room}
+                    </span>
+                  )}
+                </div>
+
+                <h2
+                  className="font-black leading-[1.15] tracking-tight text-white drop-shadow-md"
+                  style={{ fontSize: 'clamp(20px, 4.8vw, 28px)' }}
+                >
                   {booking.gameName || 'การจองห้อง'}
                 </h2>
-                <div className="flex items-center gap-2 mt-2 flex-wrap" style={{ fontSize: 12.5, color: 'rgba(26,26,26,0.55)' }}>
-                  <i className="fas fa-calendar-alt text-[10px]" style={{ color: C }} />
-                  <span className="font-medium">{fmtDate(booking.date)}</span>
+
+                {/* Sleek meta pill tags */}
+                <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      padding: '3px 9px',
+                      borderRadius: '999px',
+                      background: 'rgba(255, 255, 255, 0.1)',
+                      border: '1px solid rgba(255, 255, 255, 0.12)',
+                      color: 'rgba(255, 255, 255, 0.9)',
+                      fontSize: '11.5px',
+                      fontWeight: 600,
+                      backdropFilter: 'blur(8px)',
+                    }}
+                  >
+                    <i className="fas fa-calendar-alt text-[10px]" style={{ color: '#ef4444' }} />
+                    <span>{fmtDate(booking.date)}</span>
+                  </div>
+
                   {booking.time && (
-                    <>
-                      <span style={{ color: 'rgba(26,26,26,0.2)' }}>·</span>
-                      <span className="font-mono font-bold" style={{ color: INK }}>{booking.time} น.</span>
-                    </>
-                  )}
-                  {booking.room && (
-                    <>
-                      <span style={{ color: 'rgba(26,26,26,0.2)' }}>·</span>
-                      <span style={{ color: rc, fontWeight: 700 }}>{booking.room}</span>
-                    </>
+                    <div
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '5px',
+                        padding: '3px 9px',
+                        borderRadius: '999px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.12)',
+                        color: 'rgba(255, 255, 255, 0.95)',
+                        fontSize: '11.5px',
+                        fontWeight: 700,
+                        backdropFilter: 'blur(8px)',
+                      }}
+                    >
+                      <i className="fas fa-clock text-[10px]" style={{ color: '#fbbf24' }} />
+                      <span>{booking.time} น.</span>
+                    </div>
                   )}
                 </div>
               </div>
             </div>
 
-            {/* Close */}
-            <button onClick={onClose} className="absolute top-5 right-5 w-10 h-10 rounded-full flex items-center justify-center transition-all"
-              style={{ background: '#ffffff', border: '1px solid rgba(26,26,26,0.08)', color: 'rgba(26,26,26,0.55)', boxShadow: '0 4px 12px rgba(26,26,26,0.08)' }}
-              onMouseEnter={e => { e.currentTarget.style.color = INK; e.currentTarget.style.background = '#f5f1ef' }}
-              onMouseLeave={e => { e.currentTarget.style.color = 'rgba(26,26,26,0.55)'; e.currentTarget.style.background = '#ffffff' }}
+            {/* Close Button */}
+            <button
+              onClick={onClose}
+              className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center transition-all"
+              style={{
+                background: 'rgba(0, 0, 0, 0.45)',
+                border: '1px solid rgba(255, 255, 255, 0.18)',
+                color: 'rgba(255, 255, 255, 0.85)',
+                backdropFilter: 'blur(12px)',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={e => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)'
+                e.currentTarget.style.color = '#ffffff'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)'
+                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)'
+              }}
+              title="ปิด"
             >
-              <i className="fas fa-times text-sm" />
+              <i className="fas fa-times text-xs" />
             </button>
           </div>
 
@@ -2198,30 +2410,37 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   <span className="text-[11px] font-black uppercase tracking-[0.15em]" style={{ color: C }}>คำขอเข้าร่วม ({booking.joinRequests.length})</span>
                 </div>
                 <div className="flex flex-col gap-2.5">
-                  {booking.joinRequests.map(req => (
-                    <div key={req.uid} className="flex items-center justify-between gap-3"
-                      style={{ padding: '10px 12px', borderRadius: 12, background: '#ffffff', border: '1px solid rgba(26,26,26,0.06)' }}>
-                      <div className="flex items-center gap-3 min-w-0">
-                        {req.avatar
-                          ? <img src={req.avatar} alt="" className="w-9 h-9 rounded-full object-cover shrink-0" />
-                          : <div className="w-9 h-9 rounded-full flex items-center justify-center font-black text-xs shrink-0" style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.55)' }}>{(req.name || '?')[0]}</div>
-                        }
-                        <span className="text-sm font-bold truncate" style={{ color: INK }}>{req.name}</span>
+                  {booking.joinRequests.map(req => {
+                    const reqProf = memberProfiles[req.uid]
+                    const reqAvatar = req.avatar || reqProf?.pictureUrl || reqProf?.avatar || ''
+                    const reqName = req.name || reqProf?.nickname || reqProf?.firstname || reqProf?.name || 'ผู้ขอเข้าร่วม'
+
+                    return (
+                      <div key={req.uid} className="flex items-center justify-between gap-3"
+                        style={{ padding: '10px 12px', borderRadius: 12, background: '#ffffff', border: '1px solid rgba(26,26,26,0.06)' }}>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <MemberAvatar
+                            src={reqAvatar}
+                            name={reqName}
+                            size={36}
+                          />
+                          <span className="text-sm font-bold truncate" style={{ color: INK }}>{reqName}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <button onClick={() => handleApproveRequest(req)} disabled={approvingUid === req.uid}
+                            className="font-bold text-xs transition-opacity hover:opacity-85"
+                            style={{ padding: '7px 14px', borderRadius: 999, background: C, color: '#fff' }}>
+                            {approvingUid === req.uid ? '...' : 'รับ'}
+                          </button>
+                          <button onClick={() => handleRejectRequest(req)} disabled={rejectingUid === req.uid}
+                            className="font-bold text-xs transition-colors"
+                            style={{ padding: '7px 14px', borderRadius: 999, background: '#f5f1ef', color: 'rgba(26,26,26,0.6)' }}>
+                            ปฏิเสธ
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={() => handleApproveRequest(req)} disabled={approvingUid === req.uid}
-                          className="font-bold text-xs transition-opacity hover:opacity-85"
-                          style={{ padding: '7px 14px', borderRadius: 999, background: C, color: '#fff' }}>
-                          {approvingUid === req.uid ? '...' : 'รับ'}
-                        </button>
-                        <button onClick={() => handleRejectRequest(req)} disabled={rejectingUid === req.uid}
-                          className="font-bold text-xs transition-colors"
-                          style={{ padding: '7px 14px', borderRadius: 999, background: '#f5f1ef', color: 'rgba(26,26,26,0.6)' }}>
-                          ปฏิเสธ
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -2275,39 +2494,51 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
 
               {/* Avatar Overview Row */}
               <div className="flex items-center gap-2.5 flex-wrap">
-                {(booking.members || []).map(m => (
-                  <div key={m.uid} className="relative shrink-0" title={m.name}
-                    onClick={() => openProfile(m.uid)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    {m.avatar
-                      ? <img src={m.avatar} alt={m.name} className="w-11 h-11 rounded-full object-cover"
-                          style={m.paidDeposit
-                            ? { outline: `2.5px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 2 }
-                            : m.slipStatus === 'pending_verification'
-                              ? { outline: `2.5px solid ${C}45`, outlineOffset: 2 }
-                              : { outline: '2px solid rgba(26,26,26,0.08)', outlineOffset: 2 }} />
-                      : <div className="w-11 h-11 rounded-full flex items-center justify-center font-black text-sm"
-                          style={m.paidDeposit
-                            ? { background: `${C}14`, color: C, outline: `2.5px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 2 }
-                            : { background: '#f5f1ef', color: 'rgba(26,26,26,0.5)', outline: '2px solid rgba(26,26,26,0.06)', outlineOffset: 2 }}>
-                          {(m.name || '?')[0]}
-                        </div>
-                    }
-                    {m.paidDeposit && (
-                      <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
-                        style={{ background: isLocked ? '#16a34a' : C, border: '1.5px solid #ffffff' }}>
-                        <i className="fas fa-check" style={{ fontSize: 7, color: '#fff' }} />
-                      </div>
-                    )}
-                    {m.uid === booking.leaderId && !m.paidDeposit && (
-                      <div className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
-                        style={{ background: C, border: '1.5px solid #ffffff' }}>
-                        <i className="fas fa-crown" style={{ fontSize: 6, color: '#fff' }} />
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {(booking.members || []).map(m => {
+                  const mProf = memberProfiles[m.uid || m.id]
+                  const mAvatar = m.avatar || mProf?.pictureUrl || mProf?.avatar || ''
+                  const mName = m.name || mProf?.nickname || mProf?.firstname || mProf?.name || 'สมาชิก'
+                  const isMemLeader = m.uid === booking.leaderId
+
+                  return (
+                    <MemberAvatar
+                      key={m.uid || m.id}
+                      src={mAvatar}
+                      name={mName}
+                      size={44}
+                      onClick={() => openProfile(m.uid || m.id)}
+                      title={mName}
+                      style={{ cursor: 'pointer' }}
+                      imgStyle={
+                        m.paidDeposit
+                          ? { outline: `2.5px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 2 }
+                          : m.slipStatus === 'pending_verification'
+                            ? { outline: `2.5px solid ${C}45`, outlineOffset: 2 }
+                            : { outline: '2px solid rgba(26,26,26,0.08)', outlineOffset: 2 }
+                      }
+                      badge={
+                        <>
+                          {m.paidDeposit && (
+                            <div
+                              className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                              style={{ background: isLocked ? '#16a34a' : C, border: '1.5px solid #ffffff' }}
+                            >
+                              <i className="fas fa-check" style={{ fontSize: 7, color: '#fff' }} />
+                            </div>
+                          )}
+                          {isMemLeader && !m.paidDeposit && (
+                            <div
+                              className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full flex items-center justify-center"
+                              style={{ background: C, border: '1.5px solid #ffffff' }}
+                            >
+                              <i className="fas fa-crown" style={{ fontSize: 6, color: '#fff' }} />
+                            </div>
+                          )}
+                        </>
+                      }
+                    />
+                  )
+                })}
                 {Array.from({ length: Math.max(0, maxMembers - total) }).map((_, i) => (
                   <div key={`ea-${i}`} className="w-11 h-11 rounded-full flex items-center justify-center shrink-0"
                     style={{ border: '1.5px dashed rgba(26,26,26,0.14)', color: 'rgba(26,26,26,0.22)' }}
@@ -2320,66 +2551,69 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
 
               {/* Member Detail List */}
               <div className="flex flex-col gap-2.5">
-                {(booking.members || []).map(m => (
-                  <div key={m.uid} className="flex items-center justify-between gap-3"
-                    style={{
-                      padding: '12px 14px', borderRadius: 16,
-                      background: m.paidDeposit ? (isLocked ? '#f0fdf4' : `${C}08`) : m.slipStatus === 'pending_verification' ? `${C}05` : '#faf7f5',
-                      border: `1px solid ${m.paidDeposit ? (isLocked ? '#bbf7d0' : `${C}22`) : m.slipStatus === 'pending_verification' ? `${C}14` : 'rgba(26,26,26,0.06)'}`,
-                    }}>
-                    <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => openProfile(m.uid)}>
-                      <div className="shrink-0">
-                        {m.avatar
-                          ? <img src={m.avatar} alt="" className="w-10 h-10 rounded-full object-cover"
-                              style={m.paidDeposit ? { outline: `2px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 1.5 } : {}} />
-                          : <div className="w-10 h-10 rounded-full flex items-center justify-center font-black text-sm"
-                              style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.5)' }}>
-                              {(m.name || '?')[0]}
+                {(booking.members || []).map(m => {
+                  const mProf = memberProfiles[m.uid || m.id]
+                  const mAvatar = m.avatar || mProf?.pictureUrl || mProf?.avatar || ''
+                  const mName = m.name || mProf?.nickname || mProf?.firstname || mProf?.name || 'สมาชิก'
+                  const isMemLeader = m.uid === booking.leaderId
+
+                  return (
+                    <div key={m.uid || m.id} className="flex items-center justify-between gap-3"
+                      style={{
+                        padding: '12px 14px', borderRadius: 16,
+                        background: m.paidDeposit ? (isLocked ? '#f0fdf4' : `${C}08`) : m.slipStatus === 'pending_verification' ? `${C}05` : '#faf7f5',
+                        border: `1px solid ${m.paidDeposit ? (isLocked ? '#bbf7d0' : `${C}22`) : m.slipStatus === 'pending_verification' ? `${C}14` : 'rgba(26,26,26,0.06)'}`,
+                      }}>
+                      <div className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer" onClick={() => openProfile(m.uid || m.id)}>
+                        <MemberAvatar
+                          src={mAvatar}
+                          name={mName}
+                          size={40}
+                          imgStyle={m.paidDeposit ? { outline: `2px solid ${isLocked ? '#16a34a' : C}`, outlineOffset: 1.5 } : {}}
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-[14px] font-bold truncate" style={{ color: INK }}>{mName}</span>
+                            {isMemLeader && (
+                              <span className="text-[9px] font-black uppercase tracking-wider"
+                                style={{ padding: '2px 8px', borderRadius: 999, background: `${C}10`, color: C, border: `1px solid ${C}24` }}>
+                                <i className="fas fa-crown mr-1" style={{ fontSize: 7 }} />หัวหน้า
+                              </span>
+                            )}
+                          </div>
+                          {m.slipStatus === 'pending_verification' && !m.paidDeposit && (
+                            <div className="text-[11px] mt-0.5 font-medium" style={{ color: 'rgba(26,26,26,0.55)' }}>
+                              <i className="fas fa-hourglass-half mr-1 text-[9px]" style={{ color: C }} />รอแอดมินตรวจสลิป
                             </div>
-                        }
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[14px] font-bold truncate" style={{ color: INK }}>{m.name}</span>
-                          {m.uid === booking.leaderId && (
-                            <span className="text-[9px] font-black uppercase tracking-wider"
-                              style={{ padding: '2px 8px', borderRadius: 999, background: `${C}10`, color: C, border: `1px solid ${C}24` }}>
-                              <i className="fas fa-crown mr-1" style={{ fontSize: 7 }} />หัวหน้า
-                            </span>
+                          )}
+                          {m.paidDeposit && (
+                            <div className="text-[11px] mt-0.5 font-bold" style={{ color: isLocked ? '#16a34a' : C }}>
+                              <i className="fas fa-check-circle mr-1 text-[9px]" />ชำระมัดจำแล้ว
+                            </div>
                           )}
                         </div>
-                        {m.slipStatus === 'pending_verification' && !m.paidDeposit && (
-                          <div className="text-[11px] mt-0.5 font-medium" style={{ color: 'rgba(26,26,26,0.55)' }}>
-                            <i className="fas fa-hourglass-half mr-1 text-[9px]" style={{ color: C }} />รอแอดมินตรวจสลิป
-                          </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {m.slipUrl && (
+                          <a href={m.slipUrl} target="_blank" rel="noopener noreferrer"
+                            className="w-8 h-8 overflow-hidden block"
+                            style={{ borderRadius: 8, border: '1px solid rgba(26,26,26,0.1)' }} title="ดูสลิป">
+                            <img src={m.slipUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          </a>
                         )}
-                        {m.paidDeposit && (
-                          <div className="text-[11px] mt-0.5 font-bold" style={{ color: isLocked ? '#16a34a' : C }}>
-                            <i className="fas fa-check-circle mr-1 text-[9px]" />ชำระมัดจำแล้ว
-                          </div>
-                        )}
+                        <span className="text-[11px] font-bold"
+                          style={{
+                            padding: '5px 11px', borderRadius: 999,
+                            background: m.paidDeposit ? (isLocked ? '#16a34a' : C) : m.slipStatus === 'pending_verification' ? `${C}0c` : '#ffffff',
+                            color: m.paidDeposit ? '#fff' : m.slipStatus === 'pending_verification' ? C : 'rgba(26,26,26,0.4)',
+                            border: m.paidDeposit ? 'none' : `1px solid ${m.slipStatus === 'pending_verification' ? `${C}2c` : 'rgba(26,26,26,0.1)'}`,
+                          }}>
+                          {m.paidDeposit ? 'จ่ายแล้ว' : m.slipStatus === 'pending_verification' ? 'รอตรวจ' : 'ยังไม่จ่าย'}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {m.slipUrl && (
-                        <a href={m.slipUrl} target="_blank" rel="noopener noreferrer"
-                          className="w-8 h-8 overflow-hidden block"
-                          style={{ borderRadius: 8, border: '1px solid rgba(26,26,26,0.1)' }} title="ดูสลิป">
-                          <img src={m.slipUrl} alt="" className="w-full h-full object-cover" />
-                        </a>
-                      )}
-                      <span className="text-[11px] font-bold"
-                        style={{
-                          padding: '5px 11px', borderRadius: 999,
-                          background: m.paidDeposit ? (isLocked ? '#16a34a' : C) : m.slipStatus === 'pending_verification' ? `${C}0c` : '#ffffff',
-                          color: m.paidDeposit ? '#fff' : m.slipStatus === 'pending_verification' ? C : 'rgba(26,26,26,0.4)',
-                          border: m.paidDeposit ? 'none' : `1px solid ${m.slipStatus === 'pending_verification' ? `${C}2c` : 'rgba(26,26,26,0.1)'}`,
-                        }}>
-                        {m.paidDeposit ? 'จ่ายแล้ว' : m.slipStatus === 'pending_verification' ? 'รอตรวจ' : 'ยังไม่จ่าย'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                  )
+                })}
 
                 {/* Unfilled Slots with Clear Instructions */}
                 {Array.from({ length: Math.max(0, maxMembers - total) }).map((_, i) => (

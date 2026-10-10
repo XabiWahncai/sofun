@@ -175,7 +175,7 @@ function PartyMemberScanModal({ party, onClose }) {
           {addedMember ? (
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               {addedMember.avatar
-                ? <img src={addedMember.avatar} alt="" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--crimson-500)' }} onError={e => e.currentTarget.style.display = 'none'} />
+                ? <img src={addedMember.avatar} alt="" referrerPolicy="no-referrer" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--crimson-500)' }} onError={e => e.currentTarget.style.display = 'none'} />
                 : <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: '28px', fontWeight: 700, color: 'var(--crimson-500)' }}>{addedMember.name[0]}</div>
               }
               <div style={{ marginTop: '12px' }}>
@@ -416,7 +416,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
               <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>หัวปาร์ตี้</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {party.ownerAvatar
-                  ? <img src={party.ownerAvatar} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} alt="" onError={e => e.currentTarget.style.display = 'none'} />
+                  ? <img src={party.ownerAvatar} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
                   : <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--crimson-500)', fontSize: '15px' }}>{(party.ownerName || '?')[0]}</div>
                 }
                 <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
@@ -439,7 +439,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
                     style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: m.uid ? 'pointer' : 'default', padding: 4, margin: -4, borderRadius: 8 }}
                   >
                     {m.avatar
-                      ? <img src={m.avatar} alt={m.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+                      ? <img src={m.avatar} alt={m.name} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
                       : <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '13px' }}>{(m.name || '?')[0]}</div>
                     }
                     <span style={{ fontSize: '14px', color: 'var(--text-primary)', flex: 1 }}>{m.name}</span>
@@ -469,7 +469,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
                   {pendingRequests.map(r => (
                     <div key={r.uid} style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'var(--surface-sunken)', borderRadius: '8px', padding: '10px 12px', border: '1px solid var(--border-default)' }}>
                       {r.avatar
-                        ? <img src={r.avatar} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+                        ? <img src={r.avatar} alt="" style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
                         : <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--text-secondary)', fontSize: '13px' }}>{(r.name || '?')[0]}</div>
                       }
                       <span style={{ fontSize: '14px', color: 'var(--text-primary)', flex: 1 }}>{r.name}</span>
@@ -548,7 +548,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
                       {msg.uid !== user?.uid && (
                         <div>
                           {msg.avatar
-                            ? <img src={msg.avatar} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+                            ? <img src={msg.avatar} alt="" style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
                             : <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', fontWeight: 700, color: 'var(--text-secondary)' }}>{(msg.name || '?')[0]}</div>
                           }
                         </div>
@@ -666,7 +666,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
           style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: party.ownerId ? 'pointer' : 'default' }}
         >
           {party.ownerAvatar
-            ? <img src={party.ownerAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" onError={e => e.currentTarget.style.display = 'none'} />
+            ? <img src={party.ownerAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
             : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <i className="fas fa-user" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
               </div>
@@ -689,7 +689,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
                   style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
                 >
                   {m.avatar
-                    ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+                    ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
                     : <span>{(m.name || '?')[0]}</span>
                   }
                 </div>
@@ -823,7 +823,7 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
           style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: booking.leaderId ? 'pointer' : 'default' }}
         >
           {booking.leaderAvatar
-            ? <img src={booking.leaderAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" onError={e => e.currentTarget.style.display = 'none'} />
+            ? <img src={booking.leaderAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
             : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <i className="fas fa-user" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
               </div>
@@ -846,7 +846,7 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
                   style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
                 >
                   {m.avatar
-                    ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+                    ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
                     : <span>{(m.name || '?')[0]}</span>
                   }
                 </div>
