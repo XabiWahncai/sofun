@@ -2599,8 +2599,12 @@ function MenuEditModal({ item, onClose, showToast }) {
 
 // ─── Menu Tab ────────────────────────────────────────────────────────────────
 function MenuTab({ showToast }) {
-  const [menuItems, setMenuItems] = useState([])
-  const [editItem, setEditItem] = useState(null) // null=closed, {}=new, item=edit
+  const [menuItems, setMenuItems]           = useState([])
+  const [editItem, setEditItem]             = useState(null) // null=closed, {}=new, item=edit
+  const [search, setSearch]                 = useState('')
+  const [categoryFilter, setCategoryFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter]     = useState('ALL') // 'ALL' | 'available' | 'hidden'
+  const [sortBy, setSortBy]                 = useState('default') // 'default' | 'name_asc' | 'name_desc' | 'price_asc' | 'price_desc' | 'addons_desc'
 
   useEffect(() => {
     const q = query(collection(db, 'menuItems'), orderBy('category'), orderBy('name'))
@@ -2624,48 +2628,456 @@ function MenuTab({ showToast }) {
     showToast('ลบแล้ว')
   }
 
-  const grouped = menuItems.reduce((g, item) => {
-    const cat = item.category || 'อื่นๆ'
-    if (!g[cat]) g[cat] = []
-    g[cat].push(item); return g
-  }, {})
+  // Statistical counters & categories
+  const allCategories = useMemo(() => {
+    const cats = Array.from(new Set(menuItems.map(m => m.category || 'อื่นๆ'))).filter(Boolean)
+    return cats.sort((a, b) => a.localeCompare(b, 'th'))
+  }, [menuItems])
+
+  const categoryCounts = useMemo(() => {
+    const map = {}
+    menuItems.forEach(m => {
+      const cat = m.category || 'อื่นๆ'
+      map[cat] = (map[cat] || 0) + 1
+    })
+    return map
+  }, [menuItems])
+
+  const availableCount = useMemo(() => menuItems.filter(m => m.available !== false).length, [menuItems])
+  const hiddenCount    = useMemo(() => menuItems.filter(m => m.available === false).length, [menuItems])
+
+  // Filter & Sort
+  const { filteredItems, grouped } = useMemo(() => {
+    const q = search.trim().toLowerCase()
+
+    const matched = menuItems.filter(item => {
+      // 1. Search Query
+      if (q) {
+        const name      = (item.name || '').toLowerCase()
+        const cat       = (item.category || '').toLowerCase()
+        const price     = String(item.price ?? '')
+        const addonsStr = (item.addons || []).map(a => typeof a === 'object' ? a.name : a).join(' ').toLowerCase()
+
+        const match =
+          name.includes(q) ||
+          cat.includes(q) ||
+          price.includes(q) ||
+          addonsStr.includes(q)
+
+        if (!match) return false
+      }
+
+      // 2. Category Filter
+      if (categoryFilter !== 'ALL') {
+        const itemCat = item.category || 'อื่นๆ'
+        if (itemCat !== categoryFilter) return false
+      }
+
+      // 3. Status Filter
+      if (statusFilter === 'available' && item.available === false) return false
+      if (statusFilter === 'hidden' && item.available !== false) return false
+
+      return true
+    })
+
+    // Sort items
+    const sorted = [...matched].sort((a, b) => {
+      const nameA  = (a.name || '').toLowerCase()
+      const nameB  = (b.name || '').toLowerCase()
+      const priceA = Number(a.price) || 0
+      const priceB = Number(b.price) || 0
+      const addA   = a.addons?.length || 0
+      const addB   = b.addons?.length || 0
+      const catA   = (a.category || 'อื่นๆ').toLowerCase()
+      const catB   = (b.category || 'อื่นๆ').toLowerCase()
+
+      if (sortBy === 'name_asc') {
+        return nameA.localeCompare(nameB, 'th')
+      }
+      if (sortBy === 'name_desc') {
+        return nameB.localeCompare(nameA, 'th')
+      }
+      if (sortBy === 'price_asc') {
+        return priceA - priceB || nameA.localeCompare(nameB, 'th')
+      }
+      if (sortBy === 'price_desc') {
+        return priceB - priceA || nameA.localeCompare(nameB, 'th')
+      }
+      if (sortBy === 'addons_desc') {
+        return addB - addA || nameA.localeCompare(nameB, 'th')
+      }
+
+      // 'default': Category then Name
+      const catComp = catA.localeCompare(catB, 'th')
+      if (catComp !== 0) return catComp
+      return nameA.localeCompare(nameB, 'th')
+    })
+
+    // Group sorted items by category
+    const groupMap = sorted.reduce((g, item) => {
+      const cat = item.category || 'อื่นๆ'
+      if (!g[cat]) g[cat] = []
+      g[cat].push(item)
+      return g
+    }, {})
+
+    return {
+      filteredItems: sorted,
+      grouped: groupMap,
+    }
+  }, [menuItems, search, categoryFilter, statusFilter, sortBy])
+
+  const isFiltered = !!search || categoryFilter !== 'ALL' || statusFilter !== 'ALL' || sortBy !== 'default'
+  const handleResetFilters = () => {
+    setSearch('')
+    setCategoryFilter('ALL')
+    setStatusFilter('ALL')
+    setSortBy('default')
+  }
 
   return (
     <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+      {/* ── Top Bar: Title & Add Menu Button ── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 38,
+            height: 38,
+            borderRadius: 10,
+            background: 'rgba(239, 68, 68, 0.1)',
+            color: 'var(--crimson-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16,
+          }}>
+            <i className="fas fa-utensils" />
+          </div>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#0f172a' }}>
+              รายการเมนูอาหาร ({menuItems.length})
+            </div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>
+              พร้อมเสิร์ฟ {availableCount} รายการ · ปิดขาย {hiddenCount} รายการ
+            </div>
+          </div>
+        </div>
+
         <button className="adm-btn-red" onClick={() => setEditItem({})}>
           <i className="fas fa-plus" /> เพิ่มเมนูใหม่
         </button>
       </div>
 
+      {/* ── Search & Filter Controls Card ── */}
+      <div className="adm-card" style={{ padding: 16, marginBottom: 16, background: '#ffffff', borderRadius: 14, border: '1px solid #e2e8f0' }}>
+        {/* Row 1: Search Box + Select Dropdowns */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+          {/* Search Input with Icon and Clear button */}
+          <div style={{ position: 'relative', flex: '1 1 240px', minWidth: 220 }}>
+            <i className="fas fa-search" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', fontSize: 13 }} />
+            <input
+              type="text"
+              className="adm-input"
+              placeholder="ค้นหาชื่อเมนู, หมวดหมู่, ราคา, ท็อปปิ้ง..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              style={{
+                paddingLeft: 34,
+                paddingRight: search ? 32 : 12,
+                width: '100%',
+                boxSizing: 'border-box',
+                height: 38,
+                borderRadius: 10,
+                fontSize: 13,
+                border: '1px solid #cbd5e1',
+              }}
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                title="ล้างข้อความค้นหา"
+                style={{
+                  position: 'absolute',
+                  right: 8,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: '#94a3b8',
+                  cursor: 'pointer',
+                  padding: 4,
+                }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            )}
+          </div>
+
+          {/* Category Dropdown */}
+          <select
+            className="adm-input"
+            style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer', borderRadius: 10, border: '1px solid #cbd5e1' }}
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+          >
+            <option value="ALL">ทุกหมวดหมู่ ({menuItems.length})</option>
+            {allCategories.map(cat => (
+              <option key={cat} value={cat}>
+                {cat} ({categoryCounts[cat] || 0})
+              </option>
+            ))}
+          </select>
+
+          {/* Status Dropdown */}
+          <select
+            className="adm-input"
+            style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer', borderRadius: 10, border: '1px solid #cbd5e1' }}
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+          >
+            <option value="ALL">ทุกสถานะ</option>
+            <option value="available">พร้อมเสิร์ฟ / เปิดขาย ({availableCount})</option>
+            <option value="hidden">ปิดขายชั่วคราว ({hiddenCount})</option>
+          </select>
+
+          {/* Sort Dropdown */}
+          <select
+            className="adm-input"
+            style={{ width: 'auto', minWidth: 140, height: 38, fontSize: 13, cursor: 'pointer', borderRadius: 10, border: '1px solid #cbd5e1' }}
+            value={sortBy}
+            onChange={e => setSortBy(e.target.value)}
+          >
+            <option value="default">เรียง: หมวดหมู่ &gt; ชื่อ</option>
+            <option value="name_asc">ชื่อ (ก-ฮ / A-Z)</option>
+            <option value="name_desc">ชื่อ (ฮ-ก / Z-A)</option>
+            <option value="price_asc">ราคา (น้อย ไป มาก)</option>
+            <option value="price_desc">ราคา (มาก ไป น้อย)</option>
+            <option value="addons_desc">มี Add-on มากสุด</option>
+          </select>
+        </div>
+
+        {/* Row 2: Quick Filter Pills & Result Stats */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginTop: 10,
+          padding: '8px 12px',
+          background: '#f8fafc',
+          borderRadius: 10,
+          border: '1px solid #e2e8f0',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>ทางลัด:</span>
+            <button
+              type="button"
+              onClick={() => { setCategoryFilter('ALL'); setStatusFilter('ALL') }}
+              style={{
+                padding: '3px 10px',
+                borderRadius: 16,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: categoryFilter === 'ALL' && statusFilter === 'ALL' ? 'var(--red, #e11d48)' : '#cbd5e1',
+                background: categoryFilter === 'ALL' && statusFilter === 'ALL' ? 'var(--red, #e11d48)' : '#ffffff',
+                color: categoryFilter === 'ALL' && statusFilter === 'ALL' ? '#ffffff' : '#475569',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              ทั้งหมด ({menuItems.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'available' ? 'ALL' : 'available')}
+              style={{
+                padding: '3px 10px',
+                borderRadius: 16,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: statusFilter === 'available' ? '#059669' : '#cbd5e1',
+                background: statusFilter === 'available' ? '#d1fae5' : '#ffffff',
+                color: statusFilter === 'available' ? '#065f46' : '#475569',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <i className="fas fa-check-circle" /> พร้อมเสิร์ฟ ({availableCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter(statusFilter === 'hidden' ? 'ALL' : 'hidden')}
+              style={{
+                padding: '3px 10px',
+                borderRadius: 16,
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: '1px solid',
+                borderColor: statusFilter === 'hidden' ? '#dc2626' : '#cbd5e1',
+                background: statusFilter === 'hidden' ? '#fee2e2' : '#ffffff',
+                color: statusFilter === 'hidden' ? '#991b1b' : '#475569',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <i className="fas fa-eye-slash" /> ปิดขาย ({hiddenCount})
+            </button>
+            {allCategories.map(cat => {
+              const isSel = categoryFilter === cat
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCategoryFilter(isSel ? 'ALL' : cat)}
+                  style={{
+                    padding: '3px 10px',
+                    borderRadius: 16,
+                    fontSize: 12,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    border: '1px solid',
+                    borderColor: isSel ? '#2563eb' : '#cbd5e1',
+                    background: isSel ? '#dbeafe' : '#ffffff',
+                    color: isSel ? '#1e40af' : '#475569',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <i className="fas fa-tag" /> {cat} ({categoryCounts[cat] || 0})
+                </button>
+              )
+            })}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>
+              แสดง <strong>{filteredItems.length}</strong> จาก {menuItems.length} เมนู
+            </span>
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                style={{
+                  border: 'none',
+                  background: 'none',
+                  color: 'var(--crimson-500, #e11d48)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  padding: '2px 6px',
+                  borderRadius: 4,
+                }}
+              >
+                <i className="fas fa-rotate-left" /> ล้างตัวกรอง
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Menu List Grouped by Category ── */}
       {Object.entries(grouped).map(([cat, items]) => (
-        <div key={cat} className="adm-card" style={{ marginBottom: 16 }}>
-          <div className="adm-card-title"><i className="fas fa-tag" /> {cat}</div>
+        <div key={cat} className="adm-card" style={{ marginBottom: 16, borderRadius: 14, border: '1px solid #e2e8f0', background: '#ffffff' }}>
+          <div className="adm-card-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 15, fontWeight: 800, color: '#0f172a', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="fas fa-tag" style={{ color: 'var(--crimson-500)' }} />
+              <span>{cat}</span>
+            </div>
+            <span style={{ background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20 }}>
+              {items.length} เมนู
+            </span>
+          </div>
+
           {items.map(item => (
-            <div key={item.id} className="adm-list-row">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, minWidth: 0 }}>
+            <div key={item.id} className="adm-list-row" style={{ padding: '10px 0', borderBottom: '1px solid #f1f5f9' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
                 {(item.imageUrl || item.image)
-                  ? <img src={item.imageUrl || item.image} alt="" className="menu-list-img" />
-                  : <div className="menu-list-img-ph"><i className="fas fa-utensils" /></div>
+                  ? <img src={item.imageUrl || item.image} alt="" className="menu-list-img" style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+                  : <div className="menu-list-img-ph" style={{ width: 44, height: 44, borderRadius: 8, background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 18, flexShrink: 0 }}><i className="fas fa-utensils" /></div>
                 }
-                <div className="adm-list-info" style={{ flex: 1 }}>
-                  <div className="adm-list-name" style={{ opacity: item.available ? 1 : 0.45, textDecoration: item.available ? 'none' : 'line-through' }}>
-                    {item.name}
+                <div className="adm-list-info" style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                    <span className="adm-list-name" style={{ fontWeight: 700, fontSize: 14, color: item.available ? '#0f172a' : '#94a3b8', textDecoration: item.available ? 'none' : 'line-through' }}>
+                      {item.name}
+                    </span>
+                    {!item.available && (
+                      <span style={{ background: '#fee2e2', color: '#991b1b', fontSize: 10, fontWeight: 700, padding: '1px 6px', borderRadius: 4, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <i className="fas fa-eye-slash" style={{ fontSize: 9 }} /> ปิดขาย
+                      </span>
+                    )}
                   </div>
-                  <div className="adm-list-sub">
-                    ฿{item.price}
-                    {item.addons?.length > 0 && <span style={{ marginLeft: 8, color: '#a78bfa' /* ds-allow-hardcode */ }}>+{item.addons.length} add-on</span>}
+                  <div className="adm-list-sub" style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    <strong style={{ color: 'var(--crimson-500)', fontSize: 13 }}>฿{item.price}</strong>
+                    {item.addons?.length > 0 && (
+                      <span style={{ marginLeft: 8, color: '#7c3aed', background: '#f5f3ff', padding: '1px 7px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>
+                        +{item.addons.length} add-on
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
+
               <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
-                <button className="adm-btn-sm" onClick={() => setEditItem(item)}>
+                <button
+                  type="button"
+                  className="adm-btn-sm"
+                  onClick={() => setEditItem(item)}
+                  title="แก้ไขเมนู"
+                  style={{ width: 34, height: 34, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                >
                   <i className="fas fa-pen" />
                 </button>
-                <button className="adm-btn-sm" style={{ background: item.available ? 'rgba(var(--feedback-success-rgb), 0.13)' : 'rgba(var(--void-500-rgb), 0.13)', color: item.available ? 'var(--feedback-success-icon)' : 'var(--void-500)' }} onClick={() => toggleAvailable(item)}>
+                <button
+                  type="button"
+                  className="adm-btn-sm"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: item.available ? 'rgba(16, 185, 129, 0.12)' : 'rgba(100, 116, 139, 0.12)',
+                    color: item.available ? '#059669' : '#64748b',
+                  }}
+                  onClick={() => toggleAvailable(item)}
+                  title={item.available ? 'คลิกเพื่อปิดขาย' : 'คลิกเพื่อเปิดขาย'}
+                >
                   <i className={`fas ${item.available ? 'fa-eye' : 'fa-eye-slash'}`} />
                 </button>
-                <button className="adm-btn-sm" style={{ background: 'rgba(var(--crimson-500-rgb), 0.13)', color: 'var(--crimson-500)' }} onClick={() => handleDelete(item.id)}>
+                <button
+                  type="button"
+                  className="adm-btn-sm"
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 8,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(239, 68, 68, 0.1)',
+                    color: 'var(--crimson-500)',
+                  }}
+                  onClick={() => handleDelete(item.id)}
+                  title="ลบเมนู"
+                >
                   <i className="fas fa-trash" />
                 </button>
               </div>
@@ -2673,7 +3085,49 @@ function MenuTab({ showToast }) {
           ))}
         </div>
       ))}
-      {menuItems.length === 0 && <div className="adm-empty">ยังไม่มีเมนู กด "เพิ่มเมนูใหม่" เพื่อเริ่ม</div>}
+
+      {/* ── Empty State ── */}
+      {filteredItems.length === 0 && (
+        <div style={{
+          textAlign: 'center',
+          padding: '48px 20px',
+          background: '#ffffff',
+          borderRadius: 16,
+          border: '1px dashed #cbd5e1',
+          margin: '16px 0',
+        }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: '50%',
+            background: '#f1f5f9',
+            color: '#94a3b8',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 10px',
+            fontSize: 18,
+          }}>
+            <i className="fas fa-utensils" />
+          </div>
+          <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b', marginBottom: 4 }}>
+            {menuItems.length === 0 ? 'ยังไม่มีเมนูอาหาร' : 'ไม่พบเมนูที่ตรงกับเงื่อนไขการค้นหา'}
+          </div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 14 }}>
+            {menuItems.length === 0 ? 'กด "เพิ่มเมนูใหม่" เพื่อเริ่มสร้างเมนูแรก' : 'ลองค้นหาด้วยคำอื่น หรือคลิกล้างตัวกรองทั้งหมด'}
+          </div>
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="adm-btn-red"
+              style={{ fontSize: 12, padding: '6px 16px', borderRadius: 8 }}
+            >
+              <i className="fas fa-rotate-left" /> ล้างตัวกรองทั้งหมด
+            </button>
+          )}
+        </div>
+      )}
 
       {editItem !== null && (
         <MenuEditModal item={editItem?.id ? editItem : null} onClose={() => setEditItem(null)} showToast={showToast} />
