@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
 import { db, storage, appFunctions } from '../firebase'
 import { httpsCallable } from 'firebase/functions'
@@ -658,7 +658,20 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
     return () => obs.disconnect()
   }, [cart.length])
 
-  const categories = [ALL, ...Array.from(new Set(menuItems.map(m => m.category))).sort()]
+  const MENU_CATEGORY_ORDER = ['อาหาร', 'ของว่าง', 'ของหวาน', 'เครื่องดื่ม', 'แอลกอฮอล์', 'เพิ่มเติม']
+
+  const sortMenuCategories = (cats) => {
+    return [...cats].sort((a, b) => {
+      const idxA = MENU_CATEGORY_ORDER.indexOf(a)
+      const idxB = MENU_CATEGORY_ORDER.indexOf(b)
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB
+      if (idxA !== -1) return -1
+      if (idxB !== -1) return 1
+      return a.localeCompare(b, 'th')
+    })
+  }
+
+  const categories = [ALL, ...sortMenuCategories(Array.from(new Set(menuItems.map(m => m.category).filter(Boolean))))]
 
   const filtered = menuItems.filter(item => {
     const matchCat = activeCategory === ALL || item.category === activeCategory
@@ -666,12 +679,21 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
     return matchCat && matchSearch
   })
 
-  const groupedMenu = filtered.reduce((g, item) => {
-    const cat = item.category || 'อื่นๆ'
-    if (!g[cat]) g[cat] = []
-    g[cat].push(item)
-    return g
-  }, {})
+  const groupedMenu = useMemo(() => {
+    const rawGroups = filtered.reduce((g, item) => {
+      const cat = item.category || 'อื่นๆ'
+      if (!g[cat]) g[cat] = []
+      g[cat].push(item)
+      return g
+    }, {})
+
+    const sortedCats = sortMenuCategories(Object.keys(rawGroups))
+    const ordered = {}
+    sortedCats.forEach(cat => {
+      ordered[cat] = rawGroups[cat]
+    })
+    return ordered
+  }, [filtered])
 
   const addToCart = (menuItem, selectedAddons = [], note = '') => {
     const addonTotal = selectedAddons.reduce((s, a) => s + (a.price || 0), 0)

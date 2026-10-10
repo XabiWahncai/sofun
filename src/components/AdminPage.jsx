@@ -2551,12 +2551,11 @@ function MenuEditModal({ item, onClose, showToast }) {
   }
 
   const CATEGORY_PRESETS = [
+    'อาหาร',
     'ของว่าง',
     'ของหวาน',
-    'อาหาร',
     'เครื่องดื่ม',
     'แอลกอฮอล์',
-    'กับแกล้ม',
     'เพิ่มเติม',
   ]
 
@@ -3200,10 +3199,23 @@ function MenuTab({ showToast }) {
     showToast('ลบแล้ว')
   }
 
+  const MENU_CATEGORY_ORDER = ['อาหาร', 'ของว่าง', 'ของหวาน', 'เครื่องดื่ม', 'แอลกอฮอล์', 'เพิ่มเติม']
+
+  const sortMenuCategories = (cats) => {
+    return [...cats].sort((a, b) => {
+      const idxA = MENU_CATEGORY_ORDER.indexOf(a)
+      const idxB = MENU_CATEGORY_ORDER.indexOf(b)
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB
+      if (idxA !== -1) return -1
+      if (idxB !== -1) return 1
+      return a.localeCompare(b, 'th')
+    })
+  }
+
   // Statistical counters & categories
   const allCategories = useMemo(() => {
     const cats = Array.from(new Set(menuItems.map(m => m.category || 'อื่นๆ'))).filter(Boolean)
-    return cats.sort((a, b) => a.localeCompare(b, 'th'))
+    return sortMenuCategories(cats)
   }, [menuItems])
 
   const categoryCounts = useMemo(() => {
@@ -3280,18 +3292,34 @@ function MenuTab({ showToast }) {
       }
 
       // 'default': Category then Name
-      const catComp = catA.localeCompare(catB, 'th')
-      if (catComp !== 0) return catComp
+      const idxA = MENU_CATEGORY_ORDER.indexOf(catA)
+      const idxB = MENU_CATEGORY_ORDER.indexOf(catB)
+      if (idxA !== -1 && idxB !== -1) {
+        if (idxA !== idxB) return idxA - idxB
+      } else if (idxA !== -1) {
+        return -1
+      } else if (idxB !== -1) {
+        return 1
+      } else {
+        const catComp = catA.localeCompare(catB, 'th')
+        if (catComp !== 0) return catComp
+      }
       return nameA.localeCompare(nameB, 'th')
     })
 
     // Group sorted items by category
-    const groupMap = sorted.reduce((g, item) => {
+    const rawGroups = sorted.reduce((g, item) => {
       const cat = item.category || 'อื่นๆ'
       if (!g[cat]) g[cat] = []
       g[cat].push(item)
       return g
     }, {})
+
+    const sortedCats = sortMenuCategories(Object.keys(rawGroups))
+    const groupMap = {}
+    sortedCats.forEach(cat => {
+      groupMap[cat] = rawGroups[cat]
+    })
 
     return {
       filteredItems: sorted,

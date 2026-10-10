@@ -1070,7 +1070,20 @@ export default function POSPage({
     } catch (e) { showToast('ปิดตี้ล้มเหลว: ' + e.message, 'error') }
   }
 
-  const menuCategories = ['ทั้งหมด', ...Array.from(new Set(menuItems.map(m => m.category).filter(Boolean))).sort()]
+  const MENU_CATEGORY_ORDER = ['อาหาร', 'ของว่าง', 'ของหวาน', 'เครื่องดื่ม', 'แอลกอฮอล์', 'เพิ่มเติม']
+
+  const sortMenuCategories = (cats) => {
+    return [...cats].sort((a, b) => {
+      const idxA = MENU_CATEGORY_ORDER.indexOf(a)
+      const idxB = MENU_CATEGORY_ORDER.indexOf(b)
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB
+      if (idxA !== -1) return -1
+      if (idxB !== -1) return 1
+      return a.localeCompare(b, 'th')
+    })
+  }
+
+  const menuCategories = ['ทั้งหมด', ...sortMenuCategories(Array.from(new Set(menuItems.map(m => m.category).filter(Boolean))))]
 
   const filteredMenuItems = menuItems.filter(item => {
     if (item.available === false) return false
@@ -1079,11 +1092,21 @@ export default function POSPage({
     return true
   })
 
-  const groupedMenu = filteredMenuItems.reduce((g, item) => {
-    const cat = item.category || 'อื่นๆ'
-    if (!g[cat]) g[cat] = []
-    g[cat].push(item); return g
-  }, {})
+  const groupedMenu = useMemo(() => {
+    const rawGroups = filteredMenuItems.reduce((g, item) => {
+      const cat = item.category || 'อื่นๆ'
+      if (!g[cat]) g[cat] = []
+      g[cat].push(item)
+      return g
+    }, {})
+
+    const sortedCats = sortMenuCategories(Object.keys(rawGroups))
+    const ordered = {}
+    sortedCats.forEach(cat => {
+      ordered[cat] = rawGroups[cat]
+    })
+    return ordered
+  }, [filteredMenuItems])
 
   // ── confirm / update order ───────────────────────────────────────
   const handleConfirm = async () => {
