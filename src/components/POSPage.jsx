@@ -894,7 +894,7 @@ export default function POSPage({
     const myBaseGame = m.unpaidDeposit ? gameFullPrice : gameUnitPay
     const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
     const myDisc = isMemberDiscounted ? discountPerDiscounted : 0
-    return Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+    return Math.round(Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc) * 100) / 100
   }
 
   const confirmGroupPayment = async () => {
@@ -2131,7 +2131,7 @@ export default function POSPage({
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
                       <div style={{ fontSize: 15, fontWeight: 900, color: '#c62419', lineHeight: 1 }}>฿{fmtCurrency(bill)}</div>
-                      <div style={{ fontSize: 9.5, color: 'rgba(26,26,26,0.4)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ต้องจ่าย</div>
+                      <div style={{ fontSize: 10, color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>ต้องจ่าย</div>
                     </div>
                     <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} style={{ color: 'rgba(26,26,26,0.35)', fontSize: 11, marginLeft: 2 }} />
                   </button>
@@ -2145,14 +2145,14 @@ export default function POSPage({
                     }}>
                       {/* Character */}
                       <div>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>ตัวละคร</div>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)', marginBottom: 5 }}>ตัวละคร</div>
                         {isLocked ? (
                           <div style={{ fontSize: 13, fontWeight: 700, color: m.character ? '#1a1a1a' : 'rgba(26,26,26,0.35)', padding: '6px 0' }}>
-                            {m.character || '— ยังไม่กำหนด —'}
+                            {m.character || '- ยังไม่กำหนด -'}
                           </div>
                         ) : selectedGame?.characters?.length > 0 ? (
                           <select className="pos-char-select" value={m.character} onChange={e => setCharacter(m.uid, e.target.value)}>
-                            <option value="">— เลือกตัวละคร —</option>
+                            <option value="">- เลือกตัวละคร -</option>
                             {selectedGame.characters.map((c, i) => (
                               <option key={i} value={c.name}>{c.name}</option>
                             ))}
@@ -2164,9 +2164,9 @@ export default function POSPage({
 
                       {/* Items ordered by this member */}
                       <div>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)', marginBottom: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span>รายการที่สั่ง{myItems.length > 0 ? ` · ${myItems.length}` : ''}</span>
-                          {myFoodTotal > 0 && <span style={{ color: '#1a1a1a', fontSize: 10.5 }}>฿{myFoodTotal.toLocaleString()}</span>}
+                          {myFoodTotal > 0 && <span style={{ color: '#1a1a1a', fontSize: 10.5 }}>฿{fmtCurrency(myFoodTotal)}</span>}
                         </div>
                         {myItems.length === 0 ? (
                           <div style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.3)', padding: '6px 2px' }}>ยังไม่มีรายการ</div>
@@ -2179,7 +2179,7 @@ export default function POSPage({
                                   {it.qty > 1 && <span style={{ color: 'rgba(26,26,26,0.5)' }}> ×{it.qty}</span>}
                                   {it.addons?.length > 0 && <span style={{ color: 'rgba(26,26,26,0.4)', fontSize: 11 }}> ({it.addons.map(a => a.name).join(', ')})</span>}
                                 </span>
-                                <span style={{ fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>฿{(it.totalPrice * it.qty).toLocaleString()}</span>
+                                <span style={{ fontWeight: 700, flexShrink: 0, marginLeft: 8 }}>฿{fmtCurrency(it.totalPrice * it.qty)}</span>
                               </div>
                             ))}
                           </div>
@@ -2202,14 +2202,14 @@ export default function POSPage({
                         )}
                         {memberIsDiscounted && discountPerPerson > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
-                            <span>− โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
-                            <span>−฿{fmtCurrency(discountPerPerson)}</span>
+                            <span>- โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
+                            <span>-฿{fmtCurrency(discountPerPerson)}</span>
                           </div>
                         )}
                         {Number(m.personalDiscount) > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
-                            <span>− {m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
-                            <span>−฿{fmtCurrency(Number(m.personalDiscount))}</span>
+                            <span>- {m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
+                            <span>-฿{fmtCurrency(Number(m.personalDiscount))}</span>
                           </div>
                         )}
                       </div>
@@ -2218,16 +2218,16 @@ export default function POSPage({
                       {isLocked ? (
                         Number(m.personalDiscount) > 0 && (
                           <div>
-                            <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>ส่วนลดเพิ่มเติม / Topup</div>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)', marginBottom: 5 }}>ส่วนลดเพิ่มเติม / Topup</div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1a1a1a' }}>
                               <span style={{ fontWeight: 600 }}>{m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
-                              <span style={{ fontWeight: 800, color: '#c62419' }}>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                              <span style={{ fontWeight: 800, color: '#c62419' }}>-฿{fmtCurrency(Number(m.personalDiscount))}</span>
                             </div>
                           </div>
                         )
                       ) : (
                         <div>
-                          <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 5 }}>ส่วนลดเพิ่มเติม / Topup</div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)', marginBottom: 5 }}>ส่วนลดเพิ่มเติม / Topup</div>
                           <div style={{ display: 'flex', gap: 6 }}>
                             <input
                               className="pos-personal-disc-note"
@@ -2877,7 +2877,7 @@ export default function POSPage({
               {orderArr.length > 0 && (
                 <>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 2px 6px' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(26,26,26,0.5)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)' }}>
                       <i className="fas fa-utensils" style={{ color: '#c62419', marginRight: 5, fontSize: 10 }} />
                       อาหาร / เครื่องดื่ม
                     </span>
@@ -3010,8 +3010,8 @@ export default function POSPage({
                   color: '#fff', boxShadow: '0 6px 20px rgba(198,36,25,0.3)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                 }}>
-                  <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.85 }}>ยอดรวม</span>
-                  <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>฿{fmtCurrency(grandTotal)}</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.9 }}>ยอดรวม</span>
+                  <span style={{ fontSize: 22, fontWeight: 900 }}>฿{fmtCurrency(grandTotal)}</span>
                 </div>
               ) : (
                 <div style={{ padding: '28px 18px', textAlign: 'center', color: 'rgba(26,26,26,0.3)', fontSize: 13 }}>
@@ -3030,7 +3030,7 @@ export default function POSPage({
               </div>
             ) : verifiedTotal > 0 && (
               <div className="pos-partial-paid-banner">
-                <i className="fas fa-check-circle" /> จ่ายแล้ว ฿{verifiedTotal.toLocaleString()} · ค้าง ฿{remainingAmount.toLocaleString()}
+                <i className="fas fa-check-circle" /> จ่ายแล้ว ฿{fmtCurrency(verifiedTotal)} · ค้าง ฿{fmtCurrency(remainingAmount)}
               </div>
             )}
 
@@ -3049,7 +3049,7 @@ export default function POSPage({
                   </button>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)' }}>
                       เลือกสมาชิกที่จ่ายรวมกัน
                     </div>
                     {activeSession.members
@@ -3074,7 +3074,7 @@ export default function POSPage({
                               <span style={{ fontSize: 13, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>{(m.name || '').split(' ')[0]}</span>
                             </span>
                             <span style={{ fontSize: 13, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>
-                              ฿{bill.toLocaleString()}
+                              ฿{fmtCurrency(bill)}
                             </span>
                           </button>
                         )
@@ -3085,10 +3085,10 @@ export default function POSPage({
                           รวม {groupPaySelected.size} คน
                         </span>
                         <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--crimson-500)' }}>
-                          ฿{[...groupPaySelected].reduce((s, uid) => {
+                          ฿{fmtCurrency([...groupPaySelected].reduce((s, uid) => {
                             const m = (activeSession.members || []).find(x => x.uid === uid)
                             return s + (m ? getMemberBill(m) : 0)
-                          }, 0).toLocaleString()}
+                          }, 0))}
                         </span>
                       </div>
                     )}

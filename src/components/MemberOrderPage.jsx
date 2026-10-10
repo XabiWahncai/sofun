@@ -880,7 +880,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const myPersonalDiscount = Number(me?.personalDiscount) || 0
   const myPersonalDiscountNote = me?.personalDiscountNote || ''
   const myGameFee = getMemberGameFee(me)
-  const myTotal = Math.max(0, myHistoryTotal + myPendingTotal + myGameFee - myDiscount - myPersonalDiscount)
+  const myTotal = Math.round(Math.max(0, myHistoryTotal + myPendingTotal + myGameFee - myDiscount - myPersonalDiscount) * 100) / 100
 
   const getGroupMemberBill = (m) => {
     const food = (activeOrder.memberFoodHistory || [])
@@ -888,12 +888,12 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
       .reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
     const gameFee = getMemberGameFee(m)
     const disc = getMemberDiscount(m)
-    return Math.max(0, food + gameFee - disc - (Number(m.personalDiscount) || 0))
+    return Math.round(Math.max(0, food + gameFee - disc - (Number(m.personalDiscount) || 0)) * 100) / 100
   }
-  const groupPayTotal = [...groupPayUids].reduce((s, uid) => {
+  const groupPayTotal = Math.round([...groupPayUids].reduce((s, uid) => {
     const m = (activeOrder.members || []).find(x => x.uid === uid)
     return s + (m ? getGroupMemberBill(m) : 0)
-  }, 0)
+  }, 0) * 100) / 100
 
   const allPendingItems = activeOrder.memberFoodQueue || []
   const tablePendingTotal = allPendingItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
@@ -901,7 +901,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const tableGameTotal = activeOrder.gameTotal || orderMembers.reduce((s, m) => s + getMemberGameFee(m), 0)
   const tableTotalDiscount = nDisc > 0 ? (dMode === 'split' ? rawD : rawD * nDisc) : 0
   const tablePersonalDiscounts = (activeOrder.members || []).reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
-  const tableTotal = Math.max(0, tableConfirmedTotal + tablePendingTotal + tableGameTotal - tableTotalDiscount - tablePersonalDiscounts)
+  const tableTotal = Math.round(Math.max(0, tableConfirmedTotal + tablePendingTotal + tableGameTotal - tableTotalDiscount - tablePersonalDiscounts) * 100) / 100
 
   const handleZeroPayment = async (forAllFlag = false) => {
     if (!window.confirm(forAllFlag ? 'ยอดรวมทั้งตี้ ฿0 ยืนยันชำระโดยไม่ต้องส่งสลิป?' : 'ยอดชำระของคุณ ฿0 ยืนยันชำระโดยไม่ต้องส่งสลิป?')) return
@@ -1086,7 +1086,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                   )}
                 </div>
                 <div className="mo-cart-row-right">
-                  <button className="mo-qty-btn" onClick={() => changeQty(x.key, -1)}>−</button>
+                  <button className="mo-qty-btn" onClick={() => changeQty(x.key, -1)}>-</button>
                   <span className="mo-qty-num">{x.qty}</span>
                   <button className="mo-qty-btn mo-qty-add" onClick={() => changeQty(x.key, 1)}>+</button>
                   <span className="mo-cart-price">฿{(x.totalPrice * x.qty).toLocaleString()}</span>
@@ -1173,13 +1173,13 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                 {myDiscount > 0 && (
                   <div className="mo-bill-row" style={{ color: 'var(--feedback-success-icon)' }}>
                     <span className="mo-bill-row-name"><i className="fas fa-tag" style={{ marginRight: 5 }} />{activeOrder.promoName || 'ส่วนลด'}{numMembers > 1 ? ` · เฉลี่ย ${numMembers} คน` : ''}</span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(myDiscount)}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(myDiscount)}</span>
                   </div>
                 )}
                 {myPersonalDiscount > 0 && (
                   <div className="mo-bill-row" style={{ color: 'var(--feedback-success-icon)' }}>
                     <span className="mo-bill-row-name"><i className="fas fa-user-tag" style={{ marginRight: 5 }} />{myPersonalDiscountNote || 'ส่วนลดพิเศษ'}</span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(myPersonalDiscount)}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(myPersonalDiscount)}</span>
                   </div>
                 )}
                 <div className="mo-bill-divider" />
@@ -1257,7 +1257,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                 {tableTotalDiscount > 0 && (
                   <div className="mo-bill-row" style={{ color: 'var(--feedback-success-icon)' }}>
                     <span className="mo-bill-row-name"><i className="fas fa-tag" style={{ marginRight: 5 }} />{activeOrder.promoName || 'ส่วนลด'}{numMembers > 1 ? (dMode === 'split' ? ' · เฉลี่ยทั้งตี้' : ` · ฿${fmtCurrency(rawD)}×${nDisc}คน`) : ''}</span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(tableTotalDiscount)}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(tableTotalDiscount)}</span>
                   </div>
                 )}
                 {(activeOrder.members || []).filter(m => Number(m.personalDiscount) > 0).map((m, i) => (
@@ -1266,7 +1266,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                       <i className="fas fa-user-tag" style={{ marginRight: 5 }} />
                       {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}
                     </span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(Number(m.personalDiscount))}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(Number(m.personalDiscount))}</span>
                   </div>
                 ))}
                 <div className="mo-bill-divider" />
@@ -1359,7 +1359,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                                 </span>
                               </span>
                               <span style={{ fontSize: 14, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>
-                                ฿{bill.toLocaleString()}
+                                ฿{fmtCurrency(bill)}
                               </span>
                             </button>
                           )
@@ -1370,7 +1370,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
 
                       <div className="mo-bill-total-row" style={{ padding: '0 0 10px' }}>
                         <span>รวม {groupPayUids.size} คน</span>
-                        <span className="mo-bill-grand-total">฿{groupPayTotal.toLocaleString()}</span>
+                        <span className="mo-bill-grand-total">฿{fmtCurrency(groupPayTotal)}</span>
                       </div>
 
                       <button
@@ -1391,7 +1391,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                           cursor: groupPayUids.size >= 2 ? 'pointer' : 'default',
                         }}
                       >
-                        <i className="fas fa-qrcode" /> {groupPayUids.size >= 2 ? `จ่ายรวม ฿${groupPayTotal.toLocaleString()}` : 'เลือกอย่างน้อย 2 คน'}
+                        <i className="fas fa-qrcode" /> {groupPayUids.size >= 2 ? `จ่ายรวม ฿${fmtCurrency(groupPayTotal)}` : 'เลือกอย่างน้อย 2 คน'}
                       </button>
                     </div>
                   )

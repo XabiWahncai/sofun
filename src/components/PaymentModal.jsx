@@ -43,7 +43,7 @@ function buildPromptPayQR(phoneOrId, amount) {
 }
 
 const fmtCurrency = (val) => {
-  const n = Number(val) || 0
+  const n = Math.round((Number(val) || 0) * 100) / 100
   return Number.isInteger(n) ? n.toLocaleString() : n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
@@ -58,8 +58,11 @@ export default function PaymentModal({
   memberPayments = {},
   getMemberBill: propGetMemberBill,
   grandTotal: propGrandTotal,
+  rawTotal: propRawTotal,
+  alreadyPaid: propAlreadyPaid,
   remainingAmount: propRemainingAmount,
   totalDiscount: propTotalDiscount = 0,
+  discountTotal = 0,
   totalPersonalDiscounts: propTotalPersonalDiscounts = 0,
   gameUnitPay: propGameUnitPay,
   gameFullPrice: propGameFullPrice,
@@ -99,25 +102,33 @@ export default function PaymentModal({
     : gameUnit
 
   const getMemberBill = (m) => {
-    if (propGetMemberBill) return propGetMemberBill(m)
-    const myFood = orderArr
-      .filter(x => x.orderedBy?.uid === m.uid)
-      .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
-    const myBaseGame = m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)
-    const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m.uid)
-    const myDisc = isMemberDiscounted ? (propDiscountPerDiscounted || 0) : 0
-    return Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+    let bill = 0
+    if (propGetMemberBill) {
+      bill = propGetMemberBill(m)
+    } else {
+      const myFood = orderArr
+        .filter(x => x.orderedBy?.uid === m.uid)
+        .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+      const myBaseGame = m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)
+      const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m.uid)
+      const myDisc = isMemberDiscounted ? (propDiscountPerDiscounted || 0) : 0
+      bill = Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+    }
+    return Math.round(bill * 100) / 100
   }
 
   const rawFoodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
   const rawGameTotal = sessionMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)), 0)
-  const rawTotal = rawFoodTotal + rawGameTotal
+  const rawTotal = propRawTotal ?? (rawFoodTotal + rawGameTotal)
 
+  const effectiveTotalDiscount = propTotalDiscount || discountTotal || 0
   const alreadyPaidMembers = sessionMembers.filter(m => currentPayments[m.uid]?.verified)
-  const alreadyPaid = alreadyPaidMembers.reduce((s, m) => s + (Number(currentPayments[m.uid]?.amount) || 0), 0)
+  const alreadyPaid = propAlreadyPaid !== undefined
+    ? Number(propAlreadyPaid) || 0
+    : alreadyPaidMembers.reduce((s, m) => s + (Number(currentPayments[m.uid]?.amount) || 0), 0)
 
-  const calcGrandTotal = propGrandTotal ?? Math.max(0, rawTotal - propTotalDiscount - propTotalPersonalDiscounts)
-  const tableRemaining = propRemainingAmount ?? Math.max(0, calcGrandTotal - alreadyPaid)
+  const calcGrandTotal = propGrandTotal ?? Math.max(0, rawTotal - effectiveTotalDiscount - propTotalPersonalDiscounts)
+  const tableRemaining = propRemainingAmount ?? Math.max(0, Math.round((calcGrandTotal - alreadyPaid) * 100) / 100)
 
   const isAllMembersPaid = sessionMembers.length > 0 && sessionMembers.every(m => currentPayments[m.uid]?.verified)
 
@@ -284,7 +295,7 @@ export default function PaymentModal({
 
         {/* Header */}
         <div className="pay-header">
-          <div className="pay-title"><i className="fas fa-credit-card" /> ชำระเงิน — {session.label}</div>
+          <div className="pay-title"><i className="fas fa-credit-card" /> ชำระเงิน - {session.label}</div>
           <button className="modal-close" onClick={onClose}><i className="fas fa-times" /></button>
         </div>
 
@@ -321,7 +332,7 @@ export default function PaymentModal({
                       <i className="fas fa-scroll" style={{ color: '#c62419', marginRight: 4 }} />
                       {selectedGame.title} × {n} คน
                     </span>
-                    <span>฿{rawGameTotal.toLocaleString()}</span>
+                    <span>฿{fmtCurrency(rawGameTotal)}</span>
                   </div>
                 )}
                 {orderArr.map((x, idx) => (
@@ -330,23 +341,23 @@ export default function PaymentModal({
                       {x.name}{x.addons?.length > 0 ? ` (${x.addons.map(a => a.name).join(', ')})` : ''} × {x.qty}
                       {x.orderedBy?.name && <span style={{ color: '#888', fontSize: 11, marginLeft: 4 }}>({x.orderedBy.name.split(' ')[0]})</span>}
                     </span>
-                    <span>฿{((x.totalPrice || 0) * (x.qty || 1)).toLocaleString()}</span>
+                    <span>฿{fmtCurrency((x.totalPrice || 0) * (x.qty || 1))}</span>
                   </div>
                 ))}
                 <div className="pay-summary-sub">
                   <span>รวมรายการทั้งหมด</span>
-                  <span>฿{rawTotal.toLocaleString()}</span>
+                  <span>฿{fmtCurrency(rawTotal)}</span>
                 </div>
-                {propTotalDiscount > 0 && (
+                {effectiveTotalDiscount > 0 && (
                   <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
                     <span><i className="fas fa-tag" style={{ marginRight: 4 }} />ส่วนลดโปรโมชั่น</span>
-                    <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{propTotalDiscount.toLocaleString()}</span>
+                    <span style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(effectiveTotalDiscount)}</span>
                   </div>
                 )}
                 {propTotalPersonalDiscounts > 0 && (
                   <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
                     <span><i className="fas fa-user-tag" style={{ marginRight: 4 }} />ส่วนลดพิเศษ</span>
-                    <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{propTotalPersonalDiscounts.toLocaleString()}</span>
+                    <span style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(propTotalPersonalDiscounts)}</span>
                   </div>
                 )}
                 {alreadyPaid > 0 && (
@@ -355,7 +366,7 @@ export default function PaymentModal({
                       <i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)', marginRight: 4 }} />
                       จ่ายแล้ว ({alreadyPaidMembers.map(m => m.name.split(' ')[0]).join(', ')})
                     </span>
-                    <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{alreadyPaid.toLocaleString()}</span>
+                    <span style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(alreadyPaid)}</span>
                   </div>
                 )}
               </div>
@@ -363,7 +374,7 @@ export default function PaymentModal({
               {/* Grand total */}
               <div className="pay-grand">
                 <span>{alreadyPaid > 0 ? 'ยอดคงค้างทั้งโต๊ะ' : 'ยอดชำระทั้งโต๊ะ'}</span>
-                <span className="pay-grand-amount">฿{tableRemaining.toLocaleString()}</span>
+                <span className="pay-grand-amount">฿{fmtCurrency(tableRemaining)}</span>
               </div>
             </>
           )}
@@ -396,7 +407,7 @@ export default function PaymentModal({
                         {m.name.split(' ')[0]}
                       </span>
                       <span className="pay-member-tab-amt" style={{ color: isPaid ? '#16a34a' : 'var(--red)' }}>
-                        {isPaid ? 'จ่ายแล้ว' : `฿${mBill.toLocaleString()}`}
+                        {isPaid ? 'จ่ายแล้ว' : `฿${fmtCurrency(mBill)}`}
                       </span>
                     </button>
                   )
@@ -421,7 +432,7 @@ export default function PaymentModal({
               {/* Active member's individual breakdown */}
               {activeMemberObj && (
                 <div className="pay-summary-block">
-                  <div style={{ fontSize: 11, fontWeight: 800, color: '#888', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#888', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>
                       <i className="fas fa-user" style={{ marginRight: 5 }} />
                       รายการของ {activeMemberObj.name} {activeMemberObj.character ? `(${activeMemberObj.character})` : ''}
@@ -440,7 +451,7 @@ export default function PaymentModal({
                         <i className="fas fa-scroll" style={{ color: '#c62419', marginRight: 5 }} />
                         {selectedGame?.title || 'ค่าเกม'}{isUnpaidDep ? ' (ราคาเต็ม)' : ''}
                       </span>
-                      <span>฿{memberGameFee.toLocaleString()}</span>
+                      <span>฿{fmtCurrency(memberGameFee)}</span>
                     </div>
                   )}
 
@@ -450,7 +461,7 @@ export default function PaymentModal({
                       <span>
                         {x.name}{x.addons?.length > 0 ? ` (${x.addons.map(a => a.name).join(', ')})` : ''} × {x.qty}
                       </span>
-                      <span>฿{((x.totalPrice || 0) * (x.qty || 1)).toLocaleString()}</span>
+                      <span>฿{fmtCurrency((x.totalPrice || 0) * (x.qty || 1))}</span>
                     </div>
                   ))}
                   {memberFood.length === 0 && memberGameFee <= 0 && (
@@ -461,7 +472,7 @@ export default function PaymentModal({
                   {memberDisc > 0 && (
                     <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
                       <span><i className="fas fa-tag" style={{ marginRight: 5 }} />ส่วนลดโปรโมชั่น</span>
-                      <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(memberDisc)}</span>
+                      <span style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(memberDisc)}</span>
                     </div>
                   )}
 
@@ -469,14 +480,14 @@ export default function PaymentModal({
                   {memberPersonalDisc > 0 && (
                     <div className="pay-summary-row" style={{ color: 'var(--feedback-success-icon)' }}>
                       <span><i className="fas fa-user-tag" style={{ marginRight: 5 }} />{activeMemberObj.personalDiscountNote || 'ส่วนลดพิเศษ'}</span>
-                      <span style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(memberPersonalDisc)}</span>
+                      <span style={{ color: 'var(--feedback-success-icon)' }}>-฿{fmtCurrency(memberPersonalDisc)}</span>
                     </div>
                   )}
 
                   <div className="pay-summary-sub">
                     <span>ยอดของคนนี้</span>
                     <span style={{ color: isSelectedMemberPaid ? '#16a34a' : 'var(--red)', fontSize: 16, fontWeight: 800 }}>
-                      ฿{activeAmt.toLocaleString()}
+                      ฿{fmtCurrency(activeAmt)}
                     </span>
                   </div>
                 </div>
@@ -496,7 +507,7 @@ export default function PaymentModal({
                 {activeMemberObj?.name} ชำระเงินเรียบร้อยแล้ว
               </div>
               <div style={{ fontSize: 13, color: '#15803d', fontWeight: 600 }}>
-                ยอด ฿{Number(currentPayments[activeMemberObj?.uid]?.amount ?? activeAmt).toLocaleString()}
+                ยอด ฿{fmtCurrency(Number(currentPayments[activeMemberObj?.uid]?.amount ?? activeAmt))}
               </div>
             </div>
           ) : activeAmt <= 0 ? (
@@ -515,9 +526,9 @@ export default function PaymentModal({
             <div className="pay-qr-section">
               <div className="pay-qr-label">
                 <i className="fas fa-qrcode" /> QR PromptPay
-                {splitMode && activeMemberObj && <span> — {activeMemberObj.name}</span>}
+                {splitMode && activeMemberObj && <span> - {activeMemberObj.name}</span>}
               </div>
-              <div className="pay-qr-amount">฿{activeAmt.toLocaleString()}</div>
+              <div className="pay-qr-amount">฿{fmtCurrency(activeAmt)}</div>
               <div className="pay-qr-wrap">
                 <QRCodeSVG
                   value={qrPayload}
@@ -578,7 +589,7 @@ export default function PaymentModal({
                   ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
                   : activeAmt <= 0
                   ? <><i className="fas fa-check-circle" /> ยืนยันยอด ฿0 ({activeMemberObj?.name?.split(' ')[0]})</>
-                  : <><i className="fas fa-check-circle" /> ยืนยันรับเงิน ({activeMemberObj?.name?.split(' ')[0]}) ฿{activeAmt.toLocaleString()}</>
+                  : <><i className="fas fa-check-circle" /> ยืนยันรับเงิน ({activeMemberObj?.name?.split(' ')[0]}) ฿{fmtCurrency(activeAmt)}</>
                 }
               </button>
             )
@@ -593,7 +604,7 @@ export default function PaymentModal({
                 ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
                 : tableRemaining <= 0
                 ? <><i className="fas fa-check-circle" /> ยืนยันปิดบิลทั้งโต๊ะ (฿0)</>
-                : <><i className="fas fa-check-circle" /> ยืนยันรับเงินทั้งโต๊ะ ฿{tableRemaining.toLocaleString()}</>
+                : <><i className="fas fa-check-circle" /> ยืนยันรับเงินทั้งโต๊ะ ฿{fmtCurrency(tableRemaining)}</>
               }
             </button>
           )}
