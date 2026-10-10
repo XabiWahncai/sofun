@@ -19,6 +19,12 @@ function crc16(str) {
   return crc & 0xFFFF
 }
 
+const fmtCurrency = (val) => {
+  const n = Number(val) || 0
+  if (Number.isInteger(n)) return n.toLocaleString('th-TH')
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function buildPromptPayQR(phoneOrId, amount) {
   if (!phoneOrId) return ''
   const f = (tag, val) => { const v = String(val); return `${tag}${v.length.toString().padStart(2, '0')}${v}` }
@@ -523,7 +529,7 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
               </button>
               <span className="mo-pay-step-label">ขั้นตอน 2/2 — ส่งสลิป</span>
             </div>
-            <div className="mo-pay-amount" style={{ marginBottom: 6 }}>฿{amount.toLocaleString()}</div>
+            <div className="mo-pay-amount" style={{ marginBottom: 6 }}>฿{fmtCurrency(amount)}</div>
             <div className="mo-pay-slip-instruction">
               <i className="fas fa-info-circle" /> เปิดสลิปในแอปธนาคาร แล้วอัปโหลดภาพสลิป — ระบบจะตรวจสอบ EasySlip อัตโนมัติ
             </div>
@@ -538,7 +544,7 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
         ) : (
           <div className="mo-pay-section">
             <div className="mo-pay-step-label-top">ขั้นตอน 1/2 — สแกน QR โอนเงิน</div>
-            <div className="mo-pay-amount">฿{amount.toLocaleString()}</div>
+            <div className="mo-pay-amount">฿{fmtCurrency(amount)}</div>
             {promptPayPhone ? (
               <>
                 <div className="mo-pay-qr-box">
@@ -607,7 +613,7 @@ function MenuRow({ item, cart, changeQty, addToCart, setAddonPopup }) {
   )
 }
 
-export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
+export default function MemberOrderPage({ lineUser, activeOrder, showToast, allGames = [] }) {
   const [menuItems, setMenuItems] = useState([])
   const [cart, setCart] = useState([])
   const [addonPopup, setAddonPopup] = useState(null)
@@ -761,20 +767,46 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
   const myHistoryTotal = myHistoryItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
 
   const myPendingTotal = pendingItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
-  const numMembers = activeOrder.members?.length || 1
-  const myDiscount = me?.unpaidDeposit ? 0 : (activeOrder.discount || 0)           // per-person group promo
+
+  const selectedGame = (allGames || []).find(g => g.id === activeOrder?.scriptId)
+  const normalGameFee = selectedGame
+    ? (selectedGame.payPrice ?? selectedGame.price ?? 0)
+    : (activeOrder?.gameUnitPrice || (activeOrder?.gameTotal && activeOrder.members?.length ? Math.round(activeOrder.gameTotal / activeOrder.members.length) : 0))
+  const fullGameFee = selectedGame
+    ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (normalGameFee + (Number(selectedGame.deposit) || 0)))
+    : normalGameFee
+
+  const getMemberGameFee = (m) => (m?.unpaidDeposit ? fullGameFee : normalGameFee)
+
+  const orderMembers = activeOrder?.members || []
+  const numMembers = orderMembers.length || 1
+  const dMode = activeOrder?.discountMode || 'perPerson'
+  const rawD = Number(activeOrder?.discount) || 0
+  const selIds = Array.isArray(activeOrder?.discountMemberIds) ? activeOrder.discountMemberIds : []
+  const effIds = selIds.length > 0
+    ? selIds.filter(uid => orderMembers.some(mm => mm.uid === uid))
+    : orderMembers.map(mm => mm.uid)
+  const nDisc = effIds.length
+
+  const getMemberDiscount = (m) => {
+    if (!m) return 0
+    const isDisc = effIds.includes(m.uid)
+    if (!isDisc) return 0
+    return dMode === 'split' ? (nDisc > 0 ? rawD / nDisc : 0) : rawD
+  }
+
+  const myDiscount = getMemberDiscount(me)
   const myPersonalDiscount = Number(me?.personalDiscount) || 0
   const myPersonalDiscountNote = me?.personalDiscountNote || ''
-  const tableTotalDiscount = myDiscount * numMembers
-  const myGameFee = Math.round((activeOrder.gameTotal || 0) / numMembers)
+  const myGameFee = getMemberGameFee(me)
   const myTotal = Math.max(0, myHistoryTotal + myPendingTotal + myGameFee - myDiscount - myPersonalDiscount)
 
   const getGroupMemberBill = (m) => {
     const food = (activeOrder.memberFoodHistory || [])
       .filter(f => f.orderedBy?.uid === m.uid)
       .reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
-    const gameFee = Math.round((activeOrder.gameTotal || 0) / numMembers)
-    const disc = m.unpaidDeposit ? 0 : (activeOrder.discount || 0)
+    const gameFee = getMemberGameFee(m)
+    const disc = getMemberDiscount(m)
     return Math.max(0, food + gameFee - disc - (Number(m.personalDiscount) || 0))
   }
   const groupPayTotal = [...groupPayUids].reduce((s, uid) => {
@@ -785,7 +817,8 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
   const allPendingItems = activeOrder.memberFoodQueue || []
   const tablePendingTotal = allPendingItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
   const tableConfirmedTotal = confirmedItems.reduce((s, f) => s + (f.price || 0) * (f.qty || 1), 0)
-  const tableGameTotal = activeOrder.gameTotal || 0
+  const tableGameTotal = activeOrder.gameTotal || orderMembers.reduce((s, m) => s + getMemberGameFee(m), 0)
+  const tableTotalDiscount = nDisc > 0 ? (dMode === 'split' ? rawD : rawD * nDisc) : 0
   const tablePersonalDiscounts = (activeOrder.members || []).reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const tableTotal = Math.max(0, tableConfirmedTotal + tablePendingTotal + tableGameTotal - tableTotalDiscount - tablePersonalDiscounts)
 
@@ -1084,26 +1117,26 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                 <div className="mo-bill-row game">
                   <span className="mo-bill-row-name">
                     <i className="fas fa-scroll" style={{ marginRight: 5 }} />{activeOrder.scriptTitle || 'ค่าเกม'}
-                    {numMembers > 1 && <span className="mo-bill-sub"> · หาร {numMembers} คน</span>}
+                    {me?.unpaidDeposit ? ' (ราคาเต็ม)' : (numMembers > 1 ? ` · คนละ ฿${fmtCurrency(normalGameFee)}` : '')}
                   </span>
-                  <span className="mo-bill-row-price">฿{myGameFee.toLocaleString()}</span>
+                  <span className="mo-bill-row-price">฿{fmtCurrency(myGameFee)}</span>
                 </div>
                 {myDiscount > 0 && (
                   <div className="mo-bill-row" style={{ color: 'var(--feedback-success-icon)' }}>
-                    <span className="mo-bill-row-name"><i className="fas fa-tag" style={{ marginRight: 5 }} />{activeOrder.promoName || 'ส่วนลด'}{numMembers > 1 && <span className="mo-bill-sub"> · หาร {numMembers} คน</span>}</span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{myDiscount.toLocaleString()}</span>
+                    <span className="mo-bill-row-name"><i className="fas fa-tag" style={{ marginRight: 5 }} />{activeOrder.promoName || 'ส่วนลด'}{numMembers > 1 ? ` · เฉลี่ย ${numMembers} คน` : ''}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(myDiscount)}</span>
                   </div>
                 )}
                 {myPersonalDiscount > 0 && (
                   <div className="mo-bill-row" style={{ color: 'var(--feedback-success-icon)' }}>
                     <span className="mo-bill-row-name"><i className="fas fa-user-tag" style={{ marginRight: 5 }} />{myPersonalDiscountNote || 'ส่วนลดพิเศษ'}</span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{myPersonalDiscount.toLocaleString()}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(myPersonalDiscount)}</span>
                   </div>
                 )}
                 <div className="mo-bill-divider" />
                 <div className="mo-bill-total-row">
                   <span>{myPendingTotal > 0 ? 'รวมของฉัน (ประมาณ)' : 'รวมของฉัน'}</span>
-                  <span className="mo-bill-grand-total">฿{myTotal.toLocaleString()}</span>
+                  <span className="mo-bill-grand-total">฿{fmtCurrency(myTotal)}</span>
                 </div>
                 {myPendingTotal > 0 && <div className="mo-bill-note">* รวมรายการรอยืนยัน ยอดจริงอาจเปลี่ยนแปลง</div>}
 
@@ -1111,10 +1144,10 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                 {(() => {
                   const p = activeOrder.memberPayments?.[lineUser.uid]
                   if (activeOrder.status === 'paid') return <div className="mo-pay-status paid"><i className="fas fa-check-circle" /> ตี้ปิดแล้ว</div>
-                  if (p?.verified) return <div className="mo-pay-status paid"><i className="fas fa-check-circle" /> ชำระแล้ว ฿{(p.amount || 0).toLocaleString()}{p.bankName && <span className="mo-pay-meta"> · {p.bankName}</span>}</div>
+                  if (p?.verified) return <div className="mo-pay-status paid"><i className="fas fa-check-circle" /> ชำระแล้ว ฿{fmtCurrency(p.amount || 0)}{p.bankName && <span className="mo-pay-meta"> · {p.bankName}</span>}</div>
                   if (p?.easyslipPending) return <div className="mo-pay-status pending-review" style={{ color: 'var(--feedback-info-icon)' }}><i className="fas fa-hourglass-half" /> รอ Bangkok Bank ยืนยัน — ระบบจะอัปเดตอัตโนมัติ</div>
                   if (p?.pendingAdminReview) return <div className="mo-pay-status pending-review"><i className="fas fa-clock" /> ส่งสลิปแล้ว — EasySlip ตรวจสอบไม่สำเร็จ รอแอดมิน<button className="mo-pay-reupload-btn" onClick={() => { setShowBill(false); setPayForAll(false); setShowPaySheet(true) }}><i className="fas fa-upload" /> ลองใหม่</button></div>
-                  return <button className="mo-pay-cta-btn" onClick={() => { setShowBill(false); setPayForAll(false); setShowPaySheet(true) }}><i className="fas fa-qrcode" /> จ่ายของฉัน ฿{myTotal.toLocaleString()}</button>
+                  return <button className="mo-pay-cta-btn" onClick={() => { setShowBill(false); setPayForAll(false); setShowPaySheet(true) }}><i className="fas fa-qrcode" /> จ่ายของฉัน ฿{fmtCurrency(myTotal)}</button>
                 })()}
               </>
             ) : (
@@ -1156,12 +1189,12 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                     <i className="fas fa-scroll" style={{ marginRight: 5 }} />{activeOrder.scriptTitle || 'ค่าเกม'}
                     {numMembers > 0 && <span className="mo-bill-sub"> · {numMembers} คน</span>}
                   </span>
-                  <span className="mo-bill-row-price">฿{tableGameTotal.toLocaleString()}</span>
+                  <span className="mo-bill-row-price">฿{fmtCurrency(tableGameTotal)}</span>
                 </div>
                 {tableTotalDiscount > 0 && (
                   <div className="mo-bill-row" style={{ color: 'var(--feedback-success-icon)' }}>
-                    <span className="mo-bill-row-name"><i className="fas fa-tag" style={{ marginRight: 5 }} />{activeOrder.promoName || 'ส่วนลด'}{numMembers > 1 && <span className="mo-bill-sub"> · ฿{myDiscount}×{numMembers}คน</span>}</span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{tableTotalDiscount.toLocaleString()}</span>
+                    <span className="mo-bill-row-name"><i className="fas fa-tag" style={{ marginRight: 5 }} />{activeOrder.promoName || 'ส่วนลด'}{numMembers > 1 ? (dMode === 'split' ? ' · เฉลี่ยทั้งตี้' : ` · ฿${fmtCurrency(rawD)}×${nDisc}คน`) : ''}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(tableTotalDiscount)}</span>
                   </div>
                 )}
                 {(activeOrder.members || []).filter(m => Number(m.personalDiscount) > 0).map((m, i) => (
@@ -1170,13 +1203,13 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
                       <i className="fas fa-user-tag" style={{ marginRight: 5 }} />
                       {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}
                     </span>
-                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                    <span className="mo-bill-row-price" style={{ color: 'var(--feedback-success-icon)' }}>−฿{fmtCurrency(Number(m.personalDiscount))}</span>
                   </div>
                 ))}
                 <div className="mo-bill-divider" />
                 <div className="mo-bill-total-row">
                   <span>{tablePendingTotal > 0 ? 'รวมทั้งตี้ (ประมาณ)' : 'รวมทั้งตี้'}</span>
-                  <span className="mo-bill-grand-total">฿{tableTotal.toLocaleString()}</span>
+                  <span className="mo-bill-grand-total">฿{fmtCurrency(tableTotal)}</span>
                 </div>
                 {tablePendingTotal > 0 && <div className="mo-bill-note">* รวมรายการรอยืนยัน ยอดจริงอาจเปลี่ยนแปลง</div>}
                 {activeOrder.status !== 'paid' && (

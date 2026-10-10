@@ -200,6 +200,12 @@ let sessionCounter = 1
 const fmtDate = (d = new Date()) =>
   `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
 
+const fmtCurrency = (val) => {
+  const n = Number(val) || 0
+  if (Number.isInteger(n)) return n.toLocaleString('th-TH')
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 export const newPOSSession = () => ({
   id: Date.now() + Math.random(),
   label: `ปาร์ตี้ ${sessionCounter++}`,
@@ -567,6 +573,44 @@ export default function POSPage({
     }, () => {})
   }, [activeSession?.confirmedOrderId])
 
+  // ── derived values ───────────────────────────────────────────────
+  const selectedGame = allGames.find(g => g.id === activeSession?.scriptId)
+  const orderArr = Array.isArray(activeSession?.order) ? activeSession.order : []
+  const foodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+  const gameUnitPay = (activeSession?.customPrice !== '' && activeSession?.customPrice !== undefined)
+    ? Number(activeSession.customPrice) || 0
+    : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
+  const gameFullPrice = selectedGame
+    ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (gameUnitPay + (Number(selectedGame.deposit) || 0)))
+    : gameUnitPay
+  const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
+  const gamePrice = sessionMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gameFullPrice : gameUnitPay), 0)
+  const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
+  const discountRaw = Number(activeSession?.discount) || 0
+  // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
+  const discountMemberIdsRaw = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
+  const discountEffectiveIds = discountMemberIdsRaw.length > 0
+    ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid))
+    : sessionMembers.map(m => m.uid)
+  const nDiscounted = discountEffectiveIds.length
+  const totalDiscount = nDiscounted > 0
+    ? (discountMode === 'split' ? discountRaw : discountRaw * nDiscounted)
+    : 0
+  const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person (across all)
+  const discountPerDiscounted = nDiscounted > 0
+    ? (discountMode === 'split' ? discountRaw / nDiscounted : discountRaw)
+    : 0  // per selected member
+  const isPartialDiscount = discountMemberIdsRaw.length > 0 && nDiscounted < sessionMembers.length
+  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+  const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
+
+  // ── payment status helpers ───────────────────────────────────────
+  const allMembersPaid = activeSession?.confirmedOrderId &&
+    sessionMembers.length > 0 &&
+    sessionMembers.every(m => memberPayments[m.uid]?.verified)
+  const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
+
   // Accept all queued items into in-memory order and sync Firestore immediately
   const acceptQueue = async () => {
     const orderId = activeSession?.confirmedOrderId
@@ -590,21 +634,17 @@ export default function POSPage({
     }
     updateActive({ order: updated })
     const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const newGamePrice = activeSession.members.length * (selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0)
-    const d = Number(activeSession.discount) || 0
-    const mode = activeSession.discountMode || 'perPerson'
-    const totalD = mode === 'split' ? d : d * activeSession.members.length
     await updateDoc(doc(db, 'orders', orderId), {
       memberFoodQueue: [],
       memberFoodHistory: arrayUnion(...queuedItems),
       foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
       foodTotal: newFoodTotal,
-      gameTotal: newGamePrice,
-      discount: d,
-      discountMode: mode,
-      discountMemberIds: Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : [],
+      gameTotal: gamePrice,
+      discount: discountRaw,
+      discountMode,
+      discountMemberIds: discountMemberIdsRaw,
       promoName: activeSession.promoName || '',
-      grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
+      grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
     })
     setShowQueue(false)
     showToast(`รับ ${queuedItems.length} รายการจากลูกค้าแล้ว ✓`)
@@ -640,7 +680,7 @@ export default function POSPage({
     updateActive({ members: updatedMembers })
     showToast(
       isNowUnpaid
-        ? 'ตั้งค่าเป็น "ยังไม่ได้จ่ายมัดจำ" (คิดราคาเต็มเฉพาะคนนี้) แล้ว'
+        ? `คิดราคาเกมเต็ม (฿${fmtCurrency(gameFullPrice)}) สำหรับคนนี้แล้ว`
         : 'ยกเลิกสถานะ "ยังไม่ได้จ่ายมัดจำ" แล้ว'
     )
     const orderId = activeSession.confirmedOrderId
@@ -653,15 +693,20 @@ export default function POSPage({
           personalDiscountNote: m.personalDiscountNote || '',
           unpaidDeposit: Boolean(m.unpaidDeposit),
         }))
-        const depositPaying = updatedMembers.filter(m => !m.unpaidDeposit)
-        const nPaying = depositPaying.length
+        const newGamePrice = updatedMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gameFullPrice : gameUnitPay), 0)
         const dMode = activeSession.discountMode || 'perPerson'
         const rawD = Number(activeSession.discount) || 0
-        const totD = nPaying > 0 ? (dMode === 'split' ? rawD : rawD * nPaying) : 0
+        const selIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+        const effIds = selIds.length > 0
+          ? selIds.filter(id => updatedMembers.some(mm => mm.uid === id))
+          : updatedMembers.map(mm => mm.uid)
+        const nD = effIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? rawD : rawD * nD) : 0
         const totalPersonal = updatedMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
         await updateDoc(doc(db, 'orders', orderId), {
           members: membersPayload,
-          grandTotal: Math.max(0, foodTotal + gamePrice - totD - totalPersonal),
+          gameTotal: newGamePrice,
+          grandTotal: Math.max(0, foodTotal + newGamePrice - totD - totalPersonal),
         })
       } catch (err) {
         console.warn('Failed to sync order on unpaidDeposit toggle:', err)
@@ -741,10 +786,6 @@ export default function POSPage({
     const orderId = activeSession.confirmedOrderId
     if (orderId) {
       const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-      const newGamePrice = (activeSession.members || []).length * (selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0)
-      const d = Number(activeSession.discount) || 0
-      const mode = activeSession.discountMode || 'perPerson'
-      const totalD = mode === 'split' ? d : d * (activeSession.members || []).length
 
       const newItemsHistory = [{
         menuId: menuItem.id,
@@ -774,8 +815,8 @@ export default function POSPage({
           })),
           memberFoodHistory: arrayUnion(...newItemsHistory),
           foodTotal: newFoodTotal,
-          gameTotal: newGamePrice,
-          grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
+          gameTotal: gamePrice,
+          grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
         })
 
         // Print kitchen ticket for this newly ordered item
@@ -810,20 +851,10 @@ export default function POSPage({
     const myFood = orderArr
       .filter(x => x.orderedBy?.uid === m.uid)
       .reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const members = Array.isArray(activeSession?.members) ? activeSession.members : []
-    const rawD = Number(activeSession?.discount) || 0
-    const mode = activeSession?.discountMode || 'perPerson'
-    // discountMemberIds: empty = applies to all eligible members. Otherwise only selected uids get the discount.
-    const selectedIds = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
-    const effectiveIds = selectedIds.length > 0
-      ? selectedIds.filter(uid => members.some(mm => mm.uid === uid && !mm.unpaidDeposit))
-      : members.filter(mm => !mm.unpaidDeposit).map(mm => mm.uid)
-    const nDisc = effectiveIds.length
-    const isMemberDiscounted = !m.unpaidDeposit && effectiveIds.includes(m.uid)
-    const myDisc = isMemberDiscounted
-      ? (mode === 'split' ? (nDisc > 0 ? rawD / nDisc : 0) : rawD)
-      : 0
-    return Math.max(0, gameUnitPay + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+    const myBaseGame = m.unpaidDeposit ? gameFullPrice : gameUnitPay
+    const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
+    const myDisc = isMemberDiscounted ? discountPerDiscounted : 0
+    return Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc)
   }
 
   const confirmGroupPayment = async () => {
@@ -836,7 +867,7 @@ export default function POSPage({
       const m = activeSession.members.find(x => x.uid === uid)
       if (!m) return
       updates[`memberPayments.${uid}.verified`] = true
-      updates[`memberPayments.${uid}.amount`] = getMemberBill(m)
+      updates[`memberPayments.${uid}.amount`] = Math.round(getMemberBill(m) * 100) / 100
       updates[`memberPayments.${uid}.verifiedAt`] = new Date().toISOString()
       updates[`memberPayments.${uid}.groupPay`] = true
       updates[`memberPayments.${uid}.groupWith`] = selectedUids.filter(x => x !== uid)
@@ -872,20 +903,16 @@ export default function POSPage({
     const orderId = activeSession.confirmedOrderId
     if (!orderId) return
     const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const newGamePrice = activeSession.members.length * (selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0)
-    const d = Number(activeSession.discount) || 0
-    const mode = activeSession.discountMode || 'perPerson'
-    const totalD = mode === 'split' ? d : d * activeSession.members.length
     await updateDoc(doc(db, 'orders', orderId), {
       foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
       memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
       foodTotal: newFoodTotal,
-      gameTotal: newGamePrice,
-      discount: d,
-      discountMode: mode,
-      discountMemberIds: Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : [],
+      gameTotal: gamePrice,
+      discount: discountRaw,
+      discountMode,
+      discountMemberIds: discountMemberIdsRaw,
       promoName: activeSession.promoName || '',
-      grandTotal: Math.max(0, newFoodTotal + newGamePrice - totalD),
+      grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
     })
   }
 
@@ -909,41 +936,6 @@ export default function POSPage({
     setSessions(remaining)
     if (activeId === id) setActiveId(remaining[remaining.length - 1].id)
   }
-
-  // ── derived values ───────────────────────────────────────────────
-  const selectedGame = allGames.find(g => g.id === activeSession?.scriptId)
-  const orderArr = Array.isArray(activeSession?.order) ? activeSession.order : []
-  const foodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-  const gameUnitPay = (activeSession?.customPrice !== '' && activeSession?.customPrice !== undefined)
-    ? Number(activeSession.customPrice) || 0
-    : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
-  const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
-  const gamePrice = sessionMembers.length * gameUnitPay
-  const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
-  const discountRaw = Number(activeSession?.discount) || 0
-  // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
-  const discountMemberIdsRaw = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
-  const discountEffectiveIds = discountMemberIdsRaw.length > 0
-    ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid && !m.unpaidDeposit))
-    : sessionMembers.filter(m => !m.unpaidDeposit).map(m => m.uid)
-  const nDiscounted = discountEffectiveIds.length
-  const totalDiscount = nDiscounted > 0
-    ? (discountMode === 'split' ? discountRaw : discountRaw * nDiscounted)
-    : 0
-  const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person (across all)
-  const discountPerDiscounted = nDiscounted > 0
-    ? (discountMode === 'split' ? discountRaw / nDiscounted : discountRaw)
-    : 0  // per selected member
-  const isPartialDiscount = discountMemberIdsRaw.length > 0 && nDiscounted < sessionMembers.length
-  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
-  const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
-
-  // ── payment status helpers ───────────────────────────────────────
-  const allMembersPaid = activeSession?.confirmedOrderId &&
-    sessionMembers.length > 0 &&
-    sessionMembers.every(m => memberPayments[m.uid]?.verified)
-  const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
-  const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
 
   const acceptOtherQueue = async (order) => {
     const queue = order.memberFoodQueue || []
@@ -1992,7 +1984,7 @@ export default function POSPage({
               const myItems = orderArr.filter(x => x.orderedBy?.uid === m.uid)
               const bill = getMemberBill(m)
               const myFoodTotal = myItems.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-              const memberIsDiscounted = !m.unpaidDeposit && discountEffectiveIds.includes(m.uid)
+              const memberIsDiscounted = discountEffectiveIds.includes(m.uid)
               const discountPerPerson = memberIsDiscounted ? discountPerDiscounted : 0
               const toggleMember = () => setExpandedMembers(prev => {
                 const next = new Set(prev)
@@ -2035,7 +2027,7 @@ export default function POSPage({
                             }}
                             title="ไม่ได้ร่วมจ่ายมัดจำ คิดราคาเกมเต็ม"
                           >
-                            <i className="fas fa-circle-exclamation" style={{ fontSize: 8 }} /> ยังไม่จ่ายมัดจำ
+                            <i className="fas fa-circle-exclamation" style={{ fontSize: 8 }} /> ราคาเต็ม ฿{fmtCurrency(gameFullPrice)}
                           </span>
                         )}
                         {memberPayments[m.uid]?.easyslipPending && (
@@ -2061,7 +2053,7 @@ export default function POSPage({
                       )}
                     </div>
                     <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-                      <div style={{ fontSize: 15, fontWeight: 900, color: '#c62419', lineHeight: 1 }}>฿{bill.toLocaleString()}</div>
+                      <div style={{ fontSize: 15, fontWeight: 900, color: '#c62419', lineHeight: 1 }}>฿{fmtCurrency(bill)}</div>
                       <div style={{ fontSize: 9.5, color: 'rgba(26,26,26,0.4)', fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase' }}>ต้องจ่าย</div>
                     </div>
                     <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} style={{ color: 'rgba(26,26,26,0.35)', fontSize: 11, marginLeft: 2 }} />
@@ -2120,32 +2112,27 @@ export default function POSPage({
                       {/* Breakdown summary */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'rgba(26,26,26,0.6)', background: '#faf7f5', padding: '8px 12px', borderRadius: 10 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>ค่าเกม / คน</span>
-                          <span>฿{gameUnitPay.toLocaleString()}</span>
+                          <span>{m.unpaidDeposit ? 'ค่าเกม (ราคาเต็ม)' : 'ค่าเกม / คน'}</span>
+                          <span style={{ fontWeight: m.unpaidDeposit ? 700 : 400, color: m.unpaidDeposit ? '#b45309' : 'inherit' }}>
+                            ฿{fmtCurrency(m.unpaidDeposit ? gameFullPrice : gameUnitPay)}
+                          </span>
                         </div>
                         {myFoodTotal > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>อาหาร / เครื่องดื่ม</span>
-                            <span>฿{myFoodTotal.toLocaleString()}</span>
+                            <span>฿{fmtCurrency(myFoodTotal)}</span>
                           </div>
                         )}
-                        {m.unpaidDeposit ? (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309', fontWeight: 600 }}>
-                            <span><i className="fas fa-circle-exclamation" style={{ marginRight: 4 }} /> สถานะมัดจำ</span>
-                            <span>ไม่หักมัดจำ (จ่ายราคาเต็ม)</span>
+                        {memberIsDiscounted && discountPerPerson > 0 && (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
+                            <span>− โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
+                            <span>−฿{fmtCurrency(discountPerPerson)}</span>
                           </div>
-                        ) : (
-                          discountPerPerson > 0 && (
-                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
-                              <span>− โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
-                              <span>−฿{discountPerPerson.toLocaleString()}</span>
-                            </div>
-                          )
                         )}
                         {Number(m.personalDiscount) > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
                             <span>− {m.personalDiscountNote || 'ส่วนลดเพิ่มเติม'}</span>
-                            <span>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                            <span>−฿{fmtCurrency(Number(m.personalDiscount))}</span>
                           </div>
                         )}
                       </div>
@@ -2209,15 +2196,15 @@ export default function POSPage({
                         >
                           <i className={m.unpaidDeposit ? 'fas fa-circle-exclamation' : 'fas fa-hand-holding-dollar'} style={{ fontSize: 12, color: m.unpaidDeposit ? '#f59e0b' : '#64748b' }} />
                           {m.unpaidDeposit ? (
-                            <span>ยังไม่ได้จ่ายมัดจำ (คิดราคาเต็ม ฿{gameUnitPay.toLocaleString()}) · <span style={{ textDecoration: 'underline', fontWeight: 600 }}>แตะเพื่อยกเลิก</span></span>
+                            <span>ยังไม่ได้จ่ายมัดจำ (คิดราคาเต็ม ฿{fmtCurrency(gameFullPrice)}) · <span style={{ textDecoration: 'underline', fontWeight: 600 }}>แตะเพื่อยกเลิก</span></span>
                           ) : (
-                            <span>ยังไม่ได้จ่ายมัดจำ (คิดราคาเกมเต็มแค่คนนี้)</span>
+                            <span>ยังไม่ได้จ่ายมัดจำ (คิดราคาเกมเต็ม ฿{fmtCurrency(gameFullPrice)})</span>
                           )}
                         </button>
                       ) : (
                         m.unpaidDeposit && (
                           <div style={{ padding: '7px 12px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <i className="fas fa-circle-exclamation" /> ยังไม่ได้จ่ายมัดจำ (คิดราคาเกมเต็ม ฿{gameUnitPay.toLocaleString()})
+                            <i className="fas fa-circle-exclamation" /> ยังไม่ได้จ่ายมัดจำ (คิดราคาเต็ม ฿{fmtCurrency(gameFullPrice)})
                           </div>
                         )
                       )}
@@ -2708,8 +2695,12 @@ export default function POSPage({
                   </div>
                   {gameUnitPay > 0 ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
-                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>฿{gameUnitPay.toLocaleString()} × {activeSession.members.length} คน</span>
-                      <span style={{ fontSize: 16, fontWeight: 900, color: '#c62419' }}>฿{gamePrice.toLocaleString()}</span>
+                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>
+                        {activeSession.members.some(m => m.unpaidDeposit)
+                          ? `ค่าเกม (${activeSession.members.filter(m => !m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameUnitPay)} + ${activeSession.members.filter(m => m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameFullPrice)})`
+                          : `฿${fmtCurrency(gameUnitPay)} × ${activeSession.members.length} คน`}
+                      </span>
+                      <span style={{ fontSize: 16, fontWeight: 900, color: '#c62419' }}>฿{fmtCurrency(gamePrice)}</span>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
@@ -2831,10 +2822,10 @@ export default function POSPage({
                         <i className="fas fa-tag" style={{ color: '#c62419', fontSize: 10, marginRight: 5 }} />
                         {activeSession.promoName || 'ส่วนลด'}
                         <span style={{ color: 'rgba(26,26,26,0.4)', fontSize: 10, marginLeft: 4 }}>
-                          ({discountMode === 'split' ? 'เฉลี่ย' : `฿${discountRaw}×${activeSession.members.length}`})
+                          ({discountMode === 'split' ? 'เฉลี่ย' : `฿${fmtCurrency(discountRaw)}×${nDiscounted}`})
                         </span>
                       </span>
-                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{totalDiscount.toLocaleString()}</span>
+                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{fmtCurrency(totalDiscount)}</span>
                     </div>
                   )}
                   {activeSession.members.filter(m => Number(m.personalDiscount) > 0).map(m => (
@@ -2843,7 +2834,7 @@ export default function POSPage({
                         <i className="fas fa-user-tag" style={{ color: '#c62419', fontSize: 9, marginRight: 5 }} />
                         {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}
                       </span>
-                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{Number(m.personalDiscount).toLocaleString()}</span>
+                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{fmtCurrency(Number(m.personalDiscount))}</span>
                     </div>
                   ))}
                 </div>
@@ -2858,7 +2849,7 @@ export default function POSPage({
                   display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                 }}>
                   <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', opacity: 0.85 }}>ยอดรวม</span>
-                  <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>฿{grandTotal.toLocaleString()}</span>
+                  <span style={{ fontSize: 22, fontWeight: 900, letterSpacing: '-0.02em' }}>฿{fmtCurrency(grandTotal)}</span>
                 </div>
               ) : (
                 <div style={{ padding: '28px 18px', textAlign: 'center', color: 'rgba(26,26,26,0.3)', fontSize: 13 }}>
