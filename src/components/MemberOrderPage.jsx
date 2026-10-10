@@ -762,7 +762,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
 
   const myPendingTotal = pendingItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
   const numMembers = activeOrder.members?.length || 1
-  const myDiscount = activeOrder.discount || 0           // per-person group promo
+  const myDiscount = me?.unpaidDeposit ? 0 : (activeOrder.discount || 0)           // per-person group promo
   const myPersonalDiscount = Number(me?.personalDiscount) || 0
   const myPersonalDiscountNote = me?.personalDiscountNote || ''
   const tableTotalDiscount = myDiscount * numMembers
@@ -774,7 +774,8 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast }) {
       .filter(f => f.orderedBy?.uid === m.uid)
       .reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
     const gameFee = Math.round((activeOrder.gameTotal || 0) / numMembers)
-    return Math.max(0, food + gameFee - (activeOrder.discount || 0) - (Number(m.personalDiscount) || 0))
+    const disc = m.unpaidDeposit ? 0 : (activeOrder.discount || 0)
+    return Math.max(0, food + gameFee - disc - (Number(m.personalDiscount) || 0))
   }
   const groupPayTotal = [...groupPayUids].reduce((s, uid) => {
     const m = (activeOrder.members || []).find(x => x.uid === uid)

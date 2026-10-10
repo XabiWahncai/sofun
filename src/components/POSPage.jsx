@@ -632,6 +632,43 @@ export default function POSPage({
   const setPersonalDiscountNote = (uid, val) =>
     updateActive({ members: activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscountNote: val } : m) })
 
+  const toggleUnpaidDeposit = async (uid) => {
+    const updatedMembers = activeSession.members.map(m =>
+      m.uid === uid ? { ...m, unpaidDeposit: !m.unpaidDeposit } : m
+    )
+    const isNowUnpaid = updatedMembers.find(m => m.uid === uid)?.unpaidDeposit
+    updateActive({ members: updatedMembers })
+    showToast(
+      isNowUnpaid
+        ? 'ตั้งค่าเป็น "ยังไม่ได้จ่ายมัดจำ" (คิดราคาเต็มเฉพาะคนนี้) แล้ว'
+        : 'ยกเลิกสถานะ "ยังไม่ได้จ่ายมัดจำ" แล้ว'
+    )
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      try {
+        const membersPayload = updatedMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+        }))
+        const depositPaying = updatedMembers.filter(m => !m.unpaidDeposit)
+        const nPaying = depositPaying.length
+        const dMode = activeSession.discountMode || 'perPerson'
+        const rawD = Number(activeSession.discount) || 0
+        const totD = nPaying > 0 ? (dMode === 'split' ? rawD : rawD * nPaying) : 0
+        const totalPersonal = updatedMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          grandTotal: Math.max(0, foodTotal + gamePrice - totD - totalPersonal),
+        })
+      } catch (err) {
+        console.warn('Failed to sync order on unpaidDeposit toggle:', err)
+      }
+    }
+  }
+
   const syncMembersDiscount = async () => {
     const orderId = activeSession.confirmedOrderId
     if (!orderId) return
@@ -640,6 +677,7 @@ export default function POSPage({
       avatar: m.avatar || '', scanInAt: m.scanInAt || null,
       personalDiscount: Number(m.personalDiscount) || 0,
       personalDiscountNote: m.personalDiscountNote || '',
+      unpaidDeposit: Boolean(m.unpaidDeposit),
     }))
     const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
     await updateDoc(doc(db, 'orders', orderId), {
@@ -775,13 +813,13 @@ export default function POSPage({
     const members = Array.isArray(activeSession?.members) ? activeSession.members : []
     const rawD = Number(activeSession?.discount) || 0
     const mode = activeSession?.discountMode || 'perPerson'
-    // discountMemberIds: empty = applies to all. Otherwise only selected uids get the discount.
+    // discountMemberIds: empty = applies to all eligible members. Otherwise only selected uids get the discount.
     const selectedIds = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
     const effectiveIds = selectedIds.length > 0
-      ? selectedIds.filter(uid => members.some(mm => mm.uid === uid))
-      : members.map(mm => mm.uid)
+      ? selectedIds.filter(uid => members.some(mm => mm.uid === uid && !mm.unpaidDeposit))
+      : members.filter(mm => !mm.unpaidDeposit).map(mm => mm.uid)
     const nDisc = effectiveIds.length
-    const isMemberDiscounted = effectiveIds.includes(m.uid)
+    const isMemberDiscounted = !m.unpaidDeposit && effectiveIds.includes(m.uid)
     const myDisc = isMemberDiscounted
       ? (mode === 'split' ? (nDisc > 0 ? rawD / nDisc : 0) : rawD)
       : 0
@@ -886,8 +924,8 @@ export default function POSPage({
   // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
   const discountMemberIdsRaw = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
   const discountEffectiveIds = discountMemberIdsRaw.length > 0
-    ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid))
-    : sessionMembers.map(m => m.uid)
+    ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid && !m.unpaidDeposit))
+    : sessionMembers.filter(m => !m.unpaidDeposit).map(m => m.uid)
   const nDiscounted = discountEffectiveIds.length
   const totalDiscount = nDiscounted > 0
     ? (discountMode === 'split' ? discountRaw : discountRaw * nDiscounted)
@@ -1121,6 +1159,7 @@ export default function POSPage({
           avatar: m.avatar || '', scanInAt: m.scanInAt || null,
           personalDiscount: Number(m.personalDiscount) || 0,
           personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
         })),
         memberUids: s.members.map(m => m.uid),
         scriptId: s.scriptId,
@@ -1953,7 +1992,7 @@ export default function POSPage({
               const myItems = orderArr.filter(x => x.orderedBy?.uid === m.uid)
               const bill = getMemberBill(m)
               const myFoodTotal = myItems.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-              const memberIsDiscounted = discountEffectiveIds.includes(m.uid)
+              const memberIsDiscounted = !m.unpaidDeposit && discountEffectiveIds.includes(m.uid)
               const discountPerPerson = memberIsDiscounted ? discountPerDiscounted : 0
               const toggleMember = () => setExpandedMembers(prev => {
                 const next = new Set(prev)
@@ -1980,6 +2019,25 @@ export default function POSPage({
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <div className="pos-member-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                        {m.unpaidDeposit && (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              borderRadius: 6,
+                              background: '#fffbeb',
+                              color: '#b45309',
+                              border: '1px solid #fde68a',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            title="ไม่ได้ร่วมจ่ายมัดจำ คิดราคาเกมเต็ม"
+                          >
+                            <i className="fas fa-circle-exclamation" style={{ fontSize: 8 }} /> ยังไม่จ่ายมัดจำ
+                          </span>
+                        )}
                         {memberPayments[m.uid]?.easyslipPending && (
                           <span className="pos-member-pending-badge" title="รอ Bangkok Bank ยืนยันอัตโนมัติ">
                             <i className="fas fa-hourglass-half" /> รอ BK
@@ -2071,11 +2129,18 @@ export default function POSPage({
                             <span>฿{myFoodTotal.toLocaleString()}</span>
                           </div>
                         )}
-                        {discountPerPerson > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
-                            <span>− โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
-                            <span>−฿{discountPerPerson.toLocaleString()}</span>
+                        {m.unpaidDeposit ? (
+                          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#b45309', fontWeight: 600 }}>
+                            <span><i className="fas fa-circle-exclamation" style={{ marginRight: 4 }} /> สถานะมัดจำ</span>
+                            <span>ไม่หักมัดจำ (จ่ายราคาเต็ม)</span>
                           </div>
+                        ) : (
+                          discountPerPerson > 0 && (
+                            <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
+                              <span>− โปร{activeSession.promoName ? ` (${activeSession.promoName})` : ''}</span>
+                              <span>−฿{discountPerPerson.toLocaleString()}</span>
+                            </div>
+                          )
                         )}
                         {Number(m.personalDiscount) > 0 && (
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: '#c62419' }}>
@@ -2117,6 +2182,44 @@ export default function POSPage({
                             />
                           </div>
                         </div>
+                      )}
+
+                      {/* Unpaid deposit toggle button */}
+                      {!isLocked ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleUnpaidDeposit(m.uid)}
+                          style={{
+                            padding: '9px 12px',
+                            borderRadius: 10,
+                            background: m.unpaidDeposit ? '#fffbeb' : '#ffffff',
+                            border: `1.5px solid ${m.unpaidDeposit ? '#f59e0b' : 'rgba(26,26,26,0.14)'}`,
+                            color: m.unpaidDeposit ? '#b45309' : '#1a1a1a',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 7,
+                            fontFamily: "'Sarabun', sans-serif",
+                            transition: 'all 0.15s ease',
+                            boxShadow: m.unpaidDeposit ? '0 1px 4px rgba(245, 158, 11, 0.15)' : 'none',
+                          }}
+                        >
+                          <i className={m.unpaidDeposit ? 'fas fa-circle-exclamation' : 'fas fa-hand-holding-dollar'} style={{ fontSize: 12, color: m.unpaidDeposit ? '#f59e0b' : '#64748b' }} />
+                          {m.unpaidDeposit ? (
+                            <span>ยังไม่ได้จ่ายมัดจำ (คิดราคาเต็ม ฿{gameUnitPay.toLocaleString()}) · <span style={{ textDecoration: 'underline', fontWeight: 600 }}>แตะเพื่อยกเลิก</span></span>
+                          ) : (
+                            <span>ยังไม่ได้จ่ายมัดจำ (คิดราคาเกมเต็มแค่คนนี้)</span>
+                          )}
+                        </button>
+                      ) : (
+                        m.unpaidDeposit && (
+                          <div style={{ padding: '7px 12px', borderRadius: 8, background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <i className="fas fa-circle-exclamation" /> ยังไม่ได้จ่ายมัดจำ (คิดราคาเกมเต็ม ฿{gameUnitPay.toLocaleString()})
+                          </div>
+                        )
                       )}
 
                       {/* Remove member */}
