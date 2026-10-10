@@ -398,11 +398,10 @@ export default function PaymentModal({
                       onClick={() => setActiveMember(m.uid)}
                       style={{
                         borderColor: isActive ? (isPaid ? '#16a34a' : 'var(--red)') : (isPaid ? '#86efac' : '#e0e0e0'),
-                        background: isActive ? (isPaid ? '#f0fdf4' : 'rgba(198,36,25,0.06)') : (isPaid ? '#f0fdf4' : 'none'),
-                        position: 'relative',
+                        background: isActive ? (isPaid ? '#f0fdf4' : 'rgba(198,36,25,0.06)') : (isPaid ? '#f0fdf4' : '#ffffff'),
                       }}
                     >
-                      <span className="pay-member-tab-name" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span className="pay-member-tab-name">
                         {isPaid && <i className="fas fa-check-circle" style={{ color: '#16a34a', fontSize: 11 }} />}
                         {m.name.split(' ')[0]}
                       </span>
