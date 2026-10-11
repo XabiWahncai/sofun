@@ -313,9 +313,14 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
       <header style={{ background: PAPER_2, borderBottom: `1px solid ${L_BORDER}`, padding: 'clamp(36px,5vw,60px) clamp(20px,4vw,40px)' }}>
         <div style={{ maxWidth: 1380, margin: '0 auto' }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <h1 style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontWeight: 900, fontSize: 'clamp(42px,6vw,80px)', lineHeight: 0.88, textTransform: 'uppercase', color: INK, margin: 0 }}>
-              แฟ้มคดี<span style={{ color: C }}>ทั้งหมด</span>
-            </h1>
+            <div>
+              <h1 style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontWeight: 900, fontSize: 'clamp(42px,6vw,80px)', lineHeight: 0.88, textTransform: 'uppercase', color: INK, margin: 0 }}>
+                แฟ้มคดี<span style={{ color: C }}>ทั้งหมด</span>
+              </h1>
+              <p style={{ margin: '8px 0 0', fontSize: 13, color: INK_2 }}>
+                คลังสคริปต์เกม Script Murder จาก Sofun Club Thailand ครบทุกแนวและทุกระดับความยาก
+              </p>
+            </div>
             <span style={{ fontSize: 13, color: INK_3, flexShrink: 0, paddingBottom: 6 }}>
               {allGames.length} สคริปต์
             </span>

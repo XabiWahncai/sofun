@@ -34,7 +34,7 @@ export default function Footer() {
               SOFUN CLUB <span style={{ color: C }}>RCA</span>
             </h3>
             <p style={{ margin: '10px 0 0', fontSize: 13, color: INK_LIGHT, lineHeight: 1.65 }}>
-              Script Murder Platform เจ้าแรกในไทย — เกมสืบสวนสวมบทบาทที่คุณไม่เคยเจอมาก่อน
+              Sofun Club (Sofun Club Thailand) — แพลตฟอร์มและสตูดิโอเกม Script Murder เจ้าแรกในไทย สัมผัสประสบการณ์เกมสืบสวนสวมบทบาทที่คุณไม่เคยเจอมาก่อนใจกลาง RCA
             </p>
             <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
               <a href="https://instagram.com/sofunclub" target="_blank" rel="noopener noreferrer" title="Instagram @sofunclub"

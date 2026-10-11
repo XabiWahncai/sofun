@@ -484,7 +484,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               fontSize: 'clamp(13px,1.3vw,15.5px)', lineHeight: 1.8,
               color: '#666', maxWidth: '44ch', margin: '24px 0 32px',
             }}>
-              Sofun Club เป็นที่แรกที่ให้ประสบการ์ณ script murder และ บริการเกม script murder แห่งแรกในประเทศไทย เป้าหมายของ Sofun คือทําให้คนหนุ่มสาวชาวไทยได้สัมผัสกับความสนุกสนานทางสังคมในระดับใหม่ ผ่านการเล่นเกม script murder Sofun Club ทุ่มเทเพื่อมอบประสบการณ์การเล่นเกมที่ไม่เหมือนใครและสนุกสนานแก่แขกทุกคน ที่นี่คุณสามารถเข้าสู่สถานการณ์ role-playing ที่แตกต่างกัน สัมผัสกับความรักและความเกลียดชังระหว่างตัวละคร และเดินทางในชีวิตที่คุณไม่เคยสัมผัสมาก่อน ประสบการณ์สืบสวนสอบสวนสมจริงกว่า {scriptCount} เรื่อง — ที่แรกและใหญ่ที่สุดในประเทศไทย
+              <strong>Sofun Club (Sofun Club Thailand)</strong> แพลตฟอร์มและสตูดิโอเกม <strong>Script Murder</strong> แห่งแรกในประเทศไทย มอบประสบการณ์เกมสืบสวนสวมบทบาท (Role-playing) ในระดับพรีเมียม สัมผัสความสนุกสนานทางสังคมที่แปลกใหม่และร่วมไขปริศนาคดีฆาตกรรมไปกับตัวละครที่คุณเลือกเอง ที่ <strong>Sofun</strong> เราคัดสรรสคริปต์เกม <strong>Script Murder</strong> คุณภาพกว่า {scriptCount} เรื่อง พร้อม Game Master และห้องเล่นธีมเสมือนจริงใจกลาง RCA
             </p>
 
             {/* CTAs */}
@@ -1208,6 +1208,87 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           </div>
         </div>
 
+      </section>
+
+      {/* ══════════════════════════════════════════
+          9. SCRIPT MURDER STORY & SEO SECTION
+      ══════════════════════════════════════════ */}
+      <section style={{
+        background: '#fff',
+        color: INK,
+        padding: 'clamp(64px, 8vw, 104px) clamp(24px, 5vw, 64px)',
+        borderTop: '1px solid rgba(0,0,0,0.06)',
+      }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div className="mm-reveal" style={{ textAlign: 'center', maxWidth: 800, margin: '0 auto 56px' }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 14px', borderRadius: 999,
+              background: 'rgba(198,36,25,0.08)', border: '1px solid rgba(198,36,25,0.2)',
+              color: C, fontSize: 11, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 14,
+            }}>
+              SOFUN CLUB THAILAND · SCRIPT MURDER PLATFORM
+            </div>
+            <h2 style={{
+              fontFamily: "'Bebas Neue', sans-serif",
+              fontSize: 'clamp(36px, 5.5vw, 64px)',
+              lineHeight: 0.95, textTransform: 'uppercase', margin: '0 0 16px', color: '#111',
+            }}>
+              ประสบการณ์เกม <span style={{ color: C }}>Script Murder</span> กับ Sofun Club
+            </h2>
+            <p style={{ fontSize: 'clamp(13px, 1.3vw, 15px)', color: '#666', lineHeight: 1.8, margin: 0 }}>
+              ค้นพบเสน่ห์ของเกมสืบสวนสวมบทบาทที่ได้รับความนิยมสูงสุดในเอเชีย กับ Sofun Club Thailand
+            </p>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+            gap: 24,
+          }}>
+            {[
+              {
+                q: 'Script Murder คืออะไร?',
+                a: 'Script Murder คือเกมสืบสวนสอบสวนแบบสวมบทบาท (Live Action Roleplay) ที่ผู้เล่นแต่ละคนจะได้รับแฟ้มคดีและบทสคริปต์ส่วนตัว ทุกคนต้องซักถาม แลกเปลี่ยนเบาะแส และร่วมกันสืบหาตัวฆาตกรตัวจริง',
+                icon: 'fas fa-mask',
+              },
+              {
+                q: 'ทำไมต้อง Sofun Club Thailand?',
+                a: 'Sofun Club เป็นแพลตฟอร์มและสตูดิโอเกม Script Murder แห่งแรกในประเทศไทย มีคลังสคริปต์ให้เลือกมากที่สุดกว่า 48+ เรื่อง พร้อมห้องสืบคดีธีมเฉพาะ พร็อพเครื่องแต่งกาย และ Game Master มืออาชีพคอยดูแลตลอดทั้งเกม',
+                icon: 'fas fa-shield-halved',
+              },
+              {
+                q: 'เริ่มต้นเล่นเกมกับ Sofun ได้อย่างไร?',
+                a: 'คุณสามารถนัดกลุ่มเพื่อนหรือเข้าร่วมปาร์ตี้ออนไลน์ผ่านเว็บไซต์ Sofun Club ได้อย่างสะดวกสบาย เลือกระดับความยากที่ต้องการ แล้วจองรอบเล่นล่วงหน้าเพื่อเปิดห้องเล่นเกม Script Murder ได้ทันที',
+                icon: 'fas fa-calendar-check',
+              },
+            ].map((item, idx) => (
+              <div key={idx} className={`mm-reveal mm-d${idx + 1}`} style={{
+                background: PAPER_2,
+                borderRadius: 16,
+                border: '1px solid rgba(0,0,0,0.07)',
+                padding: '28px 24px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 14,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+              }}>
+                <div style={{
+                  width: 42, height: 42, borderRadius: 10,
+                  background: 'rgba(198,36,25,0.08)', color: C,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
+                }}>
+                  <i className={item.icon} />
+                </div>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111', lineHeight: 1.4, margin: 0 }}>
+                  {item.q}
+                </h3>
+                <p style={{ fontSize: 13, color: '#666', lineHeight: 1.75, margin: 0 }}>
+                  {item.a}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </section>
 
       {/* ── Contact / Info Footer ── */}

@@ -1199,14 +1199,14 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
                 <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <i className="fas fa-users" style={{ color: 'var(--crimson-500)', fontSize: '16px' }} />
                 </div>
-                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>ปาร์ตี้เกม</h1>
+                <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>ปาร์ตี้เกมสืบสวน</h1>
                 {myPendingCount > 0 && (
                   <span style={{ padding: '3px 10px', borderRadius: '99px', background: 'var(--crimson-500)', color: '#fff', fontSize: '12px', fontWeight: 700 }}>
                     <i className="fas fa-bell" style={{ marginRight: '4px' }} />{myPendingCount} คำขอ
                   </span>
                 )}
               </div>
-              <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>รวมกลุ่มกับเพื่อนใหม่ เล่นสคริปต์ที่คุณชื่นชอบ</p>
+              <p style={{ margin: 0, fontSize: '14px', color: 'var(--text-secondary)' }}>รวมกลุ่มเล่นเกม Script Murder กับเพื่อนใหม่ที่ Sofun Club (Sofun Club Thailand)</p>
             </div>
 
             {!user && (

@@ -3028,13 +3028,13 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
             <div>
               <div style={{ display: 'inline-flex', alignItems: 'center', gap: '7px', padding: '4px 12px', borderRadius: '20px', background: 'rgba(198,36,25,0.1)', border: '1px solid rgba(198,36,25,0.3)', color: 'var(--crimson-500)', fontSize: '11px', fontWeight: 800, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: '14px' }}>
                 <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: 'var(--crimson-400)' }} />
-                SOFUN MYSTERY LOUNGE · BOOKING SYSTEM
+                SOFUN CLUB THAILAND · SCRIPT MURDER BOOKING
               </div>
               <h1 style={{ fontFamily: "'Barlow Condensed', sans-serif", fontWeight: 900, fontSize: 'clamp(28px,5vw,48px)', color: 'var(--text-primary)', letterSpacing: '-0.01em', lineHeight: 1.15, margin: '0 0 10px', textTransform: 'uppercase' }}>
-                จองรอบเกม & ตารางห้อง
+                จองรอบเกม <span style={{ color: 'var(--crimson-500)' }}>& ตารางห้องสืบคดี</span>
               </h1>
-              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: '0 0 20px', maxWidth: '560px' }}>
-                เลือกวันเวลา เช็คตารางห้องว่างแบบเรียลไทม์ หรือสร้างปาร์ตี้เพื่อเปิดห้องสืบคดีได้ทันที
+              <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: 1.7, margin: '0 0 20px', maxWidth: '620px' }}>
+                จองรอบเล่นเกม Script Murder ที่ Sofun Club (Sofun Club Thailand) เช็คตารางห้องว่างแบบเรียลไทม์ หรือสร้างปาร์ตี้เพื่อเปิดห้องสืบคดีได้ทันที
               </p>
               {/* Stats row */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
