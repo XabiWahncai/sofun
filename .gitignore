@@ -42,3 +42,6 @@ test-results/
 
 # Screenshots in root directory (temp review screenshots)
 /*.png
+
+# Local backups
+backups/
