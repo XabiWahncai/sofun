@@ -139,7 +139,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   const heroImg       = heroGame ? convertImageUrl(heroGame.image || heroGame.coverUrl) : null;
   const tickerGames   = displayGames.map(g => g.title).filter(Boolean);
   const tickerDur     = Math.max(30, tickerGames.length * 2.5);
-  const gridGames     = displayGames.slice(0, 12);
+  const gridGames     = displayGames.slice(0, 10);
   /* dots: up to 9 covers from slidable games */
   const heroCovers    = slidableGames.slice(0, 9).map(g => convertImageUrl(g.image || g.coverUrl, 400));
   /* scatter: tiny thumbnails — displayed at 36–52px CSS, w=200 is enough at 3× DPR */
@@ -223,12 +223,9 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .mm-fg{animation:mmFloatG 5.7s ease-in-out infinite}
         .mm-fh{animation:mmFloatH 7.1s ease-in-out infinite}
 
-        /* genre row */
-        .mm-genre-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
-        .mm-genre-row::-webkit-scrollbar{display:none}
-        .mm-genre-btn{transition:border-color .18s,color .18s,background .18s!important;flex-shrink:0}
-        .mm-genre-btn:hover{border-color:${C}!important;color:${C}!important;background:rgba(198,36,25,.05)!important}
-        .mm-genre-btn.gba{background:${C}!important;color:#fff!important;border-color:${C}!important}
+        @media(max-width:639px){
+          .mm-card-mobile-hide { display: none !important; }
+        }
 
         /* ── grids ── */
         .mm-hero-text{width:min(52%,700px);padding:clamp(56px,7vw,96px) clamp(36px,5vw,80px) clamp(64px,8vw,96px)}
@@ -593,22 +590,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             </div>
           </div>
 
-          {/* Genre filter row */}
-          <div className="mm-genre-row mm-reveal" style={{ marginBottom: 28 }}>
-            {['ทั้งหมด','Horror','Drama','Detective','Emotional','Thriller','Romance','Comedy','ฟรี'].map((g, i) => (
-              <button key={g} className={`mm-genre-btn${i === 0 ? ' gba' : ''}`} onClick={() => showPage('games')} style={{
-                fontSize: 10.5, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase',
-                padding: '8px 18px', borderRadius: 20,
-                border: '1.5px solid rgba(0,0,0,.14)',
-                color: i === 0 ? '#fff' : '#555',
-                background: i === 0 ? C : 'transparent',
-                cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
-              }}>
-                {g}
-              </button>
-            ))}
-          </div>
-
           {/* Card grid */}
           <div className="mm-catalog-grid">
             {gridGames.map((game, i) => {
@@ -616,7 +597,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               const displayPrice = game.fullPrice ?? game.price;
               return (
                 <div key={game.id || i}
-                  className={`mm-card mm-reveal mm-d${Math.min((i % 4) + 1, 6)}`}
+                  className={`mm-card mm-reveal mm-d${Math.min((i % 4) + 1, 6)}${i >= 4 ? ' mm-card-mobile-hide' : ''}`}
                   role="button" tabIndex={0}
                   onClick={() => showPage('games')}
                   onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && showPage('games')}
