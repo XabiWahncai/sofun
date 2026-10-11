@@ -200,11 +200,68 @@ async function callEasySlip(payload, amount, apiKey) {
   return res.json()
 }
 
+// ── Web Application Firewall (WAF) Guards & Sanitization ─────────────────────
+const WAF_RATE_LIMIT = new Map()
+
+function checkWafRateLimit(key, maxLimit = 15, windowMs = 60000) {
+  const now = Date.now()
+  const entry = WAF_RATE_LIMIT.get(key) || { count: 0, resetAt: now + windowMs }
+  if (now > entry.resetAt) {
+    entry.count = 1
+    entry.resetAt = now + windowMs
+  } else {
+    entry.count++
+  }
+  WAF_RATE_LIMIT.set(key, entry)
+  if (WAF_RATE_LIMIT.size > 2000) {
+    for (const [k, v] of WAF_RATE_LIMIT.entries()) {
+      if (now > v.resetAt) WAF_RATE_LIMIT.delete(k)
+    }
+  }
+  return entry.count <= maxLimit
+}
+
+function validateSlipUrl(url) {
+  if (!url || typeof url !== 'string') return false
+  try {
+    const parsed = new URL(url)
+    if (parsed.protocol !== 'https:') return false
+    const hostname = parsed.hostname.toLowerCase()
+    const allowed = [
+      'firebasestorage.googleapis.com',
+      'storage.googleapis.com',
+      'sonfun0linel.firebasestorage.app',
+      'sonfun0linel.web.app',
+    ]
+    return allowed.some(d => hostname === d || hostname.endsWith('.firebasestorage.app'))
+  } catch {
+    return false
+  }
+}
+
 // ── Main callable: verify slip on upload ──────────────────────────────────────
 
 exports.verifySlip = onCall({ region: 'asia-southeast1', cors: true }, async (req) => {
-  const { slipUrl, amount, orderId, uid, name, isDeposit } = req.data
+  const { slipUrl, amount, orderId, uid, name, isDeposit } = req.data || {}
   if (!slipUrl || !orderId || !uid) return { success: false, code: 'MISSING_PARAMS' }
+
+  // ── WAF Rate Limiting Guard ────────────────────────────────────────────────
+  const clientKey = String(uid || req.rawRequest?.ip || 'anonymous')
+  if (!checkWafRateLimit(clientKey, 15, 60000)) {
+    console.warn(`[WAF BLOCK] Rate limit exceeded for client: ${clientKey}`)
+    return { success: false, code: 'WAF_RATE_LIMITED', msg: 'Too many verification attempts. Please wait.' }
+  }
+
+  // ── WAF SSRF & Storage Source Guard ────────────────────────────────────────
+  if (!validateSlipUrl(slipUrl)) {
+    console.warn(`[WAF BLOCK] Blocked suspicious slipUrl: ${slipUrl}`)
+    return { success: false, code: 'WAF_UNTRUSTED_SOURCE', msg: 'Untrusted slip storage source.' }
+  }
+
+  // ── WAF Parameter Length & Type Sanitization ───────────────────────────────
+  if (typeof orderId !== 'string' || orderId.length > 128 || typeof uid !== 'string' || uid.length > 128) {
+    return { success: false, code: 'WAF_INVALID_PAYLOAD', msg: 'Invalid parameter format.' }
+  }
 
   const db = getFirestore()
   const settingsSnap = await db.doc('settings/payment').get()
