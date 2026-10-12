@@ -1150,13 +1150,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div className="mm-reveal" style={{ textAlign: 'center', maxWidth: 800, margin: '0 auto 56px' }}>
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 14px', borderRadius: 999,
-              background: 'rgba(198,36,25,0.08)', border: '1px solid rgba(198,36,25,0.2)',
-              color: C, fontSize: 11, fontWeight: 800, letterSpacing: '0.14em', textTransform: 'uppercase', marginBottom: 14,
-            }}>
-              SOFUN CLUB THAILAND · SCRIPT MURDER PLATFORM
-            </div>
             <h2 style={{
               fontFamily: "'Bebas Neue', sans-serif",
               fontSize: 'clamp(36px, 5.5vw, 64px)',
