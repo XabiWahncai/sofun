@@ -504,22 +504,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               </button>
             </div>
 
-            {/* Inline stats */}
-            <div className="mm-hero-stats mm-r4" style={{ display: 'flex', gap: 32, marginTop: 36, paddingTop: 28, borderTop: '1px solid rgba(0,0,0,.07)' }}>
-              {[
-                { n: scriptCount + '+', label: t('home','statScriptLabel') },
-                { n: '200+',            label: t('home','statMemberLabel') },
-                { n: '5',               label: t('home','statYearsLabel') },
-              ].map(s => (
-                <div key={s.label}>
-                  <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(26px,3.2vw,34px)', color: '#111', lineHeight: 1 }}>{s.n}</div>
-                  <div style={{ fontSize: 9, color: '#bbb', letterSpacing: '0.16em', textTransform: 'uppercase', marginTop: 4 }}>{s.label}</div>
-                </div>
-              ))}
-            </div>
-
             {/* Quick category nav */}
-            <div className="mm-hero-cats mm-r4" style={{ display: 'flex', gap: 0, marginTop: 28, paddingTop: 24, borderTop: '1px solid rgba(0,0,0,.07)' }}>
+            <div className="mm-hero-cats mm-r4" style={{ display: 'flex', gap: 0, marginTop: 36, paddingTop: 24, borderTop: '1px solid rgba(0,0,0,.07)' }}>
               {[
                 { label: t('home','heroBeginner'), sub: t('home','heroBeginnerSub'), icon: 'fas fa-star',    page: 'games' },
                 { label: t('home','heroAdvanced'),  sub: t('home','heroAdvancedSub'),  icon: 'fas fa-search',  page: 'games' },
@@ -648,36 +634,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </section>
 
       {/* ══════════════════════════════════════════
-          4. FEATURE STRIP — 3 horizontal pillars
-      ══════════════════════════════════════════ */}
-      <section style={{ background: PAPER_2, padding: 'clamp(56px,7vw,88px) clamp(24px,5vw,64px)', borderTop: '1px solid rgba(0,0,0,.06)', borderBottom: '1px solid rgba(0,0,0,.06)' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 0 }}>
-            {[
-              { icon: 'fas fa-user-secret', title: t('home','feat1Title'), desc: t('home','feat1Desc') },
-              { icon: 'fas fa-search',      title: t('home','feat2Title'), desc: t('home','feat2Desc') },
-              { icon: 'fas fa-scroll',      title: t('home','feat3Title'), desc: t('home','feat3Desc') },
-            ].map((f, i) => (
-              <div key={i} className={`mm-reveal mm-d${i + 1}`} style={{
-                padding: 'clamp(32px,4vw,48px) clamp(24px,3.5vw,40px)',
-                borderRight: i < 2 ? '1px solid rgba(0,0,0,.07)' : 'none',
-                display: 'flex', gap: 20, alignItems: 'flex-start',
-              }}>
-                <div style={{ width: 44, height: 44, borderRadius: 10, background: `rgba(198,36,25,.08)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <i className={f.icon} style={{ fontSize: 18, color: C }} />
-                </div>
-                <div>
-                  <h3 style={{ fontSize: 15, fontWeight: 800, color: '#111', marginBottom: 8, margin: '0 0 8px' }}>{f.title}</h3>
-                  <p style={{ fontSize: 13, color: '#777', lineHeight: 1.7, margin: 0 }}>{f.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          5. STATS — dark, credibility numbers
+          4. STATS — dark, credibility numbers
       ══════════════════════════════════════════ */}
       <section style={{ background: '#060606', color: '#fff', padding: 'clamp(64px,8vw,104px) clamp(24px,5vw,64px)', position: 'relative', overflow: 'hidden' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
@@ -700,19 +657,10 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             ))}
           </div>
 
-          <div className="mm-reveal" style={{ marginTop: 56, paddingTop: 40, borderTop: '1px solid rgba(255,255,255,.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 20 }}>
-            <p style={{ fontSize: 'clamp(14px,1.8vw,19px)', fontWeight: 700, color: 'rgba(255,255,255,.55)', maxWidth: '56ch', lineHeight: 1.55, margin: 0 }}>
-              {t('home','statsClaim')}
+          <div className="mm-reveal" style={{ marginTop: 48, paddingTop: 36, borderTop: '1px solid rgba(255,255,255,.06)', textAlign: 'center' }}>
+            <p style={{ fontSize: 'clamp(14px,1.6vw,17px)', fontWeight: 600, color: 'rgba(255,255,255,.65)', maxWidth: '64ch', margin: '0 auto', lineHeight: 1.65 }}>
+              <strong>Sofun Club Thailand</strong> ผู้บุกเบิกและสตูดิโอเกม <strong>Script Murder</strong> คุณภาพพรีเมียมแห่งแรกใจกลาง RCA พร้อม Game Master มืออาชีพดูแลห้องสืบคดีทุกรอบ
             </p>
-            <button className="mm-btn-dark" onClick={() => showPage('games')} style={{
-              background: 'rgba(255,255,255,.07)', color: '#fff',
-              border: '1.5px solid rgba(255,255,255,.18)',
-              cursor: 'pointer', fontSize: 11, fontWeight: 800, letterSpacing: '0.18em',
-              textTransform: 'uppercase', fontFamily: "'Sarabun',sans-serif",
-              padding: '16px 40px', borderRadius: 6, flexShrink: 0,
-            }}>
-              {t('home','chooseScript')}
-            </button>
           </div>
         </div>
       </section>
@@ -951,7 +899,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 28 }}>
                   {([promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean).length > 0
                     ? [promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean)
-                    : ['🎭 สคริปต์ยอดฮิต', '⚡ ส่วนลดพิเศษ', '🔥 จำนวนจำกัด']
+                    : ['สคริปต์ยอดนิยม', 'ส่วนลดพิเศษ', 'จำนวนจำกัด']
                   ).map((b, i) => (
                     <span key={i} style={{
                       fontSize: 10.5, fontWeight: 700, letterSpacing: '0.08em',
@@ -1229,18 +1177,18 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             {[
               {
                 q: 'Script Murder คืออะไร?',
-                a: 'Script Murder คือเกมสืบสวนสอบสวนแบบสวมบทบาท (Live Action Roleplay) ที่ผู้เล่นแต่ละคนจะได้รับแฟ้มคดีและบทสคริปต์ส่วนตัว ทุกคนต้องซักถาม แลกเปลี่ยนเบาะแส และร่วมกันสืบหาตัวฆาตกรตัวจริง',
+                a: 'Script Murder (เกมสืบสวนสอบสวนแบบสวมบทบาท หรือ Live Action Roleplay) คือประสบการณ์การเล่นที่ผู้เล่นแต่ละคนจะได้รับบทบาทตัวละครและแฟ้มคดีส่วนตัว ซักถามผู้ต้องสงสัย วิเคราะห์หลักฐาน ค้นหาแรงจูงใจ และร่วมกันชี้ตัวฆาตกรตัวจริงในเนื้อเรื่องที่เข้มข้นและหักมุม',
                 icon: 'fas fa-mask',
               },
               {
-                q: 'ทำไมต้อง Sofun Club Thailand?',
-                a: 'Sofun Club เป็นแพลตฟอร์มและสตูดิโอเกม Script Murder แห่งแรกในประเทศไทย มีคลังสคริปต์ให้เลือกมากที่สุดกว่า 48+ เรื่อง พร้อมห้องสืบคดีธีมเฉพาะ พร็อพเครื่องแต่งกาย และ Game Master มืออาชีพคอยดูแลตลอดทั้งเกม',
+                q: 'ทำไมต้องเลือกเล่นที่ Sofun Club Thailand?',
+                a: 'Sofun Club เป็นแพลตฟอร์มและสตูดิโอเกม Script Murder แห่งแรกในประเทศไทย คัดสรรสคริปต์แปลไทยลิขสิทธิ์คุณภาพกว่า 48+ เรื่อง พร้อมห้องสืบคดีธีมเฉพาะ พร็อพเครื่องแต่งกายสมจริง และ Game Master มืออาชีพคอยดูแลการเล่นทุกขั้นตอน',
                 icon: 'fas fa-shield-halved',
               },
               {
-                q: 'เริ่มต้นเล่นเกมกับ Sofun ได้อย่างไร?',
-                a: 'คุณสามารถนัดกลุ่มเพื่อนหรือเข้าร่วมปาร์ตี้ออนไลน์ผ่านเว็บไซต์ Sofun Club ได้อย่างสะดวกสบาย เลือกระดับความยากที่ต้องการ แล้วจองรอบเล่นล่วงหน้าเพื่อเปิดห้องเล่นเกม Script Murder ได้ทันที',
-                icon: 'fas fa-calendar-check',
+                q: 'เล่น Script Murder ที่ Sofun เหมาะกับใครบ้าง?',
+                a: 'เหมาะสำหรับทุกคน ไม่ว่าจะเป็นกลุ่มเพื่อนที่มองหากิจกรรมบันเทิงรูปแบบใหม่ กิจกรรม Team Building ขององค์กร หรือผู้เล่นเดี่ยวที่ต้องการหาเพื่อนใหม่ผ่านระบบจับคู่ปาร์ตี้ของ Sofun Club Thailand พร้อมระดับความยากหลากหลายตั้งแต่ผู้เริ่มต้นจนถึงระดับเซียน',
+                icon: 'fas fa-users',
               },
             ].map((item, idx) => (
               <div key={idx} className={`mm-reveal mm-d${idx + 1}`} style={{
