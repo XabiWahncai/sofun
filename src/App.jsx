@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc, orderBy } from 'firebase/firestore'
+import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc, orderBy, serverTimestamp } from 'firebase/firestore'
 import { getToken, onMessage } from 'firebase/messaging'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -332,9 +332,15 @@ export default function App() {
     if (!uid || isEffectiveAdmin) { setActiveMemberOrder(null); return }
     const q = query(collection(db, 'orders'), where('memberUids', 'array-contains', uid))
     return onSnapshot(q, snap => {
+      const maxAgeMs = 18 * 60 * 60 * 1000 // Only consider active orders from the last 18 hours
+      const now = Date.now()
       const active = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .find(o => o.status === 'active')
+        .find(o => {
+          if (o.status !== 'active') return false
+          const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : 0)
+          return !orderTime || (now - orderTime) < maxAgeMs
+        })
       setActiveMemberOrder(active || null)
     }, () => setActiveMemberOrder(null))
   }, [lineUser?.uid, isEffectiveAdmin])
@@ -406,13 +412,34 @@ export default function App() {
     return onSnapshot(q, snap => {
       const start = new Date()
       start.setHours(0, 0, 0, 0)
+      const maxAgeMs = 18 * 60 * 60 * 1000
+      const now = Date.now()
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const activeOrTodayOrders = orders.filter(o => o.createdAt?.toDate?.() >= start || o.status === 'active')
+      const activeOrTodayOrders = orders.filter(o => {
+        if (o.createdAt?.toDate?.() >= start) return true
+        if (o.status !== 'active') return false
+        const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : 0)
+        return !orderTime || (now - orderTime) < maxAgeMs
+      })
       const totalPending = activeOrTodayOrders.reduce((sum, o) => {
         const count = Array.isArray(o.memberFoodQueue) ? o.memberFoodQueue.length : 0
         return sum + count
       }, 0)
       setGlobalPendingOrdersCount(totalPending)
+
+      // Auto-close stale active orders from previous days (> 18h) in the background
+      orders.forEach(o => {
+        if (o.status === 'active') {
+          const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : 0)
+          if (orderTime && (now - orderTime) >= maxAgeMs) {
+            updateDoc(doc(db, 'orders', o.id), {
+              status: 'closed',
+              closedAt: serverTimestamp(),
+              closedReason: 'auto_cleanup_stale'
+            }).catch(() => {})
+          }
+        }
+      })
     }, (err) => console.warn('Global orders queue sync error:', err))
   }, [isEffectiveAdmin])
 
