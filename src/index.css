@@ -2976,6 +2976,134 @@ nav {
 .adm-btn-red:hover { opacity: 0.85; }
 .adm-btn-red:disabled { opacity: 0.5; cursor: wait; }
 
+/* ── Promotion & Spotlight Studio Redesign ── */
+.adm-promo-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.28fr) minmax(360px, 0.92fr);
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1120px) {
+  .adm-promo-workspace {
+    grid-template-columns: 1fr;
+  }
+}
+.adm-promo-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  margin-bottom: 20px;
+}
+.adm-promo-header-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.adm-promo-header-sub {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 3px;
+}
+.adm-promo-section {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+.adm-promo-section-title {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.adm-promo-type-btn {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.65);
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  font-family: 'Google Sans', 'Sarabun', sans-serif;
+}
+.adm-promo-type-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.adm-promo-type-btn.active {
+  background: rgba(198, 36, 25, 0.2);
+  border-color: var(--crimson-500);
+  color: #fff;
+  box-shadow: 0 0 12px rgba(198, 36, 25, 0.35);
+}
+.adm-promo-slot-card {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  transition: all 0.2s;
+  position: relative;
+}
+.adm-promo-slot-card:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.05);
+}
+.adm-promo-slot-empty {
+  border: 2px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  padding: 20px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.015);
+  min-height: 180px;
+  transition: all 0.2s;
+}
+.adm-promo-slot-empty:hover {
+  border-color: var(--crimson-500);
+  background: rgba(198, 36, 25, 0.06);
+  transform: translateY(-2px);
+}
+.adm-promo-preview-sticky {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  border-radius: 18px;
+  background: #09090f;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  padding: 20px;
+}
+
 /* ── Admin mobile ── */
 @media (max-width: 900px) {
   .adm-sidebar {

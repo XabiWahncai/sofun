@@ -4994,510 +4994,653 @@ function PromotionTab({ showToast, allGames = [] }) {
   const selectedGamesList = (promo.newGameIds || []).map(id => allGames.find(g => g.id === id)).filter(Boolean)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
-      {/* ── CARD 1: โปรโมชั่น (Promotion Settings) ── */}
-      <div className="adm-card">
-        <div className="adm-card-title" style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>
-            <i className="fas fa-fire-alt" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
-            ตั้งค่าโปรโมชั่น (Promotion)
-          </span>
-          <span style={{ fontSize: 11, background: 'rgba(198,36,25,0.12)', color: 'var(--crimson-500)', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
-            โชว์ฝั่งซ้ายของหน้าหลัก
-          </span>
+      {/* ── Top Header Bar ── */}
+      <div className="adm-promo-header-bar">
+        <div>
+          <div className="adm-promo-header-title">
+            <i className="fas fa-fire-alt" style={{ color: 'var(--crimson-500)' }} />
+            จัดการโปรโมชั่น & สปอตไลท์ 3 คดีใหม่
+          </div>
+          <div className="adm-promo-header-sub">
+            ควบคุมแบนเนอร์ ส่วนลด แคมเปญ และไฮไลท์ 3 เกมใหม่ที่แสดงบนหน้าหลัก (Live Editorial Studio)
+          </div>
         </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{
+            display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 14px',
+            borderRadius: 999, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)',
+            color: '#4ade80', fontSize: 11, fontWeight: 800,
+          }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 8px #22c55e' }} />
+            โชว์บนหน้าหลัก (Live on Homepage)
+          </div>
+          <button
+            type="button"
+            className="adm-btn-red"
+            onClick={save}
+            disabled={saving}
+            style={{ padding: '9px 18px', fontSize: 13, fontWeight: 800, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}
+          >
+            {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกการเปลี่ยนแปลง</>}
+          </button>
+        </div>
+      </div>
 
-        {/* รูปภาพโปรโมชั่น */}
-        <div className="adm-field" style={{ marginBottom: 16 }}>
-          <label className="adm-label">รูปภาพโปรโมชั่น (แบนเนอร์ / โปสเตอร์)</label>
-          <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-            <label style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8,
-              background: 'var(--crimson-500)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              transition: 'opacity 0.15s', opacity: uploadingBanner ? 0.6 : 1,
-            }}>
-              <i className={`fas ${uploadingBanner ? 'fa-spinner fa-spin' : 'fa-upload'}`} />
-              {uploadingBanner ? 'กำลังอัพโหลด...' : 'อัพโหลดรูปโปรโมชั่น'}
-              <input type="file" accept="image/*" onChange={handleBannerUpload} disabled={uploadingBanner} style={{ display: 'none' }} />
-            </label>
-            {promo.bannerUrl && (
-              <button
-                type="button"
-                onClick={() => setPromo(p => ({ ...p, bannerUrl: '' }))}
-                style={{
-                  background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
-                  color: '#ef4444', padding: '10px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
-                }}
-              >
-                <i className="fas fa-trash-alt" style={{ marginRight: 6 }} /> ลบรูปออก
-              </button>
-            )}
-          </div>
-          <div style={{ marginTop: 8 }}>
-            <input
-              className="adm-input"
-              type="text"
-              value={promo.bannerUrl || ''}
-              placeholder="หรือวาง URL รูปภาพโดยตรง (https://...)"
-              onChange={e => setPromo(p => ({ ...p, bannerUrl: e.target.value }))}
-            />
-          </div>
-          {promo.bannerUrl && (
-            <div style={{ marginTop: 12, maxWidth: 360, borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.15)' }}>
-              <img src={convertImg(promo.bannerUrl, 600)} alt="Promo Banner" style={{ width: '100%', height: 'auto', display: 'block', objectFit: 'cover' }} onError={e => e.currentTarget.style.display = 'none'} />
+      {/* ── Studio 2-Column Workspace ── */}
+      <div className="adm-promo-workspace">
+
+        {/* ── LEFT: Controls & Form Sections ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+          {/* Section 1: แบนเนอร์และภาพประกอบ */}
+          <div className="adm-promo-section">
+            <div className="adm-promo-section-title">
+              <span>
+                <i className="fas fa-image" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
+                รูปภาพโปรโมชั่น (แบนเนอร์ / โปสเตอร์)
+              </span>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>
+                สัดส่วนแนะนำ 16:9
+              </span>
             </div>
-          )}
-        </div>
 
-        {/* ส่วนลด และประเภทส่วนลด */}
-        <div style={{
-          background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
-          borderRadius: 12, padding: 16, marginBottom: 16,
-        }}>
-          <div style={{ fontSize: 13, fontWeight: 800, color: '#fbbf24', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
-            <i className="fas fa-tags" /> การตั้งค่าส่วนลด (Discount Price & Type)
-          </div>
-          <div className="adm-field-row" style={{ alignItems: 'flex-start' }}>
-            <div className="adm-field" style={{ flex: 1 }}>
-              <label className="adm-label">ราคาส่วนลด (ใส่จำนวนเงิน หรือ %)</label>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+              <label style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8,
+                background: 'var(--crimson-500)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                transition: 'opacity 0.15s', opacity: uploadingBanner ? 0.6 : 1,
+              }}>
+                <i className={`fas ${uploadingBanner ? 'fa-spinner fa-spin' : 'fa-upload'}`} />
+                {uploadingBanner ? 'กำลังอัพโหลด...' : 'อัพโหลดรูปโปรโมชั่น'}
+                <input type="file" accept="image/*" onChange={handleBannerUpload} disabled={uploadingBanner} style={{ display: 'none' }} />
+              </label>
+
+              {promo.bannerUrl && (
+                <button
+                  type="button"
+                  onClick={() => setPromo(p => ({ ...p, bannerUrl: '' }))}
+                  style={{
+                    background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)',
+                    color: '#ef4444', padding: '10px 14px', borderRadius: 8, cursor: 'pointer', fontSize: 12, fontWeight: 700,
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                  }}
+                >
+                  <i className="fas fa-trash-alt" /> นำรูปออก
+                </button>
+              )}
+            </div>
+
+            <div style={{ marginBottom: 14 }}>
               <input
                 className="adm-input"
                 type="text"
-                value={promo.discountAmount || ''}
-                placeholder="เช่น 100 บาท หรือ 15%"
-                onChange={e => setPromo(p => ({ ...p, discountAmount: e.target.value }))}
+                value={promo.bannerUrl || ''}
+                placeholder="หรือวาง URL รูปภาพโดยตรง (https://... หรือ Google Drive)"
+                onChange={e => setPromo(p => ({ ...p, bannerUrl: e.target.value }))}
               />
-              <div className="adm-hint">ตัวอย่าง: "100", "50 บาท", "20%"</div>
             </div>
-
-            <div className="adm-field" style={{ flex: 1.2 }}>
-              <label className="adm-label">ประเภทส่วนลด (ลดทั้งตี้ หรือ ลดต่อคน)</label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <button
-                  type="button"
-                  onClick={() => setPromo(p => ({ ...p, discountType: 'party' }))}
-                  style={{
-                    padding: '10px 12px', borderRadius: 8, border: '1px solid',
-                    borderColor: promo.discountType === 'party' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.12)',
-                    background: promo.discountType === 'party' ? 'rgba(198,36,25,0.2)' : 'rgba(255,255,255,0.04)',
-                    color: promo.discountType === 'party' ? '#fff' : 'rgba(255,255,255,0.6)',
-                    fontWeight: 800, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
-                >
-                  <i className="fas fa-users" style={{ color: promo.discountType === 'party' ? 'var(--crimson-500)' : 'inherit' }} />
-                  ลดทั้งตี้
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPromo(p => ({ ...p, discountType: 'person' }))}
-                  style={{
-                    padding: '10px 12px', borderRadius: 8, border: '1px solid',
-                    borderColor: promo.discountType === 'person' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.12)',
-                    background: promo.discountType === 'person' ? 'rgba(198,36,25,0.2)' : 'rgba(255,255,255,0.04)',
-                    color: promo.discountType === 'person' ? '#fff' : 'rgba(255,255,255,0.6)',
-                    fontWeight: 800, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                  }}
-                >
-                  <i className="fas fa-user" style={{ color: promo.discountType === 'person' ? 'var(--crimson-500)' : 'inherit' }} />
-                  ลดต่อคน
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ข้อความและรายละเอียด */}
-        <div className="adm-field-row">
-          {field('หัวข้อโปรโมชั่น', 'heading', 'เช่น โปรเปิดตี้สืบคดีสุดคุ้ม')}
-          {field('ช่วงเวลา / เดือน', 'month', 'เช่น ประจำเดือนนี้ หรือ จำกัดเวลา')}
-        </div>
-        {field('คำอธิบายโปรโมชั่น', 'description', 'รายละเอียดและเงื่อนไขโปรโมชั่น...', 'textarea')}
-
-        <div className="adm-field-row">
-          {field('ป้ายกำกับด้านบน (Badge Tag)', 'promoTag', 'SPECIAL PROMOTION')}
-          {field('ข้อความปุ่ม CTA', 'buttonText', 'จองรอบรับสิทธิ์เลย →')}
-          <div className="adm-field">
-            <label className="adm-label">ปุ่มลิงก์ไปยังหน้า</label>
-            <select
-              className="adm-input"
-              value={promo.buttonLink || 'booking'}
-              onChange={e => setPromo(p => ({ ...p, buttonLink: e.target.value }))}
-            >
-              <option value="booking">หน้าจองห้อง / ปฏิทิน (Booking)</option>
-              <option value="games">หน้าคลังเกม (Games)</option>
-              <option value="party">หน้าร่วมตี้ (Party)</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="adm-field-row">
-          {field('จุดเด่น 1', 'badge1', 'สคริปต์ยอดฮิต')}
-          {field('จุดเด่น 2', 'badge2', 'ส่วนลดพิเศษ')}
-          {field('จุดเด่น 3', 'badge3', 'จำนวนจำกัด')}
-        </div>
-      </div>
-
-      {/* ── CARD 2: สปอตไลท์เกมใหม่ (New Games Spotlight - Max 3) ── */}
-      <div className="adm-card">
-        <div className="adm-card-title" style={{ marginBottom: '18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span>
-            <i className="fas fa-sparkles" style={{ color: '#fbbf24', marginRight: 8 }} />
-            เลือกเกมใหม่มาโชว์ (สูงสุด 3 เกม)
-          </span>
-          <span style={{ fontSize: 11, background: 'rgba(251,191,36,0.12)', color: '#fbbf24', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
-            {(promo.newGameIds || []).length} / 3 เกม
-          </span>
-        </div>
-
-        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>
-          คุณสามารถกดเลือกเกมจากคลังเกมในร้าน เพื่อนำมาแสดงเป็นเกมใหม่ล่าสุดที่หน้าหลัก (สูงสุด 3 เกม) และสามารถอัพโหลดรูปปกเฉพาะสำหรับเกมใหม่นั้นๆ ได้
-        </div>
-
-        {/* Selected 3 Slots */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 14, marginBottom: 20 }}>
-          {[0, 1, 2].map(slotIdx => {
-            const gameId = (promo.newGameIds || [])[slotIdx]
-            const game = gameId ? allGames.find(g => g.id === gameId) : null
-            const customCover = gameId ? promo.customCovers?.[gameId] : null
-            const displayCover = customCover || game?.image || game?.coverUrl
-
-            if (!game) {
-              return (
-                <div
-                  key={slotIdx}
-                  onClick={() => setShowGamePicker(true)}
-                  style={{
-                    border: '2px dashed rgba(255,255,255,0.15)', borderRadius: 14, padding: 24,
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    gap: 10, cursor: 'pointer', background: 'rgba(255,255,255,0.02)', minHeight: 180,
-                    transition: 'all 0.15s ease',
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'var(--crimson-500)'
-                    e.currentTarget.style.background = 'rgba(198,36,25,0.04)'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.15)'
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
-                  }}
-                >
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>
-                    <i className="fas fa-plus" />
-                  </div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.8)' }}>
-                    สล็อตเกมใหม่ #{slotIdx + 1} (ว่าง)
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>
-                    คลิกเพื่อเลือกเกมจากคลัง
-                  </div>
-                </div>
-              )
-            }
-
-            return (
-              <div
-                key={slotIdx}
-                style={{
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
-                  borderRadius: 14, padding: 14, display: 'flex', flexDirection: 'column', gap: 10,
-                  position: 'relative',
-                }}
-              >
-                {/* Badge Slot */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.15)', padding: '2px 8px', borderRadius: 6 }}>
-                    สล็อต #{slotIdx + 1}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => handleRemoveGame(game.id)}
-                    title="นำออกจากเกมใหม่"
-                    style={{
-                      background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
-                      fontSize: 14, padding: 4,
-                    }}
-                  >
-                    <i className="fas fa-times" />
-                  </button>
-                </div>
-
-                {/* Game Info Row */}
-                <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                  <div style={{ width: 60, height: 80, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#111', position: 'relative' }}>
-                    {displayCover ? (
-                      <img src={convertImg(displayCover, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
-                        <i className="fas fa-image" />
-                      </div>
-                    )}
-                    {customCover && (
-                      <span style={{ position: 'absolute', bottom: 2, right: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 3px', borderRadius: 3 }}>
-                        ปกใหม่
-                      </span>
-                    )}
-                  </div>
-                  <div style={{ minWidth: 0, flex: 1 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {game.title || game.name}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                      {game.players ? `${game.players} คน` : ''} · {game.difficulty || ''}
-                    </div>
-                    {game.price !== undefined && (
-                      <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
-                        ฿{game.fullPrice ?? game.price}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Upload Custom Cover */}
-                <div style={{ marginTop: 'auto', paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <label style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    padding: '7px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)',
-                    color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-                    transition: 'background 0.15s',
-                  }}>
-                    <i className={`fas ${uploadingCoverFor === game.id ? 'fa-spinner fa-spin' : 'fa-camera'}`} />
-                    {uploadingCoverFor === game.id ? 'กำลังอัพโหลด...' : customCover ? 'เปลี่ยนรูปปกใหม่' : 'อัพโหลดปกเกมใหม่นี้'}
-                    <input type="file" accept="image/*" onChange={e => handleGameCoverUpload(game.id, e)} disabled={uploadingCoverFor === game.id} style={{ display: 'none' }} />
-                  </label>
-                  {customCover && (
-                    <button
-                      type="button"
-                      onClick={() => setPromo(p => {
-                        const nextCovers = { ...(p.customCovers || {}) }
-                        delete nextCovers[game.id]
-                        return { ...p, customCovers: nextCovers }
-                      })}
-                      style={{
-                        width: '100%', marginTop: 4, background: 'none', border: 'none',
-                        color: 'rgba(255,255,255,0.4)', fontSize: 10, cursor: 'pointer', padding: 2,
-                      }}
-                    >
-                      รีเซ็ตกลับเป็นรูปปกเดิม
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Picker Button / Drawer */}
-        {(promo.newGameIds || []).length < 3 && (
-          <div>
-            {!showGamePicker ? (
-              <button
-                type="button"
-                onClick={() => setShowGamePicker(true)}
-                style={{
-                  padding: '10px 18px', borderRadius: 8, background: 'rgba(251,191,36,0.15)',
-                  border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', fontSize: 13,
-                  fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
-                }}
-              >
-                <i className="fas fa-plus" /> เลือกเกมจากคลังมาเพิ่ม (เหลืออีก {3 - (promo.newGameIds || []).length} สล็อต)
-              </button>
-            ) : (
-              <div style={{
-                background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)',
-                borderRadius: 14, padding: 16,
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
-                    เลือกเกมจากคลัง ({filteredAvailableGames.length} เกมที่พร้อมเลือก)
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowGamePicker(false)}
-                    style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 14 }}
-                  >
-                    <i className="fas fa-times" /> ปิด
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  className="adm-input"
-                  placeholder="ค้นหาชื่อเกม..."
-                  value={gameSearch}
-                  onChange={e => setGameSearch(e.target.value)}
-                  style={{ marginBottom: 12 }}
-                />
-                <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {filteredAvailableGames.length === 0 ? (
-                    <div style={{ textAlign: 'center', color: '#888', padding: 20, fontSize: 12 }}>
-                      ไม่พบเกมที่ค้นหา
-                    </div>
-                  ) : (
-                    filteredAvailableGames.map(g => (
-                      <div
-                        key={g.id}
-                        onClick={() => handleAddGame(g.id)}
-                        style={{
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)',
-                          border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer',
-                          transition: 'background 0.12s',
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
-                        onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                          <div style={{ width: 32, height: 42, borderRadius: 4, overflow: 'hidden', background: '#222', flexShrink: 0 }}>
-                            {(g.image || g.coverUrl) && (
-                              <img src={convertImg(g.image || g.coverUrl, 100)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                            )}
-                          </div>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {g.title || g.name}
-                            </div>
-                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-                              {g.players} คน · {g.difficulty || ''}
-                            </div>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          style={{
-                            background: 'var(--crimson-500)', border: 'none', color: '#fff',
-                            padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer',
-                          }}
-                        >
-                          + เลือก
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ── CARD 3: ตัวอย่างแสดงผลจริง (Live Preview) ── */}
-      <div className="adm-card" style={{ background: '#060606', border: '1px solid rgba(255,255,255,0.08)' }}>
-        <div className="adm-card-title" style={{ marginBottom: 16 }}>
-          <i className="fas fa-eye" style={{ color: 'var(--crimson-500)' }} /> ตัวอย่างแสดงผลจริงที่หน้าหลัก (Editorial Live Preview)
-        </div>
-
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          border: '1px solid rgba(255,255,255,0.06)', borderRadius: 8, overflow: 'hidden',
-        }}>
-          {/* Left Preview: Promo */}
-          <div style={{
-            background: '#060606', borderRight: '1px solid rgba(255,255,255,0.06)',
-            padding: 24, display: 'flex', flexDirection: 'column', gap: 14, position: 'relative',
-          }}>
-            {promo.month && (
-              <span style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
-                {promo.month}
-              </span>
-            )}
-
-            <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', fontFamily: "'Bebas Neue', sans-serif", textTransform: 'uppercase', lineHeight: 0.95 }}>
-              {promo.heading || 'โปรเปิดตี้สืบคดี'}
-            </div>
-
-            {promo.discountAmount && (
-              <div style={{
-                display: 'inline-flex', alignItems: 'center', gap: 10,
-                padding: '8px 12px', background: 'rgba(198,36,25,0.08)',
-                border: '1px solid rgba(198,36,25,0.3)', borderRadius: 4, width: 'fit-content',
-              }}>
-                <span style={{ fontSize: 9.5, fontWeight: 800, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>ส่วนลด</span>
-                <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, color: '#fff' }}>{promo.discountAmount}</span>
-                <span style={{ fontSize: 9, fontWeight: 800, background: 'var(--crimson-500)', color: '#fff', padding: '2px 6px', borderRadius: 3 }}>
-                  {promo.discountType === 'person' ? 'ลดต่อคน' : 'ลดทั้งตี้'}
-                </span>
-              </div>
-            )}
 
             {promo.bannerUrl && (
-              <div style={{ borderRadius: 4, overflow: 'hidden', height: 130, background: '#111', border: '1px solid rgba(255,255,255,0.08)' }}>
-                <img src={convertImg(promo.bannerUrl, 500)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div style={{
+                position: 'relative', borderRadius: 12, overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.14)', aspectRatio: '16/9', maxHeight: 200, background: '#111',
+              }}>
+                <img
+                  src={convertImg(promo.bannerUrl, 600)}
+                  alt="Promo Banner Preview"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  onError={e => e.currentTarget.parentElement.style.display = 'none'}
+                />
               </div>
             )}
-
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6 }}>
-              {promo.description}
-            </div>
-
-            <button style={{
-              marginTop: 'auto', background: '#fff', border: 'none', color: '#111',
-              padding: '12px 24px', borderRadius: 4, fontSize: 11, fontWeight: 800, letterSpacing: '0.14em',
-              textTransform: 'uppercase', cursor: 'pointer', textAlign: 'center', width: 'fit-content',
-            }}>
-              {promo.buttonText || 'เริ่มเล่นเลย →'}
-            </button>
           </div>
 
-          {/* Right Preview: 3 New Games */}
-          <div style={{
-            background: '#09090f', padding: 24,
-            display: 'flex', flexDirection: 'column', gap: 14,
-          }}>
-            <div style={{ fontSize: 26, fontWeight: 900, color: '#fff', fontFamily: "'Bebas Neue', sans-serif", textTransform: 'uppercase', lineHeight: 0.95 }}>
-              3 คดีใหม่ล่าสุด
+          {/* Section 2: การตั้งค่าส่วนลด */}
+          <div className="adm-promo-section">
+            <div className="adm-promo-section-title">
+              <span>
+                <i className="fas fa-tags" style={{ color: '#fbbf24', marginRight: 8 }} />
+                การตั้งค่าส่วนลด (Discount Price & Type)
+              </span>
+              <span style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.12)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                ตั๋วส่วนลด
+              </span>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {selectedGamesList.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '24px 0', color: 'rgba(255,255,255,0.3)', fontSize: 12 }}>
-                  ยังไม่ได้เลือกเกมใหม่ (จะดึง 3 เกมล่าสุดจากคลังอัตโนมัติ)
+            <div className="adm-field-row" style={{ alignItems: 'flex-start' }}>
+              <div className="adm-field" style={{ flex: 1 }}>
+                <label className="adm-label">ราคาส่วนลด (ใส่จำนวนเงิน หรือ %)</label>
+                <input
+                  className="adm-input"
+                  type="text"
+                  value={promo.discountAmount || ''}
+                  placeholder="เช่น 100 บาท หรือ 15%"
+                  onChange={e => setPromo(p => ({ ...p, discountAmount: e.target.value }))}
+                />
+                <div className="adm-hint">ตัวอย่าง: "100", "50 บาท", "20%"</div>
+              </div>
+
+              <div className="adm-field" style={{ flex: 1.2 }}>
+                <label className="adm-label">ประเภทส่วนลด (ลดทั้งตี้ หรือ ลดต่อคน)</label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <button
+                    type="button"
+                    onClick={() => setPromo(p => ({ ...p, discountType: 'party' }))}
+                    className={`adm-promo-type-btn ${promo.discountType === 'party' ? 'active' : ''}`}
+                  >
+                    <i className="fas fa-users" style={{ color: promo.discountType === 'party' ? 'var(--crimson-500)' : 'inherit' }} />
+                    ลดทั้งตี้
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPromo(p => ({ ...p, discountType: 'person' }))}
+                    className={`adm-promo-type-btn ${promo.discountType === 'person' ? 'active' : ''}`}
+                  >
+                    <i className="fas fa-user" style={{ color: promo.discountType === 'person' ? 'var(--crimson-500)' : 'inherit' }} />
+                    ลดต่อคน
+                  </button>
                 </div>
-              ) : (
-                selectedGamesList.map(g => {
-                  const cover = promo.customCovers?.[g.id] || g.image || g.coverUrl
+                <div className="adm-hint">
+                  {promo.discountType === 'person' ? 'คำนวณหักลบรายคนตามจำนวนผู้เล่น' : 'หักลบยอดรวมของปาร์ตี้นั้นทันที'}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: เนื้อหาและข้อความแคมเปญ */}
+          <div className="adm-promo-section">
+            <div className="adm-promo-section-title">
+              <span>
+                <i className="fas fa-pen-nib" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
+                ข้อความโปรโมชั่นและปุ่มกด (Campaign Details)
+              </span>
+            </div>
+
+            <div className="adm-field-row">
+              {field('หัวข้อโปรโมชั่น', 'heading', 'เช่น โปรเปิดตี้สืบคดีสุดคุ้ม')}
+              {field('ช่วงเวลา / เดือน', 'month', 'เช่น ประจำเดือนนี้ หรือ จำกัดเวลา')}
+            </div>
+
+            {field('คำอธิบายโปรโมชั่น', 'description', 'รายละเอียดและเงื่อนไขโปรโมชั่น...', 'textarea')}
+
+            <div className="adm-field-row">
+              {field('ป้ายกำกับด้านบน (Badge Tag)', 'promoTag', 'SPECIAL PROMOTION')}
+              {field('ข้อความปุ่ม CTA', 'buttonText', 'จองรอบรับสิทธิ์เลย')}
+              <div className="adm-field">
+                <label className="adm-label">ปุ่มลิงก์ไปยังหน้า</label>
+                <select
+                  className="adm-input"
+                  value={promo.buttonLink || 'booking'}
+                  onChange={e => setPromo(p => ({ ...p, buttonLink: e.target.value }))}
+                >
+                  <option value="booking">หน้าจองห้อง / ปฏิทิน (Booking)</option>
+                  <option value="games">หน้าคลังเกม (Games)</option>
+                  <option value="party">หน้าร่วมตี้ (Party)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: จุดเด่นและแท็กพิเศษ */}
+          <div className="adm-promo-section">
+            <div className="adm-promo-section-title">
+              <span>
+                <i className="fas fa-check-circle" style={{ color: '#4ade80', marginRight: 8 }} />
+                ไฮไลท์และจุดเด่น 3 ข้อ (Pill Badges)
+              </span>
+            </div>
+            <div className="adm-field-row">
+              {field('จุดเด่นข้อที่ 1', 'badge1', 'สคริปต์ยอดฮิต')}
+              {field('จุดเด่นข้อที่ 2', 'badge2', 'ส่วนลดพิเศษ')}
+              {field('จุดเด่นข้อที่ 3', 'badge3', 'จำนวนจำกัด')}
+            </div>
+          </div>
+
+          {/* Section 5: สปอตไลท์ 3 คดีใหม่ล่าสุด */}
+          <div className="adm-promo-section">
+            <div className="adm-promo-section-title">
+              <span>
+                <i className="fas fa-sparkles" style={{ color: '#fbbf24', marginRight: 8 }} />
+                สปอตไลท์ 3 คดีใหม่ล่าสุด (Spotlight Slots)
+              </span>
+              <span style={{ fontSize: 11, background: 'rgba(251,191,36,0.12)', color: '#fbbf24', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
+                {(promo.newGameIds || []).length} / 3 สล็อต
+              </span>
+            </div>
+
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.6 }}>
+              เลือกสคริปต์ 3 เกมเพื่อนำเสนอเป็นไฮไลท์บนการ์ดขวาของหน้าหลัก สามารถอัพโหลดรูปปกเฉพาะสำหรับการโปรโมทได้ (หากเว้นว่าง ระบบจะดึง 3 เกมล่าสุดจากคลังอัตโนมัติ)
+            </div>
+
+            {/* Selected 3 Slots */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 18 }}>
+              {[0, 1, 2].map(slotIdx => {
+                const gameId = (promo.newGameIds || [])[slotIdx]
+                const game = gameId ? allGames.find(g => g.id === gameId) : null
+                const customCover = gameId ? promo.customCovers?.[gameId] : null
+                const displayCover = customCover || game?.image || game?.coverUrl
+
+                if (!game) {
                   return (
                     <div
-                      key={g.id}
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-                        borderRadius: 4, background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
-                      }}
+                      key={slotIdx}
+                      className="adm-promo-slot-empty"
+                      onClick={() => setShowGamePicker(true)}
                     >
-                      <div style={{ width: 38, height: 52, borderRadius: 3, overflow: 'hidden', background: '#222', flexShrink: 0, position: 'relative' }}>
-                        {cover && <img src={convertImg(cover, 200)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                        <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 7, fontWeight: 900, padding: '1px 3px', borderRadius: 2 }}>
-                          NEW
-                        </span>
+                      <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>
+                        <i className="fas fa-plus" />
                       </div>
-                      <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {g.title || g.name}
-                        </div>
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                          {g.players} คน · {g.difficulty}
-                        </div>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>
+                        สล็อต #{slotIdx + 1} (ว่าง)
                       </div>
-                      <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 18, color: '#fff' }}>
-                        ฿{g.fullPrice ?? g.price}
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                        คลิกเพื่อเลือกเกมจากคลัง
                       </div>
                     </div>
                   )
-                })
-              )}
+                }
+
+                return (
+                  <div key={slotIdx} className="adm-promo-slot-card">
+                    {/* Badge Slot Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.15)', padding: '2px 8px', borderRadius: 6 }}>
+                        สล็อต #{slotIdx + 1}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGame(game.id)}
+                        title="นำออกจากเกมใหม่"
+                        style={{
+                          background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
+                          fontSize: 14, padding: 4,
+                        }}
+                      >
+                        <i className="fas fa-times" />
+                      </button>
+                    </div>
+
+                    {/* Game Info Row */}
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                      <div style={{ width: 56, height: 76, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#111', position: 'relative' }}>
+                        {displayCover ? (
+                          <img src={convertImg(displayCover, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#555' }}>
+                            <i className="fas fa-image" />
+                          </div>
+                        )}
+                        {customCover && (
+                          <span style={{ position: 'absolute', bottom: 2, right: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 4px', borderRadius: 3 }}>
+                            ปกพิเศษ
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {game.title || game.name}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                          {game.players ? `${game.players} คน` : ''} · {game.difficulty || ''}
+                        </div>
+                        {game.price !== undefined && (
+                          <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+                            ฿{game.fullPrice ?? game.price}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Upload Custom Cover */}
+                    <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <label style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        padding: '7px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)',
+                        color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        transition: 'background 0.15s',
+                      }}>
+                        <i className={`fas ${uploadingCoverFor === game.id ? 'fa-spinner fa-spin' : 'fa-camera'}`} />
+                        {uploadingCoverFor === game.id ? 'กำลังอัพโหลด...' : customCover ? 'เปลี่ยนรูปปกใหม่' : 'อัพโหลดปกเฉพาะเกมนี้'}
+                        <input type="file" accept="image/*" onChange={e => handleGameCoverUpload(game.id, e)} disabled={uploadingCoverFor === game.id} style={{ display: 'none' }} />
+                      </label>
+                      {customCover && (
+                        <button
+                          type="button"
+                          onClick={() => setPromo(p => {
+                            const nextCovers = { ...(p.customCovers || {}) }
+                            delete nextCovers[game.id]
+                            return { ...p, customCovers: nextCovers }
+                          })}
+                          style={{
+                            width: '100%', marginTop: 4, background: 'none', border: 'none',
+                            color: 'rgba(255,255,255,0.45)', fontSize: 10, cursor: 'pointer', padding: 2,
+                          }}
+                        >
+                          รีเซ็ตกลับเป็นรูปปกเดิม
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Picker Drawer */}
+            {(promo.newGameIds || []).length < 3 && (
+              <div>
+                {!showGamePicker ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowGamePicker(true)}
+                    style={{
+                      padding: '10px 18px', borderRadius: 8, background: 'rgba(251,191,36,0.15)',
+                      border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', fontSize: 13,
+                      fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+                    }}
+                  >
+                    <i className="fas fa-plus" /> เลือกเกมจากคลังมาเพิ่ม (เหลืออีก {3 - (promo.newGameIds || []).length} สล็อต)
+                  </button>
+                ) : (
+                  <div style={{
+                    background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 14, padding: 16,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                        เลือกเกมจากคลัง ({filteredAvailableGames.length} เกมที่พร้อมเลือก)
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowGamePicker(false)}
+                        style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 14 }}
+                      >
+                        <i className="fas fa-times" /> ปิด
+                      </button>
+                    </div>
+                    <input
+                      type="text"
+                      className="adm-input"
+                      placeholder="ค้นหาชื่อเกม..."
+                      value={gameSearch}
+                      onChange={e => setGameSearch(e.target.value)}
+                      style={{ marginBottom: 12 }}
+                    />
+                    <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {filteredAvailableGames.length === 0 ? (
+                        <div style={{ textAlign: 'center', color: '#888', padding: 20, fontSize: 12 }}>
+                          ไม่พบเกมที่ค้นหา
+                        </div>
+                      ) : (
+                        filteredAvailableGames.map(g => (
+                          <div
+                            key={g.id}
+                            onClick={() => handleAddGame(g.id)}
+                            style={{
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '8px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.06)', cursor: 'pointer',
+                              transition: 'background 0.12s',
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.03)'}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                              <div style={{ width: 32, height: 42, borderRadius: 4, overflow: 'hidden', background: '#222', flexShrink: 0 }}>
+                                {(g.image || g.coverUrl) && (
+                                  <img src={convertImg(g.image || g.coverUrl, 100)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                )}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {g.title || g.name}
+                                </div>
+                                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                                  {g.players} คน · {g.difficulty || ''}
+                                </div>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              style={{
+                                background: 'var(--crimson-500)', border: 'none', color: '#fff',
+                                padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                              }}
+                            >
+                              + เลือก
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+        </div>
+
+        {/* ── RIGHT: Sticky Editorial Live Preview ── */}
+        <div className="adm-promo-preview-sticky">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <i className="fas fa-desktop" style={{ color: 'var(--crimson-500)', fontSize: 13 }} />
+              <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                ตัวอย่างแสดงผลจริง (Live Preview)
+              </span>
+            </div>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 10, fontWeight: 800, color: '#4ade80' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', boxShadow: '0 0 6px #22c55e' }} />
+              LIVE UPDATE
             </div>
           </div>
+
+          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 16 }}>
+            จำลองหน้าตาที่ลูกค้าเห็นบนหน้าหลักของร้านแบบ 1:1
+          </div>
+
+          {/* Miniature replica of Homepage split section */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Promo Dossier Card */}
+            <div style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)',
+              borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)',
+              padding: '20px', position: 'relative', overflow: 'hidden',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+            }}>
+              {/* Subtle top red bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--crimson-500), transparent 70%)' }} />
+
+              {/* Eyebrow Pill */}
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(198,36,25,0.12)', border: '1px solid rgba(198,36,25,0.3)',
+                color: 'var(--crimson-400)', fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
+                textTransform: 'uppercase', marginBottom: 12, width: 'fit-content',
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--crimson-500)', boxShadow: '0 0 6px var(--crimson-500)', display: 'inline-block' }} />
+                <span>PROMOTION · {promo.month || 'สิทธิพิเศษประจำเดือน'}</span>
+              </div>
+
+              {/* Heading */}
+              <div style={{
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, lineHeight: 0.95,
+                textTransform: 'uppercase', color: '#fff', marginBottom: 12,
+              }}>
+                {promo.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
+              </div>
+
+              {/* Discount Ticket / Voucher Stamp */}
+              {promo.discountAmount && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
+                  padding: '10px 14px', background: 'linear-gradient(135deg, rgba(198,36,25,0.16) 0%, rgba(198,36,25,0.05) 100%)',
+                  border: '1px solid rgba(198,36,25,0.32)', borderRadius: 12, marginBottom: 14,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(198,36,25,0.22)', color: 'var(--crimson-400)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 }}>
+                      <i className="fas fa-ticket-alt" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+                        สิทธิ์ส่วนลดพิเศษ
+                      </div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                        {promo.discountType === 'person' ? 'ลดต่อคนทันทีในรอบเล่น' : 'ส่วนลดรอบเล่นทั้งปาร์ตี้'}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--crimson-400)' }}>฿</span>
+                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 24, lineHeight: 1, color: '#fff' }}>
+                      {promo.discountAmount}
+                    </span>
+                    <span style={{
+                      fontSize: 8.5, fontWeight: 800, padding: '3px 7px', borderRadius: 999,
+                      background: 'var(--crimson-500)', color: '#fff', textTransform: 'uppercase',
+                    }}>
+                      {promo.discountType === 'person' ? 'ลดต่อคน' : 'ลดทั้งตี้'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Banner Image Preview */}
+              {promo.bannerUrl && (
+                <div style={{
+                  borderRadius: 12, overflow: 'hidden', marginBottom: 14,
+                  border: '1px solid rgba(255,255,255,0.12)', aspectRatio: '16/9', maxHeight: 160, background: '#111',
+                }}>
+                  <img
+                    src={convertImg(promo.bannerUrl, 600)}
+                    alt=""
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                </div>
+              )}
+
+              {/* Description */}
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 14 }}>
+                {promo.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน...'}
+              </div>
+
+              {/* Feature Tags */}
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                {[promo.badge1, promo.badge2, promo.badge3].filter(Boolean).map((b, i) => (
+                  <span key={i} style={{
+                    fontSize: 9.5, fontWeight: 700, padding: '4px 9px', borderRadius: 12,
+                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.85)',
+                  }}>
+                    {b}
+                  </span>
+                ))}
+              </div>
+
+              {/* Action Button */}
+              <div style={{
+                background: 'linear-gradient(135deg, var(--crimson-500) 0%, var(--crimson-600) 100%)',
+                color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
+                textTransform: 'uppercase', padding: '10px 18px', borderRadius: 8,
+                display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content',
+                boxShadow: '0 4px 16px rgba(198,36,25,0.4)',
+              }}>
+                <span>{promo.buttonText || 'จองรอบรับสิทธิ์เลย'}</span>
+                <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
+              </div>
+            </div>
+
+            {/* New Games Spotlight Preview Card */}
+            <div style={{
+              background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)',
+              borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)',
+              padding: '20px', position: 'relative', overflow: 'hidden',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+            }}>
+              {/* Subtle top gold bar */}
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #fbbf24, transparent 70%)' }} />
+
+              {/* Eyebrow Pill */}
+              <div style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999,
+                background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)',
+                color: '#fbbf24', fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
+                textTransform: 'uppercase', marginBottom: 12, width: 'fit-content',
+              }}>
+                <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#fbbf24', boxShadow: '0 0 6px #fbbf24', display: 'inline-block' }} />
+                <span>NEW RELEASES · สคริปต์มาใหม่ล่าสุด</span>
+              </div>
+
+              {/* Heading */}
+              <div style={{
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, lineHeight: 0.95,
+                textTransform: 'uppercase', color: '#fff', marginBottom: 6,
+              }}>
+                3 คดีใหม่ล่าสุด
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 14 }}>
+                คัดสรรสคริปต์ส่งตรงสู่เลานจ์ พร้อมเปิดแฟ้มสืบสวนทุกสัปดาห์
+              </div>
+
+              {/* Game Rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {selectedGamesList.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '16px 0', color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
+                    ยังไม่ได้เลือกเกมใหม่ (ระบบจะดึง 3 เกมล่าสุดจากคลังอัตโนมัติ)
+                  </div>
+                ) : (
+                  selectedGamesList.map(g => {
+                    const cover = promo.customCovers?.[g.id] || g.image || g.coverUrl
+                    return (
+                      <div
+                        key={g.id}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                          borderRadius: 8, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)',
+                        }}
+                      >
+                        <div style={{ width: 36, height: 48, borderRadius: 4, overflow: 'hidden', background: '#222', flexShrink: 0, position: 'relative' }}>
+                          {cover && <img src={convertImg(cover, 200)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                          <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 7, fontWeight: 900, padding: '1px 3px', borderRadius: 2 }}>
+                            NEW
+                          </span>
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {g.title || g.name}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                            {g.players} คน · {g.difficulty}
+                          </div>
+                        </div>
+                        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, color: '#fff' }}>
+                          ฿{g.fullPrice ?? g.price}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+
+          </div>
         </div>
+
       </div>
 
-      {/* Save Button */}
+      {/* ── Bottom Save Action Bar ── */}
       <button
         className="adm-btn-red"
-        style={{ width: '100%', padding: '15px', fontSize: '15px', fontWeight: 800, borderRadius: 12 }}
+        style={{ width: '100%', padding: '15px', fontSize: '15px', fontWeight: 800, borderRadius: 12, marginTop: 10 }}
         onClick={save}
         disabled={saving}
       >
         {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกโปรโมชั่นและเกมใหม่</>}
       </button>
+
     </div>
   )
 }
