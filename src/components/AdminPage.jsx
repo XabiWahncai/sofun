@@ -2552,12 +2552,15 @@ function MenuEditModal({ item, onClose, showToast }) {
   }
 
   const CATEGORY_PRESETS = [
-    'อาหาร',
     'ของว่าง',
+    'เครื่องดื่มแช่เย็น',
+    'เครื่องดื่มชง',
+    'ม็อกเทล',
+    'กาแฟ',
     'ของหวาน',
-    'เครื่องดื่ม',
+    'อาหารจานเดียว',
+    'กับข้าว',
     'แอลกอฮอล์',
-    'เพิ่มเติม',
   ]
 
   return (
@@ -3200,15 +3203,31 @@ function MenuTab({ showToast }) {
     showToast('ลบแล้ว')
   }
 
-  const MENU_CATEGORY_ORDER = ['อาหาร', 'ของว่าง', 'ของหวาน', 'เครื่องดื่ม', 'แอลกอฮอล์', 'เพิ่มเติม']
+  const MENU_CATEGORY_ORDER = [
+    'ของว่าง',
+    'เครื่องดื่มแช่เย็น',
+    'เครื่องดื่มชง',
+    'ม็อกเทล',
+    'กาแฟ',
+    'ของหวาน',
+    'อาหารจานเดียว',
+    'กับข้าว',
+    'แอลกอฮอล์',
+    'อาหาร',
+    'เครื่องดื่ม',
+    'เพิ่มเติม',
+  ]
 
   const sortMenuCategories = (cats) => {
+    const getCatRank = (c) => {
+      const norm = c === 'อาหารจานเดี่ยว' ? 'อาหารจานเดียว' : c
+      const idx = MENU_CATEGORY_ORDER.indexOf(norm)
+      return idx !== -1 ? idx : 999
+    }
     return [...cats].sort((a, b) => {
-      const idxA = MENU_CATEGORY_ORDER.indexOf(a)
-      const idxB = MENU_CATEGORY_ORDER.indexOf(b)
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB
-      if (idxA !== -1) return -1
-      if (idxB !== -1) return 1
+      const rankA = getCatRank(a)
+      const rankB = getCatRank(b)
+      if (rankA !== rankB) return rankA - rankB
       return a.localeCompare(b, 'th')
     })
   }
@@ -3293,18 +3312,16 @@ function MenuTab({ showToast }) {
       }
 
       // 'default': Category then Name
-      const idxA = MENU_CATEGORY_ORDER.indexOf(catA)
-      const idxB = MENU_CATEGORY_ORDER.indexOf(catB)
-      if (idxA !== -1 && idxB !== -1) {
-        if (idxA !== idxB) return idxA - idxB
-      } else if (idxA !== -1) {
-        return -1
-      } else if (idxB !== -1) {
-        return 1
-      } else {
-        const catComp = catA.localeCompare(catB, 'th')
-        if (catComp !== 0) return catComp
+      const getCatRank = (c) => {
+        const norm = c === 'อาหารจานเดี่ยว' ? 'อาหารจานเดียว' : c
+        const idx = MENU_CATEGORY_ORDER.indexOf(norm)
+        return idx !== -1 ? idx : 999
       }
+      const rankA = getCatRank(catA)
+      const rankB = getCatRank(catB)
+      if (rankA !== rankB) return rankA - rankB
+      const catComp = catA.localeCompare(catB, 'th')
+      if (catComp !== 0) return catComp
       return nameA.localeCompare(nameB, 'th')
     })
 

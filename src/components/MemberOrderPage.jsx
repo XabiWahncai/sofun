@@ -745,15 +745,31 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
     return () => obs.disconnect()
   }, [cart.length])
 
-  const MENU_CATEGORY_ORDER = ['อาหาร', 'ของว่าง', 'ของหวาน', 'เครื่องดื่ม', 'แอลกอฮอล์', 'เพิ่มเติม']
+  const MENU_CATEGORY_ORDER = [
+    'ของว่าง',
+    'เครื่องดื่มแช่เย็น',
+    'เครื่องดื่มชง',
+    'ม็อกเทล',
+    'กาแฟ',
+    'ของหวาน',
+    'อาหารจานเดียว',
+    'กับข้าว',
+    'แอลกอฮอล์',
+    'อาหาร',
+    'เครื่องดื่ม',
+    'เพิ่มเติม',
+  ]
 
   const sortMenuCategories = (cats) => {
+    const getCatRank = (c) => {
+      const norm = c === 'อาหารจานเดี่ยว' ? 'อาหารจานเดียว' : c
+      const idx = MENU_CATEGORY_ORDER.indexOf(norm)
+      return idx !== -1 ? idx : 999
+    }
     return [...cats].sort((a, b) => {
-      const idxA = MENU_CATEGORY_ORDER.indexOf(a)
-      const idxB = MENU_CATEGORY_ORDER.indexOf(b)
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB
-      if (idxA !== -1) return -1
-      if (idxB !== -1) return 1
+      const rankA = getCatRank(a)
+      const rankB = getCatRank(b)
+      if (rankA !== rankB) return rankA - rankB
       return a.localeCompare(b, 'th')
     })
   }
