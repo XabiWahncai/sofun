@@ -2,7 +2,19 @@ import { useState } from 'react'
 import { useLang } from '../LangContext'
 import logoImg from '../assets/Logo.jpg'
 
-export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout, liffLoading, hasActiveOrder, isAdmin }) {
+export default function Nav({
+  currentPage,
+  showPage,
+  lineUser,
+  onLogin,
+  onLogout,
+  liffLoading,
+  hasActiveOrder,
+  isAdmin,
+  pendingOrdersCount = 0,
+  soundMuted = false,
+  onToggleSound,
+}) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { lang, toggle, t } = useLang()
   const effectiveAdmin = isAdmin !== undefined ? isAdmin : lineUser?.role === 'admin'
@@ -100,8 +112,19 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
 
           {effectiveAdmin && (
             <>
-              <button className="nav-pos-btn" onClick={() => handleNav('pos')}>
-                <i className="fas fa-cash-register" /> POS
+              <button className="nav-pos-btn" onClick={() => handleNav('pos')} title="ไปที่ระบบ POS">
+                <i className={`fas fa-cash-register${pendingOrdersCount > 0 && !soundMuted ? ' fa-shake' : ''}`} /> POS
+                {pendingOrdersCount > 0 && (
+                  <span className="nav-pos-badge">{pendingOrdersCount}</span>
+                )}
+              </button>
+              <button
+                className={`pos-sound-header-btn${soundMuted ? ' muted' : (pendingOrdersCount > 0 ? ' sounding' : '')}`}
+                onClick={(e) => { e.stopPropagation(); onToggleSound && onToggleSound() }}
+                title={soundMuted ? 'คลิกเพื่อเปิดเสียงแจ้งเตือนออเดอร์' : 'เสียงเตือนเปิดอยู่ (ดังทุก 5 วินาทีเมื่อมีออเดอร์ใหม่)'}
+              >
+                <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}${pendingOrdersCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
+                <span>{soundMuted ? 'ปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
               </button>
               <button className="nav-admin-btn" onClick={() => handleNav('random')} style={{ background: 'rgba(200,160,80,0.15)', borderColor: '#c8a050', color: '#c8a050' }}>
                 <i className="fas fa-dharmachakra" /> วงล้อ
@@ -115,6 +138,18 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
 
         {/* mobile top-right: login or avatar */}
         <div className="nav-mobile-right">
+          {effectiveAdmin && (
+            <button
+              className={`pos-sound-header-btn${soundMuted ? ' muted' : (pendingOrdersCount > 0 ? ' sounding' : '')}`}
+              onClick={(e) => { e.stopPropagation(); onToggleSound && onToggleSound() }}
+              title={soundMuted ? 'คลิกเพื่อเปิดเสียงแจ้งเตือนออเดอร์' : 'เสียงเตือนเปิดอยู่ (ดังทุก 5 วินาทีเมื่อมีออเดอร์ใหม่)'}
+              style={{ marginRight: 6 }}
+            >
+              <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}${pendingOrdersCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
+              <span>{soundMuted ? 'ปิดเสียง' : '5วิ'}</span>
+            </button>
+          )}
+
           {/* mobile lang toggle */}
           <button className="lang-toggle-btn lang-toggle-mobile" onClick={toggle}>
             {lang === 'th' ? 'EN' : lang === 'en' ? '中' : 'TH'}
@@ -200,8 +235,11 @@ export default function Nav({ currentPage, showPage, lineUser, onLogin, onLogout
         )}
         {effectiveAdmin && (
           <button className={`bottom-nav-item${currentPage === 'pos' ? ' active' : ''}`} onClick={() => handleNav('pos')}>
-            <i className="fas fa-cash-register" />
+            <i className={`fas fa-cash-register${pendingOrdersCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
             <span>POS</span>
+            {pendingOrdersCount > 0 && (
+              <span className="bottom-nav-badge">{pendingOrdersCount}</span>
+            )}
           </button>
         )}
         {lineUser ? (

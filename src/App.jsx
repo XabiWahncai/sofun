@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc } from 'firebase/firestore'
+import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc, orderBy } from 'firebase/firestore'
 import { getToken, onMessage } from 'firebase/messaging'
 import { onAuthStateChanged } from 'firebase/auth'
 
 import { db, auth, getMessagingInstance, VAPID_KEY } from './firebase'
+import { playOrderAlertSound, unlockAudioContext } from './utils/soundAlert'
 import liff from '@line/liff'
 import Nav from './components/Nav'
 import ErrorBoundary from './components/ErrorBoundary'
@@ -354,6 +355,92 @@ export default function App() {
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 3000)
   }, [])
 
+  // ── Global POS sound alert state and controls ─────────────────────
+  const [posSoundMuted, setPosSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem('sofun_pos_sound_muted') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [globalPendingOrdersCount, setGlobalPendingOrdersCount] = useState(0)
+  const soundTimerRef = useRef(null)
+
+  // Unlock Web Audio API on first user interaction anywhere in the app
+  useEffect(() => {
+    const unlock = () => unlockAudioContext()
+    window.addEventListener('click', unlock, { passive: true })
+    window.addEventListener('touchstart', unlock, { passive: true })
+    window.addEventListener('keydown', unlock, { passive: true })
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  // Toggle POS sound mute globally
+  const togglePosSoundMute = useCallback(() => {
+    setPosSoundMuted(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem('sofun_pos_sound_muted', String(next))
+      } catch {}
+      if (!next) {
+        playOrderAlertSound()
+        showToast('เปิดเสียงแจ้งเตือนออเดอร์แล้ว')
+      } else {
+        showToast('ปิดเสียงแจ้งเตือนแล้ว')
+      }
+      return next
+    })
+  }, [showToast])
+
+  // Listen for pending member food orders globally across all orders
+  useEffect(() => {
+    if (!isEffectiveAdmin) {
+      setGlobalPendingOrdersCount(0)
+      return
+    }
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'))
+    return onSnapshot(q, snap => {
+      const start = new Date()
+      start.setHours(0, 0, 0, 0)
+      const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      const activeOrTodayOrders = orders.filter(o => o.createdAt?.toDate?.() >= start || o.status === 'active')
+      const totalPending = activeOrTodayOrders.reduce((sum, o) => {
+        const count = Array.isArray(o.memberFoodQueue) ? o.memberFoodQueue.length : 0
+        return sum + count
+      }, 0)
+      setGlobalPendingOrdersCount(totalPending)
+    }, (err) => console.warn('Global orders queue sync error:', err))
+  }, [isEffectiveAdmin])
+
+  // 5-second recurring chime when pending orders exist and sound not muted
+  useEffect(() => {
+    if (!isEffectiveAdmin || globalPendingOrdersCount === 0 || posSoundMuted) {
+      if (soundTimerRef.current) {
+        clearInterval(soundTimerRef.current)
+        soundTimerRef.current = null
+      }
+      return
+    }
+
+    if (!soundTimerRef.current) {
+      playOrderAlertSound()
+      soundTimerRef.current = setInterval(() => {
+        playOrderAlertSound()
+      }, 5000)
+    }
+
+    return () => {
+      if (soundTimerRef.current) {
+        clearInterval(soundTimerRef.current)
+        soundTimerRef.current = null
+      }
+    }
+  }, [isEffectiveAdmin, globalPendingOrdersCount, posSoundMuted])
+
   const showPage = useCallback((page) => {
     setPrevPage(p => p)
     setCurrentPage(page)
@@ -380,6 +467,9 @@ export default function App() {
           liffLoading={liffLoading}
           hasActiveOrder={!!activeMemberOrder}
           isAdmin={isEffectiveAdmin}
+          pendingOrdersCount={globalPendingOrdersCount}
+          soundMuted={posSoundMuted}
+          onToggleSound={togglePosSoundMute}
         />
       )}
 
@@ -407,6 +497,8 @@ export default function App() {
               onActiveIdChange={setPosActiveId}
               onScanConsumed={() => setScanUid(null)}
               onClose={() => { setScanUid(null); showPage('adminscan') }}
+              soundMuted={posSoundMuted}
+              onToggleSoundMute={togglePosSoundMute}
             />
           ) : (
             <div style={{
@@ -534,6 +626,29 @@ export default function App() {
         const tier = ['golden', 'silver', 'bronze', 'sadness', 'hunger', 'billionaire', 'charity'].find(t => achs.includes(t))
         return tier ? <TierEffect tier={tier} /> : null
       })()}
+
+      {isEffectiveAdmin && currentPage !== 'pos' && globalPendingOrdersCount > 0 && (
+        <div className="pos-global-alert-bar" onClick={() => showPage('pos')} role="button" tabIndex={0}>
+          <div className="pos-global-alert-left">
+            <i className="fas fa-bell fa-shake" />
+            <span>มีออเดอร์ใหม่รอดำเนินการ: <strong>{globalPendingOrdersCount} รายการ</strong></span>
+          </div>
+          <div className="pos-global-alert-actions">
+            <button
+              type="button"
+              className={`pos-sound-header-btn${posSoundMuted ? ' muted' : ' sounding'}`}
+              onClick={(e) => { e.stopPropagation(); togglePosSoundMute() }}
+              title={posSoundMuted ? 'คลิกเพื่อเปิดเสียงแจ้งเตือนออเดอร์' : 'เสียงเตือนเปิดอยู่ (ดังทุก 5 วินาทีเมื่อมีออเดอร์ใหม่)'}
+            >
+              <i className={`fas fa-${posSoundMuted ? 'volume-mute' : 'volume-up'}`} />
+              <span>{posSoundMuted ? 'ปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
+            </button>
+            <button type="button" className="pos-global-alert-go-btn" onClick={() => showPage('pos')}>
+              เปิด POS <i className="fas fa-arrow-right" />
+            </button>
+          </div>
+        </div>
+      )}
 
       <Toast msg={toast.msg} type={toast.type} visible={toast.visible} />
     </>

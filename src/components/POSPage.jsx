@@ -8,6 +8,7 @@ import { Html5Qrcode } from 'html5-qrcode'
 import QRScanner from './QRScanner'
 import PaymentModal from './PaymentModal'
 import { buildKitchenTicketHTML } from '../constants/receipt'
+import { playOrderAlertSound } from '../utils/soundAlert'
 
 // ── Admin slip verifier (camera scan QR → EasySlip v2) ──────────────────────
 function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, onClose, onVerified }) {
@@ -263,53 +264,11 @@ export const newPOSSession = () => ({
   discount: 0,
 })
 
-// ── Web Audio API sound alert (plays pleasant chime every 5s on customer order) ──
-const playOrderAlertSound = () => {
-  try {
-    const AudioCtx = window.AudioContext || window.webkitAudioContext
-    if (!AudioCtx) return
-    if (!window._posAudioCtx) {
-      window._posAudioCtx = new AudioCtx()
-    }
-    const ctx = window._posAudioCtx
-    if (ctx.state === 'suspended') {
-      ctx.resume().catch(() => {})
-    }
-
-    const now = ctx.currentTime
-    // 4-tone ascending bell chime: C5 (523.25) -> E5 (659.25) -> G5 (783.99) -> C6 (1046.50)
-    const notes = [
-      { f: 523.25, t: 0,    d: 0.14 },
-      { f: 659.25, t: 0.11, d: 0.14 },
-      { f: 783.99, t: 0.22, d: 0.16 },
-      { f: 1046.50, t: 0.35, d: 0.40 },
-    ]
-
-    notes.forEach(({ f, t, d }) => {
-      const osc = ctx.createOscillator()
-      const gain = ctx.createGain()
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(f, now + t)
-
-      gain.gain.setValueAtTime(0.001, now + t)
-      gain.gain.linearRampToValueAtTime(0.28, now + t + 0.02)
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + t + d)
-
-      osc.connect(gain)
-      gain.connect(ctx.destination)
-
-      osc.start(now + t)
-      osc.stop(now + t + d + 0.05)
-    })
-  } catch (e) {
-    console.warn('Audio alert error:', e)
-  }
-}
-
 export default function POSPage({
   initialUid, adminUser, allGames, showToast, onClose,
   sessions, activeId,
   onSessionsChange, onActiveIdChange, onScanConsumed,
+  soundMuted: propSoundMuted, onToggleSoundMute: propToggleSoundMute,
 }) {
   const [menuItems, setMenuItems] = useState([])
   const [adminMembers, setAdminMembers] = useState([])
@@ -375,7 +334,7 @@ export default function POSPage({
         // Without the flag, browser will show print dialog that admin must confirm.
         printHtmlLocal(data.html, data.printWidth || '80mm')
         if (!isFirstSnap) {
-          showToast(`🖨 ปริ้นออเดอร์: ${data.label || 'ไม่ระบุ'}`)
+          showToast(`ปริ้นออเดอร์: ${data.label || 'ไม่ระบุ'}`)
         }
         // Delete after delay so content has time to render into print pipeline
         setTimeout(() => { deleteDoc(doc(db, 'print_jobs', d.id)).catch(() => {}) }, 8000)
@@ -531,25 +490,30 @@ export default function POSPage({
     }
   }, [])
 
-  const [soundMuted, setSoundMuted] = useState(() => {
+  const [localSoundMuted, setLocalSoundMuted] = useState(() => {
     try {
       return localStorage.getItem('sofun_pos_sound_muted') === 'true'
     } catch {
       return false
     }
   })
+  const soundMuted = propSoundMuted !== undefined ? propSoundMuted : localSoundMuted
 
   const toggleSoundMute = () => {
-    setSoundMuted(prev => {
+    if (propToggleSoundMute) {
+      propToggleSoundMute()
+      return
+    }
+    setLocalSoundMuted(prev => {
       const next = !prev
       try {
         localStorage.setItem('sofun_pos_sound_muted', String(next))
       } catch {}
       if (!next) {
         playOrderAlertSound()
-        showToast('เปิดเสียงแจ้งเตือนออเดอร์แล้ว 🔔')
+        showToast('เปิดเสียงแจ้งเตือนออเดอร์แล้ว')
       } else {
-        showToast('ปิดเสียงแจ้งเตือนแล้ว 🔇')
+        showToast('ปิดเสียงแจ้งเตือนแล้ว')
       }
       return next
     })
@@ -568,8 +532,9 @@ export default function POSPage({
 
   const soundTimerRef = useRef(null)
 
-  // Loop alert chime every 5 seconds while there are pending orders
+  // Loop alert chime every 5 seconds while there are pending orders (fallback if not managed globally)
   useEffect(() => {
+    if (propSoundMuted !== undefined) return // Handled globally by App.jsx
     if (totalPendingQueueCount === 0 || soundMuted) {
       if (soundTimerRef.current) {
         clearInterval(soundTimerRef.current)
@@ -585,7 +550,7 @@ export default function POSPage({
         playOrderAlertSound()
       }, 5000)
     }
-  }, [totalPendingQueueCount, soundMuted])
+  }, [totalPendingQueueCount, soundMuted, propSoundMuted])
 
   // Cleanup sound interval on unmount
   useEffect(() => {
@@ -3431,7 +3396,7 @@ export default function POSPage({
                           </div>
                           {m.character ? (
                             <div style={{ fontSize: 10.5, color: '#c62419', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
-                              🎭 {m.character}
+                              <i className="fas fa-mask" style={{ marginRight: 4 }} />{m.character}
                             </div>
                           ) : (
                             <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.4)', marginTop: 2 }}>
