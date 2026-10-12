@@ -49,7 +49,7 @@ export default function Nav({
           <button className={`nav-btn${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
             <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />จอง
           </button>
-          {lineUser && !effectiveAdmin && (
+          {lineUser && !effectiveAdmin ? (
             hasActiveOrder ? (
               <button className={`nav-btn${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
                 <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />สั่งอาหาร
@@ -59,7 +59,18 @@ export default function Nav({
                 <i className="fas fa-qrcode" style={{ marginRight: '5px', fontSize: '11px' }} />QR
               </button>
             )
-          )}
+          ) : effectiveAdmin ? (
+            <>
+              {hasActiveOrder && (
+                <button className={`nav-btn${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
+                  <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />สั่งอาหาร
+                </button>
+              )}
+              <button className={`nav-btn${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
+                <i className="fas fa-qrcode" style={{ marginRight: '5px', fontSize: '11px' }} />QR
+              </button>
+            </>
+          ) : null}
 
           {/* Language toggle */}
           <button className="lang-toggle-btn" onClick={toggle} title="Switch language">
@@ -89,7 +100,10 @@ export default function Nav({
                   <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                     <i className="fas fa-users" /> {t('nav', 'myParty')}
                   </button>
-                  {hasActiveOrder && !effectiveAdmin && (
+                  <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
+                    <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
+                  </button>
+                  {hasActiveOrder && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('order')}>
                       <i className="fas fa-utensils" /> สั่งอาหาร
                     </button>
@@ -170,7 +184,10 @@ export default function Nav({
                   <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                     <i className="fas fa-users" /> {t('nav', 'myParty')}
                   </button>
-                  {hasActiveOrder && !effectiveAdmin && (
+                  <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
+                    <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
+                  </button>
+                  {hasActiveOrder && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('order')}>
                       <i className="fas fa-utensils" /> สั่งอาหาร
                     </button>
@@ -220,7 +237,7 @@ export default function Nav({
           <i className="fas fa-calendar-check" />
           <span>จอง</span>
         </button>
-        {lineUser && !effectiveAdmin && (
+        {lineUser && !effectiveAdmin ? (
           hasActiveOrder ? (
             <button className={`bottom-nav-item bottom-nav-order${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
               <i className="fas fa-utensils" />
@@ -232,16 +249,21 @@ export default function Nav({
               <span>QR</span>
             </button>
           )
-        )}
-        {effectiveAdmin && (
-          <button className={`bottom-nav-item${currentPage === 'pos' ? ' active' : ''}`} onClick={() => handleNav('pos')}>
-            <i className={`fas fa-cash-register${pendingOrdersCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
-            <span>POS</span>
-            {pendingOrdersCount > 0 && (
-              <span className="bottom-nav-badge">{pendingOrdersCount}</span>
-            )}
-          </button>
-        )}
+        ) : effectiveAdmin ? (
+          <>
+            <button className={`bottom-nav-item${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
+              <i className="fas fa-qrcode" />
+              <span>QR</span>
+            </button>
+            <button className={`bottom-nav-item${currentPage === 'pos' ? ' active' : ''}`} onClick={() => handleNav('pos')}>
+              <i className={`fas fa-cash-register${pendingOrdersCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
+              <span>POS</span>
+              {pendingOrdersCount > 0 && (
+                <span className="bottom-nav-badge">{pendingOrdersCount}</span>
+              )}
+            </button>
+          </>
+        ) : null}
         {lineUser ? (
           <button className="bottom-nav-item bottom-nav-profile" onClick={() => handleNav('profile')}>
             {lineUser.avatar
