@@ -41,10 +41,47 @@ const convertImageUrl = (url) => {
 }
 
 /* ── Filter constants ────────────────────────────────── */
-const GENRE_OPTIONS  = ['Horror','Drama','Detective','Emotional','Comedy','Thriller','Romance','Action']
-const DIFF_OPTIONS   = ['Beginner','Normal','Hard','Expert']
-const PLAYER_COUNTS  = [1,2,3,4,5,6,7,8,9]
+const GENRE_OPTIONS  = ['Horror', 'Drama', 'Detective', 'Emotional', 'Comedy']
+const DIFF_OPTIONS   = ['Beginner', 'Normal', 'Hard', 'Expert']
+const PLAYER_COUNTS  = [1, 2, 3, 4, 5, 6, 7, 8, 9]
 const STAR_OPTIONS   = [1, 2, 3, 4, 5]
+
+const PRICE_OPTIONS = [
+  { value: '', label: 'ทุกราคา' },
+  { value: 'free', label: 'เล่นฟรี (฿0)' },
+  { value: 'under700', label: 'ไม่เกิน ฿699' },
+  { value: '700-899', label: '฿700 - ฿899' },
+  { value: 'above900', label: '฿900 ขึ้นไป' },
+]
+
+const TIME_OPTIONS = [
+  { value: '', label: 'ทุกระยะเวลา' },
+  { value: '3-4', label: '3 - 4 ชั่วโมง' },
+  { value: '5-6', label: '5 - 6 ชั่วโมง' },
+  { value: '7+', label: '7 ชั่วโมงขึ้นไป' },
+]
+
+function priceMatches(displayPrice, filter) {
+  if (!filter) return true
+  const p = Number(displayPrice) || 0
+  if (filter === 'free') return p === 0
+  if (filter === 'under700') return p > 0 && p <= 699
+  if (filter === '700-899') return p >= 700 && p <= 899
+  if (filter === 'above900') return p >= 900
+  return true
+}
+
+function timeMatches(timeStr, filter) {
+  if (!filter) return true
+  const nums = String(timeStr || '').match(/\d+(\.\d+)?/g)?.map(Number) || []
+  if (nums.length === 0) return true
+  const minH = nums[0]
+  const maxH = nums[1] || nums[0]
+  if (filter === '3-4') return maxH <= 4
+  if (filter === '5-6') return (minH >= 4 && maxH <= 6) || (minH <= 5 && maxH >= 5)
+  if (filter === '7+') return minH >= 6 || maxH >= 7
+  return true
+}
 
 /* Returns badge bg + accessible text color (WCAG AA verified) */
 function diffConfig(level) {
@@ -221,14 +258,16 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
   }, [lineUser?.uid])
 
   const { t } = useLang()
-  const [search,           setSearch]           = useState('')
-  const [selectedTags,     setSelectedTags]     = useState([])
-  const [selectedDiffs,    setSelectedDiffs]    = useState([])
+  const [search,              setSearch]              = useState('')
+  const [selectedTags,        setSelectedTags]        = useState([])
+  const [selectedDiffs,       setSelectedDiffs]       = useState([])
   const [selectedPlayerCount, setSelectedPlayerCount] = useState(null)
-  const [minDetective,     setMinDetective]     = useState(null)
-  const [minRoleplay,      setMinRoleplay]      = useState(null)
-  const [mobileFilterOpen, setMobileFilterOpen] = useState(false)
-  const [sidebarVisible,   setSidebarVisible]   = useState(false)
+  const [selectedPriceRange,  setSelectedPriceRange]  = useState('')
+  const [selectedTimeRange,   setSelectedTimeRange]   = useState('')
+  const [selectedDetective,   setSelectedDetective]   = useState(null)
+  const [selectedRoleplay,    setSelectedRoleplay]    = useState(null)
+  const [mobileFilterOpen,    setMobileFilterOpen]    = useState(false)
+  const [sidebarVisible,      setSidebarVisible]      = useState(false)
 
   useEffect(() => { setTimeout(() => setSidebarVisible(true), 80) }, [])
 
@@ -239,11 +278,14 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
       const matchDiff    = selectedDiffs.length === 0 || selectedDiffs.some(d => (g.difficulty || '').toLowerCase() === d.toLowerCase())
       const matchTags    = selectedTags.length  === 0 || selectedTags.some(tg => g.tags?.includes(tg))
       const matchPlayers = playerMatches(g.players, selectedPlayerCount)
-      const matchDet     = !minDetective || (parseInt(g.detective) || 0) >= minDetective
-      const matchRole    = !minRoleplay  || (parseInt(g.roleplay)  || 0) >= minRoleplay
-      return matchName && matchDiff && matchTags && matchPlayers && matchDet && matchRole
+      const displayPrice = g.fullPrice ?? g.price
+      const matchPrice   = priceMatches(displayPrice, selectedPriceRange)
+      const matchTime    = timeMatches(g.time, selectedTimeRange)
+      const matchDet     = selectedDetective === null || (parseInt(g.detective) || 0) === selectedDetective
+      const matchRole    = selectedRoleplay === null  || (parseInt(g.roleplay)  || 0) === selectedRoleplay
+      return matchName && matchDiff && matchTags && matchPlayers && matchPrice && matchTime && matchDet && matchRole
     })
-  }, [allGames, search, selectedTags, selectedDiffs, selectedPlayerCount, minDetective, minRoleplay])
+  }, [allGames, search, selectedTags, selectedDiffs, selectedPlayerCount, selectedPriceRange, selectedTimeRange, selectedDetective, selectedRoleplay])
 
   useEffect(() => {
     const obs = new IntersectionObserver(
@@ -258,10 +300,20 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
 
   const toggleTag  = tg => setSelectedTags(p  => p.includes(tg) ? p.filter(x => x !== tg) : [...p, tg])
   const toggleDiff = d  => setSelectedDiffs(p => p.includes(d)  ? p.filter(x => x !== d)  : [...p, d])
-  const resetAll   = () => { setSelectedTags([]); setSelectedDiffs([]); setSelectedPlayerCount(null); setMinDetective(null); setMinRoleplay(null); setSearch('') }
+  const resetAll   = () => {
+    setSelectedTags([])
+    setSelectedDiffs([])
+    setSelectedPlayerCount(null)
+    setSelectedPriceRange('')
+    setSelectedTimeRange('')
+    setSelectedDetective(null)
+    setSelectedRoleplay(null)
+    setSearch('')
+  }
 
   const hasFilters = selectedTags.length > 0 || selectedDiffs.length > 0 ||
-    selectedPlayerCount !== null || minDetective !== null || minRoleplay !== null
+    selectedPlayerCount !== null || !!selectedPriceRange || !!selectedTimeRange ||
+    selectedDetective !== null || selectedRoleplay !== null
 
   return (
     <div style={{ fontFamily: "'Sarabun', sans-serif", background: PAPER, color: INK, minHeight: '100vh', paddingTop: 60 }}>
@@ -377,10 +429,50 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
             </select>
           </SidebarSection>
 
+          <SidebarSection label="ราคา">
+            <select
+              value={selectedPriceRange}
+              onChange={e => setSelectedPriceRange(e.target.value)}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: PAPER_2, border: `1px solid ${selectedPriceRange ? C : L_BORDER}`,
+                borderRadius: 6, color: selectedPriceRange ? C : INK_2,
+                fontSize: 13, padding: '8px 10px',
+                fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                outline: 'none', fontWeight: selectedPriceRange ? 700 : 400,
+                transition: 'border-color 0.18s, color 0.18s',
+              }}
+            >
+              {PRICE_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </SidebarSection>
+
+          <SidebarSection label="เวลา / ระยะเวลา">
+            <select
+              value={selectedTimeRange}
+              onChange={e => setSelectedTimeRange(e.target.value)}
+              style={{
+                width: '100%', boxSizing: 'border-box',
+                background: PAPER_2, border: `1px solid ${selectedTimeRange ? C : L_BORDER}`,
+                borderRadius: 6, color: selectedTimeRange ? C : INK_2,
+                fontSize: 13, padding: '8px 10px',
+                fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                outline: 'none', fontWeight: selectedTimeRange ? 700 : 400,
+                transition: 'border-color 0.18s, color 0.18s',
+              }}
+            >
+              {TIME_OPTIONS.map(opt => (
+                <option key={opt.value} value={opt.value}>{opt.label}</option>
+              ))}
+            </select>
+          </SidebarSection>
+
           <SidebarSection label="ความเข้มข้น">
-            <StarRow label={t('games','detectiveLevel')} value={minDetective} onChange={setMinDetective} color={AMBER} />
+            <StarRow label={t('games','detectiveLevel')} value={selectedDetective} onChange={setSelectedDetective} color={AMBER} />
             <div style={{ marginTop: 12 }}>
-              <StarRow label={t('games','roleplayLevel')} value={minRoleplay} onChange={setMinRoleplay} color="#a78bfa" />
+              <StarRow label={t('games','roleplayLevel')} value={selectedRoleplay} onChange={setSelectedRoleplay} color="#a78bfa" />
             </div>
           </SidebarSection>
         </aside>
@@ -429,7 +521,7 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
               className="gp-mobile-filter-btn"
             >
               <i className="fas fa-sliders-h" style={{ marginRight: 6 }} />
-              ตัวกรอง{hasFilters ? ` (${selectedTags.length + selectedDiffs.length + (selectedPlayerCount ? 1 : 0) + (minDetective ? 1 : 0) + (minRoleplay ? 1 : 0)})` : ''}
+              ตัวกรอง{hasFilters ? ` (${selectedTags.length + selectedDiffs.length + (selectedPlayerCount ? 1 : 0) + (selectedPriceRange ? 1 : 0) + (selectedTimeRange ? 1 : 0) + (selectedDetective ? 1 : 0) + (selectedRoleplay ? 1 : 0)})` : ''}
             </button>
             <style>{`@media(max-width:767px){.gp-mobile-filter-btn{display:flex!important}}`}</style>
           </div>
@@ -441,22 +533,63 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
                 <FilterGroup label="แนว" options={GENRE_OPTIONS} selected={selectedTags} onToggle={toggleTag} />
                 <FilterGroup label="ความยาก" options={DIFF_OPTIONS} selected={selectedDiffs} onToggle={toggleDiff} />
               </div>
-              <div style={{ marginBottom: 4 }}>
-                <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 8 }}>จำนวนผู้เล่น</p>
-                <select
-                  value={selectedPlayerCount ?? ''}
-                  onChange={e => setSelectedPlayerCount(e.target.value ? Number(e.target.value) : null)}
-                  style={{
-                    background: PAPER_2, border: `1px solid ${selectedPlayerCount ? C : L_BORDER}`,
-                    borderRadius: 6, color: selectedPlayerCount ? C : INK_2,
-                    fontSize: 13, padding: '8px 12px',
-                    fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                    outline: 'none', fontWeight: selectedPlayerCount ? 700 : 400,
-                  }}
-                >
-                  <option value="">ทุกจำนวน</option>
-                  {PLAYER_COUNTS.map(n => <option key={n} value={n}>{n} คน</option>)}
-                </select>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 6 }}>จำนวนผู้เล่น</p>
+                  <select
+                    value={selectedPlayerCount ?? ''}
+                    onChange={e => setSelectedPlayerCount(e.target.value ? Number(e.target.value) : null)}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      background: PAPER_2, border: `1px solid ${selectedPlayerCount ? C : L_BORDER}`,
+                      borderRadius: 6, color: selectedPlayerCount ? C : INK_2,
+                      fontSize: 13, padding: '8px 10px',
+                      fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                      outline: 'none', fontWeight: selectedPlayerCount ? 700 : 400,
+                    }}
+                  >
+                    <option value="">ทุกจำนวน</option>
+                    {PLAYER_COUNTS.map(n => <option key={n} value={n}>{n} คน</option>)}
+                  </select>
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 6 }}>ราคา</p>
+                  <select
+                    value={selectedPriceRange}
+                    onChange={e => setSelectedPriceRange(e.target.value)}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      background: PAPER_2, border: `1px solid ${selectedPriceRange ? C : L_BORDER}`,
+                      borderRadius: 6, color: selectedPriceRange ? C : INK_2,
+                      fontSize: 13, padding: '8px 10px',
+                      fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                      outline: 'none', fontWeight: selectedPriceRange ? 700 : 400,
+                    }}
+                  >
+                    {PRICE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 6 }}>ระยะเวลา</p>
+                  <select
+                    value={selectedTimeRange}
+                    onChange={e => setSelectedTimeRange(e.target.value)}
+                    style={{
+                      width: '100%', boxSizing: 'border-box',
+                      background: PAPER_2, border: `1px solid ${selectedTimeRange ? C : L_BORDER}`,
+                      borderRadius: 6, color: selectedTimeRange ? C : INK_2,
+                      fontSize: 13, padding: '8px 10px',
+                      fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                      outline: 'none', fontWeight: selectedTimeRange ? 700 : 400,
+                    }}
+                  >
+                    {TIME_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+                <StarRow label={t('games','detectiveLevel')} value={selectedDetective} onChange={setSelectedDetective} color={AMBER} />
+                <StarRow label={t('games','roleplayLevel')} value={selectedRoleplay} onChange={setSelectedRoleplay} color="#a78bfa" />
               </div>
               {hasFilters && (
                 <button onClick={resetAll} style={{ fontSize: 11, fontWeight: 700, padding: '8px 18px', borderRadius: 6, background: `${C}18`, color: C, border: `1px solid ${C}44`, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: "'Sarabun', sans-serif" }}>
@@ -473,8 +606,10 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
                 ...selectedTags.map(v => ({ label: v, rm: () => toggleTag(v), color: C })),
                 ...selectedDiffs.map(v => ({ label: v, rm: () => toggleDiff(v), color: diffConfig(v).bg })),
                 ...(selectedPlayerCount ? [{ label: `${selectedPlayerCount} คน`, rm: () => setSelectedPlayerCount(null), color: C }] : []),
-                ...(minDetective ? [{ label: `สืบ ${'★'.repeat(minDetective)}+`, rm: () => setMinDetective(null), color: AMBER }] : []),
-                ...(minRoleplay  ? [{ label: `บท ${'★'.repeat(minRoleplay)}+`,  rm: () => setMinRoleplay(null),  color: 'var(--void-400)' }] : []),
+                ...(selectedPriceRange ? [{ label: PRICE_OPTIONS.find(o => o.value === selectedPriceRange)?.label || selectedPriceRange, rm: () => setSelectedPriceRange(''), color: C }] : []),
+                ...(selectedTimeRange ? [{ label: TIME_OPTIONS.find(o => o.value === selectedTimeRange)?.label || selectedTimeRange, rm: () => setSelectedTimeRange(''), color: C }] : []),
+                ...(selectedDetective ? [{ label: `สืบ ${'★'.repeat(selectedDetective)}`, rm: () => setSelectedDetective(null), color: AMBER }] : []),
+                ...(selectedRoleplay  ? [{ label: `บท ${'★'.repeat(selectedRoleplay)}`,  rm: () => setSelectedRoleplay(null),  color: '#a78bfa' }] : []),
               ].map(({ label, rm, color }) => (
                 <button key={label} className="gp-active-tag" onClick={rm} style={{
                   fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
