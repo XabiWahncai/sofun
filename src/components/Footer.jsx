@@ -5,9 +5,9 @@ const INK = '#1a1a1a'
 const INK_LIGHT = 'rgba(255,255,255,0.75)'
 const INK_DIM = 'rgba(255,255,255,0.5)'
 
-const MAP_URL = 'https://maps.app.goo.gl/4opXQJmN2fkNRbHr7'
+const MAP_URL = 'https://maps.app.goo.gl/rcepAG2vr1wTaxFZA'
 const MAP_EMBED =
-  'https://www.google.com/maps/embed/v1/place?key=&q=SOFUN+CLUB+RCA+Bangkok&zoom=16'
+  'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3875.460481230006!2d100.5731317757917!3d13.751374986640578!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x30e29f8617947b49%3A0x6d41483c2a2ba5b7!2sSofun%20Club%20RCA!5e0!3m2!1sth!2sth!4v1710000000000!5m2!1sth!2sth'
 
 export default function Footer() {
   return (
@@ -147,7 +147,7 @@ export default function Footer() {
         }}>
           <iframe
             title="SoFun Club RCA map"
-            src="https://maps.app.goo.gl/rcepAG2vr1wTaxFZA"
+            src={MAP_EMBED}
             width="100%" height="100%"
             style={{ border: 0, filter: 'invert(90%) hue-rotate(180deg) saturate(0.7)' }}
             loading="lazy"
