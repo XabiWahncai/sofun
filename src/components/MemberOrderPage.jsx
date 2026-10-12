@@ -853,14 +853,26 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
     }
   }
 
-  const me = activeOrder.members?.find(m => m.uid === lineUser.uid)
+  if (!activeOrder) {
+    return (
+      <div id="member-order-page" className="page active" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '60vh' }}>
+        <div style={{ textAlign: 'center', color: 'rgba(26,26,26,0.6)' }}>
+          <i className="fas fa-spinner fa-spin" style={{ fontSize: 24, marginBottom: 12 }} />
+          <div>กำลังโหลดข้อมูลออเดอร์...</div>
+        </div>
+      </div>
+    )
+  }
+
+  const currentUid = lineUser?.uid || lineUser?.userId || lineUser?.id
+  const me = activeOrder.members?.find(m => (m.uid || m.id) === currentUid)
   const confirmedItems = activeOrder.foodItems || []
-  const pendingItems = (activeOrder.memberFoodQueue || []).filter(q => q.orderedBy?.uid === lineUser.uid)
-  const otherPending = (activeOrder.memberFoodQueue || []).filter(q => q.orderedBy?.uid !== lineUser.uid)
+  const pendingItems = (activeOrder.memberFoodQueue || []).filter(q => (q.orderedBy?.uid || q.orderedBy?.id) === currentUid)
+  const otherPending = (activeOrder.memberFoodQueue || []).filter(q => (q.orderedBy?.uid || q.orderedBy?.id) !== currentUid)
 
   // My accepted food (items admin accepted from my queue — reliable uid tracking)
   const memberFoodHistory = activeOrder.memberFoodHistory || []
-  const myHistoryItems = memberFoodHistory.filter(f => f.orderedBy?.uid === lineUser.uid)
+  const myHistoryItems = memberFoodHistory.filter(f => (f.orderedBy?.uid || f.orderedBy?.id) === currentUid)
   const myHistoryTotal = myHistoryItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
 
   const myPendingTotal = pendingItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)

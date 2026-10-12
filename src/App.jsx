@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc, orderBy, serverTimestamp } from 'firebase/firestore'
+import { collection, onSnapshot, doc, getDoc, updateDoc, query, where, setDoc, orderBy, serverTimestamp, arrayUnion } from 'firebase/firestore'
 import { getToken, onMessage } from 'firebase/messaging'
 import { onAuthStateChanged } from 'firebase/auth'
 
@@ -326,24 +326,88 @@ export default function App() {
     }
   }, [currentPage, lineUser, firebaseUser, liffReady])
 
-  // ── Active order for current member (non-admin) ─────────────────────
+  // ── Active order for current member ─────────────────────
   useEffect(() => {
-    const uid = lineUser?.uid
-    if (!uid || isEffectiveAdmin) { setActiveMemberOrder(null); return }
+    const uid = lineUser?.uid || lineUser?.userId || lineUser?.id
+    if (!uid) { setActiveMemberOrder(null); return }
+
+    const maxAgeMs = 24 * 60 * 60 * 1000 // Only consider active orders from the last 24 hours
+    const now = Date.now()
+    const isOrderFresh = (o) => {
+      if (!o || o.status !== 'active') return false
+      const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime()
+        : (o.updatedAt?.toDate ? o.updatedAt.toDate().getTime()
+        : (o.createdAt ? new Date(o.createdAt).getTime() : 0))
+      return !orderTime || (now - orderTime) < maxAgeMs
+    }
+
+    let isMounted = true
+
+    // 1. Primary listener: query orders by memberUids
     const q = query(collection(db, 'orders'), where('memberUids', 'array-contains', uid))
-    return onSnapshot(q, snap => {
-      const maxAgeMs = 18 * 60 * 60 * 1000 // Only consider active orders from the last 18 hours
-      const now = Date.now()
+    const unsub = onSnapshot(q, snap => {
+      if (!isMounted) return
       const active = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .find(o => {
-          if (o.status !== 'active') return false
-          const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : 0)
-          return !orderTime || (now - orderTime) < maxAgeMs
-        })
-      setActiveMemberOrder(active || null)
-    }, () => setActiveMemberOrder(null))
-  }, [lineUser?.uid, isEffectiveAdmin])
+        .find(isOrderFresh)
+
+      if (active) {
+        setActiveMemberOrder(active)
+      } else {
+        // Fallback: check if posSessions has this member in an active confirmed session
+        const liveSession = (posSessions || []).find(s =>
+          s.confirmedOrderId && Array.isArray(s.members) && s.members.some(m => (m.uid || m.id) === uid)
+        )
+        if (liveSession?.confirmedOrderId) {
+          getDoc(doc(db, 'orders', liveSession.confirmedOrderId)).then(orderSnap => {
+            if (!isMounted) return
+            if (orderSnap.exists()) {
+              const oData = { id: orderSnap.id, ...orderSnap.data() }
+              if (isOrderFresh(oData)) {
+                setActiveMemberOrder(oData)
+                // Auto-heal memberUids in Firestore if missing
+                if (!oData.memberUids?.includes(uid)) {
+                  updateDoc(doc(db, 'orders', orderSnap.id), {
+                    memberUids: arrayUnion(uid)
+                  }).catch(() => {})
+                }
+                return
+              }
+            }
+            setActiveMemberOrder(null)
+          }).catch(() => { if (isMounted) setActiveMemberOrder(null) })
+        } else {
+          setActiveMemberOrder(null)
+        }
+      }
+    }, () => {
+      if (!isMounted) return
+      // Fallback on snapshot error
+      const liveSession = (posSessions || []).find(s =>
+        s.confirmedOrderId && Array.isArray(s.members) && s.members.some(m => (m.uid || m.id) === uid)
+      )
+      if (liveSession?.confirmedOrderId) {
+        getDoc(doc(db, 'orders', liveSession.confirmedOrderId)).then(orderSnap => {
+          if (!isMounted) return
+          if (orderSnap.exists()) {
+            const oData = { id: orderSnap.id, ...orderSnap.data() }
+            if (isOrderFresh(oData)) {
+              setActiveMemberOrder(oData)
+              return
+            }
+          }
+          setActiveMemberOrder(null)
+        }).catch(() => { if (isMounted) setActiveMemberOrder(null) })
+      } else {
+        setActiveMemberOrder(null)
+      }
+    })
+
+    return () => {
+      isMounted = false
+      unsub()
+    }
+  }, [lineUser?.uid, lineUser?.userId, lineUser?.id, posSessions])
 
   // ── Auto-sync between QR and Order page based on active order ─────────────
   useEffect(() => {

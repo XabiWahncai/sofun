@@ -441,15 +441,72 @@ export default function POSPage({
       const snap = await getDoc(doc(db, 'members', uid))
       if (!snap.exists()) { showToast('ไม่พบสมาชิก', 'error'); return }
       const d = snap.data()
+      const newMember = {
+        uid,
+        name: d.nickname || d.firstname || d.name || 'ไม่ระบุ',
+        avatar: d.pictureUrl || '',
+        character: '',
+        scanInAt: new Date().toISOString(),
+      }
+      const newMembers = [...session.members, newMember]
       updateSession(sessionId, {
-        members: [...session.members, {
-          uid,
-          name: d.nickname || d.firstname || d.name || 'ไม่ระบุ',
-          avatar: d.pictureUrl || '',
-          character: '',
-          scanInAt: new Date().toISOString(),
-        }]
+        members: newMembers
       })
+
+      // If the session is already confirmed in Firestore, auto-sync immediately
+      if (session.confirmedOrderId) {
+        const orderId = session.confirmedOrderId
+        const g = allGames.find(x => x.id === session.scriptId)
+        const gUnitPay = (session.customPrice !== '' && session.customPrice !== undefined)
+          ? Number(session.customPrice) || 0
+          : g ? (g.payPrice ?? g.price ?? 0) : 0
+        const gFullPrice = g
+          ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
+          : gUnitPay
+        const newGamePrice = newMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gFullPrice : gUnitPay), 0)
+        const fTotal = (session.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+        const dMode = session.discountMode || 'perPerson'
+        const dRaw = Number(session.discount) || 0
+        const dSelIds = Array.isArray(session.discountMemberIds) ? session.discountMemberIds : []
+        const dEffIds = dSelIds.length > 0
+          ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
+          : newMembers.map(mm => mm.uid)
+        const nD = dEffIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
+        const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        const newGrandTotal = Math.max(0, fTotal + newGamePrice - totD - totPersonal)
+
+        const membersPayload = newMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+        }))
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          memberUids: newMembers.map(m => m.uid),
+          gameTotal: newGamePrice,
+          grandTotal: newGrandTotal,
+          updatedAt: serverTimestamp(),
+        })
+
+        if (session.scriptId) {
+          addDoc(collection(db, 'playHistory'), {
+            userId: newMember.uid,
+            userName: newMember.name,
+            userAvatar: newMember.avatar,
+            scriptId: session.scriptId,
+            scriptTitle: g?.title || '',
+            character: '',
+            dm: session.dm || '',
+            room: session.room || '',
+            playedAt: serverTimestamp(),
+            recordedBy: adminUser?.name || 'admin',
+          }).catch(e => console.warn('Record play history for new member failed:', e))
+        }
+      }
     } catch { showToast('โหลดข้อมูลล้มเหลว', 'error') }
   }
 
@@ -668,8 +725,26 @@ export default function POSPage({
     fetchAndAddMember(activeId, uid)
   }
 
-  const setCharacter = (uid, val) =>
-    updateActive({ members: activeSession.members.map(m => m.uid === uid ? { ...m, character: val } : m) })
+  const setCharacter = async (uid, val) => {
+    const updated = activeSession.members.map(m => m.uid === uid ? { ...m, character: val } : m)
+    updateActive({ members: updated })
+    if (activeSession.confirmedOrderId) {
+      try {
+        await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+          members: updated.map(m => ({
+            uid: m.uid, name: m.name, character: m.character || '',
+            avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+            personalDiscount: Number(m.personalDiscount) || 0,
+            personalDiscountNote: m.personalDiscountNote || '',
+            unpaidDeposit: Boolean(m.unpaidDeposit),
+          })),
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync orders on setCharacter:', err)
+      }
+    }
+  }
 
   const setPersonalDiscount = (uid, val) =>
     updateActive({ members: activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscount: Number(val) || 0 } : m) })
@@ -737,8 +812,52 @@ export default function POSPage({
     showToast('อัปเดตส่วนลดรายบุคคลแล้ว ✓')
   }
 
-  const removeMember = (uid) =>
-    updateActive({ members: activeSession.members.filter(m => m.uid !== uid) })
+  const removeMember = async (uid) => {
+    const newMembers = activeSession.members.filter(m => m.uid !== uid)
+    updateActive({ members: newMembers })
+    if (activeSession.confirmedOrderId) {
+      try {
+        const orderId = activeSession.confirmedOrderId
+        const g = selectedGame
+        const gUnitPay = (activeSession.customPrice !== '' && activeSession.customPrice !== undefined)
+          ? Number(activeSession.customPrice) || 0
+          : g ? (g.payPrice ?? g.price ?? 0) : 0
+        const gFullPrice = g
+          ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
+          : gUnitPay
+        const newGamePrice = newMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gFullPrice : gUnitPay), 0)
+        const fTotal = (activeSession.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+        const dMode = activeSession.discountMode || 'perPerson'
+        const dRaw = Number(activeSession.discount) || 0
+        const dSelIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+        const dEffIds = dSelIds.length > 0
+          ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
+          : newMembers.map(mm => mm.uid)
+        const nD = dEffIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
+        const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        const newGrandTotal = Math.max(0, fTotal + newGamePrice - totD - totPersonal)
+
+        const membersPayload = newMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+        }))
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          memberUids: newMembers.map(m => m.uid),
+          gameTotal: newGamePrice,
+          grandTotal: newGrandTotal,
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync orders on removeMember:', err)
+      }
+    }
+  }
 
   // order is now array: [{ key, menuId, name, basePrice, addons, totalPrice, qty, orderedBy, note }]
   const addItem = (menuItem) => {
