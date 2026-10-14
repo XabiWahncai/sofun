@@ -68,6 +68,20 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     return () => unsub();
   }, []);
 
+  /* Sort games by newest first (descending by createdAt) */
+  const sortedNewestGames = useMemo(() => {
+    return [...allGames].sort((a, b) => {
+      const getTimestamp = (g) => {
+        if (!g) return 0;
+        if (g.createdAt?.toMillis) return g.createdAt.toMillis();
+        if (g.createdAt?.seconds) return g.createdAt.seconds * 1000;
+        if (g.createdAt) return new Date(g.createdAt).getTime();
+        return 0;
+      };
+      return getTimestamp(b) - getTimestamp(a);
+    });
+  }, [allGames]);
+
   /* 3 New Games to display */
   const newGames = useMemo(() => {
     if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds) && promoSettings.newGameIds.length > 0) {
@@ -76,27 +90,30 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .filter(Boolean);
       if (mapped.length > 0) return mapped.slice(0, 3);
     }
-    // Fallback to latest 3 games
-    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 3);
-  }, [promoSettings?.newGameIds, allGames]);
+    // Fallback to latest 3 games sorted by creation time
+    const source = sortedNewestGames.length > 0 ? sortedNewestGames : (allGames.length > 0 ? allGames : PLACEHOLDER);
+    return source.slice(0, 3);
+  }, [promoSettings?.newGameIds, allGames, sortedNewestGames]);
 
-  /* hero slideshow */
+  /* Hero Featured Games: show ONLY new games in the hero card */
+  const heroFeaturedGames = useMemo(() => {
+    if (newGames && newGames.length > 0) return newGames;
+    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 3);
+  }, [newGames, allGames]);
+
+  /* hero slideshow - cycles ONLY through new games */
   useEffect(() => {
-    const len = allGames.length || PLACEHOLDER.length;
+    const len = heroFeaturedGames.length;
     if (len <= 1) return;
     const timer = setInterval(() => {
       setHeroVisible(false);
       setTimeout(() => {
-        setHeroIdx(prev => {
-          let next = Math.floor(Math.random() * len);
-          while (next === prev && len > 1) next = Math.floor(Math.random() * len);
-          return next;
-        });
+        setHeroIdx(prev => (prev + 1) % len);
         setHeroVisible(true);
       }, 600);
-    }, 5000);
+    }, 4500);
     return () => clearInterval(timer);
-  }, [allGames.length]);
+  }, [heroFeaturedGames.length]);
 
   /* scroll reveal */
   useEffect(() => {
@@ -134,14 +151,18 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     const url = g.image || g.coverUrl;
     return url && !HERO_EXCLUDED.some(id => url.includes(id));
   });
-  const heroSlide     = heroIdx % Math.max(slidableGames.length, 1);
-  const heroGame      = slidableGames[heroSlide] || displayGames[0];
-  const heroImg       = heroGame ? convertImageUrl(heroGame.image || heroGame.coverUrl) : null;
+  const heroSlide     = heroIdx % Math.max(heroFeaturedGames.length, 1);
+  const heroGame      = heroFeaturedGames[heroSlide] || heroFeaturedGames[0];
+  const heroCustomCover = heroGame ? promoSettings?.customCovers?.[heroGame.id] : null;
+  const heroImg       = heroGame ? convertImageUrl(heroCustomCover || heroGame.image || heroGame.coverUrl, 900) : null;
   const tickerGames   = displayGames.map(g => g.title).filter(Boolean);
   const tickerDur     = Math.max(30, tickerGames.length * 2.5);
   const gridGames     = displayGames.slice(0, 10);
-  /* dots: up to 9 covers from slidable games */
-  const heroCovers    = slidableGames.slice(0, 9).map(g => convertImageUrl(g.image || g.coverUrl, 400));
+  /* dots: covers from heroFeaturedGames (strictly new games) */
+  const heroCovers    = heroFeaturedGames.map(g => {
+    const custom = promoSettings?.customCovers?.[g.id];
+    return convertImageUrl(custom || g.image || g.coverUrl, 400);
+  });
   /* scatter: tiny thumbnails — displayed at 36–52px CSS, w=200 is enough at 3× DPR */
   const scatterCovers = slidableGames.map(g => convertImageUrl(g.image || g.coverUrl, 200));
 
@@ -420,11 +441,24 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               transform:'translate(-50%, -50%)',
               zIndex:5,
             }}>
-              <div className="mm-cover-main" style={{
-                width:'clamp(300px,34vw,480px)', aspectRatio:'2/3',
-                borderRadius:22, overflow:'hidden',
-                boxShadow:'0 100px 200px rgba(0,0,0,.50), 0 0 0 7px #fff',
-              }}>
+              <div
+                className="mm-cover-main"
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  if (heroGame?.id && showDetail) {
+                    showDetail(heroGame.id);
+                  } else if (showPage) {
+                    showPage('games');
+                  }
+                }}
+                style={{
+                  width:'clamp(300px,34vw,480px)', aspectRatio:'2/3',
+                  borderRadius:22, overflow:'hidden',
+                  boxShadow:'0 100px 200px rgba(0,0,0,.50), 0 0 0 7px #fff',
+                  cursor: heroGame?.id ? 'pointer' : 'default',
+                }}
+              >
                 {heroImg
                   ? <img src={heroImg} alt="" aria-hidden fetchpriority="high" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover', opacity: heroVisible ? 1 : 0, transition:'opacity .65s ease' }} />
                   : <div style={{ width:'100%', height:'100%', background:'linear-gradient(145deg,#1a1a2e,#0f3460)', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -455,7 +489,25 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         {heroCovers.length > 1 && (
           <div className="mm-hero-dots" style={{ position:'absolute', bottom:'7%', left:'71%', transform:'translateX(-50%)', display:'flex', gap:6, zIndex:6 }}>
             {heroCovers.map((_, i) => (
-              <div key={i} style={{ width:20, height:6, borderRadius:3, background: i === heroSlide % heroCovers.length ? C : 'rgba(0,0,0,.18)', transform:`scaleX(${i === heroSlide % heroCovers.length ? 1 : 0.3})`, transformOrigin:'center', transition:'transform .4s, background .4s' }} />
+              <div
+                key={i}
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setHeroVisible(false);
+                  setTimeout(() => {
+                    setHeroIdx(i);
+                    setHeroVisible(true);
+                  }, 200);
+                }}
+                style={{
+                  width:20, height:6, borderRadius:3,
+                  cursor:'pointer',
+                  background: i === heroSlide ? C : 'rgba(0,0,0,.18)',
+                  transform:`scaleX(${i === heroSlide ? 1 : 0.3})`,
+                  transformOrigin:'center', transition:'transform .4s, background .4s'
+                }}
+              />
             ))}
           </div>
         )}
