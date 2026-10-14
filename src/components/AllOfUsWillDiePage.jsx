@@ -79,18 +79,36 @@ function playTaskSuccessSound() {
   } catch {}
 }
 
+// ── Building Floors and Room Locations ─────────────────
+export const BUILDING_FLOORS = [
+  { floor: 1, label: 'ชั้น 1', rooms: ['โซนหน้า', 'ห้องแต่งตัว', 'โซนหลัง'] },
+  { floor: 2, label: 'ชั้น 2', rooms: ['โถงทางเดิน', 'ห้องญี่ปุ่น'] },
+  { floor: 3, label: 'ชั้น 3', rooms: ['ห้องจีน', 'โถงทางเดิน', 'ห้องยุโรป'] },
+  { floor: 4, label: 'ชั้น 4', rooms: ['ห้องผี', 'โถงทางเดิน', 'ห้องแคบ'] },
+  { floor: 5, label: 'ชั้น 5', rooms: ['ห้องวินเทจ', 'ห้องโปรเจคเตอร์'] },
+]
+
+// ── Default Sabotages Pool ─────────────────────────────
+export const DEFAULT_SABOTAGE_POOL = [
+  { id: 'sab_lights', title: 'ไฟดับ (Lights Out)', desc: 'ลดการมองเห็น คนดีต้องรีบไปแก้ปัญหากับแอดมินที่เคาน์เตอร์', countdownSeconds: 90 },
+  { id: 'sab_o2', title: 'อากาศรั่ว (O2 Depletion)', desc: 'มีเวลานับถอยหลัง คนดีต้องรีบไปกู้สถานการณ์กับแอดมิน', countdownSeconds: 90 },
+  { id: 'sab_doors', title: 'ประตูล็อค (Doors Locked)', desc: 'ประตูปิดกั้น คนดีต้องช่วยกันเคลียร์ทางกับแอดมิน', countdownSeconds: 90 },
+  { id: 'sab_comms', title: 'ป่วนระบบสื่อสาร (Comms Jammed)', desc: 'แถบความคืบหน้าภารกิจจะถูกซ่อนชั่วคราว', countdownSeconds: 90 },
+]
+
 // ── Default Tasks Pool for Real Life Boardgame Cafe ───
-const DEFAULT_TASKS_POOL = [
-  { id: 't1', title: 'จัดเรียงแก้วน้ำ 5 ใบ', desc: 'ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่มให้เป็นระเบียบเรียบร้อย' },
-  { id: 't2', title: 'ถ่ายรูปคู่กับ DM 1 รูป', desc: 'เดินไปหา DM ประจำห้อง Europe แล้วขอถ่ายรูปคู่เป็นหลักฐาน' },
-  { id: 't3', title: 'นับจำนวนเก้าอี้ในห้อง', desc: 'นับจำนวนเก้าอี้ทั้งหมดในห้องแล้วไปตอบตัวเลขกับแอดมิน' },
-  { id: 't4', title: 'หากล่องเกมสีแดง 3 กล่อง', desc: 'เดินหาบอร์ดเกมที่มีหน้ากล่องสีแดง 3 กล่องบนชั้นวาง' },
-  { id: 't5', title: 'ทิ้งขยะลงถังให้เรียบร้อย', desc: 'ตรวจสอบความสะอาดรอบโต๊ะและนำเศษขยะไปทิ้งที่ถังขยะ' },
-  { id: 't6', title: 'เติมน้ำเปล่าใส่แก้ว 1 แก้ว', desc: 'เดินไปกดน้ำดื่มใส่แก้วของตัวเองให้เต็ม' },
-  { id: 't7', title: 'หาลูกเต๋า 20 หน้า (D20)', desc: 'หาลูกเต๋า 20 หน้าจากกล่องอุปกรณ์แล้วนำมาแสดงให้แอดมินดู' },
-  { id: 't8', title: 'โพสต์ท่าปริศนาให้เพื่อนทาย', desc: 'ทำท่าทางบอร์ดเกม 1 ท่าให้เพื่อนในตี้ทายถูก 1 คน' },
-  { id: 't9', title: 'เช็ดทำความสะอาดโต๊ะเล่นเกม', desc: 'ใช้ทิชชู่หรือผ้าสะอาดเช็ดโต๊ะบอร์ดเกมบริเวณที่ว่าง' },
-  { id: 't10', title: 'จัดเรียงการ์ดเกมให้ตรงหมวด', desc: 'จัดเรียงการ์ดในกล่องเกมที่เปิดอยู่ให้หันหน้าไปทางเดียวกัน' },
+export const DEFAULT_TASKS_POOL = [
+  { id: 't1', title: 'จัดเรียงแก้วน้ำ 5 ใบ', desc: 'ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่มให้เป็นระเบียบเรียบร้อย', floor: 1, room: 'โซนหน้า' },
+  { id: 't2', title: 'ตรวจสอบชุดแต่งตัว', desc: 'เดินไปเช็คความเรียบร้อยของชุดแต่งตัวในห้อง', floor: 1, room: 'ห้องแต่งตัว' },
+  { id: 't3', title: 'นับกล่องเกมโซนหลัง', desc: 'เดินไปนับกล่องเกมที่วางอยู่บริเวณโซนหลัง 3 กล่อง', floor: 1, room: 'โซนหลัง' },
+  { id: 't4', title: 'ตรวจตราโถงทางเดินชั้น 2', desc: 'เดินสำรวจความเรียบร้อยบริเวณโถงทางเดินชั้น 2', floor: 2, room: 'โถงทางเดิน' },
+  { id: 't5', title: 'นับเบาะนั่งห้องญี่ปุ่น', desc: 'เดินไปนับจำนวนเบาะนั่งในห้องญี่ปุ่นแล้วจำมาตอบ', floor: 2, room: 'ห้องญี่ปุ่น' },
+  { id: 't6', title: 'ตรวจตราโต๊ะห้องจีน', desc: 'เดินไปสำรวจโต๊ะเล่นเกมในห้องจีน', floor: 3, room: 'ห้องจีน' },
+  { id: 't7', title: 'ถ่ายรูปคู่กับ DM ห้องยุโรป', desc: 'เดินไปหา DM ประจำห้องยุโรปแล้วขอถ่ายรูปคู่เป็นหลักฐาน', floor: 3, room: 'ห้องยุโรป' },
+  { id: 't8', title: 'สำรวจห้องผี', desc: 'เดินเข้าไปในห้องผีและถ่ายรูปสัญลักษณ์ที่กำหนด', floor: 4, room: 'ห้องผี' },
+  { id: 't9', title: 'สำรวจห้องแคบ', desc: 'เดินไปส่องดูความเรียบร้อยในห้องแคบชั้น 4', floor: 4, room: 'ห้องแคบ' },
+  { id: 't10', title: 'ตรวจห้องวินเทจ', desc: 'เดินไปสำรวจของตกแต่งในห้องวินเทจชั้น 5', floor: 5, room: 'ห้องวินเทจ' },
+  { id: 't11', title: 'เช็คห้องโปรเจคเตอร์', desc: 'เดินขึ้นไปดูภาพโปรเจคเตอร์ที่ห้องโปรเจคเตอร์ชั้น 5', floor: 5, room: 'ห้องโปรเจคเตอร์' },
 ]
 
 export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: isAppAdmin, showToast, showPage }) {
@@ -103,6 +121,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     timerUpdatedAt: Date.now(),
     players: {},
     taskPool: DEFAULT_TASKS_POOL,
+    sabotagePool: DEFAULT_SABOTAGE_POOL,
     sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 },
     meeting: null,
     winner: null,
@@ -121,6 +140,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [scannerOpen, setScannerOpen] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDesc, setNewTaskDesc] = useState('')
+  const [newTaskFloor, setNewTaskFloor] = useState(1)
+  const [newTaskRoom, setNewTaskRoom] = useState(BUILDING_FLOORS[0].rooms[0])
+  const [taskFloorFilter, setTaskFloorFilter] = useState('all')
+  const [editingTask, setEditingTask] = useState(null)
+
+  const [newSabTitle, setNewSabTitle] = useState('')
+  const [newSabDesc, setNewSabDesc] = useState('')
+  const [newSabCountdown, setNewSabCountdown] = useState(90)
+  const [editingSabotage, setEditingSabotage] = useState(null)
+
   const [currentTimeSec, setCurrentTimeSec] = useState(0)
   const [meetingTimeSec, setMeetingTimeSec] = useState(0)
   const [sabotageTimeSec, setSabotageTimeSec] = useState(0)
@@ -163,7 +192,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const unsub = onSnapshot(doc(db, 'all_of_us_games', 'active_game'), snap => {
       if (snap.exists()) {
         const data = snap.data()
-        setGameDoc(data)
+        setGameDoc({
+          ...data,
+          taskPool: data.taskPool || DEFAULT_TASKS_POOL,
+          sabotagePool: data.sabotagePool || DEFAULT_SABOTAGE_POOL,
+        })
       } else {
         // Initialize active_game document if not yet created
         const initData = {
@@ -174,6 +207,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           timerUpdatedAt: Date.now(),
           players: {},
           taskPool: DEFAULT_TASKS_POOL,
+          sabotagePool: DEFAULT_SABOTAGE_POOL,
           sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 },
           meeting: null,
           winner: null,
@@ -428,6 +462,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         poolTaskId: t.id,
         title: t.title,
         desc: t.desc,
+        floor: t.floor || 1,
+        room: t.room || 'โซนหน้า',
         verified: false,
         verifiedAt: null,
       }))
@@ -457,7 +493,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   }
 
   // Impostor requests Sabotage
-  const requestSabotage = async (title, desc) => {
+  const requestSabotage = async (title, desc, countdownSeconds = 90) => {
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         sabotage: {
@@ -467,14 +503,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           desc,
           requestedBy: myUid,
           status: 'pending_approval',
-          countdownSeconds: 90,
+          countdownSeconds: Number(countdownSeconds) || 90,
           startedAt: 0,
         }
       })
       setShowSabotageModal(false)
       showToast('ส่งคำขอ Sabotage ถึงแอดมินแล้ว')
     } catch (e) {
-      showToast('ส่ง Sabotage ล้มเหลว', 'error')
+      showToast('ส่งคำขอ Sabotage ล้มเหลว', 'error')
     }
   }
 
@@ -802,14 +838,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }, [scannerOpen])
 
-  // ── Add task to pool ────────────────────────────────────
+  // ── Task Pool Management (Add, Edit, Delete) ────────────
   const handleAddTaskToPool = async () => {
-    if (!newTaskTitle.trim()) return
+    if (!newTaskTitle.trim()) {
+      showToast('กรุณาระบุชื่อภารกิจ', 'error')
+      return
+    }
     const pool = gameDoc?.taskPool || DEFAULT_TASKS_POOL
     const item = {
       id: `t_${Date.now()}`,
       title: newTaskTitle.trim(),
-      desc: newTaskDesc.trim() || 'ทำภารกิจให้สำเร็จและให้แอดมินสแกนยืนยัน'
+      desc: newTaskDesc.trim() || 'ทำภารกิจให้สำเร็จและให้แอดมินสแกนยืนยัน',
+      floor: Number(newTaskFloor) || 1,
+      room: newTaskRoom || BUILDING_FLOORS[0].rooms[0],
     }
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -823,8 +864,29 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  // Delete task from pool
+  const handleUpdateTaskInPool = async () => {
+    if (!editingTask || !editingTask.title.trim()) return
+    const pool = gameDoc?.taskPool || DEFAULT_TASKS_POOL
+    const updated = pool.map(t => t.id === editingTask.id ? {
+      ...t,
+      title: editingTask.title.trim(),
+      desc: (editingTask.desc || '').trim(),
+      floor: Number(editingTask.floor) || 1,
+      room: editingTask.room || BUILDING_FLOORS[0].rooms[0],
+    } : t)
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        taskPool: updated
+      })
+      setEditingTask(null)
+      showToast('บันทึกการแก้ไขภารกิจสำเร็จ')
+    } catch (e) {
+      showToast('แก้ไขภารกิจล้มเหลว', 'error')
+    }
+  }
+
   const handleDeleteTaskFromPool = async (taskId) => {
+    if (!window.confirm('ยืนยันลบภารกิจนี้ออกจากคลัง?')) return
     const pool = gameDoc?.taskPool || DEFAULT_TASKS_POOL
     const updated = pool.filter(t => t.id !== taskId)
     try {
@@ -834,6 +896,66 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast('ลบภารกิจออกจากคลังแล้ว')
     } catch (e) {
       showToast('ลบภารกิจล้มเหลว', 'error')
+    }
+  }
+
+  // ── Sabotage Pool Management (Add, Edit, Delete) ────────
+  const handleAddSabotageToPool = async () => {
+    if (!newSabTitle.trim()) {
+      showToast('กรุณาระบุชื่อ Sabotage', 'error')
+      return
+    }
+    const pool = gameDoc?.sabotagePool || DEFAULT_SABOTAGE_POOL
+    const item = {
+      id: `sab_${Date.now()}`,
+      title: newSabTitle.trim(),
+      desc: newSabDesc.trim() || 'สถานการณ์ฉุกเฉิน คนดีต้องรีบไปแก้ปัญหากับแอดมิน',
+      countdownSeconds: Math.max(10, Number(newSabCountdown) || 90),
+    }
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        sabotagePool: [...pool, item]
+      })
+      setNewSabTitle('')
+      setNewSabDesc('')
+      setNewSabCountdown(90)
+      showToast('เพิ่ม Sabotage ลงคลังสำเร็จ')
+    } catch (e) {
+      showToast('เพิ่ม Sabotage ล้มเหลว', 'error')
+    }
+  }
+
+  const handleUpdateSabotageInPool = async () => {
+    if (!editingSabotage || !editingSabotage.title.trim()) return
+    const pool = gameDoc?.sabotagePool || DEFAULT_SABOTAGE_POOL
+    const updated = pool.map(s => s.id === editingSabotage.id ? {
+      ...s,
+      title: editingSabotage.title.trim(),
+      desc: (editingSabotage.desc || '').trim(),
+      countdownSeconds: Math.max(10, Number(editingSabotage.countdownSeconds) || 90),
+    } : s)
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        sabotagePool: updated
+      })
+      setEditingSabotage(null)
+      showToast('บันทึกการแก้ไข Sabotage สำเร็จ')
+    } catch (e) {
+      showToast('แก้ไข Sabotage ล้มเหลว', 'error')
+    }
+  }
+
+  const handleDeleteSabotageFromPool = async (sabId) => {
+    if (!window.confirm('ยืนยันลบ Sabotage นี้ออกจากคลัง?')) return
+    const pool = gameDoc?.sabotagePool || DEFAULT_SABOTAGE_POOL
+    const updated = pool.filter(s => s.id !== sabId)
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        sabotagePool: updated
+      })
+      showToast('ลบ Sabotage ออกจากคลังแล้ว')
+    } catch (e) {
+      showToast('ลบ Sabotage ล้มเหลว', 'error')
     }
   }
 
@@ -1396,9 +1518,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                                 fontSize: 11.5, color: t.verified ? '#81c784' : 'rgba(255,255,255,0.7)',
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                                 <i className={`fas fa-${t.verified ? 'check-circle' : 'circle'}`} style={{ fontSize: 9, color: t.verified ? '#4caf50' : '#ffa726' }} />
                                 <span>{t.title}</span>
+                                <span style={{
+                                  fontSize: 9.5, color: '#64b5f6', background: 'rgba(33, 150, 243, 0.12)',
+                                  padding: '1px 5px', borderRadius: 4, fontWeight: 700
+                                }}>
+                                  ชั้น {t.floor || 1} · {t.room || 'โซนหน้า'}
+                                </span>
                               </div>
                               {!t.verified && (
                                 <button
@@ -1429,78 +1557,362 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               background: '#121722', borderRadius: 16, padding: 16,
               border: '1px solid rgba(255,255,255,0.08)',
             }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 10 }}>
-                คลังภารกิจทั้งหมด ({gameDoc.taskPool?.length || 0} ภารกิจ)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                    คลังภารกิจทั้งหมด ({gameDoc.taskPool?.length || 0} ภารกิจ)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                    กำหนดชื่อ รายละเอียด ชั้น 1-5 และห้อง เพื่อให้คนดีไปทำภารกิจในสถานที่จริง
+                  </div>
+                </div>
               </div>
 
-              {/* Add New Task Input */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12 }}>
+              {/* Add New Task Form */}
+              <div style={{
+                background: 'rgba(255,255,255,0.03)',
+                padding: 12, borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.06)',
+                marginBottom: 14,
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: '#ff8a80' }}>
+                  <i className="fas fa-plus-circle" style={{ marginRight: 5 }} /> เพิ่มภารกิจใหม่
+                </div>
                 <input
                   type="text"
-                  placeholder="ชื่อภารกิจใหม่ (เช่น เช็ดโต๊ะ, นับเก้าอี้)"
+                  placeholder="ชื่อภารกิจ (เช่น จัดเรียงแก้วน้ำ, ถ่ายรูปคู่กับ DM)"
                   value={newTaskTitle}
                   onChange={e => setNewTaskTitle(e.target.value)}
                   style={{
                     padding: '8px 12px', borderRadius: 8,
-                    background: 'rgba(255,255,255,0.05)',
+                    background: '#1c2230',
                     border: '1px solid rgba(255,255,255,0.12)',
                     color: '#fff', fontSize: 12.5, outline: 'none',
                     fontFamily: 'inherit',
                   }}
                 />
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <input
-                    type="text"
-                    placeholder="รายละเอียดภารกิจ (ถ้ามี)"
-                    value={newTaskDesc}
-                    onChange={e => setNewTaskDesc(e.target.value)}
-                    style={{
-                      flex: 1, padding: '8px 12px', borderRadius: 8,
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      color: '#fff', fontSize: 12, outline: 'none',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={handleAddTaskToPool}
-                    style={{
-                      padding: '8px 14px', borderRadius: 8,
-                      background: '#c62828', color: '#fff',
-                      border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                    }}
-                  >
-                    เพิ่ม
-                  </button>
+                <input
+                  type="text"
+                  placeholder="รายละเอียดภารกิจ (เช่น ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่ม)"
+                  value={newTaskDesc}
+                  onChange={e => setNewTaskDesc(e.target.value)}
+                  style={{
+                    padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 12, outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                      ชั้น (1 - 5)
+                    </label>
+                    <select
+                      value={newTaskFloor}
+                      onChange={e => {
+                        const fl = Number(e.target.value)
+                        setNewTaskFloor(fl)
+                        const rooms = BUILDING_FLOORS.find(b => b.floor === fl)?.rooms || []
+                        setNewTaskRoom(rooms[0] || '')
+                      }}
+                      style={{
+                        width: '100%', padding: '7px 10px', borderRadius: 8,
+                        background: '#1c2230', color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {BUILDING_FLOORS.map(b => (
+                        <option key={b.floor} value={b.floor}>{b.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                      ห้อง / โซน
+                    </label>
+                    <select
+                      value={newTaskRoom}
+                      onChange={e => setNewTaskRoom(e.target.value)}
+                      style={{
+                        width: '100%', padding: '7px 10px', borderRadius: 8,
+                        background: '#1c2230', color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      {(BUILDING_FLOORS.find(b => b.floor === Number(newTaskFloor))?.rooms || []).map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleAddTaskToPool}
+                  style={{
+                    marginTop: 4, padding: '9px 16px', borderRadius: 8,
+                    background: '#c62828', color: '#fff',
+                    border: 'none', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <i className="fas fa-plus" />
+                  <span>เพิ่มภารกิจลงคลัง</span>
+                </button>
+              </div>
+
+              {/* Floor Filter Tabs */}
+              <div style={{ display: 'flex', gap: 6, overflowX: 'auto', paddingBottom: 6, marginBottom: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setTaskFloorFilter('all')}
+                  style={{
+                    padding: '4px 10px', borderRadius: 6, border: 'none',
+                    background: taskFloorFilter === 'all' ? '#ff5252' : 'rgba(255,255,255,0.06)',
+                    color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                  }}
+                >
+                  ทั้งหมด ({gameDoc.taskPool?.length || 0})
+                </button>
+                {BUILDING_FLOORS.map(b => {
+                  const count = (gameDoc.taskPool || []).filter(t => (t.floor || 1) === b.floor).length
+                  return (
+                    <button
+                      key={b.floor}
+                      type="button"
+                      onClick={() => setTaskFloorFilter(b.floor)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, border: 'none',
+                        background: taskFloorFilter === b.floor ? '#ff5252' : 'rgba(255,255,255,0.06)',
+                        color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+                      }}
+                    >
+                      {b.label} ({count})
+                    </button>
+                  )
+                })}
+              </div>
+
+              {/* Task Pool List */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 260, overflowY: 'auto' }}>
+                {(gameDoc.taskPool || [])
+                  .filter(t => taskFloorFilter === 'all' || (t.floor || 1) === Number(taskFloorFilter))
+                  .map(t => (
+                    <div
+                      key={t.id}
+                      style={{
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                        padding: '9px 12px', borderRadius: 10,
+                        background: 'rgba(255,255,255,0.02)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                      }}
+                    >
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '1px 6px', borderRadius: 4,
+                            background: 'rgba(33, 150, 243, 0.15)',
+                            color: '#64b5f6', fontSize: 10, fontWeight: 800,
+                          }}>
+                            <i className="fas fa-map-marker-alt" style={{ fontSize: 8 }} />
+                            ชั้น {t.floor || 1} · {t.room || 'โซนหน้า'}
+                          </span>
+                          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff' }}>{t.title}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {t.desc}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                        <button
+                          type="button"
+                          onClick={() => setEditingTask({
+                            id: t.id,
+                            title: t.title,
+                            desc: t.desc || '',
+                            floor: t.floor || 1,
+                            room: t.room || BUILDING_FLOORS[0].rooms[0],
+                          })}
+                          style={{
+                            background: 'rgba(255,255,255,0.06)', border: 'none', color: '#90caf9',
+                            cursor: 'pointer', padding: '5px 8px', borderRadius: 6, fontSize: 11,
+                          }}
+                          title="แก้ไขภารกิจ"
+                        >
+                          <i className="fas fa-pencil-alt" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteTaskFromPool(t.id)}
+                          style={{
+                            background: 'rgba(255,255,255,0.06)', border: 'none', color: '#ef5350',
+                            cursor: 'pointer', padding: '5px 8px', borderRadius: 6, fontSize: 11,
+                          }}
+                          title="ลบภารกิจ"
+                        >
+                          <i className="fas fa-trash-alt" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                {(gameDoc.taskPool || []).length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 16, color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
+                    ยังไม่มีภารกิจในคลัง กรุณาเพิ่มภารกิจ
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Sabotage Pool Management */}
+            <div style={{
+              background: '#121722', borderRadius: 16, padding: 16,
+              border: '1px solid rgba(229, 57, 53, 0.25)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#ff8a80' }}>
+                    <i className="fas fa-radiation" style={{ marginRight: 6 }} />
+                    คลังสถานการณ์ Sabotage ({(gameDoc.sabotagePool || DEFAULT_SABOTAGE_POOL).length} รายการ)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                    เพิ่ม ลบ หรือแก้ไขเหตุการณ์ Sabotage ที่คนร้ายสามารถกดใช้งานในเกม
+                  </div>
                 </div>
               </div>
 
+              {/* Add New Sabotage Form */}
+              <div style={{
+                background: 'rgba(255,255,255,0.03)',
+                padding: 12, borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.06)',
+                marginBottom: 14,
+                display: 'flex', flexDirection: 'column', gap: 8,
+              }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, color: '#ff8a80' }}>
+                  <i className="fas fa-plus-circle" style={{ marginRight: 5 }} /> เพิ่ม Sabotage ใหม่
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 8 }}>
+                  <input
+                    type="text"
+                    placeholder="ชื่อ Sabotage (เช่น ไฟดับ, ประตูล็อค)"
+                    value={newSabTitle}
+                    onChange={e => setNewSabTitle(e.target.value)}
+                    style={{
+                      padding: '8px 12px', borderRadius: 8,
+                      background: '#1c2230',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      color: '#fff', fontSize: 12.5, outline: 'none',
+                      fontFamily: 'inherit',
+                    }}
+                  />
+                  <div>
+                    <input
+                      type="number"
+                      placeholder="เวลานับถอยหลัง (วิ)"
+                      value={newSabCountdown}
+                      onChange={e => setNewSabCountdown(e.target.value)}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        background: '#1c2230',
+                        border: '1px solid rgba(255,255,255,0.12)',
+                        color: '#fff', fontSize: 12, outline: 'none',
+                        fontFamily: 'inherit',
+                      }}
+                    />
+                  </div>
+                </div>
+                <input
+                  type="text"
+                  placeholder="คำอธิบาย / อาการ (เช่น คนดีต้องรีบไปแจ้งแอดมินที่เคาน์เตอร์)"
+                  value={newSabDesc}
+                  onChange={e => setNewSabDesc(e.target.value)}
+                  style={{
+                    padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230',
+                    border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 12, outline: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleAddSabotageToPool}
+                  style={{
+                    marginTop: 4, padding: '9px 16px', borderRadius: 8,
+                    background: '#c62828', color: '#fff',
+                    border: 'none', fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  }}
+                >
+                  <i className="fas fa-plus" />
+                  <span>เพิ่ม Sabotage ลงคลัง</span>
+                </button>
+              </div>
+
+              {/* Sabotage Pool List */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 220, overflowY: 'auto' }}>
-                {(gameDoc.taskPool || []).map(t => (
+                {(gameDoc.sabotagePool || DEFAULT_SABOTAGE_POOL).map(s => (
                   <div
-                    key={t.id}
+                    key={s.id || s.title}
                     style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 10px', borderRadius: 8,
+                      padding: '9px 12px', borderRadius: 10,
                       background: 'rgba(255,255,255,0.02)',
-                      border: '1px solid rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.06)',
                     }}
                   >
-                    <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{t.title}</div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>{t.desc}</div>
+                    <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: '#ff8a80' }}>{s.title}</span>
+                        <span style={{
+                          padding: '1px 6px', borderRadius: 4,
+                          background: 'rgba(255,255,255,0.08)',
+                          color: '#ffcc80', fontSize: 10, fontWeight: 800,
+                        }}>
+                          {s.countdownSeconds || 90} วินาที
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {s.desc}
+                      </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteTaskFromPool(t.id)}
-                      style={{
-                        background: 'none', border: 'none', color: 'rgba(255,255,255,0.3)',
-                        cursor: 'pointer', padding: 4,
-                      }}
-                    >
-                      <i className="fas fa-trash-alt" />
-                    </button>
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSabotage({
+                          id: s.id,
+                          title: s.title,
+                          desc: s.desc || '',
+                          countdownSeconds: s.countdownSeconds || 90,
+                        })}
+                        style={{
+                          background: 'rgba(255,255,255,0.06)', border: 'none', color: '#90caf9',
+                          cursor: 'pointer', padding: '5px 8px', borderRadius: 6, fontSize: 11,
+                        }}
+                        title="แก้ไข Sabotage"
+                      >
+                        <i className="fas fa-pencil-alt" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSabotageFromPool(s.id)}
+                        style={{
+                          background: 'rgba(255,255,255,0.06)', border: 'none', color: '#ef5350',
+                          cursor: 'pointer', padding: '5px 8px', borderRadius: 6, fontSize: 11,
+                        }}
+                        title="ลบ Sabotage"
+                      >
+                        <i className="fas fa-trash-alt" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1809,6 +2221,18 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       {t.verified ? <i className="fas fa-check" /> : `${idx + 1}`}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '2px 7px', borderRadius: 6,
+                          background: 'rgba(33, 150, 243, 0.15)',
+                          border: '1px solid rgba(33, 150, 243, 0.3)',
+                          color: '#64b5f6', fontSize: 10.5, fontWeight: 800,
+                        }}>
+                          <i className="fas fa-map-marker-alt" style={{ fontSize: 9 }} />
+                          ชั้น {t.floor || 1} · {t.room || 'โซนหน้า'}
+                        </span>
+                      </div>
                       <div style={{
                         fontSize: 13.5, fontWeight: 700,
                         textDecoration: t.verified ? 'line-through' : 'none',
@@ -2150,8 +2574,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             <div style={{ fontSize: 12, fontWeight: 800, color: '#ff5252', letterSpacing: '0.05em' }}>
               QR CODE ยืนยันภารกิจ
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginTop: 4, marginBottom: 2 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginTop: 4, marginBottom: 4 }}>
               {activeTaskModal.title}
+            </div>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '3px 10px', borderRadius: 8,
+              background: 'rgba(33, 150, 243, 0.15)',
+              border: '1px solid rgba(33, 150, 243, 0.3)',
+              color: '#64b5f6', fontSize: 11.5, fontWeight: 800,
+              marginBottom: 10,
+            }}>
+              <i className="fas fa-map-marker-alt" />
+              สถานที่: ชั้น {activeTaskModal.floor || 1} · {activeTaskModal.room || 'โซนหน้า'}
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
               ยื่นหน้านี้ให้แอดมินสแกนด้วยกล้อง เพื่อบันทึกว่าทำสำเร็จ
@@ -2212,17 +2647,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               คำขอจะถูกส่งให้แอดมินตรวจสอบ เมื่อแอดมินอนุมัติ สัญญาณเตือนจะดังขึ้นบนโทรศัพท์ของทุกคน
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
-              {[
-                { title: 'ไฟดับ (Lights Out)', desc: 'ลดการมองเห็น คนดีต้องรีบไปแก้ปัญหากับแอดมิน' },
-                { title: 'อากาศรั่ว (O2 Depletion)', desc: 'มีเวลานับถอยหลัง คนดีต้องรีบไปกู้สถานการณ์' },
-                { title: 'ประตูล็อค (Doors Locked)', desc: 'ประตูปิดกั้น คนดีต้องช่วยกันเคลียร์ทาง' },
-                { title: 'ป่วนระบบสื่อสาร (Comms Jammed)', desc: 'แถบความคืบหน้าภารกิจจะถูกซ่อนชั่วคราว' },
-              ].map(s => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, maxHeight: 300, overflowY: 'auto' }}>
+              {(gameDoc.sabotagePool || DEFAULT_SABOTAGE_POOL).map(s => (
                 <button
-                  key={s.title}
+                  key={s.id || s.title}
                   type="button"
-                  onClick={() => requestSabotage(s.title, s.desc)}
+                  onClick={() => requestSabotage(s.title, s.desc, s.countdownSeconds)}
                   style={{
                     padding: '11px 14px', borderRadius: 10,
                     background: 'rgba(255,255,255,0.03)',
@@ -2230,8 +2660,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     color: '#fff', textAlign: 'left', cursor: 'pointer',
                   }}
                 >
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#ff8a80' }}>{s.title}</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>{s.desc}</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#ff8a80' }}>{s.title}</div>
+                    <span style={{ fontSize: 10, color: '#ffcc80', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                      {s.countdownSeconds || 90} วินาที
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>{s.desc}</div>
                 </button>
               ))}
             </div>
@@ -2247,6 +2682,231 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             >
               ยกเลิก
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── EDIT TASK MODAL (FOR ADMIN) ─── */}
+      {editingTask && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 130,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setEditingTask(null)}>
+          <div style={{
+            background: '#121722', borderRadius: 20, padding: 22,
+            maxWidth: 400, width: '100%',
+            border: '1px solid rgba(255,255,255,0.15)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 14 }}>
+              แก้ไขภารกิจ
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                  ชื่อภารกิจ
+                </label>
+                <input
+                  type="text"
+                  value={editingTask.title}
+                  onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 13,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                  รายละเอียดภารกิจ
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingTask.desc}
+                  onChange={e => setEditingTask({ ...editingTask, desc: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 12, resize: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                    ชั้น (1 - 5)
+                  </label>
+                  <select
+                    value={editingTask.floor}
+                    onChange={e => {
+                      const fl = Number(e.target.value)
+                      const rooms = BUILDING_FLOORS.find(b => b.floor === fl)?.rooms || []
+                      setEditingTask({
+                        ...editingTask,
+                        floor: fl,
+                        room: rooms[0] || '',
+                      })
+                    }}
+                    style={{
+                      width: '100%', padding: '7px 10px', borderRadius: 8,
+                      background: '#1c2230', color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {BUILDING_FLOORS.map(b => (
+                      <option key={b.floor} value={b.floor}>{b.label}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                    ห้อง / โซน
+                  </label>
+                  <select
+                    value={editingTask.room}
+                    onChange={e => setEditingTask({ ...editingTask, room: e.target.value })}
+                    style={{
+                      width: '100%', padding: '7px 10px', borderRadius: 8,
+                      background: '#1c2230', color: '#fff',
+                      border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    {(BUILDING_FLOORS.find(b => b.floor === Number(editingTask.floor))?.rooms || []).map(r => (
+                      <option key={r} value={r}>{r}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleUpdateTaskInPool}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: 10,
+                  background: '#c62828', color: '#fff',
+                  border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                }}
+              >
+                บันทึกการแก้ไข
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingTask(null)}
+                style={{
+                  padding: '10px 16px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+                  border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                ยกเลิก
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── EDIT SABOTAGE MODAL (FOR ADMIN) ─── */}
+      {editingSabotage && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 130,
+          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setEditingSabotage(null)}>
+          <div style={{
+            background: '#121722', borderRadius: 20, padding: 22,
+            maxWidth: 400, width: '100%',
+            border: '1px solid rgba(229, 57, 53, 0.4)',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 14 }}>
+              แก้ไข Sabotage
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                  ชื่อ Sabotage
+                </label>
+                <input
+                  type="text"
+                  value={editingSabotage.title}
+                  onChange={e => setEditingSabotage({ ...editingSabotage, title: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 13,
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                  คำอธิบาย / อาการ
+                </label>
+                <textarea
+                  rows={2}
+                  value={editingSabotage.desc}
+                  onChange={e => setEditingSabotage({ ...editingSabotage, desc: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 12, resize: 'none',
+                    fontFamily: 'inherit',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                  เวลานับถอยหลัง (วินาที)
+                </label>
+                <input
+                  type="number"
+                  value={editingSabotage.countdownSeconds}
+                  onChange={e => setEditingSabotage({ ...editingSabotage, countdownSeconds: e.target.value })}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8,
+                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    color: '#fff', fontSize: 12,
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                onClick={handleUpdateSabotageInPool}
+                style={{
+                  flex: 1, padding: '10px', borderRadius: 10,
+                  background: '#c62828', color: '#fff',
+                  border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
+                }}
+              >
+                บันทึกการแก้ไข
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditingSabotage(null)}
+                style={{
+                  padding: '10px 16px', borderRadius: 10,
+                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+                  border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                ยกเลิก
+              </button>
+            </div>
           </div>
         </div>
       )}
