@@ -580,7 +580,7 @@ export default function App() {
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}
       {currentPage === 'qr' && <QRPage lineUser={lineUser} />}
       {currentPage === 'order' && activeMemberOrder && (
-        <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} allGames={allGames} />
+        <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} allGames={allGames} showPage={showPage} />
       )}
       {currentPage === 'adminscan' && isEffectiveAdmin && <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />}
       {currentPage === 'pos' && (

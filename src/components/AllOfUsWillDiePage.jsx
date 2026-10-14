@@ -263,9 +263,18 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const unsub = onSnapshot(q, snap => {
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const specialEvent = orders.find(o => {
-        const title = (o.scriptTitle || '').toLowerCase()
-        const room = (o.room || '').toLowerCase()
-        return title.includes('special event') || room.includes('special')
+        const title = (o.scriptTitle || '').toLowerCase().trim()
+        const scriptId = (o.scriptId || '').toLowerCase().trim()
+        const room = (o.room || '').toLowerCase().trim()
+        return (
+          title.includes('special event') ||
+          title.includes('secial event') ||
+          title.includes('spacial event') ||
+          title.includes('all of us') ||
+          scriptId.includes('special') ||
+          scriptId.includes('allofus') ||
+          room.includes('special')
+        )
       })
       if (specialEvent) {
         setActiveParty(specialEvent)
@@ -1222,7 +1231,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           {/* Exit / Return button */}
           <button
             type="button"
-            onClick={() => showPage('home')}
+            onClick={() => showPage(activeParty ? 'order' : 'home')}
             style={{
               width: 34, height: 34, borderRadius: 10,
               background: 'rgba(255,255,255,0.06)',

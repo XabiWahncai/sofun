@@ -695,7 +695,7 @@ function MenuRow({ item, cart, changeQty, addToCart, setAddonPopup }) {
   )
 }
 
-export default function MemberOrderPage({ lineUser, activeOrder, showToast, allGames = [] }) {
+export default function MemberOrderPage({ lineUser, activeOrder, showToast, allGames = [], showPage }) {
   const [menuItems, setMenuItems] = useState([])
   const [cart, setCart] = useState([])
   const [addonPopup, setAddonPopup] = useState(null)
@@ -965,10 +965,35 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
     }
   }
 
+  const scriptTitleLower = (activeOrder?.scriptTitle || '').toLowerCase().trim()
+  const scriptIdLower = (activeOrder?.scriptId || '').toLowerCase().trim()
+  const roomLower = (activeOrder?.room || '').toLowerCase().trim()
+  const isSpecialEvent =
+    scriptTitleLower.includes('special event') ||
+    scriptTitleLower.includes('secial event') ||
+    scriptTitleLower.includes('spacial event') ||
+    scriptTitleLower.includes('all of us will die') ||
+    scriptTitleLower.includes('all of us') ||
+    scriptIdLower.includes('special') ||
+    scriptIdLower.includes('allofus') ||
+    roomLower.includes('special')
+
+  const handleOpenAllOfUsWillDie = () => {
+    const effectiveUid = me?.uid || lineUser?.uid || currentUid
+    if (effectiveUid) {
+      localStorage.setItem('allofus_player_uid', effectiveUid)
+    }
+    if (typeof showPage === 'function') {
+      showPage('allofuswilldie')
+    } else {
+      window.location.href = '/AllOfUsWillDie'
+    }
+  }
+
   return (
     <div id="member-order-page">
 
-      {/* ── Top: session card + history (scrollable summary) ── */}
+      {/* Top: session card + history (scrollable summary) */}
       <div className="mo-top-section">
         <div className="mo-session-card">
           {(() => {
@@ -986,9 +1011,21 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
             <div className="mo-session-game">
               <i className="fas fa-scroll" /> {activeOrder.scriptTitle || 'ไม่ระบุเกม'}
             </div>
-            <button className="mo-bill-btn" onClick={() => setShowBill(true)}>
-              <i className="fas fa-receipt" /> บิล
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+              {isSpecialEvent && (
+                <button
+                  type="button"
+                  className="mo-aou-btn"
+                  onClick={handleOpenAllOfUsWillDie}
+                  title="All Of Us Will Die"
+                >
+                  <i className="fas fa-skull-crossbones" /> All Of Us Will Die
+                </button>
+              )}
+              <button className="mo-bill-btn" onClick={() => setShowBill(true)}>
+                <i className="fas fa-receipt" /> บิล
+              </button>
+            </div>
           </div>
           <div className="mo-session-meta">
             {activeOrder.dm && <span><i className="fas fa-crown" /> {activeOrder.dm}</span>}
