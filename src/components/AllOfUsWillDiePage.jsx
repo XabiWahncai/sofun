@@ -79,6 +79,96 @@ function playTaskSuccessSound() {
   } catch {}
 }
 
+// ── Among Us Visor / Crewmate Bean Component ────────────
+export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, color = null }) {
+  const visorWidth = Math.round(size * 0.95)
+  const visorHeight = Math.round(size * 1.1)
+
+  const defaultBody = !isAlive
+    ? '#78909c'
+    : role === 'impostor'
+    ? '#c51111'
+    : role === 'dodo'
+    ? '#8e24aa'
+    : '#0288d1'
+
+  const bodyColor = color || defaultBody
+
+  const shadowColor = !isAlive
+    ? '#455a64'
+    : role === 'impostor'
+    ? '#7a0813'
+    : role === 'dodo'
+    ? '#4a148c'
+    : (color ? '#000000' : '#01579b')
+
+  return (
+    <div
+      style={{
+        width: visorWidth,
+        height: visorHeight,
+        borderRadius: '45% 45% 40% 40%',
+        background: `radial-gradient(circle at 40% 30%, ${bodyColor} 60%, ${shadowColor} 100%)`,
+        border: '2.5px solid #0a0e17',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        boxShadow: 'inset -2px -4px 0 rgba(0,0,0,0.35), 0 3px 6px rgba(0,0,0,0.4)',
+        flexShrink: 0,
+        verticalAlign: 'middle',
+      }}
+    >
+      {/* Backpack on the side */}
+      <div
+        style={{
+          position: 'absolute',
+          left: -4,
+          top: '25%',
+          width: 5,
+          height: '50%',
+          borderRadius: 3,
+          background: shadowColor,
+          border: '1.5px solid #0a0e17',
+        }}
+      />
+
+      {isAlive ? (
+        // Glass Visor with Specular Highlight
+        <div
+          style={{
+            width: '68%',
+            height: '42%',
+            borderRadius: 14,
+            background: 'linear-gradient(180deg, #b2fcf3 0%, #38fedc 45%, #00838f 100%)',
+            border: '2px solid #0a0e17',
+            position: 'relative',
+            overflow: 'hidden',
+            boxShadow: 'inset 0 1px 2px rgba(255,255,255,0.9)',
+          }}
+        >
+          <div
+            style={{
+              position: 'absolute',
+              top: 1,
+              left: 2,
+              width: '50%',
+              height: '38%',
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.9)',
+            }}
+          />
+        </div>
+      ) : (
+        // Ghost Mode Icon
+        <div style={{ color: '#eceff1', fontSize: Math.round(size * 0.45) }}>
+          <i className="fas fa-ghost" />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Building Floors and Room Locations ─────────────────
 export const BUILDING_FLOORS = [
   { floor: 1, label: 'ชั้น 1', rooms: ['โซนหน้า', 'ห้องแต่งตัว', 'โซนหลัง'] },
@@ -153,6 +243,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [currentTimeSec, setCurrentTimeSec] = useState(0)
   const [meetingTimeSec, setMeetingTimeSec] = useState(0)
   const [sabotageTimeSec, setSabotageTimeSec] = useState(0)
+  const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
 
   // Determine effective admin permission
   const hasAdminPerm = isAppAdmin || lineUser?.role === 'admin' || !!firebaseUser
@@ -687,7 +778,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             players: updatedPlayers,
             winner: 'crewmate',
             winReason: 'โหวตคนร้ายออกหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false },
+            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget },
           })
         } else if (remainingImpostors.length >= remainingCrew.length) {
           // Impostors win!
@@ -696,14 +787,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             players: updatedPlayers,
             winner: 'impostor',
             winReason: 'จำนวนคนร้ายเท่ากับคนดีแล้ว! ฝ่ายคนร้ายชนะ!',
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false },
+            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget },
           })
         } else {
           // Move to meeting result screen
           await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
             status: 'meeting_result',
             players: updatedPlayers,
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false },
+            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget },
           })
         }
       }
@@ -962,7 +1053,18 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#090b10',
+      background: '#060913',
+      backgroundImage: `
+        radial-gradient(1.5px 1.5px at 25px 35px, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 60px 85px, #80d8ff, rgba(0,0,0,0)),
+        radial-gradient(1.5px 1.5px at 120px 45px, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(2px 2px at 190px 140px, #ffe082, rgba(0,0,0,0)),
+        radial-gradient(1.5px 1.5px at 270px 210px, #ffffff, rgba(0,0,0,0)),
+        radial-gradient(1px 1px at 340px 95px, #80d8ff, rgba(0,0,0,0)),
+        radial-gradient(2px 2px at 390px 270px, #ffffff, rgba(0,0,0,0))
+      `,
+      backgroundRepeat: 'repeat',
+      backgroundSize: '420px 420px',
       color: '#e0e6ed',
       fontFamily: "'Sarabun', sans-serif",
       display: 'flex',
@@ -971,11 +1073,92 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       overflowX: 'hidden'
     }}>
 
+      {/* ─── AMONG US GLOBAL CSS STYLES ─── */}
+      <style>{`
+        @keyframes auTwinkle {
+          0%, 100% { opacity: 0.3; transform: scale(0.95); }
+          50% { opacity: 1; transform: scale(1.15); }
+        }
+        @keyframes auEjectSpin {
+          0% { transform: translateX(-140px) translateY(0px) rotate(0deg); opacity: 0; }
+          15% { opacity: 1; }
+          85% { opacity: 1; }
+          100% { transform: translateX(390px) translateY(35px) rotate(720deg); opacity: 0; }
+        }
+        @keyframes auEmergencyPulse {
+          0%, 100% { transform: scale(1); box-shadow: 0 0 15px rgba(229, 57, 53, 0.5), inset 0 2px 4px rgba(255,255,255,0.4); }
+          50% { transform: scale(1.03); box-shadow: 0 0 35px rgba(229, 57, 53, 0.95), 0 0 10px #ff1744, inset 0 2px 8px rgba(255,255,255,0.6); }
+        }
+        @keyframes auAlarmBlink {
+          0%, 100% { background: #b71c1c; }
+          50% { background: #e53935; }
+        }
+        .au-card {
+          background: #141c2a;
+          border: 2.5px solid #233146;
+          border-radius: 18px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .au-btn {
+          font-family: inherit;
+          font-weight: 900;
+          border: 2.5px solid #080d16;
+          border-radius: 12px;
+          cursor: pointer;
+          transition: all 0.08s ease-in-out;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          user-select: none;
+        }
+        .au-btn:active {
+          transform: translateY(2px);
+          box-shadow: none !important;
+        }
+        .au-btn-red {
+          background: #c51111;
+          color: #ffffff;
+          border-bottom: 4.5px solid #7a0813;
+          box-shadow: 0 4px 0 #7a0813, 0 6px 16px rgba(197, 17, 17, 0.4);
+        }
+        .au-btn-green {
+          background: #2e7d32;
+          color: #ffffff;
+          border-bottom: 4.5px solid #1b5e20;
+          box-shadow: 0 4px 0 #1b5e20, 0 6px 16px rgba(46, 125, 50, 0.4);
+        }
+        .au-btn-blue {
+          background: #0288d1;
+          color: #ffffff;
+          border-bottom: 4.5px solid #01579b;
+          box-shadow: 0 4px 0 #01579b, 0 6px 16px rgba(2, 136, 209, 0.4);
+        }
+        .au-btn-purple {
+          background: #8e24aa;
+          color: #ffffff;
+          border-bottom: 4.5px solid #4a148c;
+          box-shadow: 0 4px 0 #4a148c, 0 6px 16px rgba(142, 36, 170, 0.4);
+        }
+        .au-btn-yellow {
+          background: #fbc02d;
+          color: #111827;
+          border-bottom: 4.5px solid #f57f17;
+          box-shadow: 0 4px 0 #f57f17, 0 6px 16px rgba(251, 192, 45, 0.4);
+        }
+        .au-btn-dark {
+          background: #1e293b;
+          color: #ffffff;
+          border-bottom: 4.5px solid #0f172a;
+          box-shadow: 0 4px 0 #0f172a;
+        }
+      `}</style>
+
       {/* ─── GLOBAL HEADER BAR ─── */}
       <header style={{
-        background: 'rgba(15, 20, 31, 0.95)',
-        backdropFilter: 'blur(10px)',
-        borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+        background: 'rgba(13, 19, 31, 0.95)',
+        backdropFilter: 'blur(12px)',
+        borderBottom: '2.5px solid #1f2c42',
         padding: '10px 16px',
         display: 'flex',
         alignItems: 'center',
@@ -985,20 +1168,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         zIndex: 50,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: 'linear-gradient(135deg, #c62828 0%, #d32f2f 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 14, fontWeight: 900,
-            boxShadow: '0 2px 8px rgba(198, 40, 40, 0.4)'
-          }}>
-            <i className="fas fa-biohazard" />
-          </div>
+          <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={30} />
           <div>
-            <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.06em', color: '#ff5252', lineHeight: 1.1 }}>
+            <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.08em', color: '#ff5252', lineHeight: 1.1 }}>
               ALL OF US WILL DIE
             </div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
               {activeParty ? `ตี้: ${activeParty.room || activeParty.scriptTitle || 'Special Event'}` : 'SPECIAL EVENT'}
             </div>
           </div>
@@ -1013,15 +1188,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               onClick={() => setShowSabotageModal(true)}
               title="Sabotage"
               style={{
-                width: 34, height: 34, borderRadius: 8,
-                background: 'rgba(255, 255, 255, 0.04)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                color: 'rgba(255, 255, 255, 0.5)',
+                width: 36, height: 36, borderRadius: 10,
+                background: 'rgba(197, 17, 17, 0.2)',
+                border: '1.5px solid #c51111',
+                color: '#ff5252',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 cursor: 'pointer',
               }}
             >
-              <i className="fas fa-satellite-dish" style={{ fontSize: 13 }} />
+              <i className="fas fa-radiation" style={{ fontSize: 14 }} />
             </button>
           )}
 
@@ -1030,14 +1205,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             <button
               type="button"
               onClick={() => setIsAdminView(v => !v)}
+              className="au-btn"
               style={{
-                padding: '5px 10px', borderRadius: 8,
-                background: isAdminView ? '#c62828' : 'rgba(255,255,255,0.06)',
+                padding: '6px 12px',
+                fontSize: 11,
+                background: isAdminView ? '#c51111' : '#1e293b',
                 color: '#fff',
-                border: `1px solid ${isAdminView ? '#c62828' : 'rgba(255,255,255,0.12)'}`,
-                fontSize: 11, fontWeight: 800,
-                display: 'flex', alignItems: 'center', gap: 5,
-                cursor: 'pointer',
+                borderBottom: `3.5px solid ${isAdminView ? '#7a0813' : '#0f172a'}`,
               }}
             >
               <i className="fas fa-crown" style={{ fontSize: 10, color: isAdminView ? '#fff' : '#ffd54f' }} />
@@ -1050,19 +1224,96 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             type="button"
             onClick={() => showPage('home')}
             style={{
-              width: 32, height: 32, borderRadius: 8,
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: 'rgba(255,255,255,0.6)',
+              width: 34, height: 34, borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1.5px solid rgba(255,255,255,0.12)',
+              color: 'rgba(255,255,255,0.7)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               cursor: 'pointer',
             }}
             title="กลับหน้าหลัก"
           >
-            <i className="fas fa-times" style={{ fontSize: 12 }} />
+            <i className="fas fa-times" style={{ fontSize: 13 }} />
           </button>
         </div>
       </header>
+
+      {/* ─── ICONIC TOP TASK BAR (AMONG US STYLE) ─── */}
+      <div style={{
+        maxWidth: 640,
+        width: '100%',
+        margin: '12px auto 0',
+        padding: '0 16px',
+        boxSizing: 'border-box',
+      }}>
+        <div style={{
+          background: '#0d131d',
+          border: '2.5px solid #233147',
+          borderRadius: 14,
+          padding: '8px 12px',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 6,
+          }}>
+            <span style={{
+              fontSize: 10.5,
+              fontWeight: 900,
+              letterSpacing: '0.08em',
+              color: (gameDoc.sabotage?.active && gameDoc.sabotage.id === 'sab_comms') ? '#ff5252' : '#8bc34a',
+              textTransform: 'uppercase',
+            }}>
+              <i className="fas fa-tasks" style={{ marginRight: 6 }} />
+              {gameDoc.sabotage?.active && gameDoc.sabotage.id === 'sab_comms'
+                ? 'COMMUNICATIONS SABOTAGED'
+                : 'TOTAL TASKS COMPLETED'}
+            </span>
+            <span style={{
+              fontSize: 11,
+              fontWeight: 900,
+              color: '#6bfb5b',
+              fontFamily: 'monospace',
+            }}>
+              {gameDoc.sabotage?.active && gameDoc.sabotage.id === 'sab_comms' ? '??%' : `${progressPercent}%`}
+            </span>
+          </div>
+
+          {/* Outer Segmented Slot Bar with 10 Divider Notches */}
+          <div style={{
+            height: 16,
+            background: '#080d14',
+            borderRadius: 8,
+            border: '2px solid #000',
+            position: 'relative',
+            overflow: 'hidden',
+          }}>
+            {/* Lime Green Progress Fill */}
+            <div style={{
+              height: '100%',
+              width: (gameDoc.sabotage?.active && gameDoc.sabotage.id === 'sab_comms') ? '0%' : `${progressPercent}%`,
+              background: 'linear-gradient(180deg, #99ff88 0%, #46dd3b 50%, #2bb822 100%)',
+              boxShadow: '0 0 12px rgba(107, 251, 91, 0.8)',
+              transition: 'width 0.4s ease',
+            }} />
+
+            {/* Overlaid 10 Segment Divider Notches */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(10, 1fr)',
+              pointerEvents: 'none',
+            }}>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} style={{ borderRight: '1.5px solid rgba(0,0,0,0.65)', height: '100%' }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ─── ACTIVE SABOTAGE BANNER ─── */}
       {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
@@ -1073,8 +1324,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '2px solid #ff5252',
-          animation: 'pulse 1.5s infinite',
+          borderBottom: '2.5px solid #ff5252',
+          animation: 'auAlarmBlink 1.2s infinite',
+          marginTop: 8,
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <i className="fas fa-exclamation-triangle" style={{ fontSize: 18, color: '#ffebee' }} />
@@ -1089,8 +1341,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           </div>
           <div style={{
             fontSize: 18, fontWeight: 900,
-            background: 'rgba(0,0,0,0.4)',
-            padding: '3px 8px', borderRadius: 6,
+            background: 'rgba(0,0,0,0.5)',
+            border: '1.5px solid rgba(255,255,255,0.2)',
+            padding: '3px 9px', borderRadius: 8,
             fontFamily: 'monospace',
           }}>
             {fmtTime(sabotageTimeSec)}
@@ -1103,61 +1356,52 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
         {/* ── SELECT / IDENTIFY PLAYER MODAL (If player not bound yet) ── */}
         {(!myUid || !me) && !isAdminView && (
-          <div style={{
-            background: '#121722',
-            borderRadius: 16,
-            padding: 20,
-            border: '1px solid rgba(255,255,255,0.08)',
+          <div className="au-card" style={{
+            padding: 22,
             marginBottom: 20,
             textAlign: 'center',
           }}>
-            <div style={{
-              width: 50, height: 50, borderRadius: '50%',
-              background: 'rgba(255,255,255,0.05)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              margin: '0 auto 12px', color: '#ff5252', fontSize: 22,
-            }}>
-              <i className="fas fa-user-astronaut" />
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+              <AmongUsVisor role="crewmate" isAlive={true} size={50} />
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-              เลือกชื่อของคุณจากสมาชิกตี้ Special Event
+            <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+              เลือกตัวละครของคุณ
             </div>
             <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-              ไม่ต้องล็อกอิน แตะชื่อของคุณเพื่อเข้าสู่ระบบเกมมือถือ
+              แตะชื่อของคุณจากสมาชิกตี้ Special Event เพื่อเข้าสู่ยาน
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(activeParty?.members || []).map(m => (
-                <button
-                  key={m.uid}
-                  type="button"
-                  onClick={() => {
-                    setMyUid(m.uid)
-                    localStorage.setItem('allofus_player_uid', m.uid)
-                    showToast(`ยินดีต้อนรับ ${m.name}`)
-                  }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 12,
-                    padding: '10px 14px', borderRadius: 12,
-                    background: 'rgba(255,255,255,0.04)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    color: '#fff', cursor: 'pointer', textAlign: 'left',
-                  }}
-                >
-                  {m.avatar ? (
-                    <img src={m.avatar} alt="" style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }} />
-                  ) : (
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#37474f', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 14 }}>
-                      <i className="fas fa-user" />
+              {(activeParty?.members || []).map((m, idx) => {
+                const colors = ['#0288d1', '#c51111', '#2e7d32', '#fbc02d', '#8e24aa', '#ff9800', '#009688', '#e91e63']
+                const assignedColor = colors[idx % colors.length]
+                return (
+                  <button
+                    key={m.uid}
+                    type="button"
+                    onClick={() => {
+                      setMyUid(m.uid)
+                      localStorage.setItem('allofus_player_uid', m.uid)
+                      showToast(`ยินดีต้อนรับ ${m.name}`)
+                    }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12,
+                      padding: '10px 14px', borderRadius: 14,
+                      background: 'rgba(255,255,255,0.03)',
+                      border: '2px solid #1f2c42',
+                      color: '#fff', cursor: 'pointer', textAlign: 'left',
+                      transition: 'border-color 0.15s ease',
+                    }}
+                  >
+                    <AmongUsVisor size={36} color={assignedColor} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{m.name}</div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>สมาชิกตี้ Special Event</div>
                     </div>
-                  )}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{m.name}</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>สมาชิกตี้ Special Event</div>
-                  </div>
-                  <i className="fas fa-chevron-right" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }} />
-                </button>
-              ))}
+                    <i className="fas fa-chevron-right" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }} />
+                  </button>
+                )
+              })}
 
               {(!activeParty?.members || activeParty.members.length === 0) && (
                 <div style={{ padding: '16px 0', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
@@ -1166,9 +1410,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               )}
             </div>
 
-            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
               <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-                หรือพิมพ์ชื่อเพื่อเข้าร่วมเกมโดยตรง
+                หรือพิมพ์ชื่อเพื่อเข้าร่วมยานโดยตรง
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <input
@@ -1179,18 +1423,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   onKeyDown={e => { if (e.key === 'Enter') handleDirectJoin() }}
                   style={{
                     flex: 1, padding: '10px 12px', borderRadius: 10,
-                    background: '#1c2230', color: '#fff',
-                    border: '1px solid rgba(255,255,255,0.15)', fontSize: 13
+                    background: '#0d131d', color: '#fff',
+                    border: '2px solid #233147', fontSize: 13,
+                    fontFamily: 'inherit',
                   }}
                 />
                 <button
                   type="button"
                   onClick={handleDirectJoin}
-                  style={{
-                    padding: '10px 16px', borderRadius: 10,
-                    background: '#c62828', color: '#fff',
-                    border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer'
-                  }}
+                  className="au-btn au-btn-red"
+                  style={{ padding: '10px 18px', fontSize: 13 }}
                 >
                   เข้าร่วม
                 </button>
@@ -1206,17 +1448,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Admin Header Card */}
-            <div style={{
-              background: '#121722',
-              borderRadius: 16,
-              padding: 16,
-              border: '1px solid rgba(255, 213, 79, 0.25)',
+            <div className="au-card" style={{
+              padding: 18,
+              border: '2.5px solid #fbc02d',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
             }}>
               <div>
-                <div style={{ fontSize: 11, color: '#ffd54f', fontWeight: 800, letterSpacing: '0.05em' }}>
+                <div style={{ fontSize: 11, color: '#fbc02d', fontWeight: 900, letterSpacing: '0.08em' }}>
                   GAME MASTER CONTROLLER
                 </div>
                 <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginTop: 2 }}>
@@ -1235,14 +1475,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               <button
                 type="button"
                 onClick={() => setScannerOpen(true)}
-                style={{
-                  padding: '9px 14px', borderRadius: 10,
-                  background: '#c62828', color: '#fff',
-                  border: 'none', fontSize: 12.5, fontWeight: 800,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 10px rgba(198, 40, 40, 0.4)',
-                }}
+                className="au-btn au-btn-red"
+                style={{ padding: '9px 14px', fontSize: 12.5 }}
               >
                 <i className="fas fa-qrcode" />
                 <span>สแกนตรวจภารกิจ</span>
@@ -1250,10 +1484,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             </div>
 
             {/* Admin Quick Game Controls */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
+            <div className="au-card" style={{ padding: 18 }}>
               <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.6)', marginBottom: 12 }}>
                 การควบคุมเวลาและสถานะเกม
               </div>
@@ -1261,7 +1492,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               {gameDoc.status === 'waiting' ? (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-                    <span style={{ fontSize: 13, color: '#fff', fontWeight: 600 }}>ตั้งเวลาเล่นเกม:</span>
+                    <span style={{ fontSize: 13, color: '#fff', fontWeight: 700 }}>ตั้งเวลาเล่นเกม:</span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <button
                         type="button"
@@ -1269,9 +1500,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           gameDurationMinutes: Math.max(5, (gameDoc.gameDurationMinutes || 20) - 5),
                           gameSecondsRemaining: Math.max(5, (gameDoc.gameDurationMinutes || 20) - 5) * 60,
                         })}
-                        style={{ width: 32, height: 32, borderRadius: 8, background: '#1c2230', color: '#fff', border: 'none', fontWeight: 800 }}
+                        className="au-btn au-btn-dark"
+                        style={{ width: 34, height: 34, fontSize: 13 }}
                       >-5</button>
-                      <span style={{ fontSize: 16, fontWeight: 900, color: '#ff5252' }}>
+                      <span style={{ fontSize: 18, fontWeight: 900, color: '#ff5252', fontFamily: 'monospace' }}>
                         {gameDoc.gameDurationMinutes || 20} นาที
                       </span>
                       <button
@@ -1280,7 +1512,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           gameDurationMinutes: (gameDoc.gameDurationMinutes || 20) + 5,
                           gameSecondsRemaining: ((gameDoc.gameDurationMinutes || 20) + 5) * 60,
                         })}
-                        style={{ width: 32, height: 32, borderRadius: 8, background: '#1c2230', color: '#fff', border: 'none', fontWeight: 800 }}
+                        className="au-btn au-btn-dark"
+                        style={{ width: 34, height: 34, fontSize: 13 }}
                       >+5</button>
                     </div>
                   </div>
@@ -1288,13 +1521,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   <button
                     type="button"
                     onClick={handleStartGame}
-                    style={{
-                      width: '100%', padding: '12px', borderRadius: 12,
-                      background: 'linear-gradient(135deg, #c62828 0%, #e53935 100%)',
-                      color: '#fff', fontSize: 14, fontWeight: 900,
-                      border: 'none', cursor: 'pointer',
-                      boxShadow: '0 4px 14px rgba(198, 40, 40, 0.4)',
-                    }}
+                    className="au-btn au-btn-red"
+                    style={{ width: '100%', padding: '13px', fontSize: 14 }}
                   >
                     <i className="fas fa-play" style={{ marginRight: 8 }} />
                     เริ่มเกม (สุ่มแจกคนละ 3 ภารกิจและเริ่มนับเวลา)
@@ -1303,7 +1531,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div style={{ fontSize: 22, fontWeight: 900, color: '#ff5252', fontFamily: 'monospace' }}>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: '#ff5252', fontFamily: 'monospace' }}>
                       {fmtTime(currentTimeSec)}
                     </div>
                     <div style={{ display: 'flex', gap: 6 }}>
@@ -1313,7 +1541,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           gameSecondsRemaining: currentTimeSec + 60,
                           timerUpdatedAt: Date.now(),
                         })}
-                        style={{ padding: '6px 10px', borderRadius: 8, background: '#1c2230', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700 }}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '6px 10px', fontSize: 11 }}
                       >+1 นาที</button>
                       <button
                         type="button"
@@ -1321,7 +1550,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           gameSecondsRemaining: Math.max(0, currentTimeSec - 60),
                           timerUpdatedAt: Date.now(),
                         })}
-                        style={{ padding: '6px 10px', borderRadius: 8, background: '#1c2230', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700 }}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '6px 10px', fontSize: 11 }}
                       >-1 นาที</button>
                       <button
                         type="button"
@@ -1329,9 +1559,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           gameTimerRunning: !gameDoc.gameTimerRunning,
                           timerUpdatedAt: Date.now(),
                         })}
-                        style={{ padding: '6px 12px', borderRadius: 8, background: gameDoc.gameTimerRunning ? '#ff9800' : '#4caf50', color: '#fff', border: 'none', fontSize: 11, fontWeight: 800 }}
+                        className={`au-btn ${gameDoc.gameTimerRunning ? 'au-btn-yellow' : 'au-btn-green'}`}
+                        style={{ padding: '6px 12px', fontSize: 11 }}
                       >
-                        {gameDoc.gameTimerRunning ? 'หยุดเวลาชั่วคราว' : 'เดินเวลาต่อ'}
+                        {gameDoc.gameTimerRunning ? 'หยุดเวลา' : 'เดินเวลา'}
                       </button>
                     </div>
                   </div>
@@ -1340,22 +1571,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     <button
                       type="button"
                       onClick={() => callEmergencyMeeting(false)}
-                      style={{
-                        flex: 1, padding: '10px', borderRadius: 10,
-                        background: '#e53935', color: '#fff',
-                        border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                      }}
+                      className="au-btn au-btn-red"
+                      style={{ flex: 1, padding: '11px', fontSize: 12.5 }}
                     >
                       <i className="fas fa-bullhorn" style={{ marginRight: 6 }} /> เรียกประชุมด่วน
                     </button>
                     <button
                       type="button"
                       onClick={handleResetGame}
-                      style={{
-                        padding: '10px 14px', borderRadius: 10,
-                        background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-                        border: '1px solid rgba(255,255,255,0.1)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                      }}
+                      className="au-btn au-btn-dark"
+                      style={{ padding: '11px 14px', fontSize: 12.5 }}
                     >
                       รีเซ็ตเกม
                     </button>
@@ -1366,35 +1591,29 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
             {/* Admin Sabotage Pending Approval Alert */}
             {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'pending_approval' && (
-              <div style={{
-                background: '#211216', border: '1px solid #c62828',
-                borderRadius: 16, padding: 14,
+              <div className="au-card" style={{
+                background: '#211216', border: '2.5px solid #c51111',
+                padding: 16,
               }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ff5252', fontSize: 13, fontWeight: 800, marginBottom: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ff5252', fontSize: 13, fontWeight: 900, marginBottom: 6 }}>
                   <i className="fas fa-radiation fa-spin" /> มีคำขอ Sabotage จากคนร้าย!
                 </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{gameDoc.sabotage.title}</div>
+                <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{gameDoc.sabotage.title}</div>
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{gameDoc.sabotage.desc}</div>
                 <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                   <button
                     type="button"
                     onClick={approveSabotage}
-                    style={{
-                      flex: 1, padding: '9px', borderRadius: 8,
-                      background: '#c62828', color: '#fff',
-                      border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                    }}
+                    className="au-btn au-btn-red"
+                    style={{ flex: 1, padding: '10px', fontSize: 12.5 }}
                   >
                     อนุมัติ Sabotage
                   </button>
                   <button
                     type="button"
                     onClick={resolveSabotage}
-                    style={{
-                      padding: '9px 14px', borderRadius: 8,
-                      background: 'rgba(255,255,255,0.08)', color: '#fff',
-                      border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                    }}
+                    className="au-btn au-btn-dark"
+                    style={{ padding: '10px 16px', fontSize: 12.5 }}
                   >
                     ปฏิเสธ / ปิด
                   </button>
@@ -1404,33 +1623,27 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
             {/* Admin Active Sabotage Controls */}
             {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
-              <div style={{
-                background: '#1b1318', border: '1px solid #d32f2f',
-                borderRadius: 16, padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              <div className="au-card" style={{
+                background: '#1b1318', border: '2.5px solid #d32f2f',
+                padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               }}>
                 <div>
-                  <div style={{ fontSize: 11, color: '#ff5252', fontWeight: 800 }}>SABOTAGE กำลังทำงาน</div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>{gameDoc.sabotage.title}</div>
+                  <div style={{ fontSize: 11, color: '#ff5252', fontWeight: 900 }}>SABOTAGE กำลังทำงาน</div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>{gameDoc.sabotage.title}</div>
                 </div>
                 <button
                   type="button"
                   onClick={resolveSabotage}
-                  style={{
-                    padding: '8px 14px', borderRadius: 8,
-                    background: '#2e7d32', color: '#fff',
-                    border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
-                  }}
+                  className="au-btn au-btn-green"
+                  style={{ padding: '9px 14px', fontSize: 12 }}
                 >
-                  <i className="fas fa-check" style={{ marginRight: 6 }} /> ยืนยันคนดีแก้สำเร็จ (ยกเลิก Sabotage)
+                  <i className="fas fa-check" style={{ marginRight: 6 }} /> คนดีแก้สำเร็จ
                 </button>
               </div>
             )}
 
             {/* Admin Player List & Role Inspector */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
+            <div className="au-card" style={{ padding: 18 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
                   รายชื่อผู้เล่น ({allPlayersList.length} คน)
@@ -1448,21 +1661,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     <div
                       key={p.uid}
                       style={{
-                        padding: 12, borderRadius: 12,
+                        padding: 12, borderRadius: 14,
                         background: 'rgba(255,255,255,0.03)',
-                        border: `1px solid ${p.isAlive ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.03)'}`,
+                        border: `1.5px solid ${p.isAlive ? '#1f2c42' : 'rgba(255,255,255,0.04)'}`,
                         opacity: p.isAlive ? 1 : 0.6,
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          {p.avatar ? (
-                            <img src={p.avatar} alt="" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-                          ) : (
-                            <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#37474f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
-                              <i className="fas fa-user" />
-                            </div>
-                          )}
+                          <AmongUsVisor role={p.role} isAlive={p.isAlive} size={32} />
                           <div>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
                               {p.name} {!p.isAlive && <span style={{ color: '#9e9e9e', fontSize: 10 }}>(ตาย)</span>}
@@ -1928,19 +2135,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Player Identity Card */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 18,
-              border: '1px solid rgba(255,255,255,0.08)',
+            <div className="au-card" style={{
+              padding: 18,
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                {me.avatar ? (
-                  <img src={me.avatar} alt="" style={{ width: 46, height: 46, borderRadius: '50%', objectFit: 'cover', border: '2px solid #ff5252' }} />
-                ) : (
-                  <div style={{ width: 46, height: 46, borderRadius: '50%', background: '#263238', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, color: '#fff' }}>
-                    <i className="fas fa-user-astronaut" />
-                  </div>
-                )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={48} />
                 <div>
                   {editingName ? (
                     <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
@@ -1949,29 +2149,30 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         value={nameInput}
                         onChange={e => setNameInput(e.target.value)}
                         placeholder="พิมพ์ชื่อของคุณ"
-                        style={{ padding: '4px 8px', borderRadius: 6, background: '#1c2230', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', fontSize: 12 }}
+                        style={{ padding: '6px 10px', borderRadius: 8, background: '#0d131d', color: '#fff', border: '2px solid #233147', fontSize: 13, fontFamily: 'inherit' }}
                       />
                       <button
                         type="button"
                         onClick={saveMyName}
-                        style={{ padding: '4px 10px', borderRadius: 6, background: '#c62828', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700 }}
+                        className="au-btn au-btn-red"
+                        style={{ padding: '6px 12px', fontSize: 11 }}
                       >บันทึก</button>
                     </div>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{me.name}</span>
+                      <span style={{ fontSize: 17, fontWeight: 900, color: '#fff' }}>{me.name}</span>
                       <button
                         type="button"
                         onClick={() => { setNameInput(me.name); setEditingName(true) }}
                         style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2 }}
                         title="แก้ไขชื่อ"
                       >
-                        <i className="fas fa-pencil-alt" style={{ fontSize: 11 }} />
+                        <i className="fas fa-pencil-alt" style={{ fontSize: 12 }} />
                       </button>
                     </div>
                   )}
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
-                    สมาชิกตี้ Special Event
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                    สมาชิกตี้ Special Event · {myRole === 'impostor' ? 'คนร้าย' : (myRole === 'dodo' ? 'โดโด้' : 'คนดี')}
                   </div>
                 </div>
               </div>
@@ -1982,24 +2183,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   localStorage.removeItem('allofus_player_uid')
                   setMyUid('')
                 }}
-                style={{
-                  background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)',
-                  fontSize: 11, cursor: 'pointer',
-                }}
+                className="au-btn au-btn-dark"
+                style={{ padding: '6px 10px', fontSize: 11 }}
               >
                 สลับชื่อ
               </button>
             </div>
 
             {/* Secret Role Selection (In Real Life) */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 18,
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
+            <div className="au-card" style={{ padding: 18 }}>
+              <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
                 เลือกบทบาทที่คุณได้รับในชีวิตจริง
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
                 เลือกบทบาทที่สุ่มได้จากการจับฉลาก เพื่อให้ระบบแสดงปุ่มและความสามารถที่ถูกต้อง
               </div>
 
@@ -2009,24 +2205,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   type="button"
                   onClick={() => setMyRole('crewmate')}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12,
-                    background: myRole === 'crewmate' ? 'rgba(41, 182, 246, 0.15)' : 'rgba(255,255,255,0.03)',
-                    border: `1.5px solid ${myRole === 'crewmate' ? '#29b6f6' : 'rgba(255,255,255,0.08)'}`,
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
+                    background: myRole === 'crewmate' ? 'rgba(2, 136, 209, 0.18)' : 'rgba(255,255,255,0.03)',
+                    border: `2.5px solid ${myRole === 'crewmate' ? '#0288d1' : '#1f2c42'}`,
                     color: '#fff', cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 0.12s ease',
                   }}
                 >
-                  <div style={{
-                    width: 38, height: 38, borderRadius: 10,
-                    background: '#0288d1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, color: '#fff',
-                  }}>
-                    <i className="fas fa-shield-alt" />
-                  </div>
+                  <AmongUsVisor role="crewmate" size={40} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>ฝ่ายคนดี (Crewmate)</div>
+                    <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>ฝ่ายคนดี (Crewmate)</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>ทำภารกิจส่วนตัวให้ครบ 100% หรือจับคนร้าย</div>
                   </div>
-                  {myRole === 'crewmate' && <i className="fas fa-check-circle" style={{ color: '#29b6f6', fontSize: 16 }} />}
+                  {myRole === 'crewmate' && <i className="fas fa-check-circle" style={{ color: '#29b6f6', fontSize: 18 }} />}
                 </button>
 
                 {/* Impostor */}
@@ -2034,24 +2225,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   type="button"
                   onClick={() => setMyRole('impostor')}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12,
-                    background: myRole === 'impostor' ? 'rgba(229, 57, 53, 0.15)' : 'rgba(255,255,255,0.03)',
-                    border: `1.5px solid ${myRole === 'impostor' ? '#e53935' : 'rgba(255,255,255,0.08)'}`,
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
+                    background: myRole === 'impostor' ? 'rgba(197, 17, 17, 0.2)' : 'rgba(255,255,255,0.03)',
+                    border: `2.5px solid ${myRole === 'impostor' ? '#c51111' : '#1f2c42'}`,
                     color: '#fff', cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 0.12s ease',
                   }}
                 >
-                  <div style={{
-                    width: 38, height: 38, borderRadius: 10,
-                    background: '#c62828', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, color: '#fff',
-                  }}>
-                    <i className="fas fa-skull" />
-                  </div>
+                  <AmongUsVisor role="impostor" size={40} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>คนร้าย (Impostor)</div>
+                    <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>คนร้าย (Impostor)</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>เนียนทำภารกิจ และแอบกด Sabotage ป่วนระบบ</div>
                   </div>
-                  {myRole === 'impostor' && <i className="fas fa-check-circle" style={{ color: '#e53935', fontSize: 16 }} />}
+                  {myRole === 'impostor' && <i className="fas fa-check-circle" style={{ color: '#e53935', fontSize: 18 }} />}
                 </button>
 
                 {/* Dodo */}
@@ -2059,24 +2245,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   type="button"
                   onClick={() => setMyRole('dodo')}
                   style={{
-                    display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 12,
-                    background: myRole === 'dodo' ? 'rgba(171, 71, 188, 0.15)' : 'rgba(255,255,255,0.03)',
-                    border: `1.5px solid ${myRole === 'dodo' ? '#ab47bc' : 'rgba(255,255,255,0.08)'}`,
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
+                    background: myRole === 'dodo' ? 'rgba(142, 36, 170, 0.2)' : 'rgba(255,255,255,0.03)',
+                    border: `2.5px solid ${myRole === 'dodo' ? '#8e24aa' : '#1f2c42'}`,
                     color: '#fff', cursor: 'pointer', textAlign: 'left',
+                    transition: 'all 0.12s ease',
                   }}
                 >
-                  <div style={{
-                    width: 38, height: 38, borderRadius: 10,
-                    background: '#7b1fa2', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 16, color: '#fff',
-                  }}>
-                    <i className="fas fa-mask" />
-                  </div>
+                  <AmongUsVisor role="dodo" size={40} />
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>โดโด้ (Dodo / Jester)</div>
+                    <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>โดโด้ (Dodo / Jester)</div>
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>ทำตัวให้สงสัยเพื่อให้ที่ประชุมโหวตคุณออก ชนะทันที!</div>
                   </div>
-                  {myRole === 'dodo' && <i className="fas fa-check-circle" style={{ color: '#ab47bc', fontSize: 16 }} />}
+                  {myRole === 'dodo' && <i className="fas fa-check-circle" style={{ color: '#ce93d8', fontSize: 18 }} />}
                 </button>
               </div>
             </div>
@@ -2100,97 +2281,122 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
             {/* Ghost Mode Notice */}
             {!isAlive && (
-              <div style={{
-                background: 'rgba(158, 158, 158, 0.12)',
-                border: '1px solid rgba(158, 158, 158, 0.3)',
-                borderRadius: 14, padding: '10px 14px',
-                display: 'flex', alignItems: 'center', gap: 10,
+              <div className="au-card" style={{
+                background: 'rgba(69, 90, 100, 0.25)',
+                border: '2px solid #546e7a',
+                padding: '12px 16px',
+                display: 'flex', alignItems: 'center', gap: 12,
               }}>
-                <i className="fas fa-ghost" style={{ fontSize: 20, color: '#b0bec5' }} />
+                <AmongUsVisor isAlive={false} size={36} />
                 <div>
-                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#eceff1' }}>สถานะ: วิญญาณ (GHOST)</div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
-                    คุณถูกกำจัดแล้ว แต่ยังสามารถทำภารกิจส่วนตัวให้ครบเพื่อช่วยฝ่ายคนดีได้
+                  <div style={{ fontSize: 13, fontWeight: 900, color: '#eceff1' }}>สถานะ: วิญญาณ (GHOST)</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', marginTop: 2 }}>
+                    คุณถูกกำจัดแล้ว แต่ยังสามารถทำภารกิจส่วนตัวให้ครบเพื่อช่วยฝ่ายคนดีชนะได้
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Status & Timer Card */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            {/* Futuristic Spaceship Monitor & Big Red Emergency Dome Button */}
+            <div className="au-card" style={{
+              padding: 18,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 16,
             }}>
               <div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>
-                  เวลาเล่นเกมคงเหลือ
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 800, letterSpacing: '0.06em' }}>
+                  GAME TIME REMAINING
                 </div>
                 <div style={{
-                  fontSize: 28, fontWeight: 900, color: '#ff5252',
-                  fontFamily: 'monospace', letterSpacing: '0.04em', lineHeight: 1.1, marginTop: 2,
+                  fontSize: 32, fontWeight: 900, color: '#ff5252',
+                  fontFamily: 'monospace', letterSpacing: '0.04em', lineHeight: 1.1, marginTop: 4,
+                  textShadow: '0 0 10px rgba(255, 82, 82, 0.4)',
                 }}>
                   {fmtTime(currentTimeSec)}
                 </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+                  <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={22} />
+                  <span style={{ fontSize: 11, fontWeight: 800, color: myRole === 'impostor' ? '#ff5252' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff') }}>
+                    {myRole === 'impostor' ? 'คนร้าย' : (myRole === 'dodo' ? 'โดโด้' : 'คนดี')}
+                  </span>
+                </div>
               </div>
 
-              {/* Emergency Report Body Button */}
-              {isAlive && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (window.confirm('ยืนยัน REPORT ศพหรือเรียกประชุมฉุกเฉิน?')) {
-                      callEmergencyMeeting(true)
-                    }
-                  }}
-                  style={{
-                    padding: '10px 16px', borderRadius: 12,
-                    background: 'linear-gradient(135deg, #c62828 0%, #e53935 100%)',
-                    color: '#fff', fontSize: 13, fontWeight: 900,
-                    border: 'none', cursor: 'pointer',
-                    display: 'flex', alignItems: 'center', gap: 8,
-                    boxShadow: '0 4px 12px rgba(198, 40, 40, 0.4)',
-                  }}
-                >
-                  <i className="fas fa-bullhorn" />
-                  <span>REPORT ศพ</span>
-                </button>
-              )}
+              {/* Action Buttons: Emergency Dome & Sabotage Trigger */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Impostor Sabotage Quick Button */}
+                {myRole === 'impostor' && isAlive && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSabotageModal(true)}
+                    className="au-btn"
+                    style={{
+                      width: 58, height: 58, borderRadius: '50%',
+                      background: 'radial-gradient(circle at 40% 30%, #b71c1c 0%, #7a0813 100%)',
+                      border: '3px solid #ff5252',
+                      boxShadow: '0 4px 14px rgba(183, 28, 28, 0.6)',
+                      color: '#fff',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                    }}
+                    title="Sabotage"
+                  >
+                    <i className="fas fa-radiation" style={{ fontSize: 17, color: '#ffebee' }} />
+                    <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.04em' }}>SABOTAGE</span>
+                  </button>
+                )}
+
+                {/* Iconic Big Red Emergency Dome Button */}
+                {isAlive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (window.confirm('ยืนยัน REPORT ศพหรือกดปุ่มเรียกประชุมฉุกเฉิน?')) {
+                        callEmergencyMeeting(true)
+                      }
+                    }}
+                    style={{
+                      width: 76, height: 76,
+                      borderRadius: '50%',
+                      background: 'repeating-linear-gradient(45deg, #181818, #181818 7px, #fbc02d 7px, #fbc02d 14px)',
+                      padding: 5,
+                      border: '3px solid #080d16',
+                      boxShadow: '0 6px 18px rgba(0,0,0,0.7)',
+                      cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}
+                    title="Emergency Meeting / Report"
+                  >
+                    <div style={{
+                      width: '100%', height: '100%',
+                      borderRadius: '50%',
+                      background: 'radial-gradient(circle at 40% 30%, #ff5252 0%, #c62828 60%, #7a0813 100%)',
+                      border: '2px solid rgba(255,255,255,0.4)',
+                      boxShadow: 'inset 0 3px 6px rgba(255,255,255,0.6), 0 3px 6px rgba(0,0,0,0.6)',
+                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+                      color: '#fff',
+                      animation: 'auEmergencyPulse 2s infinite ease-in-out',
+                    }}>
+                      <i className="fas fa-bullhorn" style={{ fontSize: 20 }} />
+                      <span style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: '0.04em' }}>REPORT</span>
+                    </div>
+                  </button>
+                )}
+              </div>
             </div>
 
-            {/* Total Tasks Progress Bar */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 14,
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>
-                  ความคืบหน้าภารกิจรวมทั้งหมด
+            {/* My Personal Tasks List (Skeld Terminal Style) */}
+            <div className="au-card" style={{ padding: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 900, color: '#ffd54f', letterSpacing: '0.06em' }}>
+                  <i className="fas fa-clipboard-list" style={{ marginRight: 6 }} />
+                  ภารกิจส่วนตัว (YOUR TASKS)
+                </div>
+                <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 800 }}>
+                  3 ภารกิจ
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 900, color: '#4caf50' }}>
-                  {progressPercent}%
-                </span>
-              </div>
-              <div style={{
-                height: 12, background: 'rgba(255,255,255,0.06)', borderRadius: 999,
-                overflow: 'hidden', padding: 2,
-              }}>
-                <div style={{
-                  height: '100%', borderRadius: 999,
-                  background: 'linear-gradient(90deg, #2e7d32 0%, #4caf50 100%)',
-                  width: `${progressPercent}%`,
-                  transition: 'width 0.4s ease',
-                }} />
-              </div>
-            </div>
-
-            {/* My Personal Tasks List (3 Tasks) */}
-            <div style={{
-              background: '#121722', borderRadius: 16, padding: 16,
-              border: '1px solid rgba(255,255,255,0.08)',
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', marginBottom: 4 }}>
-                ภารกิจส่วนตัวของคุณ (3 ภารกิจ)
               </div>
               <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>
                 แตะที่หัวข้อภารกิจเมื่อทำเสร็จ เพื่อแสดง QR Code ให้แอดมินสแกนยืนยัน
@@ -2206,17 +2412,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     }}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '12px 14px', borderRadius: 12,
-                      background: t.verified ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.03)',
-                      border: `1.5px solid ${t.verified ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.08)'}`,
+                      padding: '12px 14px', borderRadius: 14,
+                      background: t.verified ? 'rgba(46, 125, 50, 0.15)' : '#0d131d',
+                      border: `2px solid ${t.verified ? '#2e7d32' : '#1f2c42'}`,
                       color: '#fff', textAlign: 'left', cursor: t.verified ? 'default' : 'pointer',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.3)',
                     }}
                   >
                     <div style={{
-                      width: 32, height: 32, borderRadius: 8,
-                      background: t.verified ? '#2e7d32' : 'rgba(255,255,255,0.06)',
+                      width: 32, height: 32, borderRadius: 10,
+                      background: t.verified ? '#2e7d32' : '#1e293b',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: '#fff', fontSize: 13, fontWeight: 800,
+                      color: '#fff', fontSize: 13, fontWeight: 900,
+                      border: '1.5px solid rgba(255,255,255,0.15)',
                     }}>
                       {t.verified ? <i className="fas fa-check" /> : `${idx + 1}`}
                     </div>
@@ -2224,19 +2432,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
                         <span style={{
                           display: 'inline-flex', alignItems: 'center', gap: 4,
-                          padding: '2px 7px', borderRadius: 6,
-                          background: 'rgba(33, 150, 243, 0.15)',
-                          border: '1px solid rgba(33, 150, 243, 0.3)',
-                          color: '#64b5f6', fontSize: 10.5, fontWeight: 800,
+                          padding: '2px 8px', borderRadius: 6,
+                          background: 'rgba(251, 192, 45, 0.15)',
+                          border: '1px solid rgba(251, 192, 45, 0.3)',
+                          color: '#fbc02d', fontSize: 10.5, fontWeight: 900,
                         }}>
                           <i className="fas fa-map-marker-alt" style={{ fontSize: 9 }} />
                           ชั้น {t.floor || 1} · {t.room || 'โซนหน้า'}
                         </span>
                       </div>
                       <div style={{
-                        fontSize: 13.5, fontWeight: 700,
+                        fontSize: 13.5, fontWeight: 800,
                         textDecoration: t.verified ? 'line-through' : 'none',
-                        color: t.verified ? '#a5d6a7' : '#fff',
+                        color: t.verified ? '#81c784' : '#ffffff',
                       }}>
                         {t.title}
                       </div>
@@ -2246,11 +2454,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     </div>
                     <div>
                       {t.verified ? (
-                        <span style={{ fontSize: 10, fontWeight: 800, color: '#81c784', background: 'rgba(76,175,80,0.15)', padding: '3px 8px', borderRadius: 999 }}>
-                          เสร็จแล้ว
+                        <span style={{ fontSize: 10.5, fontWeight: 900, color: '#81c784', background: 'rgba(46,125,50,0.2)', padding: '4px 8px', borderRadius: 8, border: '1px solid #2e7d32' }}>
+                          <i className="fas fa-check" style={{ marginRight: 4 }} /> เสร็จแล้ว
                         </span>
                       ) : (
-                        <span style={{ fontSize: 10, fontWeight: 800, color: '#ffa726', background: 'rgba(255,167,38,0.15)', padding: '3px 8px', borderRadius: 999 }}>
+                        <span className="au-btn au-btn-yellow" style={{ fontSize: 10.5, padding: '5px 10px' }}>
                           แสดง QR
                         </span>
                       )}
@@ -2270,7 +2478,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* ─── MEETING FULL-SCREEN OVERLAY ─────────────────────────── */}
+        {/* ─── MEETING FULL-SCREEN OVERLAY (THE SKELD TABLET) ──────── */}
         {/* ─────────────────────────────────────────────────────────── */}
         {(gameDoc.status === 'meeting_called' ||
           gameDoc.status === 'meeting_discussion' ||
@@ -2278,50 +2486,59 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           gameDoc.status === 'meeting_result') && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 100,
-            background: 'rgba(10, 13, 20, 0.98)',
+            background: 'rgba(4, 7, 15, 0.98)',
+            backgroundImage: `
+              radial-gradient(1.5px 1.5px at 30px 40px, #ffffff, rgba(0,0,0,0)),
+              radial-gradient(1px 1px at 80px 100px, #80d8ff, rgba(0,0,0,0)),
+              radial-gradient(2px 2px at 150px 70px, #ffe082, rgba(0,0,0,0)),
+              radial-gradient(1.5px 1.5px at 240px 180px, #ffffff, rgba(0,0,0,0))
+            `,
+            backgroundRepeat: 'repeat',
+            backgroundSize: '350px 350px',
             backdropFilter: 'blur(16px)',
             display: 'flex', flexDirection: 'column',
-            padding: '20px 16px', overflowY: 'auto',
+            padding: '16px 12px', overflowY: 'auto',
           }}>
-            <div style={{ maxWidth: 540, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-              {/* Meeting Phase 1: Alarm / Called */}
+              {/* Meeting Phase 1: Siren Alarm / Called */}
               {gameDoc.status === 'meeting_called' && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '20px 0' }}>
                   <div style={{
-                    width: 90, height: 90, borderRadius: '50%',
-                    background: 'rgba(229, 57, 53, 0.15)',
-                    border: '3px solid #e53935',
+                    width: 100, height: 100, borderRadius: '50%',
+                    background: 'radial-gradient(circle at 40% 30%, #ff5252 0%, #c62828 60%, #7a0813 100%)',
+                    border: '4px solid #fff',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: '#ff5252', fontSize: 38, marginBottom: 20,
+                    color: '#fff', fontSize: 42, marginBottom: 20,
+                    animation: 'auEmergencyPulse 1.5s infinite ease-in-out',
+                    boxShadow: '0 0 35px rgba(229, 57, 53, 0.9)',
                   }}>
-                    <i className="fas fa-bullhorn fa-shake" />
+                    <i className="fas fa-bullhorn" />
                   </div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: '#ff5252', letterSpacing: '0.05em' }}>
+                  <div style={{ fontSize: 28, fontWeight: 900, color: '#ff5252', letterSpacing: '0.08em', textShadow: '0 0 15px rgba(255, 82, 82, 0.6)' }}>
                     EMERGENCY MEETING
                   </div>
-                  <div style={{ fontSize: 15, color: '#fff', fontWeight: 700, marginTop: 8 }}>
-                    {gameDoc.meeting?.calledBy?.name} กดเรียกประชุมฉุกเฉิน!
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
+                    <AmongUsVisor size={38} />
+                    <span style={{ fontSize: 17, color: '#fff', fontWeight: 800 }}>
+                      {gameDoc.meeting?.calledBy?.name} กดเรียกประชุมฉุกเฉิน!
+                    </span>
                   </div>
-                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
-                    เวลาเกมหลักหยุดเดินชั่วคราว ให้ทุกคนมารวมตัวกันที่ห้อง
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, maxWidth: 360 }}>
+                    เวลาเกมหลักหยุดเดินชั่วคราว ให้ลูกเรือทุกคนมารวมตัวกันที่ห้องประชุม
                   </div>
 
                   {hasAdminPerm ? (
                     <button
                       type="button"
                       onClick={startDiscussionPhase}
-                      style={{
-                        marginTop: 32, padding: '14px 28px', borderRadius: 12,
-                        background: '#c62828', color: '#fff', fontSize: 15, fontWeight: 900,
-                        border: 'none', cursor: 'pointer',
-                        boxShadow: '0 4px 16px rgba(198, 40, 40, 0.4)',
-                      }}
+                      className="au-btn au-btn-red"
+                      style={{ marginTop: 32, padding: '14px 32px', fontSize: 15 }}
                     >
                       เริ่มจับเวลาประชุม (3 นาที)
                     </button>
                   ) : (
-                    <div style={{ marginTop: 32, color: 'rgba(255,255,255,0.4)', fontSize: 13 }}>
+                    <div style={{ marginTop: 32, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
                       <i className="fas fa-spinner fa-spin" style={{ marginRight: 8 }} />
                       รอแอดมินเริ่มการประชุม...
                     </div>
@@ -2329,22 +2546,33 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 </div>
               )}
 
-              {/* Meeting Phase 2 & 3: Discussion & Voting */}
+              {/* Meeting Phase 2 & 3: Discussion & Skeld Voting Table */}
               {(gameDoc.status === 'meeting_discussion' || gameDoc.status === 'meeting_voting') && (
-                <div>
-                  {/* Meeting Header */}
-                  <div style={{ textAlign: 'center', marginBottom: 16 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: gameDoc.status === 'meeting_voting' ? '#ff5252' : '#ffd54f', letterSpacing: '0.06em' }}>
+                <div className="au-card" style={{ padding: 18, border: '3.5px solid #28374d', borderRadius: 22 }}>
+                  {/* Tablet Header */}
+                  <div style={{ textAlign: 'center', marginBottom: 14 }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.08em', color: '#fff' }}>
+                      WHO IS AN IMPOSTOR?
+                    </div>
+                    <div style={{
+                      display: 'inline-block',
+                      marginTop: 4,
+                      padding: '2px 10px',
+                      borderRadius: 6,
+                      fontSize: 11,
+                      fontWeight: 900,
+                      background: gameDoc.status === 'meeting_voting' ? 'rgba(229, 57, 53, 0.2)' : 'rgba(251, 192, 45, 0.15)',
+                      color: gameDoc.status === 'meeting_voting' ? '#ff5252' : '#fbc02d',
+                      border: `1px solid ${gameDoc.status === 'meeting_voting' ? '#ff5252' : '#fbc02d'}`,
+                    }}>
                       {gameDoc.status === 'meeting_voting' ? 'ช่วงลงคะแนนโหวต (1 นาทีสุดท้าย)' : 'ช่วงสอบสวนและอภิปราย (ยังไม่เปิดโหวต)'}
                     </div>
                     <div style={{
-                      fontSize: 34, fontWeight: 900, color: '#fff',
-                      fontFamily: 'monospace', letterSpacing: '0.05em', marginTop: 4,
+                      fontSize: 34, fontWeight: 900, color: '#ff5252',
+                      fontFamily: 'monospace', letterSpacing: '0.06em', marginTop: 4,
+                      textShadow: '0 0 10px rgba(255, 82, 82, 0.5)',
                     }}>
                       {fmtTime(meetingTimeSec)}
-                    </div>
-                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                      {gameDoc.status === 'meeting_voting' ? 'แตะชื่อผู้เล่นที่คุณสงสัย หรือเลือก SKIP' : 'พูดคุยหาเบาะแสก่อนเปิดระบบโหวต'}
                     </div>
                   </div>
 
@@ -2353,93 +2581,125 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     <button
                       type="button"
                       onClick={openVotingPhaseNow}
-                      style={{
-                        width: '100%', padding: '10px', borderRadius: 10,
-                        background: 'rgba(255, 213, 79, 0.1)', color: '#ffd54f',
-                        border: '1px solid rgba(255, 213, 79, 0.3)',
-                        fontSize: 12, fontWeight: 800, marginBottom: 14, cursor: 'pointer',
-                      }}
+                      className="au-btn au-btn-yellow"
+                      style={{ width: '100%', padding: '10px', fontSize: 12, marginBottom: 14 }}
                     >
                       เปิดโหวตทันที (ข้ามเวลาคุย)
                     </button>
                   )}
 
-                  {/* Voting Candidates List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+                  {/* Skeld Voting Candidates Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 14 }}>
                     {allPlayersList.filter(p => p.isAlive).map(p => {
                       const hasMyVote = gameDoc.meeting?.votes?.[myUid] === p.uid
                       const voteCount = Object.values(gameDoc.meeting?.votes || {}).filter(v => v === p.uid).length
+                      const hasVotedAnyone = !!gameDoc.meeting?.votes?.[p.uid]
+                      const isSelected = selectedVoteTarget === p.uid
 
                       return (
-                        <button
+                        <div
                           key={p.uid}
-                          type="button"
-                          disabled={gameDoc.status !== 'meeting_voting' || !isAlive}
-                          onClick={() => castVote(p.uid)}
+                          onClick={() => {
+                            if (gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid]) {
+                              setSelectedVoteTarget(isSelected ? null : p.uid)
+                            }
+                          }}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '12px 14px', borderRadius: 12,
-                            background: hasMyVote ? 'rgba(229, 57, 53, 0.2)' : 'rgba(255,255,255,0.04)',
-                            border: `1.5px solid ${hasMyVote ? '#e53935' : 'rgba(255,255,255,0.08)'}`,
-                            color: '#fff', cursor: (gameDoc.status === 'meeting_voting' && isAlive) ? 'pointer' : 'default',
-                            opacity: (gameDoc.status === 'meeting_voting' && isAlive) ? 1 : 0.8,
+                            padding: '10px 12px', borderRadius: 12,
+                            background: hasMyVote ? 'rgba(229, 57, 53, 0.25)' : (isSelected ? '#1c283c' : '#0d131d'),
+                            border: `2.5px solid ${hasMyVote ? '#ff5252' : (isSelected ? '#0288d1' : '#1f2c42')}`,
+                            color: '#fff',
+                            cursor: (gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid]) ? 'pointer' : 'default',
+                            transition: 'all 0.1s ease',
                           }}
                         >
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            {p.avatar ? (
-                              <img src={p.avatar} alt="" style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover' }} />
-                            ) : (
-                              <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#37474f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
-                                <i className="fas fa-user" />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+                            <AmongUsVisor role={p.role} isAlive={p.isAlive} size={34} />
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>
+                                {p.name} {p.uid === myUid && <span style={{ fontSize: 10.5, color: '#80d8ff' }}>(คุณ)</span>}
                               </div>
-                            )}
-                            <div style={{ fontSize: 14, fontWeight: 700 }}>
-                              {p.name} {p.uid === myUid && <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }}>(คุณ)</span>}
                             </div>
                           </div>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            {/* Live Vote Tally (visible for admin or upon voting) */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {/* Live Vote Count Badge */}
                             {voteCount > 0 && (
-                              <span style={{ fontSize: 11, fontWeight: 800, color: '#ff5252', background: 'rgba(229,57,53,0.15)', padding: '2px 8px', borderRadius: 999 }}>
-                                {voteCount} โหวต
+                              <span style={{ fontSize: 11, fontWeight: 900, color: '#ff5252', background: 'rgba(229,57,53,0.18)', padding: '2px 7px', borderRadius: 8, border: '1px solid #ff5252' }}>
+                                {voteCount}
                               </span>
                             )}
-                            {hasMyVote && <i className="fas fa-check-circle" style={{ color: '#ff5252' }} />}
+
+                            {/* Red VOTED stamp if this player has cast their vote */}
+                            {hasVotedAnyone && (
+                              <span style={{
+                                fontSize: 9, fontWeight: 900, color: '#fff',
+                                background: '#c51111', padding: '2px 5px', borderRadius: 4,
+                                border: '1px solid #ff5252', letterSpacing: '0.04em',
+                              }}>
+                                VOTED
+                              </span>
+                            )}
+
+                            {/* Vote Confirmation Checkmark Button (Authentic Among Us Mechanic) */}
+                            {isSelected && gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid] && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  castVote(p.uid)
+                                  setSelectedVoteTarget(null)
+                                }}
+                                className="au-btn au-btn-green"
+                                style={{ width: 32, height: 32, borderRadius: 8, padding: 0 }}
+                                title="ยืนยันโหวตคนนี้"
+                              >
+                                <i className="fas fa-check" />
+                              </button>
+                            )}
+
+                            {/* Checkmark if current player voted for this target */}
+                            {hasMyVote && <i className="fas fa-check-circle" style={{ color: '#ff5252', fontSize: 16 }} />}
                           </div>
-                        </button>
+                        </div>
                       )
                     })}
+                  </div>
 
-                    {/* Skip Vote Button */}
-                    {gameDoc.status === 'meeting_voting' && isAlive && (
+                  {/* Skip Vote Button Card */}
+                  {gameDoc.status === 'meeting_voting' && isAlive && (
+                    <div style={{ marginBottom: 14 }}>
                       <button
                         type="button"
                         onClick={() => castVote('skip')}
+                        disabled={!!gameDoc.meeting?.votes?.[myUid]}
+                        className="au-btn au-btn-dark"
                         style={{
-                          padding: '12px 14px', borderRadius: 12,
-                          background: gameDoc.meeting?.votes?.[myUid] === 'skip' ? 'rgba(158,158,158,0.2)' : 'rgba(255,255,255,0.02)',
-                          border: `1.5px solid ${gameDoc.meeting?.votes?.[myUid] === 'skip' ? '#9e9e9e' : 'rgba(255,255,255,0.08)'}`,
-                          color: '#fff', fontSize: 13, fontWeight: 800,
-                          cursor: 'pointer', textAlign: 'center', marginTop: 4,
+                          width: '100%', padding: '12px 14px',
+                          border: `2.5px solid ${gameDoc.meeting?.votes?.[myUid] === 'skip' ? '#9e9e9e' : '#1f2c42'}`,
+                          background: gameDoc.meeting?.votes?.[myUid] === 'skip' ? 'rgba(158,158,158,0.25)' : '#0d131d',
+                          fontSize: 13,
                         }}
                       >
                         <i className="fas fa-forward" style={{ marginRight: 8 }} />
                         SKIP VOTE (งดออกเสียง)
+                        {Object.values(gameDoc.meeting?.votes || {}).filter(v => v === 'skip').length > 0 && (
+                          <span style={{ marginLeft: 8, fontSize: 11, background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 6 }}>
+                            {Object.values(gameDoc.meeting?.votes || {}).filter(v => v === 'skip').length} โหวต
+                          </span>
+                        )}
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Admin Force Conclude Votes Button */}
                   {hasAdminPerm && (
                     <button
                       type="button"
                       onClick={concludeVoting}
-                      style={{
-                        width: '100%', padding: '12px', borderRadius: 10,
-                        background: '#c62828', color: '#fff',
-                        border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                      }}
+                      className="au-btn au-btn-red"
+                      style={{ width: '100%', padding: '12px', fontSize: 13 }}
                     >
                       สรุปผลโหวตทันที
                     </button>
@@ -2447,35 +2707,68 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 </div>
               )}
 
-              {/* Meeting Phase 4: Result Reveal */}
+              {/* Meeting Phase 4: Outer Space Ejection Reveal Screen */}
               {gameDoc.status === 'meeting_result' && (
-                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
+                <div style={{
+                  flex: 1, display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                  padding: '24px 0', minHeight: 360,
+                  position: 'relative', overflow: 'hidden',
+                }}>
+                  {/* Floating Ejected Crewmate Sprite tumbling through space */}
                   <div style={{
-                    width: 76, height: 76, borderRadius: '50%',
-                    background: 'rgba(255,255,255,0.05)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 32, color: '#ff5252', marginBottom: 16,
+                    width: 70, height: 70,
+                    marginBottom: 24,
+                    animation: 'auEjectSpin 4.5s linear infinite',
                   }}>
-                    <i className="fas fa-poll" />
+                    <AmongUsVisor
+                      role={gameDoc.meeting?.result?.eliminatedRole || 'crewmate'}
+                      isAlive={true}
+                      size={60}
+                    />
                   </div>
 
-                  <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', marginBottom: 8 }}>
-                    ผลการประชุมและคะแนนโหวต
-                  </div>
-                  <div style={{ fontSize: 15, color: '#ff5252', fontWeight: 800, maxWidth: 360, lineHeight: 1.4 }}>
-                    {gameDoc.meeting?.result?.outcomeText || 'การประชุมเสร็จสิ้น'}
-                  </div>
+                  {/* Classic Reveal Text Banner */}
+                  {(() => {
+                    const res = gameDoc.meeting?.result
+                    const victim = res?.eliminatedUid ? gameDoc.players?.[res.eliminatedUid] : null
+                    const remainingImpostorsCount = Object.values(gameDoc.players || {}).filter(p => p.role === 'impostor' && p.isAlive).length
+
+                    if (victim) {
+                      const wasImpostor = res?.eliminatedRole === 'impostor'
+                      return (
+                        <div style={{ maxWidth: 420, padding: '0 16px' }}>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', lineHeight: 1.3, marginBottom: 6 }}>
+                            {victim.name} was {wasImpostor ? 'An Impostor.' : 'not An Impostor.'}
+                          </div>
+                          <div style={{ fontSize: 15, fontWeight: 800, color: '#80d8ff', marginBottom: 12 }}>
+                            {remainingImpostorsCount} Impostor{remainingImpostorsCount === 1 ? '' : 's'} remain{remainingImpostorsCount === 1 ? 's' : ''}.
+                          </div>
+                          <div style={{ fontSize: 14, color: wasImpostor ? '#ff5252' : '#a5d6a7', fontWeight: 800 }}>
+                            {res?.outcomeText}
+                          </div>
+                        </div>
+                      )
+                    } else {
+                      return (
+                        <div style={{ maxWidth: 420, padding: '0 16px' }}>
+                          <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', marginBottom: 8 }}>
+                            No one was ejected. ({res?.isTie ? 'Tie' : 'Skipped'})
+                          </div>
+                          <div style={{ fontSize: 14.5, color: '#ffd54f', fontWeight: 800 }}>
+                            {res?.outcomeText || 'ไม่มีใครถูกขับออกจากยาน'}
+                          </div>
+                        </div>
+                      )
+                    }
+                  })()}
 
                   {hasAdminPerm && (
                     <button
                       type="button"
                       onClick={handleResumeGame}
-                      style={{
-                        marginTop: 32, padding: '14px 28px', borderRadius: 12,
-                        background: '#2e7d32', color: '#fff', fontSize: 14, fontWeight: 900,
-                        border: 'none', cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(46, 125, 50, 0.4)',
-                      }}
+                      className="au-btn au-btn-green"
+                      style={{ marginTop: 32, padding: '14px 32px', fontSize: 14 }}
                     >
                       <i className="fas fa-play" style={{ marginRight: 8 }} />
                       เล่นเกมต่อ (เวลาเดินต่อ)
@@ -2489,51 +2782,59 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         )}
 
         {/* ─────────────────────────────────────────────────────────── */}
-        {/* ─── GAME OVER / VICTORY SCREEN ─────────────────────────── */}
+        {/* ─── GAME OVER / VICTORY SCREEN (AUTHENTIC AMONG US) ─────── */}
         {/* ─────────────────────────────────────────────────────────── */}
         {gameDoc.status === 'ended' && (
-          <div style={{
-            background: '#121722', borderRadius: 20, padding: 24,
-            border: '2px solid rgba(255,255,255,0.1)',
+          <div className="au-card" style={{
+            padding: 26,
             textAlign: 'center', marginTop: 10,
+            border: `3px solid ${gameDoc.winner === 'dodo' ? '#8e24aa' : (gameDoc.winner === 'crewmate' ? '#0288d1' : '#c51111')}`,
           }}>
-            <div style={{
-              width: 72, height: 72, borderRadius: '50%',
-              background: gameDoc.winner === 'dodo' ? '#7b1fa2' : (gameDoc.winner === 'crewmate' ? '#0288d1' : '#c62828'),
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', fontSize: 32, margin: '0 auto 16px',
-            }}>
-              <i className={`fas fa-${gameDoc.winner === 'dodo' ? 'mask' : (gameDoc.winner === 'crewmate' ? 'shield-alt' : 'skull')}`} />
+            <div style={{ marginBottom: 16 }}>
+              <AmongUsVisor
+                role={gameDoc.winner || 'crewmate'}
+                size={70}
+              />
             </div>
 
             <div style={{
-              fontSize: 22, fontWeight: 900,
-              color: gameDoc.winner === 'dodo' ? '#ce93d8' : (gameDoc.winner === 'crewmate' ? '#81d4fa' : '#ff8a80'),
-              letterSpacing: '0.04em',
+              fontSize: 26, fontWeight: 900,
+              color: gameDoc.winner === 'dodo' ? '#ce93d8' : (gameDoc.winner === 'crewmate' ? '#80d8ff' : '#ff5252'),
+              letterSpacing: '0.06em',
+              textShadow: '0 0 12px rgba(255,255,255,0.3)',
             }}>
-              {gameDoc.winner === 'dodo' ? 'โดโด้เป็นฝ่ายชนะ!' : (gameDoc.winner === 'crewmate' ? 'ฝ่ายคนดีเป็นฝ่ายชนะ!' : 'ฝ่ายคนร้ายเป็นฝ่ายชนะ!')}
+              {gameDoc.winner === 'dodo' ? 'VICTORY - โดโด้ชนะ!' : (gameDoc.winner === 'crewmate' ? 'VICTORY - ฝ่ายคนดีชนะ!' : 'VICTORY - ฝ่ายคนร้ายชนะ!')}
             </div>
 
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginTop: 6, marginBottom: 20 }}>
+            <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.75)', marginTop: 6, marginBottom: 20 }}>
               {gameDoc.winReason}
             </div>
 
             {/* Reveal All Roles */}
             <div style={{
-              background: 'rgba(0,0,0,0.3)', borderRadius: 14, padding: 14,
+              background: '#0d131d', borderRadius: 16, padding: 16,
+              border: '2px solid #1f2c42',
               textAlign: 'left', marginBottom: 20,
             }}>
-              <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.4)', marginBottom: 8, letterSpacing: '0.05em' }}>
+              <div style={{ fontSize: 11, fontWeight: 900, color: '#fbc02d', marginBottom: 10, letterSpacing: '0.06em' }}>
+                <i className="fas fa-id-card" style={{ marginRight: 6 }} />
                 เฉลยบทบาทผู้เล่นทุกคน
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {allPlayersList.map(p => {
-                  const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : '#29b6f6')
+                  const roleColor = p.role === 'impostor' ? '#ff5252' : (p.role === 'dodo' ? '#ce93d8' : '#80d8ff')
                   const roleLabel = p.role === 'impostor' ? 'คนร้าย (Impostor)' : (p.role === 'dodo' ? 'โดโด้ (Dodo)' : 'คนดี (Crewmate)')
                   return (
-                    <div key={p.uid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12.5 }}>
-                      <span style={{ fontWeight: 700, color: '#fff' }}>{p.name}</span>
-                      <span style={{ fontWeight: 800, color: roleColor }}>{roleLabel}</span>
+                    <div key={p.uid} style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      padding: '8px 10px', borderRadius: 10,
+                      background: 'rgba(255,255,255,0.03)',
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <AmongUsVisor role={p.role} isAlive={p.isAlive} size={26} />
+                        <span style={{ fontWeight: 800, color: '#fff', fontSize: 13 }}>{p.name}</span>
+                      </div>
+                      <span style={{ fontWeight: 900, color: roleColor, fontSize: 12 }}>{roleLabel}</span>
                     </div>
                   )
                 })}
@@ -2544,11 +2845,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               <button
                 type="button"
                 onClick={handleResetGame}
-                style={{
-                  width: '100%', padding: '12px', borderRadius: 12,
-                  background: '#c62828', color: '#fff', fontSize: 14, fontWeight: 900,
-                  border: 'none', cursor: 'pointer',
-                }}
+                className="au-btn au-btn-red"
+                style={{ width: '100%', padding: '13px', fontSize: 14 }}
               >
                 เริ่มเกมรอบใหม่ (กลับสู่ล็อบบี้)
               </button>
@@ -2562,39 +2860,40 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       {activeTaskModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 120,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: 16,
         }} onClick={() => setActiveTaskModal(null)}>
-          <div style={{
-            background: '#121722', borderRadius: 20, padding: 24,
+          <div className="au-card" style={{
+            padding: 24,
             maxWidth: 340, width: '100%', textAlign: 'center',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: '3px solid #0288d1',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 12, fontWeight: 800, color: '#ff5252', letterSpacing: '0.05em' }}>
-              QR CODE ยืนยันภารกิจ
+            <div style={{ fontSize: 12, fontWeight: 900, color: '#ffd54f', letterSpacing: '0.08em' }}>
+              TASK VERIFICATION QR
             </div>
-            <div style={{ fontSize: 16, fontWeight: 800, color: '#fff', marginTop: 4, marginBottom: 4 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginTop: 4, marginBottom: 4 }}>
               {activeTaskModal.title}
             </div>
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               padding: '3px 10px', borderRadius: 8,
-              background: 'rgba(33, 150, 243, 0.15)',
-              border: '1px solid rgba(33, 150, 243, 0.3)',
-              color: '#64b5f6', fontSize: 11.5, fontWeight: 800,
+              background: 'rgba(251, 192, 45, 0.15)',
+              border: '1px solid rgba(251, 192, 45, 0.3)',
+              color: '#fbc02d', fontSize: 11.5, fontWeight: 900,
               marginBottom: 10,
             }}>
               <i className="fas fa-map-marker-alt" />
               สถานที่: ชั้น {activeTaskModal.floor || 1} · {activeTaskModal.room || 'โซนหน้า'}
             </div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-              ยื่นหน้านี้ให้แอดมินสแกนด้วยกล้อง เพื่อบันทึกว่าทำสำเร็จ
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 16 }}>
+              ยื่นหน้านี้ให้แอดมินสแกนด้วยกล้อง เพื่อยืนยันว่าทำภารกิจสำเร็จ
             </div>
 
             <div style={{
-              background: '#fff', padding: 16, borderRadius: 16,
-              display: 'inline-block', marginBottom: 16,
+              background: '#fff', padding: 16, borderRadius: 18,
+              display: 'inline-block', marginBottom: 18,
+              boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
             }}>
               <QRCodeSVG
                 value={JSON.stringify({
@@ -2611,11 +2910,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             <button
               type="button"
               onClick={() => setActiveTaskModal(null)}
-              style={{
-                width: '100%', padding: '10px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.08)', color: '#fff',
-                border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-              }}
+              className="au-btn au-btn-dark"
+              style={{ width: '100%', padding: '10px', fontSize: 13 }}
             >
               ปิดหน้าต่าง
             </button>
@@ -2627,20 +2923,20 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       {showSabotageModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 120,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: 16,
         }} onClick={() => setShowSabotageModal(false)}>
-          <div style={{
-            background: '#121722', borderRadius: 20, padding: 22,
+          <div className="au-card" style={{
+            padding: 22,
             maxWidth: 380, width: '100%',
-            border: '1px solid rgba(229, 57, 53, 0.4)',
+            border: '3px solid #c51111',
           }} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ff5252', marginBottom: 4 }}>
               <i className="fas fa-radiation" />
-              <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.05em' }}>IMPOSTOR SABOTAGE</span>
+              <span style={{ fontSize: 12, fontWeight: 900, letterSpacing: '0.08em' }}>IMPOSTOR SABOTAGE</span>
             </div>
-            <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 6 }}>
+            <div style={{ fontSize: 16.5, fontWeight: 900, color: '#fff', marginBottom: 6 }}>
               เลือกสถานการณ์ก่อกวน
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
@@ -2654,15 +2950,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   type="button"
                   onClick={() => requestSabotage(s.title, s.desc, s.countdownSeconds)}
                   style={{
-                    padding: '11px 14px', borderRadius: 10,
-                    background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    padding: '11px 14px', borderRadius: 12,
+                    background: '#0d131d',
+                    border: '2px solid #1f2c42',
                     color: '#fff', textAlign: 'left', cursor: 'pointer',
+                    transition: 'border-color 0.1s ease',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#ff8a80' }}>{s.title}</div>
-                    <span style={{ fontSize: 10, color: '#ffcc80', background: 'rgba(255,255,255,0.06)', padding: '2px 6px', borderRadius: 4, fontWeight: 700 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 800, color: '#ff8a80' }}>{s.title}</div>
+                    <span style={{ fontSize: 10, color: '#ffcc80', background: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 6, fontWeight: 800 }}>
                       {s.countdownSeconds || 90} วินาที
                     </span>
                   </div>
@@ -2674,11 +2971,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             <button
               type="button"
               onClick={() => setShowSabotageModal(false)}
-              style={{
-                width: '100%', padding: '10px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-                border: 'none', fontSize: 12, fontWeight: 700, cursor: 'pointer',
-              }}
+              className="au-btn au-btn-dark"
+              style={{ width: '100%', padding: '10px', fontSize: 12.5 }}
             >
               ยกเลิก
             </button>
@@ -2690,16 +2984,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       {editingTask && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 130,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: 16,
         }} onClick={() => setEditingTask(null)}>
-          <div style={{
-            background: '#121722', borderRadius: 20, padding: 22,
+          <div className="au-card" style={{
+            padding: 22,
             maxWidth: 400, width: '100%',
-            border: '1px solid rgba(255,255,255,0.15)',
+            border: '2.5px solid #0288d1',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 14 }}>
               แก้ไขภารกิจ
             </div>
 
@@ -2714,8 +3008,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   onChange={e => setEditingTask({ ...editingTask, title: e.target.value })}
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
-                    color: '#fff', fontSize: 13,
+                    background: '#0d131d', border: '2px solid #1f2c42',
+                    color: '#fff', fontSize: 13, fontFamily: 'inherit',
                   }}
                 />
               </div>
@@ -2730,7 +3024,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   onChange={e => setEditingTask({ ...editingTask, desc: e.target.value })}
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    background: '#0d131d', border: '2px solid #1f2c42',
                     color: '#fff', fontSize: 12, resize: 'none',
                     fontFamily: 'inherit',
                   }}
@@ -2755,8 +3049,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     }}
                     style={{
                       width: '100%', padding: '7px 10px', borderRadius: 8,
-                      background: '#1c2230', color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                      background: '#0d131d', color: '#fff',
+                      border: '2px solid #1f2c42', fontSize: 12,
                       fontFamily: 'inherit',
                     }}
                   >
@@ -2774,8 +3068,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     onChange={e => setEditingTask({ ...editingTask, room: e.target.value })}
                     style={{
                       width: '100%', padding: '7px 10px', borderRadius: 8,
-                      background: '#1c2230', color: '#fff',
-                      border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                      background: '#0d131d', color: '#fff',
+                      border: '2px solid #1f2c42', fontSize: 12,
                       fontFamily: 'inherit',
                     }}
                   >
@@ -2791,22 +3085,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               <button
                 type="button"
                 onClick={handleUpdateTaskInPool}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: 10,
-                  background: '#c62828', color: '#fff',
-                  border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                }}
+                className="au-btn au-btn-blue"
+                style={{ flex: 1, padding: '10px', fontSize: 13 }}
               >
                 บันทึกการแก้ไข
               </button>
               <button
                 type="button"
                 onClick={() => setEditingTask(null)}
-                style={{
-                  padding: '10px 16px', borderRadius: 10,
-                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-                  border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}
+                className="au-btn au-btn-dark"
+                style={{ padding: '10px 16px', fontSize: 13 }}
               >
                 ยกเลิก
               </button>
@@ -2819,16 +3107,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       {editingSabotage && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 130,
-          background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)',
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           padding: 16,
         }} onClick={() => setEditingSabotage(null)}>
-          <div style={{
-            background: '#121722', borderRadius: 20, padding: 22,
+          <div className="au-card" style={{
+            padding: 22,
             maxWidth: 400, width: '100%',
-            border: '1px solid rgba(229, 57, 53, 0.4)',
+            border: '2.5px solid #c51111',
           }} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 14 }}>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 14 }}>
               แก้ไข Sabotage
             </div>
 
@@ -2843,8 +3131,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   onChange={e => setEditingSabotage({ ...editingSabotage, title: e.target.value })}
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
-                    color: '#fff', fontSize: 13,
+                    background: '#0d131d', border: '2px solid #1f2c42',
+                    color: '#fff', fontSize: 13, fontFamily: 'inherit',
                   }}
                 />
               </div>
@@ -2859,7 +3147,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   onChange={e => setEditingSabotage({ ...editingSabotage, desc: e.target.value })}
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
+                    background: '#0d131d', border: '2px solid #1f2c42',
                     color: '#fff', fontSize: 12, resize: 'none',
                     fontFamily: 'inherit',
                   }}
@@ -2876,8 +3164,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   onChange={e => setEditingSabotage({ ...editingSabotage, countdownSeconds: e.target.value })}
                   style={{
                     width: '100%', padding: '8px 12px', borderRadius: 8,
-                    background: '#1c2230', border: '1px solid rgba(255,255,255,0.12)',
-                    color: '#fff', fontSize: 12,
+                    background: '#0d131d', border: '2px solid #1f2c42',
+                    color: '#fff', fontSize: 12, fontFamily: 'inherit',
                   }}
                 />
               </div>
@@ -2887,22 +3175,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               <button
                 type="button"
                 onClick={handleUpdateSabotageInPool}
-                style={{
-                  flex: 1, padding: '10px', borderRadius: 10,
-                  background: '#c62828', color: '#fff',
-                  border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-                }}
+                className="au-btn au-btn-red"
+                style={{ flex: 1, padding: '10px', fontSize: 13 }}
               >
                 บันทึกการแก้ไข
               </button>
               <button
                 type="button"
                 onClick={() => setEditingSabotage(null)}
-                style={{
-                  padding: '10px 16px', borderRadius: 10,
-                  background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-                  border: 'none', fontSize: 13, fontWeight: 700, cursor: 'pointer',
-                }}
+                className="au-btn au-btn-dark"
+                style={{ padding: '10px 16px', fontSize: 13 }}
               >
                 ยกเลิก
               </button>
@@ -2920,27 +3202,26 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           padding: 16,
         }}>
           <div style={{ width: '100%', maxWidth: 360, textAlign: 'center' }}>
-            <div style={{ fontSize: 14, fontWeight: 800, color: '#fff', marginBottom: 8 }}>
+            <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginBottom: 10 }}>
               ส่องกล้องไปที่ QR Code ภารกิจของผู้เล่น
             </div>
             <div
               id="allofus-admin-qr-reader"
               style={{
                 width: '100%',
-                borderRadius: 16,
+                borderRadius: 18,
                 overflow: 'hidden',
                 background: '#000',
                 marginBottom: 16,
+                border: '3px solid #ff5252',
+                boxShadow: '0 0 20px rgba(255, 82, 82, 0.4)',
               }}
             />
             <button
               type="button"
               onClick={() => setScannerOpen(false)}
-              style={{
-                padding: '10px 24px', borderRadius: 10,
-                background: '#c62828', color: '#fff',
-                border: 'none', fontSize: 13, fontWeight: 800, cursor: 'pointer',
-              }}
+              className="au-btn au-btn-red"
+              style={{ padding: '10px 28px', fontSize: 13 }}
             >
               ปิดกล้อง
             </button>
