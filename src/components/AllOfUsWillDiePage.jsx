@@ -95,13 +95,26 @@ const DEFAULT_TASKS_POOL = [
 
 export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: isAppAdmin, showToast, showPage }) {
   const [activeParty, setActiveParty] = useState(null)
-  const [gameDoc, setGameDoc] = useState(null)
+  const [gameDoc, setGameDoc] = useState(() => ({
+    status: 'waiting',
+    gameDurationMinutes: 20,
+    gameSecondsRemaining: 1200,
+    gameTimerRunning: false,
+    timerUpdatedAt: Date.now(),
+    players: {},
+    taskPool: DEFAULT_TASKS_POOL,
+    sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 },
+    meeting: null,
+    winner: null,
+    winReason: '',
+  }))
   const [myUid, setMyUid] = useState(() => {
     return localStorage.getItem('allofus_player_uid') || lineUser?.uid || lineUser?.userId || lineUser?.id || ''
   })
   const [myName, setMyName] = useState('')
   const [editingName, setEditingName] = useState(false)
   const [nameInput, setNameInput] = useState('')
+  const [directJoinName, setDirectJoinName] = useState('')
   const [isAdminView, setIsAdminView] = useState(false)
   const [activeTaskModal, setActiveTaskModal] = useState(null)
   const [showSabotageModal, setShowSabotageModal] = useState(false)
@@ -115,6 +128,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   // Determine effective admin permission
   const hasAdminPerm = isAppAdmin || lineUser?.role === 'admin' || !!firebaseUser
   const qrScannerRef = useRef(null)
+  const initialAdminSetRef = useRef(false)
+
+  useEffect(() => {
+    if (hasAdminPerm && !initialAdminSetRef.current) {
+      initialAdminSetRef.current = true
+      setIsAdminView(true)
+    }
+  }, [hasAdminPerm])
 
   // ── 1. Find Special Event Active Party / Order ───────────
   useEffect(() => {
@@ -351,6 +372,35 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast('แก้ไขชื่อสำเร็จ')
     } catch (e) {
       showToast('แก้ไขชื่อล้มเหลว', 'error')
+    }
+  }
+
+  // Direct join game by entering name
+  const handleDirectJoin = async () => {
+    const trimmed = (directJoinName || '').trim()
+    if (!trimmed) {
+      showToast('กรุณาระบุชื่อของคุณ', 'error')
+      return
+    }
+    const newUid = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6)
+    setMyUid(newUid)
+    localStorage.setItem('allofus_player_uid', newUid)
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        [`players.${newUid}`]: {
+          uid: newUid,
+          name: trimmed,
+          avatar: '',
+          role: 'crewmate',
+          isAlive: true,
+          tasks: [],
+          ready: false,
+        }
+      })
+      setDirectJoinName('')
+      showToast(`ยินดีต้อนรับ ${trimmed}`)
+    } catch (e) {
+      showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
     }
   }
 
@@ -787,19 +837,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  if (!gameDoc) {
-    return (
-      <div style={{
-        minHeight: '100vh', background: '#0a0d14', color: '#fff',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-        fontFamily: "'Sarabun', sans-serif"
-      }}>
-        <i className="fas fa-spinner fa-spin" style={{ fontSize: 32, color: '#e53935', marginBottom: 16 }} />
-        <div style={{ fontSize: 16, fontWeight: 700 }}>กำลังเชื่อมต่อฐานข้อมูล ALL OF US WILL DIE...</div>
-      </div>
-    )
-  }
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -1002,9 +1039,40 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
               {(!activeParty?.members || activeParty.members.length === 0) && (
                 <div style={{ padding: '16px 0', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
-                  ไม่พบสมาชิกในตี้ Special Event กรุณาให้แอดมินเพิ่มสมาชิกที่ POS
+                  ไม่พบสมาชิกในตี้ Special Event กรุณาให้แอดมินเพิ่มสมาชิกที่ POS หรือพิมพ์ชื่อของคุณด้านล่าง
                 </div>
               )}
+            </div>
+
+            <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
+                หรือพิมพ์ชื่อเพื่อเข้าร่วมเกมโดยตรง
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  type="text"
+                  placeholder="พิมพ์ชื่อของคุณ..."
+                  value={directJoinName}
+                  onChange={e => setDirectJoinName(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleDirectJoin() }}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 10,
+                    background: '#1c2230', color: '#fff',
+                    border: '1px solid rgba(255,255,255,0.15)', fontSize: 13
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleDirectJoin}
+                  style={{
+                    padding: '10px 16px', borderRadius: 10,
+                    background: '#c62828', color: '#fff',
+                    border: 'none', fontWeight: 800, fontSize: 13, cursor: 'pointer'
+                  }}
+                >
+                  เข้าร่วม
+                </button>
+              </div>
             </div>
           </div>
         )}

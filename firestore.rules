@@ -110,6 +110,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // All Of Us Will Die - Among Us in real life mobile game
+    match /all_of_us_games/{docId} {
+      allow read, write: if true;
+    }
+
     // Deny everything else
     match /{document=**} {
       allow read, write: if false;
