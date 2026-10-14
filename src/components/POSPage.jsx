@@ -355,7 +355,7 @@ export default function POSPage({
 
   const fallbackSession = useMemo(() => newPOSSession(), [])
   const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
-  const activeSession = safeSessions.find(s => s.id === activeId) || safeSessions[0]
+  const activeSession = safeSessions.find(s => String(s.id) === String(activeId)) || safeSessions[0]
   // Owner DM OR 'manager' admin — can edit/pay/cancel/close any party.
   // Manager = either (a) LINE admin with 'manager' achievement
   //           or (b) Firebase-authenticated admin (store owner/staff).
@@ -373,17 +373,18 @@ export default function POSPage({
 
   // initialise with 1 session if empty
   useEffect(() => {
-    if (!sessions || sessions.length === 0) {
+    const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : []
+    if (list.length === 0) {
       const s = newPOSSession()
       setSessions([s])
       setActiveId(s.id)
-    } else if (!activeId || !sessions.find(s => s.id === activeId)) {
-      setActiveId(sessions[sessions.length - 1].id)
+    } else if (!activeId || !list.find(s => String(s.id) === String(activeId))) {
+      setActiveId(list[list.length - 1].id)
     }
   }, [sessions, activeId])
 
   const updateSession = (id, patch) =>
-    setSessions(prev => (Array.isArray(prev) ? prev : [fallbackSession]).map(s => s.id === id ? { ...s, ...patch } : s))
+    setSessions(prev => (Array.isArray(prev) ? prev : [fallbackSession]).map(s => String(s.id) === String(id) ? { ...s, ...patch } : s))
 
   const updateActive = (patch) => updateSession(activeSession.id, patch)
 
@@ -433,8 +434,9 @@ export default function POSPage({
 
   // ── fetch member and add to a session ───────────────────────────
   const fetchAndAddMember = async (sessionId, uid) => {
-    const session = sessions.find(s => s.id === sessionId) || activeSession
-    if (session.members.find(m => m.uid === uid)) {
+    const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+    const session = list.find(s => String(s.id) === String(sessionId)) || activeSession
+    if ((session?.members || []).find(m => m.uid === uid)) {
       showToast('สมาชิกคนนี้อยู่ในปาร์ตี้นี้แล้ว', 'error'); return
     }
     try {
@@ -624,6 +626,9 @@ export default function POSPage({
     setShowPaidMembers(false)
   }, [activeId])
 
+  const activeOrderRef = useRef(activeSession?.order || [])
+  activeOrderRef.current = activeSession?.order || []
+
   // Listen for member food requests and payments on the confirmed order
   useEffect(() => {
     const orderId = activeSession?.confirmedOrderId
@@ -632,8 +637,32 @@ export default function POSPage({
       const data = snap.data() || {}
       setMemberQueue(data.memberFoodQueue || [])
       setMemberPayments(data.memberPayments || {})
+
+      // Keep activeSession.order in sync with Firestore orders.foodItems
+      if (Array.isArray(data.foodItems)) {
+        const firestoreItems = data.foodItems.map(x => ({
+          key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+          menuId: x.menuId || '',
+          name: x.name,
+          basePrice: x.price ?? x.totalPrice ?? 0,
+          addons: x.addons || [],
+          totalPrice: x.price ?? x.totalPrice ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        }))
+        const curOrder = activeOrderRef.current || []
+        const isDiff = firestoreItems.length !== curOrder.length ||
+          firestoreItems.some((fi, idx) => {
+            const co = curOrder[idx]
+            return !co || co.name !== fi.name || co.qty !== fi.qty || co.totalPrice !== fi.totalPrice || co.note !== fi.note
+          })
+        if (isDiff) {
+          updateActive({ order: firestoreItems })
+        }
+      }
     }, () => {})
-  }, [activeSession?.confirmedOrderId])
+  }, [activeId, activeSession?.confirmedOrderId])
 
   // ── derived values ───────────────────────────────────────────────
   const selectedGame = allGames.find(g => g.id === activeSession?.scriptId)
@@ -682,16 +711,61 @@ export default function POSPage({
     // Optimistically clear immediately to silence sound and update UI instantaneously
     setMemberQueue([])
 
-    const cur = activeSession.order || []
+    let existingFoodItems = []
+    try {
+      const snap = await getDoc(doc(db, 'orders', orderId))
+      if (snap.exists()) {
+        existingFoodItems = snap.data().foodItems || []
+      }
+    } catch (e) {
+      console.warn('Fetch live foodItems for acceptQueue failed:', e)
+    }
+
+    const cur = existingFoodItems.length > 0
+      ? existingFoodItems.map(x => ({
+          key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+          menuId: x.menuId || '',
+          name: x.name,
+          basePrice: x.price ?? x.totalPrice ?? 0,
+          addons: x.addons || [],
+          totalPrice: x.price ?? x.totalPrice ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        }))
+      : ((Array.isArray(activeSession.order) && activeSession.order.length > 0)
+          ? activeSession.order
+          : (todayOrders.find(o => o.id === orderId)?.foodItems || []).map(x => ({
+              key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+              menuId: x.menuId || '',
+              name: x.name,
+              basePrice: x.price ?? x.totalPrice ?? 0,
+              addons: x.addons || [],
+              totalPrice: x.price ?? x.totalPrice ?? 0,
+              qty: x.qty || 1,
+              orderedBy: x.orderedBy || null,
+              note: x.note || '',
+            })))
+
     const updated = [...cur]
     for (const qi of queuedItems) {
       // Include note in key so same item + different notes = separate order lines
-      const key = qi.menuId + '|' + (qi.addons || []).map(a => a.name).sort().join(',') + '|' + (qi.orderedBy?.uid || '') + '|' + (qi.note || '')
+      const key = (qi.menuId || qi.name) + '|' + (qi.addons || []).map(a => a.name || a).sort().join(',') + '|' + (qi.orderedBy?.uid || '') + '|' + (qi.note || '')
       const idx = updated.findIndex(x => x.key === key)
       if (idx >= 0) {
         updated[idx] = { ...updated[idx], qty: updated[idx].qty + qi.qty }
       } else {
-        updated.push({ key, menuId: qi.menuId, name: qi.name, basePrice: qi.totalPrice, addons: qi.addons || [], note: qi.note || '', totalPrice: qi.totalPrice, qty: qi.qty, orderedBy: qi.orderedBy || null })
+        updated.push({
+          key,
+          menuId: qi.menuId || '',
+          name: qi.name,
+          basePrice: qi.totalPrice,
+          addons: qi.addons || [],
+          note: qi.note || '',
+          totalPrice: qi.totalPrice,
+          qty: qi.qty,
+          orderedBy: qi.orderedBy || null
+        })
       }
     }
     updateActive({ order: updated })
@@ -699,7 +773,15 @@ export default function POSPage({
     await updateDoc(doc(db, 'orders', orderId), {
       memberFoodQueue: [],
       memberFoodHistory: arrayUnion(...queuedItems),
-      foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
+      foodItems: updated.map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        price: x.totalPrice,
+        qty: x.qty,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      })),
       foodTotal: newFoodTotal,
       gameTotal: gamePrice,
       discount: discountRaw,
@@ -715,9 +797,9 @@ export default function POSPage({
     const now = new Date()
     const isPaid = activeSession.members.length > 0 &&
       activeSession.members.every(m => memberPayments[m.uid]?.verified)
-    const html = buildKitchenTicketHTML(memberQueue, activeSession, now, isPaid, receiptSettings)
+    const html = buildKitchenTicketHTML(queuedItems, activeSession, now, isPaid, receiptSettings)
     const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
-    dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${memberQueue.length} รายการ`)
+    dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${queuedItems.length} รายการ`)
   }
 
   const handleScan = (uid) => {
@@ -930,6 +1012,7 @@ export default function POSPage({
       try {
         await updateDoc(doc(db, 'orders', orderId), {
           foodItems: updated.map(x => ({
+            menuId: x.menuId || '',
             name: x.name,
             addons: x.addons || [],
             price: x.totalPrice,
@@ -959,15 +1042,38 @@ export default function POSPage({
     showToast(`สั่ง ${menuItem.name} ${addQty > 1 ? `× ${addQty} ` : ''}ให้ ${recipientName} สำเร็จ ✓`)
   }
 
-  const removeItem = (key) => {
+  const removeItem = async (key) => {
     const cur = activeSession.order || []
     const idx = cur.findIndex(x => x.key === key)
     if (idx < 0) return
+    let updated
     if (cur[idx].qty <= 1) {
-      updateActive({ order: cur.filter(x => x.key !== key) })
+      updated = cur.filter(x => x.key !== key)
     } else {
-      const updated = [...cur]; updated[idx] = { ...updated[idx], qty: updated[idx].qty - 1 }
-      updateActive({ order: updated })
+      updated = [...cur]
+      updated[idx] = { ...updated[idx], qty: updated[idx].qty - 1 }
+    }
+    updateActive({ order: updated })
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          foodItems: updated.map(x => ({
+            menuId: x.menuId || '',
+            name: x.name,
+            addons: x.addons || [],
+            price: x.totalPrice,
+            qty: x.qty,
+            orderedBy: x.orderedBy || null,
+            note: x.note || '',
+          })),
+          foodTotal: newFoodTotal,
+          grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
+        })
+      } catch (err) {
+        console.warn('Failed to sync removed item to firestore:', err)
+      }
     }
   }
 
@@ -1034,8 +1140,24 @@ export default function POSPage({
     const orderId = activeSession.confirmedOrderId
     if (!orderId) return
     await updateDoc(doc(db, 'orders', orderId), {
-      foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
-      memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
+      foodItems: updated.map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        price: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      })),
+      memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        totalPrice: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy,
+        note: x.note || '',
+      })),
     })
   }
 
@@ -1047,8 +1169,24 @@ export default function POSPage({
     if (!orderId) return
     const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
     await updateDoc(doc(db, 'orders', orderId), {
-      foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
-      memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
+      foodItems: updated.map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        price: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      })),
+      memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        totalPrice: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy,
+        note: x.note || '',
+      })),
       foodTotal: newFoodTotal,
       gameTotal: gamePrice,
       discount: discountRaw,
@@ -1066,8 +1204,9 @@ export default function POSPage({
   }
 
   const removeSession = async (id) => {
-    if (sessions.length <= 1) { showToast('ต้องมีอย่างน้อย 1 ปาร์ตี้', 'error'); return }
-    const session = sessions.find(s => s.id === id)
+    const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+    if (list.length <= 1) { showToast('ต้องมีอย่างน้อย 1 ปาร์ตี้', 'error'); return }
+    const session = list.find(s => String(s.id) === String(id))
     if (session?.confirmedOrderId) {
       try {
         await updateDoc(doc(db, 'orders', session.confirmedOrderId), {
@@ -1075,33 +1214,58 @@ export default function POSPage({
         })
       } catch (e) { console.warn('close order failed:', e.message) }
     }
-    const remaining = sessions.filter(s => s.id !== id)
+    const remaining = list.filter(s => String(s.id) !== String(id))
     setSessions(remaining)
-    if (activeId === id) setActiveId(remaining[remaining.length - 1].id)
+    if (String(activeId) === String(id)) {
+      const nextActive = remaining[remaining.length - 1]
+      setActiveId(nextActive ? nextActive.id : null)
+    }
+    showToast('ปิดปาร์ตี้แล้ว')
   }
 
   const acceptOtherQueue = async (order) => {
     const queue = order.memberFoodQueue || []
     if (queue.length === 0) return
     try {
-      const cur = (order.foodItems || []).map(x => ({
-        key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name).join(',') + '|' + (x.orderedBy?.uid || ''),
+      let existingFoodItems = order.foodItems || []
+      try {
+        const snap = await getDoc(doc(db, 'orders', order.id))
+        if (snap.exists()) {
+          existingFoodItems = snap.data().foodItems || existingFoodItems
+        }
+      } catch (err) {
+        console.warn('Fetch fresh order doc failed in acceptOtherQueue:', err)
+      }
+
+      const cur = existingFoodItems.map(x => ({
+        key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
         menuId: x.menuId || '',
         name: x.name,
-        basePrice: x.price || 0,
+        basePrice: x.price ?? x.totalPrice ?? 0,
         addons: x.addons || [],
-        totalPrice: x.price || 0,
+        totalPrice: x.price ?? x.totalPrice ?? 0,
         qty: x.qty || 1,
         orderedBy: x.orderedBy || null,
+        note: x.note || '',
       }))
       const updated = [...cur]
       for (const qi of queue) {
-        const key = (qi.menuId || qi.name) + '|' + (qi.addons || []).map(a => a.name).sort().join(',') + '|' + (qi.orderedBy?.uid || '')
+        const key = (qi.menuId || qi.name) + '|' + (qi.addons || []).map(a => a.name || a).sort().join(',') + '|' + (qi.orderedBy?.uid || '') + '|' + (qi.note || '')
         const idx = updated.findIndex(x => x.key === key)
         if (idx >= 0) {
           updated[idx] = { ...updated[idx], qty: updated[idx].qty + qi.qty }
         } else {
-          updated.push({ key, menuId: qi.menuId || '', name: qi.name, basePrice: qi.totalPrice, addons: qi.addons || [], totalPrice: qi.totalPrice, qty: qi.qty, orderedBy: qi.orderedBy || null })
+          updated.push({
+            key,
+            menuId: qi.menuId || '',
+            name: qi.name,
+            basePrice: qi.totalPrice,
+            addons: qi.addons || [],
+            totalPrice: qi.totalPrice,
+            qty: qi.qty,
+            orderedBy: qi.orderedBy || null,
+            note: qi.note || '',
+          })
         }
       }
       const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
@@ -1112,10 +1276,25 @@ export default function POSPage({
       await updateDoc(doc(db, 'orders', order.id), {
         memberFoodQueue: [],
         memberFoodHistory: arrayUnion(...queue),
-        foodItems: updated.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
+        foodItems: updated.map(x => ({
+          menuId: x.menuId || '',
+          name: x.name,
+          addons: x.addons || [],
+          price: x.totalPrice,
+          qty: x.qty,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        })),
         foodTotal: newFoodTotal,
         grandTotal: Math.max(0, newFoodTotal + gameTotal - d * membersCount),
       })
+
+      // Sync to matching session in POS immediately
+      const targetSession = safeSessions.find(s => s.confirmedOrderId === order.id)
+      if (targetSession) {
+        updateSession(targetSession.id, { order: updated })
+      }
+
       showToast(`รับ ${queue.length} รายการจาก ${order.room || order.scriptTitle || 'ลูกค้า'} แล้ว ✓`)
 
       // Dispatch print — local if primary printer, else via Firestore queue
@@ -1132,7 +1311,22 @@ export default function POSPage({
 
   const openExistingOrder = (order) => {
     const existing = safeSessions.find(s => s.confirmedOrderId === order.id)
+    const orderItems = (order.foodItems || []).map(x => ({
+      key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+      menuId: x.menuId || '',
+      name: x.name,
+      basePrice: x.price ?? x.totalPrice ?? 0,
+      addons: x.addons || [],
+      totalPrice: x.price ?? x.totalPrice ?? 0,
+      qty: x.qty || 1,
+      orderedBy: x.orderedBy || null,
+      note: x.note || '',
+    }))
+
     if (existing) {
+      if (orderItems.length > 0) {
+        updateSession(existing.id, { order: orderItems })
+      }
       setActiveId(existing.id)
       return
     }
@@ -1147,16 +1341,7 @@ export default function POSPage({
       dm: order.dm || '',
       npc: order.npc || '',
       room: order.room || '',
-      order: (order.foodItems || []).map(x => ({
-        key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name).join(',') + '|' + (x.orderedBy?.uid || ''),
-        menuId: x.menuId || '',
-        name: x.name,
-        basePrice: x.price || 0,
-        addons: x.addons || [],
-        totalPrice: x.price || 0,
-        qty: x.qty || 1,
-        orderedBy: x.orderedBy || null,
-      })),
+      order: orderItems,
       confirmedOrderId: order.id,
       promoName: order.promoName || '',
       discount: order.discount || 0,
@@ -1233,7 +1418,8 @@ export default function POSPage({
         })
       }
 
-      const remaining = sessions.filter(s => s.id !== activeId)
+      const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+      const remaining = list.filter(s => String(s.id) !== String(activeId))
       if (remaining.length === 0) {
         const fresh = newPOSSession(); setSessions([fresh]); setActiveId(fresh.id)
       } else {
@@ -1318,8 +1504,24 @@ export default function POSPage({
         dm: s.dm,
         npc: s.npc || '',
         room: s.room,
-        foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
-        memberFoodHistory: orderArr.filter(x => x.orderedBy).map(x => ({ name: x.name, addons: x.addons || [], totalPrice: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy })),
+        foodItems: orderArr.map(x => ({
+          menuId: x.menuId || '',
+          name: x.name,
+          addons: x.addons || [],
+          price: x.totalPrice ?? x.price ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        })),
+        memberFoodHistory: orderArr.filter(x => x.orderedBy).map(x => ({
+          menuId: x.menuId || '',
+          name: x.name,
+          addons: x.addons || [],
+          totalPrice: x.totalPrice ?? x.price ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy,
+          note: x.note || '',
+        })),
         foodTotal,
         gameTotal: gamePrice,
         discount: discountRaw,  // raw input value (per-person or lump sum)
@@ -1400,9 +1602,41 @@ export default function POSPage({
         }
         .pos-tab.active .pos-tab-count { background: rgba(255,255,255,0.22) !important; color: #ffffff !important; }
         .pos-tab-count { background: rgba(198,36,25,0.1) !important; color: #c62419 !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10.5px !important; font-weight: 800 !important; margin-left: 6px !important; border: none !important; }
-        .pos-tab-close { color: rgba(255,255,255,0.6) !important; opacity: 0; margin-left: 2px !important; }
-        .pos-tab.active .pos-tab-close { opacity: 0.75 !important; }
-        .pos-tab.active .pos-tab-close:hover { color: #ffffff !important; opacity: 1 !important; }
+        .pos-tab-close {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 22px !important;
+          height: 22px !important;
+          margin-left: 6px !important;
+          border-radius: 50% !important;
+          border: none !important;
+          background: transparent !important;
+          cursor: pointer !important;
+          color: rgba(26,26,26,0.4) !important;
+          opacity: 0.5 !important;
+          transition: all 0.15s ease !important;
+          padding: 0 !important;
+          flex-shrink: 0 !important;
+          z-index: 2 !important;
+        }
+        .pos-tab:hover .pos-tab-close { opacity: 0.8 !important; }
+        .pos-tab-close:hover {
+          color: #c62419 !important;
+          background: rgba(198,36,25,0.1) !important;
+          opacity: 1 !important;
+          transform: scale(1.1) !important;
+        }
+        .pos-tab.active .pos-tab-close {
+          color: rgba(255,255,255,0.75) !important;
+          opacity: 0.85 !important;
+        }
+        .pos-tab.active .pos-tab-close:hover {
+          color: #ffffff !important;
+          background: rgba(255,255,255,0.25) !important;
+          opacity: 1 !important;
+          transform: scale(1.1) !important;
+        }
         .pos-tab-add {
           background: transparent !important;
           color: #c62419 !important;
@@ -1941,7 +2175,7 @@ export default function POSPage({
       <div className="pos-tabs-wrap">
         <div className="pos-tabs">
           {safeSessions.map(s => {
-            const isCurrent = s.id === activeSession.id
+            const isCurrent = String(s.id) === String(activeSession.id)
             const pendingCount = isCurrent
               ? memberQueue.length
               : (todayOrders.find(o => o.id === s.confirmedOrderId)?.memberFoodQueue?.length || 0)
@@ -1966,8 +2200,18 @@ export default function POSPage({
                   )}
                 </span>
                 {safeSessions.length > 1 && (
-                  <button className="pos-tab-close" onClick={e => { e.stopPropagation(); removeSession(s.id) }}>
-                    <i className="fas fa-times" />
+                  <button
+                    type="button"
+                    className="pos-tab-close"
+                    title="ปิดปาร์ตี้"
+                    aria-label="ปิดปาร์ตี้"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      removeSession(s.id)
+                    }}
+                  >
+                    <i className="fas fa-times" style={{ pointerEvents: 'none', fontSize: 11 }} />
                   </button>
                 )}
               </div>
@@ -3307,7 +3551,8 @@ export default function POSPage({
                           await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
                             status: 'closed', closedAt: serverTimestamp()
                           })
-                          const remaining = sessions.filter(s => s.id !== activeId)
+                          const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+                          const remaining = list.filter(s => String(s.id) !== String(activeId))
                           if (remaining.length === 0) {
                             const fresh = newPOSSession()
                             setSessions([fresh]); setActiveId(fresh.id)
@@ -3382,8 +3627,8 @@ export default function POSPage({
           onClose={() => setShowPayment(false)}
           onPaid={() => {
             setShowPayment(false)
-            // Remove the paid session, keep others
-            const remaining = sessions.filter(s => s.id !== activeId)
+            const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+            const remaining = list.filter(s => String(s.id) !== String(activeId))
             if (remaining.length === 0) {
               const fresh = newPOSSession()
               setSessions([fresh])

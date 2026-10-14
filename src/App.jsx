@@ -114,7 +114,7 @@ export default function App() {
     } catch {}
   }, [posSessions, posActiveId])
 
-  // Setter wrapper: writes to Firestore (debounced) so other admins see updates
+  // Setter wrapper: writes to Firestore (debounced for edits, immediate for add/remove)
   const handlePosSessionsChange = useCallback((updater) => {
     setPosSessions(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater
@@ -124,10 +124,16 @@ export default function App() {
         }
       } catch {}
       clearTimeout(posWriteTimerRef.current)
-      posWriteTimerRef.current = setTimeout(() => {
+      const countChanged = !Array.isArray(prev) || !Array.isArray(next) || prev.length !== next.length
+      if (countChanged) {
         setDoc(doc(db, 'pos_live', 'current'), { sessions: next })
           .catch(e => console.warn('POS sync write failed:', e))
-      }, 350)
+      } else {
+        posWriteTimerRef.current = setTimeout(() => {
+          setDoc(doc(db, 'pos_live', 'current'), { sessions: next })
+            .catch(e => console.warn('POS sync write failed:', e))
+        }, 350)
+      }
       return next
     })
   }, [posActiveId])
