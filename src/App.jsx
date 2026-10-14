@@ -24,25 +24,28 @@ import POSPage, { newPOSSession } from './components/POSPage'
 import MemberOrderPage from './components/MemberOrderPage'
 import BookingPage from './components/BookingPage'
 import RandomWheelPage from './components/RandomWheelPage'
+import AllOfUsWillDiePage from './components/AllOfUsWillDiePage'
 import TierEffect from './components/TierEffect'
 import { ACHIEVEMENT_LIST } from './constants/achievements'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 
-const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random']
+const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie']
 
 function parseUrl(pathname) {
   const parts = pathname.replace(/^\//, '').split('/')
   const first = parts[0] || ''
+  if (first.toLowerCase() === 'allofuswilldie') return { page: 'allofuswilldie', detailId: null }
   if (first === 'games' && parts[1]) return { page: 'detail', detailId: parts[1] }
   if (first === 'admindashboard') return { page: 'admin', detailId: null }
-  if (PAGE_PATHS.includes(first)) return { page: first, detailId: null }
+  if (PAGE_PATHS.includes(first.toLowerCase())) return { page: first.toLowerCase(), detailId: null }
   return { page: 'home', detailId: null }
 }
 
 function buildUrl(page, id = null) {
   if (page === 'home') return '/'
   if (page === 'detail' && id) return `/games/${id}`
+  if (page === 'allofuswilldie') return '/AllOfUsWillDie'
   return `/${page}`
 }
 
@@ -554,7 +557,7 @@ export default function App() {
 
   return (
     <>
-      {currentPage !== 'random' && (
+      {currentPage !== 'random' && currentPage !== 'allofuswilldie' && (
         <Nav
           currentPage={currentPage}
           showPage={showPage}
@@ -673,6 +676,15 @@ export default function App() {
       )}
       {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} />}
       {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} />}
+      {currentPage === 'allofuswilldie' && (
+        <AllOfUsWillDiePage
+          lineUser={lineUser}
+          firebaseUser={firebaseUser}
+          isAdmin={isEffectiveAdmin}
+          showToast={showToast}
+          showPage={showPage}
+        />
+      )}
       {currentPage === 'admin' && (
         <AdminPage
           showToast={showToast}
