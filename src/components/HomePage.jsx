@@ -260,19 +260,18 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .mm-steps-grid{display:grid;grid-template-columns:1fr}
         @media(min-width:640px){.mm-steps-grid{grid-template-columns:repeat(3,1fr)}}
 
-        /* ── Event Ticket Styles ── */
+        /* ── LUXURY EVENT TICKET STYLES ── */
         .mm-ticket-card {
           display: flex;
           flex-direction: column;
-          background: linear-gradient(145deg, rgba(20, 20, 28, 0.94) 0%, rgba(10, 10, 16, 0.98) 100%);
-          border: 1px solid rgba(255, 255, 255, 0.1);
-          border-radius: 24px;
-          overflow: hidden;
+          background: linear-gradient(145deg, #151520 0%, #0d0d15 100%);
+          border: 1.5px solid rgba(255, 255, 255, 0.12);
+          border-radius: 22px;
           position: relative;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.65), 0 0 0 1px rgba(198,36,25,0.18);
+          box-shadow: 0 30px 70px rgba(0,0,0,0.7), 0 0 0 1px rgba(198,36,25,0.16);
         }
         .mm-ticket-stub {
-          padding: clamp(24px, 3.5vw, 40px);
+          padding: 24px 20px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -293,36 +292,100 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           position: relative;
           overflow: hidden;
         }
-        .mm-ticket-divider {
+        .mm-ticket-seam {
           position: relative;
           display: flex;
           align-items: center;
           justify-content: center;
-          z-index: 3;
+          z-index: 4;
+        }
+        .mm-ticket-scissor {
+          width: 22px;
+          height: 22px;
+          border-radius: 50%;
+          background: #14141e;
+          border: 1px solid rgba(255, 255, 255, 0.22);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(255, 255, 255, 0.65);
+          font-size: 10px;
+          z-index: 5;
+        }
+        .mm-ticket-barcode-lines {
+          height: 32px;
+          background: repeating-linear-gradient(
+            90deg,
+            rgba(255,255,255,0.8) 0px, rgba(255,255,255,0.8) 2px,
+            transparent 2px, transparent 4px,
+            rgba(255,255,255,0.8) 4px, rgba(255,255,255,0.8) 5px,
+            transparent 5px, transparent 7px,
+            rgba(255,255,255,0.8) 7px, rgba(255,255,255,0.8) 10px,
+            transparent 10px, transparent 12px,
+            rgba(255,255,255,0.8) 12px, rgba(255,255,255,0.8) 13px,
+            transparent 13px, transparent 16px,
+            rgba(255,255,255,0.8) 16px, rgba(255,255,255,0.8) 18px,
+            transparent 18px, transparent 20px,
+            rgba(255,255,255,0.8) 20px, rgba(255,255,255,0.8) 24px,
+            transparent 24px, transparent 27px
+          );
+          border-radius: 2px;
+          opacity: 0.85;
         }
         @media(max-width: 899px) {
-          .mm-ticket-body { order: 1; }
-          .mm-ticket-divider {
+          .mm-ticket-body {
+            order: 1;
+            border-radius: 20px 20px 0 0;
+          }
+          .mm-ticket-img-wrap {
+            border-radius: 20px 20px 0 0;
+          }
+          .mm-ticket-seam {
             order: 2;
             width: 100%;
-            height: 2px;
-            border-bottom: 2px dashed rgba(255, 255, 255, 0.18);
+            height: 24px;
             margin: 0;
           }
-          .mm-ticket-stub { order: 3; }
-          .mm-ticket-notch-l {
-            position: absolute; left: -14px; top: -13px;
-            width: 26px; height: 26px; border-radius: 50%;
-            background: #07070b; box-shadow: inset -2px 0 4px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+          .mm-ticket-seam-line {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            right: 0;
+            height: 0;
+            border-top: 2px dashed rgba(255, 255, 255, 0.28);
           }
-          .mm-ticket-notch-r {
-            position: absolute; right: -14px; top: -13px;
-            width: 26px; height: 26px; border-radius: 50%;
-            background: #07070b; box-shadow: inset 2px 0 4px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+          .mm-ticket-stub {
+            order: 3;
+            border-radius: 0 0 20px 20px;
           }
-          .mm-ticket-notch-t, .mm-ticket-notch-b { display: none; }
+          .mm-ticket-notch-start {
+            position: absolute;
+            top: 50%;
+            left: 0;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 36px;
+            border-radius: 0 18px 18px 0;
+            background: #07070b;
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            border-left: none;
+            box-shadow: inset -2px 0 6px rgba(0,0,0,0.8);
+            z-index: 6;
+          }
+          .mm-ticket-notch-end {
+            position: absolute;
+            top: 50%;
+            right: 0;
+            transform: translateY(-50%);
+            width: 18px;
+            height: 36px;
+            border-radius: 18px 0 0 18px;
+            background: #07070b;
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            border-right: none;
+            box-shadow: inset 2px 0 6px rgba(0,0,0,0.8);
+            z-index: 6;
+          }
         }
         @media(min-width: 900px) {
           .mm-ticket-card {
@@ -331,31 +394,64 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           }
           .mm-ticket-stub {
             order: 1;
-            flex: 0 0 420px;
-            max-width: 440px;
+            flex: 0 0 400px;
+            max-width: 420px;
+            padding: clamp(24px, 2.5vw, 36px);
+            border-radius: 20px 0 0 20px;
           }
-          .mm-ticket-divider {
+          .mm-ticket-seam {
             order: 2;
-            width: 2px;
-            border-right: 2px dashed rgba(255, 255, 255, 0.18);
+            width: 24px;
+            flex-shrink: 0;
+          }
+          .mm-ticket-seam-line {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            border-left: 2px dashed rgba(255, 255, 255, 0.28);
+          }
+          .mm-ticket-scissor {
+            transform: rotate(90deg);
           }
           .mm-ticket-body {
             order: 3;
             flex: 1;
+            border-radius: 0 20px 20px 0;
           }
-          .mm-ticket-notch-t {
-            position: absolute; top: -14px; left: -13px;
-            width: 26px; height: 26px; border-radius: 50%;
-            background: #07070b; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+          .mm-ticket-img-wrap {
+            height: 100%;
+            border-radius: 0 20px 20px 0;
           }
-          .mm-ticket-notch-b {
-            position: absolute; bottom: -14px; left: -13px;
-            width: 26px; height: 26px; border-radius: 50%;
-            background: #07070b; box-shadow: inset 0 2px 4px rgba(0,0,0,0.6);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+          .mm-ticket-notch-start {
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 36px;
+            height: 18px;
+            border-radius: 0 0 18px 18px;
+            background: #07070b;
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            border-top: none;
+            box-shadow: inset 0 -2px 6px rgba(0,0,0,0.8);
+            z-index: 6;
           }
-          .mm-ticket-notch-l, .mm-ticket-notch-r { display: none; }
+          .mm-ticket-notch-end {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 36px;
+            height: 18px;
+            border-radius: 18px 18px 0 0;
+            background: #07070b;
+            border: 1.5px solid rgba(255, 255, 255, 0.18);
+            border-bottom: none;
+            box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
+            z-index: 6;
+          }
         }
         .mm-footer-split{display:grid;grid-template-columns:1fr}
         @media(min-width:768px){.mm-footer-split{grid-template-columns:1fr 1fr}}
@@ -941,17 +1037,40 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         <div aria-hidden style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(200,160,80,0.09) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
 
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          {/* ══ LUXURY EVENT TICKET (980x400 IMAGE + DETAILS STUB) ══ */}
+          {/* ══ LUXURY VIP EVENT TICKET (DETAILS STUB + PERFORATED SEAM + 980x400 IMAGE) ══ */}
           <div className="mm-ticket-card mm-reveal">
             {/* ── SHORT SIDE: DETAILS STUB ── */}
             <div className="mm-ticket-stub">
               <div>
+                {/* Top Row: Serial Number and Admit One Stamp */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                  <div style={{
+                    fontFamily: 'monospace', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em',
+                    color: 'var(--crimson-400)', textTransform: 'uppercase',
+                  }}>
+                    NO. SF-09482
+                  </div>
+                  <div style={{
+                    border: '1px solid rgba(200, 160, 80, 0.55)',
+                    color: 'var(--case-amber)',
+                    padding: '2px 8px',
+                    borderRadius: 4,
+                    fontSize: 9,
+                    fontWeight: 800,
+                    letterSpacing: '0.15em',
+                    textTransform: 'uppercase',
+                    background: 'rgba(200, 160, 80, 0.08)',
+                  }}>
+                    ADMIT ONE
+                  </div>
+                </div>
+
                 {/* Eyebrow */}
                 <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 12px', borderRadius: 999,
+                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 12px', borderRadius: 999,
                   background: 'rgba(198,36,25,0.12)', border: '1px solid rgba(198,36,25,0.28)',
-                  color: 'var(--crimson-400)', fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em',
-                  textTransform: 'uppercase', marginBottom: 14, width: 'fit-content',
+                  color: 'var(--crimson-400)', fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
+                  textTransform: 'uppercase', marginBottom: 12, width: 'fit-content',
                 }}>
                   <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--crimson-500)', boxShadow: '0 0 6px var(--crimson-500)' }} />
                   <span>SPECIAL PASS · {promoSettings?.month || 'สิทธิพิเศษประจำเดือน'}</span>
@@ -960,30 +1079,34 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 {/* Heading */}
                 <h2 style={{
                   fontFamily: "'Bebas Neue',sans-serif",
-                  fontSize: 'clamp(32px, 3.2vw, 46px)',
+                  fontSize: 'clamp(28px, 2.8vw, 42px)',
                   lineHeight: 0.95,
                   textTransform: 'uppercase',
                   color: '#fff',
-                  margin: '0 0 16px 0',
+                  margin: '0 0 14px 0',
                   letterSpacing: '-0.01em',
                 }}>
                   {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
                 </h2>
 
-                {/* Discount Voucher Box */}
+                {/* Stamped Voucher Discount Box */}
                 {promoSettings?.discountAmount && (
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
-                    padding: '12px 16px', background: 'linear-gradient(135deg, rgba(198,36,25,0.18) 0%, rgba(198,36,25,0.06) 100%)',
-                    border: '1px solid rgba(198,36,25,0.35)', borderRadius: 14, marginBottom: 16,
+                    padding: '12px 14px', background: 'linear-gradient(135deg, rgba(198,36,25,0.18) 0%, rgba(198,36,25,0.05) 100%)',
+                    border: '1.5px dashed rgba(198,36,25,0.45)', borderRadius: 12, marginBottom: 14,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 9, background: 'rgba(198,36,25,0.25)', color: 'var(--crimson-400)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flexShrink: 0 }}>
+                      <div style={{
+                        width: 34, height: 34, borderRadius: 8, background: 'rgba(198,36,25,0.25)',
+                        color: 'var(--crimson-400)', display: 'flex', alignItems: 'center',
+                        justifyContent: 'center', fontSize: 14, flexShrink: 0,
+                      }}>
                         <i className="fas fa-ticket-alt" />
                       </div>
                       <div>
-                        <div style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>
-                          สิทธิ์ส่วนลดพิเศษ
+                        <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
+                          VOUCHER DISCOUNT
                         </div>
                         <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginTop: 1 }}>
                           {promoSettings.discountType === 'person' ? 'ลดต่อคนในรอบเล่น' : 'ส่วนลดทั้งปาร์ตี้'}
@@ -1009,25 +1132,25 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
                 {/* Description */}
                 <p style={{
-                  fontSize: 'clamp(13px, 1.2vw, 14.5px)', color: 'rgba(255,255,255,0.72)',
-                  lineHeight: 1.65, margin: '0 0 16px 0',
+                  fontSize: 'clamp(12.5px, 1.1vw, 13.5px)', color: 'rgba(255,255,255,0.7)',
+                  lineHeight: 1.6, margin: '0 0 14px 0',
                 }}>
                   {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
                 </p>
 
-                {/* Feature Badges - ZERO EMOJIS! Text and icons only */}
-                <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 20 }}>
+                {/* Feature Badges - Text and FontAwesome Icons only */}
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
                   {([promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean).length > 0
                     ? [promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean)
                     : ['สคริปต์ยอดนิยม', 'ส่วนลดพิเศษ', 'จำนวนจำกัด']
                   ).map((b, i) => {
                     const cleanText = b.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
-                    const badgeIcons = ['fas fa-star', 'fas fa-tag', 'fas fa-clock'];
+                    const badgeIcons = ['fas fa-theater-masks', 'fas fa-tags', 'fas fa-hourglass-half'];
                     return (
                       <span key={i} style={{
-                        fontSize: 10, fontWeight: 700, letterSpacing: '0.06em',
-                        padding: '4px 10px', borderRadius: 20,
-                        background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                        fontSize: 9.5, fontWeight: 700, letterSpacing: '0.05em',
+                        padding: '4px 9px', borderRadius: 16,
+                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
                         color: 'rgba(255,255,255,0.85)', display: 'inline-flex', alignItems: 'center', gap: 5,
                       }}>
                         <i className={badgeIcons[i % badgeIcons.length]} style={{ fontSize: 9, color: 'var(--case-amber)' }} />
@@ -1038,8 +1161,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 </div>
               </div>
 
-              {/* Action Button & Stub Info */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 16 }}>
+              {/* Action Button */}
+              <div>
                 <button
                   onClick={() => showPage(promoSettings?.buttonLink || 'booking')}
                   style={{
@@ -1047,35 +1170,49 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                     background: 'linear-gradient(135deg, var(--crimson-500) 0%, var(--crimson-600) 100%)',
                     color: '#fff', border: 'none', cursor: 'pointer',
                     fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
-                    fontFamily: "'Sarabun',sans-serif", padding: '15px 24px', borderRadius: 12,
+                    fontFamily: "'Sarabun',sans-serif", padding: '13px 20px', borderRadius: 10,
                     transition: 'all 0.22s ease', textAlign: 'center',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-                    boxShadow: '0 8px 24px rgba(198,36,25,0.4)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: '0 8px 20px rgba(198,36,25,0.4)',
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 12px 30px rgba(198,36,25,0.55)';
+                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(198,36,25,0.55)';
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(198,36,25,0.4)';
+                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(198,36,25,0.4)';
                   }}
                 >
+                  <i className="fas fa-ticket-alt" style={{ fontSize: 11 }} />
                   <span>{promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย'}</span>
-                  <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
+                  <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
                 </button>
+
+                {/* Barcode & Serial Stamp */}
+                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                  <div className="mm-ticket-barcode-lines" />
+                  <div style={{
+                    fontFamily: 'monospace', fontSize: 9.5, letterSpacing: '0.22em',
+                    color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 4, textTransform: 'uppercase',
+                  }}>
+                    * SF - VOUCHER - 2026 *
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* ── PERFORATED TICKET DIVIDER WITH NOTCHES ── */}
-            <div className="mm-ticket-divider" aria-hidden="true">
-              <div className="mm-ticket-notch-t" />
-              <div className="mm-ticket-notch-b" />
-              <div className="mm-ticket-notch-l" />
-              <div className="mm-ticket-notch-r" />
+            {/* ── PERFORATED SEAM WITH TEAR NOTCHES AND SCISSORS ── */}
+            <div className="mm-ticket-seam" aria-hidden="true">
+              <div className="mm-ticket-seam-line" />
+              <div className="mm-ticket-scissor">
+                <i className="fas fa-cut" />
+              </div>
+              <div className="mm-ticket-notch-start" />
+              <div className="mm-ticket-notch-end" />
             </div>
 
-            {/* ── LONG SIDE: EVENT TICKET IMAGE (980x400) ── */}
+            {/* ── LONG SIDE: EVENT TICKET BANNER (980x400) ── */}
             <div className="mm-ticket-body">
               <div className="mm-ticket-img-wrap">
                 {promoSettings?.bannerUrl ? (
@@ -1092,59 +1229,62 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                     padding: 24, textAlign: 'center', position: 'relative',
                   }}>
                     <div style={{
-                      width: 60, height: 60, borderRadius: '50%',
+                      width: 56, height: 56, borderRadius: '50%',
                       background: 'rgba(198,36,25,0.15)', border: '1px solid rgba(198,36,25,0.3)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--crimson-400)', fontSize: 24, marginBottom: 12,
+                      color: 'var(--crimson-400)', fontSize: 22, marginBottom: 10,
                     }}>
                       <i className="fas fa-ticket-alt" />
                     </div>
-                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, letterSpacing: '0.08em', color: '#fff', textTransform: 'uppercase' }}>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, letterSpacing: '0.08em', color: '#fff', textTransform: 'uppercase' }}>
                       SOFUN EVENT PASS
                     </div>
-                    <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
                       EXCLUSIVE MURDER MYSTERY EVENT
                     </div>
                   </div>
                 )}
 
-                {/* VIP Pass Watermark in Corner */}
+                {/* Ornamental Gold Corner Brackets for Luxury Ticket Frame */}
+                <div style={{ position: 'absolute', top: 12, left: 12, width: 18, height: 18, borderTop: '2px solid rgba(255,215,0,0.65)', borderLeft: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
+                <div style={{ position: 'absolute', top: 12, right: 12, width: 18, height: 18, borderTop: '2px solid rgba(255,215,0,0.65)', borderRight: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
+                <div style={{ position: 'absolute', bottom: 12, left: 12, width: 18, height: 18, borderBottom: '2px solid rgba(255,215,0,0.65)', borderLeft: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
+                <div style={{ position: 'absolute', bottom: 12, right: 12, width: 18, height: 18, borderBottom: '2px solid rgba(255,215,0,0.65)', borderRight: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
+
+                {/* VIP Gold Foil Badge */}
                 <div style={{
                   position: 'absolute', top: 16, right: 16,
-                  background: 'rgba(10, 10, 16, 0.78)',
-                  backdropFilter: 'blur(10px)',
-                  border: '1px solid rgba(255,255,255,0.16)',
-                  color: '#fff', padding: '5px 12px', borderRadius: 8,
-                  fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
+                  background: 'linear-gradient(135deg, rgba(212,175,55,0.95) 0%, rgba(160,120,40,0.95) 100%)',
+                  color: '#1a1002', padding: '4px 12px', borderRadius: 6,
+                  fontSize: 9.5, fontWeight: 900, letterSpacing: '0.14em',
                   textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6,
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.5)',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.6)', zIndex: 5,
                 }}>
-                  <i className="fas fa-crown" style={{ color: 'var(--case-amber)', fontSize: 10 }} />
-                  <span>EVENT TICKET · 980x400</span>
+                  <i className="fas fa-crown" style={{ fontSize: 9 }} />
+                  <span>VIP ADMISSION PASS</span>
                 </div>
 
-                {/* Bottom Gradient Overlay with Barcode */}
+                {/* Bottom Ticket Watermark Overlay */}
                 <div style={{
                   position: 'absolute', bottom: 0, left: 0, right: 0,
-                  background: 'linear-gradient(to top, rgba(10,10,16,0.95) 0%, rgba(10,10,16,0.5) 60%, transparent 100%)',
-                  padding: '24px 20px 14px',
+                  background: 'linear-gradient(to top, rgba(8,8,12,0.96) 0%, rgba(8,8,12,0.6) 60%, transparent 100%)',
+                  padding: '24px 18px 12px',
                   display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-                  gap: 12,
+                  gap: 12, zIndex: 4,
                 }}>
                   <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.18em', color: 'var(--crimson-400)', textTransform: 'uppercase', marginBottom: 2 }}>
-                      OFFICIAL ADMISSION
+                    <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.18em', color: 'var(--crimson-400)', textTransform: 'uppercase', marginBottom: 2 }}>
+                      SOFUN LOUNGE · SPECIAL VOUCHER
                     </div>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {promoSettings?.heading || 'สิทธิ์พิเศษเฉพาะคุณ'}
                     </div>
                   </div>
-                  {/* Decorative Barcode */}
                   <div style={{
-                    fontFamily: 'monospace', fontSize: 11, letterSpacing: '2px',
-                    color: 'rgba(255,255,255,0.45)', flexShrink: 0, userSelect: 'none',
+                    fontFamily: 'monospace', fontSize: 10, letterSpacing: '0.12em',
+                    color: 'rgba(255,255,255,0.45)', flexShrink: 0, textTransform: 'uppercase',
                   }}>
-                    ||| | ||||| || |||||| | |||
+                    FORMAT 980x400
                   </div>
                 </div>
               </div>
