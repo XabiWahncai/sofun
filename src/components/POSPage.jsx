@@ -1203,23 +1203,32 @@ export default function POSPage({
     setActiveId(s.id)
   }
 
-  const removeSession = async (id) => {
+  const removeSession = (id) => {
     const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
-    if (list.length <= 1) { showToast('ต้องมีอย่างน้อย 1 ปาร์ตี้', 'error'); return }
     const session = list.find(s => String(s.id) === String(id))
+
+    // Close confirmed order in the background without blocking the UI
     if (session?.confirmedOrderId) {
-      try {
-        await updateDoc(doc(db, 'orders', session.confirmedOrderId), {
-          status: 'closed', closedAt: serverTimestamp()
-        })
-      } catch (e) { console.warn('close order failed:', e.message) }
+      updateDoc(doc(db, 'orders', session.confirmedOrderId), {
+        status: 'closed',
+        closedAt: serverTimestamp(),
+      }).catch(e => console.warn('close order failed:', e.message))
     }
-    const remaining = list.filter(s => String(s.id) !== String(id))
-    setSessions(remaining)
-    if (String(activeId) === String(id)) {
-      const nextActive = remaining[remaining.length - 1]
-      setActiveId(nextActive ? nextActive.id : null)
-    }
+
+    setSessions(prev => {
+      const curList = Array.isArray(prev) && prev.length > 0 ? prev : list
+      const remaining = curList.filter(s => String(s.id) !== String(id))
+      if (remaining.length === 0) {
+        const fresh = newPOSSession()
+        setActiveId(fresh.id)
+        return [fresh]
+      }
+      if (String(activeId) === String(id)) {
+        const nextActive = remaining[remaining.length - 1]
+        setActiveId(nextActive ? nextActive.id : null)
+      }
+      return remaining
+    })
     showToast('ปิดปาร์ตี้แล้ว')
   }
 
@@ -1582,17 +1591,24 @@ export default function POSPage({
         .pos-tabs-wrap { background: transparent !important; border: none !important; padding: 14px 20px 6px !important; max-width: 1340px !important; margin: 0 auto !important; }
         .pos-tabs { gap: 6px !important; }
         .pos-tab {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 6px !important;
+          position: relative !important;
           background: #ffffff !important;
           border: 1px solid rgba(26,26,26,0.08) !important;
-          color: rgba(26,26,26,0.55) !important;
-          padding: 8px 14px !important;
+          color: rgba(26,26,26,0.65) !important;
+          padding: 8px 10px 8px 14px !important;
           border-radius: 10px !important;
           font-weight: 700 !important;
           font-size: 12.5px !important;
           transition: all 0.14s !important;
           box-shadow: 0 1px 2px rgba(26,26,26,0.03) !important;
+          cursor: pointer !important;
+          user-select: none !important;
         }
-        .pos-tab:hover { color: #1a1a1a !important; border-color: rgba(26,26,26,0.18) !important; }
+        .pos-tab:hover { color: #1a1a1a !important; border-color: rgba(26,26,26,0.2) !important; }
         .pos-tab.active {
           background: #c62419 !important;
           border-color: #c62419 !important;
@@ -1600,42 +1616,66 @@ export default function POSPage({
           box-shadow: 0 4px 14px rgba(198,36,25,0.3) !important;
           transform: translateY(-1px);
         }
+        .pos-tab.confirmed:not(.active) {
+          border-color: rgba(200,160,80,0.5) !important;
+          background: rgba(200,160,80,0.07) !important;
+          color: #1a1a1a !important;
+        }
         .pos-tab.active .pos-tab-count { background: rgba(255,255,255,0.22) !important; color: #ffffff !important; }
-        .pos-tab-count { background: rgba(198,36,25,0.1) !important; color: #c62419 !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10.5px !important; font-weight: 800 !important; margin-left: 6px !important; border: none !important; }
+        .pos-tab-count { background: rgba(198,36,25,0.1) !important; color: #c62419 !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10.5px !important; font-weight: 800 !important; margin-left: 6px !important; border: none !important; flex-shrink: 0 !important; }
+        .pos-tab-label {
+          display: inline-flex !important;
+          align-items: center !important;
+          min-width: 0 !important;
+          flex: 1 1 auto !important;
+          overflow: hidden !important;
+        }
+        .pos-tab-text {
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          white-space: nowrap !important;
+          min-width: 0 !important;
+          display: inline-block !important;
+        }
         .pos-tab-close {
           display: inline-flex !important;
           align-items: center !important;
           justify-content: center !important;
-          width: 22px !important;
-          height: 22px !important;
+          width: 24px !important;
+          height: 24px !important;
+          min-width: 24px !important;
+          min-height: 24px !important;
           margin-left: 6px !important;
           border-radius: 50% !important;
           border: none !important;
-          background: transparent !important;
+          background: rgba(0,0,0,0.06) !important;
           cursor: pointer !important;
-          color: rgba(26,26,26,0.4) !important;
-          opacity: 0.5 !important;
+          color: rgba(26,26,26,0.5) !important;
+          opacity: 0.8 !important;
           transition: all 0.15s ease !important;
           padding: 0 !important;
           flex-shrink: 0 !important;
-          z-index: 2 !important;
+          z-index: 10 !important;
+          pointer-events: auto !important;
+          position: relative !important;
         }
-        .pos-tab:hover .pos-tab-close { opacity: 0.8 !important; }
+        .pos-tab:hover .pos-tab-close { opacity: 1 !important; color: #1a1a1a !important; }
         .pos-tab-close:hover {
           color: #c62419 !important;
-          background: rgba(198,36,25,0.1) !important;
+          background: rgba(198,36,25,0.15) !important;
           opacity: 1 !important;
-          transform: scale(1.1) !important;
+          transform: scale(1.12) !important;
         }
         .pos-tab.active .pos-tab-close {
-          color: rgba(255,255,255,0.75) !important;
-          opacity: 0.85 !important;
+          color: rgba(255,255,255,0.9) !important;
+          background: rgba(255,255,255,0.2) !important;
+          opacity: 0.9 !important;
         }
         .pos-tab.active .pos-tab-close:hover {
           color: #ffffff !important;
-          background: rgba(255,255,255,0.25) !important;
+          background: rgba(255,255,255,0.35) !important;
           opacity: 1 !important;
-          transform: scale(1.1) !important;
+          transform: scale(1.12) !important;
         }
         .pos-tab-add {
           background: transparent !important;
@@ -1979,8 +2019,9 @@ export default function POSPage({
           .pos-tabs-wrap { padding: 12px 14px 4px !important; overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; width: 100% !important; box-sizing: border-box !important; margin: 0 !important; }
           .pos-tabs-wrap::-webkit-scrollbar { height: 0 !important; }
           .pos-tabs { flex-wrap: nowrap !important; min-width: min-content !important; }
-          .pos-tab { flex-shrink: 0 !important; white-space: nowrap !important; max-width: 65vw !important; overflow: hidden !important; text-overflow: ellipsis !important; }
-          .pos-tab-label { overflow: hidden !important; text-overflow: ellipsis !important; }
+          .pos-tab { flex-shrink: 0 !important; white-space: nowrap !important; max-width: 78vw !important; }
+          .pos-tab-label { min-width: 0 !important; flex: 1 1 auto !important; overflow: hidden !important; }
+          .pos-tab-close { width: 28px !important; height: 28px !important; min-width: 28px !important; min-height: 28px !important; flex-shrink: 0 !important; }
           .pos-tab-add { flex-shrink: 0 !important; white-space: nowrap !important; }
 
           .pos-queue-bar { margin: 8px 14px 0 !important; width: calc(100% - 28px) !important; max-width: calc(100% - 28px) !important; }
@@ -2186,12 +2227,14 @@ export default function POSPage({
                 onClick={() => setActiveId(s.id)}
               >
                 <span className="pos-tab-label">
-                  {s.confirmedOrderId && <i className="fas fa-check-circle" style={{ marginRight: 5, color: 'var(--feedback-success-icon)', fontSize: 10 }} />}
-                  {(() => {
-                    const game = allGames.find(g => g.id === s.scriptId)
-                    const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
-                    return game ? `${game.title} ${date}` : s.label
-                  })()}
+                  {s.confirmedOrderId && <i className="fas fa-check-circle" style={{ marginRight: 5, color: 'var(--feedback-success-icon)', fontSize: 10, flexShrink: 0 }} />}
+                  <span className="pos-tab-text">
+                    {(() => {
+                      const game = allGames.find(g => g.id === s.scriptId)
+                      const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
+                      return game ? `${game.title} ${date}` : s.label
+                    })()}
+                  </span>
                   {(s.members || []).length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
                   {pendingCount > 0 && (
                     <span className="pos-tab-alert-badge" title={`มีออเดอร์ใหม่รอรับ ${pendingCount} รายการ`}>
@@ -2199,14 +2242,13 @@ export default function POSPage({
                     </span>
                   )}
                 </span>
-                {safeSessions.length > 1 && (
+                {(safeSessions.length > 1 || s.confirmedOrderId || (s.members || []).length > 0 || (s.order || []).length > 0) && (
                   <button
                     type="button"
                     className="pos-tab-close"
                     title="ปิดปาร์ตี้"
                     aria-label="ปิดปาร์ตี้"
                     onClick={(e) => {
-                      e.preventDefault()
                       e.stopPropagation()
                       removeSession(s.id)
                     }}
