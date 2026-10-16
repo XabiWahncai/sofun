@@ -815,10 +815,11 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
             {/* Description */}
             <p className="mm-r3" style={{
-              fontSize: 'clamp(13px,1.3vw,15.5px)', lineHeight: 1.8,
-              color: '#666', maxWidth: '44ch', margin: '24px 0 32px',
+              fontSize: 'clamp(13px,1.3vw,15.5px)', lineHeight: 1.85,
+              color: '#666', maxWidth: '48ch', margin: '24px 0 32px',
+              textWrap: 'pretty', wordBreak: 'normal',
             }}>
-              <strong>Sofun Club (Sofun Club Thailand)</strong> แพลตฟอร์มและสตูดิโอเกม <strong>Script Murder</strong> แห่งแรกในประเทศไทย มอบประสบการณ์เกมสืบสวนสวมบทบาท (Role-playing) ในระดับพรีเมียม สัมผัสความสนุกสนานทางสังคมที่แปลกใหม่และร่วมไขปริศนาคดีฆาตกรรมไปกับตัวละครที่คุณเลือกเอง ที่ <strong>Sofun</strong> เราคัดสรรสคริปต์เกม <strong>Script Murder</strong> คุณภาพกว่า {scriptCount} เรื่อง พร้อม Game Master และห้องเล่นธีมเสมือนจริงใจกลาง RCA
+              <strong>Sofun Club (Sofun Club Thailand)</strong> แพลตฟอร์มและสตูดิโอเกม <strong>Script Murder</strong> แห่งแรกในประเทศไทย พร้อมมอบประสบการณ์สืบสวนสวมบทบาท (Role-Playing) ระดับพรีเมียม สัมผัสความสนุกรูปแบบใหม่และร่วมไขปริศนาคดีฆาตกรรมไปกับตัวละครที่คุณเลือกเอง ที่&nbsp;<strong>Sofun</strong> เราคัดสรรสคริปต์เกมคุณภาพกว่า&nbsp;{scriptCount}&nbsp;เรื่อง พร้อม Game&nbsp;Master และห้องเล่นธีมเสมือนจริงใจกลาง&nbsp;RCA
             </p>
 
             {/* CTAs */}
