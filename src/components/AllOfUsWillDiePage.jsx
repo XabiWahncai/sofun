@@ -806,8 +806,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  // Impostor requests Sabotage
+  // Impostor requests Sabotage - sends request to admin for confirmation
   const requestSabotage = async (title, desc, countdownSeconds = 90) => {
+    if (gameDoc.sabotage?.active) {
+      showToast('มีเหตุการณ์ Sabotage ในระบบอยู่แล้ว', 'error')
+      return
+    }
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         sabotage: {
@@ -822,22 +826,26 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         }
       })
       setShowSabotageModal(false)
-      showToast('ส่งคำขอ Sabotage ถึงแอดมินแล้ว')
+      showToast('ส่งคำขอ Sabotage แล้ว รอแอดมินยืนยันอนุมัติ')
     } catch (e) {
       showToast('ส่งคำขอ Sabotage ล้มเหลว', 'error')
     }
   }
 
-  // Admin approves Sabotage
+  // Admin approves Sabotage - always requires admin confirmation
   const approveSabotage = async () => {
     if (!gameDoc?.sabotage) return
+    const sabTitle = gameDoc.sabotage.title || 'Sabotage'
+    if (!window.confirm(`ยืนยันการอนุมัติ ${sabTitle} หรือไม่? สัญญาณเตือนภัยจะดังบนโทรศัพท์ของทุกคนทันที`)) {
+      return
+    }
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         'sabotage.status': 'active',
         'sabotage.startedAt': Date.now(),
       })
       playAlarmSound()
-      showToast('อนุมัติ Sabotage แล้ว! กระจายสัญญาณเตือนทุกคน')
+      showToast('อนุมัติ Sabotage แล้ว กระจายสัญญาณเตือนทุกคน')
     } catch (e) {
       showToast('อนุมัติล้มเหลว', 'error')
     }
@@ -1565,6 +1573,33 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             fontFamily: 'monospace',
           }}>
             {fmtTime(sabotageTimeSec)}
+          </div>
+        </div>
+      )}
+
+      {/* ─── PENDING SABOTAGE NOTICE FOR IMPOSTOR ─── */}
+      {myRole === 'impostor' && gameDoc.sabotage?.active && gameDoc.sabotage.status === 'pending_approval' && (
+        <div style={{
+          background: 'rgba(197, 17, 17, 0.15)',
+          border: '1.5px dashed #c51111',
+          borderRadius: 12,
+          color: '#ff8a80',
+          padding: '10px 16px',
+          margin: '10px 16px 0',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          fontSize: 12.5,
+          fontWeight: 800,
+        }}>
+          <i className="fas fa-hourglass-half fa-spin" style={{ color: '#ff5252', fontSize: 16 }} />
+          <div>
+            <div style={{ fontWeight: 900, color: '#fff' }}>
+              ส่งคำขอ Sabotage &quot;{gameDoc.sabotage.title}&quot; แล้ว
+            </div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+              ระบบกำลังรอให้แอดมินกดยืนยันอนุมัติในระบบ
+            </div>
           </div>
         </div>
       )}
@@ -3338,7 +3373,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               เลือกสถานการณ์ก่อกวน
             </div>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
-              คำขอจะถูกส่งให้แอดมินตรวจสอบ เมื่อแอดมินอนุมัติ สัญญาณเตือนจะดังขึ้นบนโทรศัพท์ของทุกคน
+              คำขอจะถูกส่งให้แอดมินตรวจสอบ โดยแอดมินต้องเป็นผู้กดยืนยันอนุมัติเสมอ สัญญาณเตือนจึงจะเริ่มทำงาน
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16, maxHeight: 300, overflowY: 'auto' }}>
