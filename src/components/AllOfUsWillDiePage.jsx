@@ -245,6 +245,21 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [sabotageTimeSec, setSabotageTimeSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
+  const [revealedRole, setRevealedRole] = useState(false)
+  const revealRoleTimeoutRef = useRef(null)
+
+  const handleToggleRevealRole = () => {
+    if (revealedRole) {
+      setRevealedRole(false)
+      if (revealRoleTimeoutRef.current) clearTimeout(revealRoleTimeoutRef.current)
+    } else {
+      setRevealedRole(true)
+      if (revealRoleTimeoutRef.current) clearTimeout(revealRoleTimeoutRef.current)
+      revealRoleTimeoutRef.current = setTimeout(() => {
+        setRevealedRole(false)
+      }, 5000)
+    }
+  }
 
   // Determine effective admin permission
   const hasAdminPerm = isAppAdmin || lineUser?.role === 'admin' || !!firebaseUser
@@ -1332,9 +1347,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <AmongUsVisor
-            role={gameDoc.status === 'waiting' ? 'crewmate' : (myRole || 'crewmate')}
-            color={gameDoc.status === 'waiting' ? '#546e7a' : null}
-            isAlive={isAlive}
+            role="crewmate"
+            color="#0288d1"
+            isAlive={true}
             size={30}
           />
           <div>
@@ -2615,12 +2630,61 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 }}>
                   {fmtTime(currentTimeSec)}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
-                  <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={22} />
-                  <span style={{ fontSize: 11, fontWeight: 800, color: myRole === 'impostor' ? '#ff5252' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff') }}>
-                    {myRole === 'impostor' ? 'คนร้าย' : (myRole === 'dodo' ? 'โดโด้' : 'คนดี')}
-                  </span>
-                </div>
+                {revealedRole ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleRevealRole}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 6,
+                      padding: '4px 10px',
+                      borderRadius: 10,
+                      background: myRole === 'impostor'
+                        ? 'rgba(197, 17, 17, 0.25)'
+                        : (myRole === 'dodo' ? 'rgba(142, 36, 170, 0.25)' : 'rgba(2, 136, 209, 0.25)'),
+                      border: `1.5px solid ${myRole === 'impostor' ? '#c51111' : (myRole === 'dodo' ? '#8e24aa' : '#0288d1')}`,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="แตะเพื่อซ่อนบทบาททันที (จะซ่อนเองอัตโนมัติใน 5 วินาที)"
+                  >
+                    <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={22} />
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: myRole === 'impostor' ? '#ff5252' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff')
+                    }}>
+                      {myRole === 'impostor' ? 'ฝ่ายคนร้าย' : (myRole === 'dodo' ? 'ฝ่ายโดโด้' : 'ฝ่ายคนดี')}
+                    </span>
+                    <i className="fas fa-eye-slash" style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginLeft: 3 }} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleToggleRevealRole}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      marginTop: 6,
+                      padding: '5px 12px',
+                      borderRadius: 10,
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1.5px solid rgba(255, 255, 255, 0.15)',
+                      color: 'rgba(255, 255, 255, 0.75)',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="แตะเพื่อเช็คฝ่ายที่คุณได้รับ"
+                  >
+                    <i className="fas fa-eye" style={{ fontSize: 11, color: '#90caf9' }} />
+                    <span>แตะเพื่อเช็คฝ่าย</span>
+                  </button>
+                )}
               </div>
 
               {/* Action Button: Emergency Dome */}
