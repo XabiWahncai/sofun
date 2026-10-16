@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   doc, onSnapshot, setDoc, updateDoc, getDoc,
-  collection, query, where, getDocs, serverTimestamp,
+  collection, query, where, getDocs, serverTimestamp, deleteField,
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { QRCodeSVG } from 'qrcode.react'
@@ -258,10 +258,76 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }, [hasAdminPerm])
 
-  // ── 1. Find Special Event Active Party / Order ───────────
+  // ── 1. Find Special Event Active Party / Order (pos_live or orders) ───
   useEffect(() => {
+    let posSession = null
+    let orderSession = null
+
+    const evaluateParty = (pos, ord) => {
+      if (pos) {
+        const title = (pos.scriptTitle || pos.eventName || pos.label || '').toLowerCase().trim()
+        const scriptId = (pos.scriptId || '').toLowerCase().trim()
+        const room = (pos.room || '').toLowerCase().trim()
+        const isSpecial = (
+          title.includes('special event') ||
+          title.includes('secial event') ||
+          title.includes('spacial event') ||
+          title.includes('all of us') ||
+          scriptId.includes('special') ||
+          scriptId.includes('allofus') ||
+          room.includes('special')
+        )
+        if (isSpecial) return pos
+      }
+
+      if (ord) {
+        const title = (ord.scriptTitle || '').toLowerCase().trim()
+        const scriptId = (ord.scriptId || '').toLowerCase().trim()
+        const room = (ord.room || '').toLowerCase().trim()
+        const isSpecial = (
+          title.includes('special event') ||
+          title.includes('secial event') ||
+          title.includes('spacial event') ||
+          title.includes('all of us') ||
+          scriptId.includes('special') ||
+          scriptId.includes('allofus') ||
+          room.includes('special')
+        )
+        if (isSpecial) return ord
+      }
+
+      return pos || ord || null
+    }
+
+    // 1. Listen to pos_live/current (active real-time session from POS)
+    const unsubPos = onSnapshot(doc(db, 'pos_live', 'current'), snap => {
+      if (snap.exists()) {
+        const data = snap.data()
+        const sessions = data.sessions || []
+        const special = sessions.find(s => {
+          const title = (s.scriptTitle || s.eventName || s.label || '').toLowerCase().trim()
+          const scriptId = (s.scriptId || '').toLowerCase().trim()
+          const room = (s.room || '').toLowerCase().trim()
+          return (
+            title.includes('special event') ||
+            title.includes('secial event') ||
+            title.includes('spacial event') ||
+            title.includes('all of us') ||
+            scriptId.includes('special') ||
+            scriptId.includes('allofus') ||
+            room.includes('special')
+          )
+        })
+        posSession = special || (sessions.length > 0 ? sessions[0] : null)
+      } else {
+        posSession = null
+      }
+      setActiveParty(evaluateParty(posSession, orderSession))
+    }, err => console.warn('pos_live sync error:', err))
+
+    // 2. Listen to orders (confirmed active orders)
     const q = query(collection(db, 'orders'), where('status', '==', 'active'))
-    const unsub = onSnapshot(q, snap => {
+    const unsubOrders = onSnapshot(q, snap => {
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const specialEvent = orders.find(o => {
         const title = (o.scriptTitle || '').toLowerCase().trim()
@@ -277,15 +343,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           room.includes('special')
         )
       })
-      if (specialEvent) {
-        setActiveParty(specialEvent)
-      } else {
-        // Fallback: check all active orders, take the newest active order
-        const fallback = orders[0] || null
-        setActiveParty(fallback)
-      }
+      orderSession = specialEvent || orders[0] || null
+      setActiveParty(evaluateParty(posSession, orderSession))
     }, err => console.warn('Special event party query error:', err))
-    return unsub
+
+    return () => {
+      unsubPos()
+      unsubOrders()
+    }
   }, [])
 
   // ── 2. Listen to Game State Document in Realtime ─────────
@@ -537,6 +602,67 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast(`ยินดีต้อนรับ ${trimmed}`)
     } catch (e) {
       showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Admin: Delete / Kick single player from game
+  const handleDeletePlayer = async (playerUid) => {
+    if (!window.confirm('ยืนยันลบผู้เล่นนี้ออกจากเกม?')) return
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        [`players.${playerUid}`]: deleteField()
+      })
+      if (myUid === playerUid) {
+        localStorage.removeItem('allofus_player_uid')
+        setMyUid('')
+      }
+      showToast('ลบผู้เล่นเรียบร้อย')
+    } catch (e) {
+      showToast('ลบผู้เล่นล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Admin: Clear all players from game
+  const handleClearAllPlayers = async () => {
+    if (!window.confirm('ยืนยันล้างรายชื่อผู้เล่นทั้งหมดในห้อง?')) return
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        players: {}
+      })
+      localStorage.removeItem('allofus_player_uid')
+      setMyUid('')
+      showToast('ล้างรายชื่อผู้เล่นทั้งหมดแล้ว')
+    } catch (e) {
+      showToast('ล้างผู้เล่นล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Admin: Sync / Overwrite players strictly from active POS party
+  const handleSyncFromPos = async () => {
+    if (!activeParty || !activeParty.members || activeParty.members.length === 0) {
+      showToast('ไม่พบสมาชิกในปาร์ตี้ POS ปัจจุบัน', 'error')
+      return
+    }
+    if (!window.confirm(`ยืนยันซิงค์รายชื่อจาก POS (${activeParty.members.length} คน) แทนที่รายชื่อเดิม?`)) return
+    try {
+      const newPlayers = {}
+      activeParty.members.forEach(m => {
+        newPlayers[m.uid] = {
+          uid: m.uid,
+          name: m.name || 'ผู้เล่น',
+          avatar: m.avatar || '',
+          role: 'crewmate',
+          isAlive: true,
+          tasks: [],
+          ready: false,
+        }
+      })
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        players: newPlayers
+      })
+      showToast(`ซิงค์สมาชิก ${activeParty.members.length} คนจาก POS เรียบร้อย`)
+    } catch (e) {
+      showToast('ซิงค์ล้มเหลว: ' + e.message, 'error')
     }
   }
 
@@ -1686,12 +1812,36 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
             {/* Admin Player List & Role Inspector */}
             <div className="au-card" style={{ padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
-                  รายชื่อผู้เล่น ({allPlayersList.length} คน)
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
+                    รายชื่อผู้เล่น ({allPlayersList.length} คน)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
+                    ความคืบหน้าภารกิจรวม: {progressPercent}% ({completedTasksCount}/{totalTasksCount})
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-                  ความคืบหน้าภารกิจรวม: {progressPercent}% ({completedTasksCount}/{totalTasksCount})
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={handleSyncFromPos}
+                    className="au-btn au-btn-dark"
+                    style={{ padding: '6px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}
+                    title="ซิงค์รายชื่อจากปาร์ตี้ POS ปัจจุบัน"
+                  >
+                    <i className="fas fa-sync-alt" />
+                    <span>ซิงค์จาก POS</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearAllPlayers}
+                    className="au-btn au-btn-dark"
+                    style={{ padding: '6px 10px', fontSize: 11, color: '#ff5252', display: 'flex', alignItems: 'center', gap: 5 }}
+                    title="ล้างรายชื่อผู้เล่นทั้งหมดในห้อง"
+                  >
+                    <i className="fas fa-trash-alt" />
+                    <span>ล้างทั้งหมด</span>
+                  </button>
                 </div>
               </div>
 
@@ -1752,6 +1902,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                             }}
                           >
                             {p.isAlive ? 'ฆ่า' : 'ชุบ'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeletePlayer(p.uid)}
+                            style={{
+                              padding: '3px 8px', borderRadius: 6,
+                              background: 'rgba(244, 67, 54, 0.15)',
+                              border: '1px solid rgba(244, 67, 54, 0.35)',
+                              color: '#ff5252', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                            }}
+                            title="ลบผู้เล่นคนนี้ออกจากห้อง"
+                          >
+                            <i className="fas fa-trash-alt" />
                           </button>
                         </div>
                       </div>
