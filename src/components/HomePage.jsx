@@ -171,9 +171,9 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
       <style>{`
         @keyframes mmTicker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
-        @keyframes mmFadeUp { from{opacity:0;transform:translateY(28px)} to{opacity:1;transform:translateY(0)} }
-        @keyframes mmFadeL  { from{opacity:0;transform:translateX(-24px)} to{opacity:1;transform:translateX(0)} }
-        @keyframes mmFadeR  { from{opacity:0;transform:translateX(24px)} to{opacity:1;transform:translateX(0)} }
+        @keyframes mmFadeUp { from{opacity:0;transform:translateY(32px);filter:blur(6px)} to{opacity:1;transform:translateY(0);filter:blur(0)} }
+        @keyframes mmFadeL  { from{opacity:0;transform:translateX(-28px);filter:blur(6px)} to{opacity:1;transform:translateX(0);filter:blur(0)} }
+        @keyframes mmFadeR  { from{opacity:0;transform:translateX(28px);filter:blur(6px)} to{opacity:1;transform:translateX(0);filter:blur(0)} }
         @keyframes mmPulse  { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.8)} }
         @keyframes mmPing   { 0%{opacity:0.9;transform:scale(1)} 100%{opacity:0;transform:scale(3)} }
         @keyframes mmFloatA { 0%,100%{transform:translateY(0px) rotate(4deg)}   50%{transform:translateY(-14px) rotate(4deg)} }
@@ -185,56 +185,131 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         @keyframes mmFloatG { 0%,100%{transform:translateY(0px) rotate(5deg)}   50%{transform:translateY(-7px)  rotate(5deg)} }
         @keyframes mmFloatH { 0%,100%{transform:translateY(0px) rotate(-5deg)}  50%{transform:translateY(-10px) rotate(-5deg)} }
 
-        .mm-r1{animation:mmFadeUp .72s cubic-bezier(.22,1,.36,1) .06s both}
-        .mm-r2{animation:mmFadeUp .72s cubic-bezier(.22,1,.36,1) .16s both}
-        .mm-r3{animation:mmFadeUp .72s cubic-bezier(.22,1,.36,1) .28s both}
-        .mm-r4{animation:mmFadeUp .72s cubic-bezier(.22,1,.36,1) .40s both}
-        .mm-r5{animation:mmFadeL  .72s cubic-bezier(.22,1,.36,1) .18s both}
+        @keyframes mmMainFloat {
+          0%,100%{ transform:translateY(0px) rotate(0deg) scale(1) }
+          35%    { transform:translateY(-20px) rotate(.7deg) scale(1.018) }
+          65%    { transform:translateY(-9px) rotate(-.4deg) scale(1.008) }
+        }
 
-        .mm-reveal   {opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
-        .mm-reveal-l {opacity:0;transform:translateX(-28px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
-        .mm-reveal-r {opacity:0;transform:translateX(28px);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
-        .mm-reveal-s {opacity:0;transform:scale(.96);transition:opacity .7s cubic-bezier(.22,1,.36,1),transform .7s cubic-bezier(.22,1,.36,1)}
-        .mm-reveal.mm-in,.mm-reveal-l.mm-in,.mm-reveal-r.mm-in,.mm-reveal-s.mm-in{opacity:1;transform:none}
+        @keyframes mmPillFloat {
+          0%, 100% { transform: translate(calc(-50% + clamp(120px,13vw,200px)), calc(-50% + clamp(160px,20vw,280px))) translateY(0) scale(1); }
+          50% { transform: translate(calc(-50% + clamp(120px,13vw,200px)), calc(-50% + clamp(160px,20vw,280px))) translateY(-9px) scale(1.025); }
+        }
+
+        @keyframes mmOrbPulseA {
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.12; }
+          50% { transform: translate(32px, -24px) scale(1.18); opacity: 0.19; }
+        }
+        @keyframes mmOrbPulseB {
+          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.09; }
+          50% { transform: translate(-28px, 28px) scale(1.22); opacity: 0.16; }
+        }
+
+        @keyframes mmSnip {
+          0%, 100% { transform: rotate(90deg) scale(1); }
+          50% { transform: rotate(68deg) scale(1.2); color: var(--crimson-400); }
+        }
+
+        .mm-glow-orb-a { animation: mmOrbPulseA 9s ease-in-out infinite; }
+        .mm-glow-orb-b { animation: mmOrbPulseB 11s ease-in-out infinite; }
+
+        .mm-r1{animation:mmFadeUp .82s cubic-bezier(.16,1,.3,1) .06s both}
+        .mm-r2{animation:mmFadeUp .82s cubic-bezier(.16,1,.3,1) .16s both}
+        .mm-r3{animation:mmFadeUp .82s cubic-bezier(.16,1,.3,1) .28s both}
+        .mm-r4{animation:mmFadeUp .82s cubic-bezier(.16,1,.3,1) .40s both}
+        .mm-r5{animation:mmFadeL  .82s cubic-bezier(.16,1,.3,1) .18s both}
+
+        .mm-reveal   {opacity:0;transform:translateY(32px);filter:blur(6px);transition:opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1),filter .85s cubic-bezier(.16,1,.3,1)}
+        .mm-reveal-l {opacity:0;transform:translateX(-32px);filter:blur(6px);transition:opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1),filter .85s cubic-bezier(.16,1,.3,1)}
+        .mm-reveal-r {opacity:0;transform:translateX(32px);filter:blur(6px);transition:opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1),filter .85s cubic-bezier(.16,1,.3,1)}
+        .mm-reveal-s {opacity:0;transform:scale(.94);filter:blur(6px);transition:opacity .85s cubic-bezier(.16,1,.3,1),transform .85s cubic-bezier(.16,1,.3,1),filter .85s cubic-bezier(.16,1,.3,1)}
+        .mm-reveal.mm-in,.mm-reveal-l.mm-in,.mm-reveal-r.mm-in,.mm-reveal-s.mm-in{opacity:1;transform:none;filter:blur(0)}
         .mm-d1{transition-delay:.05s!important}.mm-d2{transition-delay:.10s!important}
         .mm-d3{transition-delay:.16s!important}.mm-d4{transition-delay:.22s!important}
         .mm-d5{transition-delay:.28s!important}.mm-d6{transition-delay:.34s!important}
 
-        .mm-btn-pri{transition:background .22s cubic-bezier(.22,1,.36,1),transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s cubic-bezier(.22,1,.36,1)!important}
-        .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px)!important;box-shadow:0 18px 48px rgba(198,36,25,.55)!important}
+        .mm-btn-pri{transition:background .25s ease,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s cubic-bezier(.16,1,.3,1)!important}
+        .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px) scale(1.015)!important;box-shadow:0 18px 48px rgba(198,36,25,.55),0 0 24px rgba(198,36,25,.3)!important}
+        .mm-btn-pri:active{transform:translateY(0) scale(0.98)!important}
+        .mm-btn-pri:hover i.fa-arrow-right{transform:translateX(4px);transition:transform .22s ease}
         .mm-btn-pri:focus-visible{outline:2px solid ${C};outline-offset:3px}
-        .mm-btn-gho{transition:border-color .2s,color .2s!important}
-        .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important}
+
+        .mm-btn-gho{transition:border-color .25s,color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s!important}
+        .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(198,36,25,.14)!important}
+        .mm-btn-gho:active{transform:scale(0.98)!important}
         .mm-btn-gho:focus-visible{outline:2px solid ${C};outline-offset:3px}
-        .mm-btn-dark{transition:background .2s,color .2s,transform .2s!important}
-        .mm-btn-dark:hover{background:#fff!important;color:#111!important;transform:translateY(-2px)!important}
+
+        .mm-btn-dark{transition:background .25s,color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s!important}
+        .mm-btn-dark:hover{background:#fff!important;color:#111!important;transform:translateY(-2px) scale(1.015)!important;box-shadow:0 12px 30px rgba(0,0,0,.2)!important}
+        .mm-btn-dark:active{transform:scale(0.98)!important}
         button:focus-visible{outline:2px solid ${C};outline-offset:2px}
 
-        .mm-card{transition:transform .35s cubic-bezier(.22,1,.36,1),box-shadow .35s,border-color .22s!important;cursor:pointer}
-        .mm-card:hover{transform:translateY(-8px)!important;box-shadow:0 24px 48px rgba(0,0,0,.13),0 0 0 1.5px rgba(198,36,25,.25)!important}
-        .mm-card:hover .mm-card-img{transform:scale(1.07)!important}
-        .mm-card:hover .mm-card-overlay{opacity:.72!important}
-        .mm-card:focus-visible{outline:2px solid ${C};outline-offset:2px}
-        .mm-card-img{transition:transform .55s cubic-bezier(.22,1,.36,1)!important}
-        .mm-card-overlay{transition:opacity .35s!important}
-
-        .mm-stat-num{font-family:'Bebas Neue',sans-serif;line-height:.88;letter-spacing:-.02em}
-        .mm-step-num{font-family:'Bebas Neue',sans-serif;font-size:clamp(80px,11vw,130px);line-height:.8;letter-spacing:-.04em;color:rgba(255,255,255,.045);pointer-events:none;user-select:none}
-
-        @keyframes mmMainFloat {
-          0%,100%{ transform:translateY(0px) rotate(0deg) scale(1) }
-          35%    { transform:translateY(-22px) rotate(.7deg) scale(1.016) }
-          65%    { transform:translateY(-10px) rotate(-.4deg) scale(1.008) }
+        /* ── Script Cards with Sheen Sweep ── */
+        .mm-card{
+          position:relative;
+          overflow:hidden;
+          transition:transform .45s cubic-bezier(.16,1,.3,1),box-shadow .45s cubic-bezier(.16,1,.3,1),border-color .3s ease!important;
+          cursor:pointer;
         }
+        .mm-card::after{
+          content:'';
+          position:absolute;
+          top:-60%;
+          left:-70%;
+          width:70%;
+          height:220%;
+          background:linear-gradient(to right,transparent 0%,rgba(255,255,255,.22) 50%,transparent 100%);
+          transform:rotate(25deg) translateX(-100%);
+          transition:transform .75s cubic-bezier(.16,1,.3,1);
+          pointer-events:none;
+          z-index:5;
+        }
+        .mm-card:hover{
+          transform:translateY(-10px) scale(1.015)!important;
+          box-shadow:0 28px 56px rgba(0,0,0,.18),0 0 0 1.5px rgba(198,36,25,.35)!important;
+        }
+        .mm-card:hover::after{
+          transform:rotate(25deg) translateX(420%);
+        }
+        .mm-card:hover .mm-card-img{transform:scale(1.08)!important;filter:brightness(1.04)!important}
+        .mm-card:hover .mm-card-overlay{opacity:.65!important}
+        .mm-card:focus-visible{outline:2px solid ${C};outline-offset:2px}
+        .mm-card-img{transition:transform .65s cubic-bezier(.16,1,.3,1),filter .65s cubic-bezier(.16,1,.3,1)!important}
+        .mm-card-overlay{transition:opacity .35s ease!important}
 
-        .mm-cover{transition:box-shadow .38s!important}
+        /* ── Interactive Step Cards ── */
+        .mm-step-card{transition:transform .4s cubic-bezier(.16,1,.3,1),background .3s ease,box-shadow .4s ease!important;border-radius:12px}
+        .mm-step-card:hover{transform:translateY(-8px)!important;background:rgba(255,255,255,0.02)!important}
+        .mm-step-card:hover .mm-step-num{color:rgba(198,36,25,0.14)!important;transform:scale(1.06) translateX(4px)!important}
+        .mm-step-card:hover i{transform:scale(1.15) rotate(-5deg);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+        .mm-step-num{font-family:'Bebas Neue',sans-serif;font-size:clamp(80px,11vw,130px);line-height:.8;letter-spacing:-.04em;color:rgba(255,255,255,.045);pointer-events:none;user-select:none;transition:color .4s ease,transform .4s cubic-bezier(.16,1,.3,1)!important}
+
+        /* ── Interactive Stat Cards ── */
+        .mm-stat-box{transition:transform .35s cubic-bezier(.16,1,.3,1),background .3s ease!important;border-radius:8px}
+        .mm-stat-box:hover{transform:translateY(-5px)!important;background:rgba(255,255,255,0.02)!important}
+        .mm-stat-box:hover .mm-stat-num{color:var(--crimson-400)!important;transition:color .3s ease}
+        .mm-stat-num{font-family:'Bebas Neue',sans-serif;line-height:.88;letter-spacing:-.02em}
+
+        /* ── Interactive Party Cards ── */
+        .mm-party-card{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s cubic-bezier(.16,1,.3,1),border-color .25s ease!important}
+        .mm-party-card:hover{transform:translateY(-5px)!important;box-shadow:0 16px 36px rgba(0,0,0,.08)!important;border-color:rgba(198,36,25,.25)!important}
+
+        /* ── Interactive Story/FAQ Cards ── */
+        .mm-story-card{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s cubic-bezier(.16,1,.3,1),border-color .25s ease!important}
+        .mm-story-card:hover{transform:translateY(-6px)!important;box-shadow:0 16px 36px rgba(0,0,0,.07)!important;border-color:rgba(198,36,25,.22)!important}
+        .mm-story-card:hover i{transform:scale(1.15);transition:transform .3s cubic-bezier(.16,1,.3,1)}
+
+        /* ── Hero Main & Covers ── */
+        .mm-cover{transition:box-shadow .38s,transform .38s!important}
         .mm-cover:hover{box-shadow:0 36px 72px rgba(0,0,0,.32)!important;filter:brightness(1.06)!important}
         .mm-cover-main{
           transition:box-shadow .38s,filter .38s!important;
           animation:mmMainFloat 7.5s ease-in-out infinite;
           transform-origin:center bottom;
         }
-        .mm-cover-main:hover{box-shadow:0 64px 120px rgba(0,0,0,.42)!important;filter:brightness(1.07)!important;animation-play-state:paused!important}
+        .mm-cover-main:hover{box-shadow:0 64px 120px rgba(0,0,0,.42),0 0 50px rgba(198,36,25,.3)!important;filter:brightness(1.07)!important;animation-play-state:paused!important}
+        .mm-hero-pill{animation:mmPillFloat 4.6s ease-in-out infinite}
+
         .mm-fa{animation:mmFloatA 5.2s ease-in-out infinite}
         .mm-fb{animation:mmFloatB 6.8s ease-in-out infinite}
         .mm-fc{animation:mmFloatC 7.6s ease-in-out infinite}
@@ -269,6 +344,20 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           border-radius: 22px;
           position: relative;
           box-shadow: 0 30px 70px rgba(0,0,0,0.7), 0 0 0 1px rgba(198,36,25,0.16);
+          transition: transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s cubic-bezier(.16,1,.3,1)!important;
+        }
+        .mm-ticket-card:hover {
+          transform: translateY(-6px)!important;
+          box-shadow: 0 42px 90px rgba(0,0,0,0.8), 0 0 45px rgba(198,36,25,0.22)!important;
+        }
+        .mm-ticket-card:hover .mm-ticket-img-wrap img {
+          transform: scale(1.04);
+        }
+        .mm-ticket-card:hover .mm-ticket-scissor i {
+          animation: mmSnip .8s ease-in-out infinite;
+        }
+        .mm-ticket-img-wrap img {
+          transition: transform .8s cubic-bezier(.16,1,.3,1)!important;
         }
         .mm-ticket-stub {
           padding: 24px 20px;
@@ -484,10 +573,10 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         }
 
         @media(prefers-reduced-motion:reduce){
-          .mm-r1,.mm-r2,.mm-r3,.mm-r4,.mm-r5{animation:none;opacity:1;transform:none}
-          .mm-reveal,.mm-reveal-l,.mm-reveal-r,.mm-reveal-s{transition:none;opacity:1;transform:none}
-          .mm-btn-pri:hover,.mm-card:hover{transform:none}
-          .mm-fa,.mm-fb,.mm-fc,.mm-fd,.mm-fe,.mm-ff,.mm-fg,.mm-fh,.mm-cover-main{animation:none}
+          .mm-r1,.mm-r2,.mm-r3,.mm-r4,.mm-r5{animation:none;opacity:1;transform:none;filter:none}
+          .mm-reveal,.mm-reveal-l,.mm-reveal-r,.mm-reveal-s{transition:none;opacity:1;transform:none;filter:none}
+          .mm-btn-pri:hover,.mm-card:hover,.mm-ticket-card:hover,.mm-step-card:hover,.mm-stat-box:hover,.mm-party-card:hover,.mm-story-card:hover{transform:none}
+          .mm-fa,.mm-fb,.mm-fc,.mm-fd,.mm-fe,.mm-ff,.mm-fg,.mm-fh,.mm-cover-main,.mm-hero-pill,.mm-glow-orb-a,.mm-glow-orb-b{animation:none}
         }
       `}</style>
 
@@ -894,7 +983,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               { num: '฿499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
               { num: '5',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
             ].map((s, i) => (
-              <div key={i} className={`mm-reveal mm-d${i + 1}`} style={{
+              <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
                 padding: 'clamp(32px,4vw,56px) clamp(20px,3vw,40px)',
                 borderRight: s.border ? '1px solid rgba(255,255,255,.06)' : 'none',
               }}>
@@ -932,7 +1021,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               { n: '02', icon: 'fas fa-user-secret', title: t('home','step2Title'), desc: t('home','step2Desc'), d: 'mm-d2' },
               { n: '03', icon: 'fas fa-search',      title: t('home','step3Title'), desc: t('home','step3Desc'), d: 'mm-d3' },
             ].map((step, i) => (
-              <div key={i} className={`mm-reveal ${step.d}`} style={{
+              <div key={i} className={`mm-reveal ${step.d} mm-step-card`} style={{
                 padding: 'clamp(28px,4vw,48px)',
                 borderRight: i < 2 ? '1px solid rgba(255,255,255,.05)' : 'none',
                 position: 'relative',
@@ -987,7 +1076,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(272px,1fr))', gap: 12 }}>
               {openParties.map((party, i) => (
-                <div key={party.id} className={`mm-reveal mm-d${Math.min(i + 1, 4)}`} style={{
+                <div key={party.id} className={`mm-reveal mm-d${Math.min(i + 1, 4)} mm-party-card`} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                   padding: '16px 18px', background: PAPER, borderRadius: 10,
                   border: '1px solid rgba(0,0,0,.08)', gap: 14,
@@ -1033,8 +1122,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         padding: 'clamp(64px, 8vw, 104px) clamp(20px, 4vw, 48px)',
       }}>
         {/* Subtle Ambient Decorative Glows */}
-        <div aria-hidden style={{ position: 'absolute', top: '-10%', left: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(198,36,25,0.12) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
-        <div aria-hidden style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(200,160,80,0.09) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
+        <div aria-hidden className="mm-glow-orb-a" style={{ position: 'absolute', top: '-10%', left: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(198,36,25,0.12) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
+        <div aria-hidden className="mm-glow-orb-b" style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(200,160,80,0.09) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
 
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
           {/* ══ LUXURY VIP EVENT TICKET (DETAILS STUB + PERFORATED SEAM + 980x400 IMAGE) ══ */}
@@ -1289,7 +1378,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 icon: 'fas fa-users',
               },
             ].map((item, idx) => (
-              <div key={idx} className={`mm-reveal mm-d${idx + 1}`} style={{
+              <div key={idx} className={`mm-reveal mm-d${idx + 1} mm-story-card`} style={{
                 background: PAPER_2,
                 borderRadius: 16,
                 border: '1px solid rgba(0,0,0,0.07)',
