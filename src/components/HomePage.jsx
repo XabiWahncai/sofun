@@ -1039,92 +1039,53 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
           {/* ══ LUXURY VIP EVENT TICKET (DETAILS STUB + PERFORATED SEAM + 980x400 IMAGE) ══ */}
           <div className="mm-ticket-card mm-reveal">
-            {/* ── SHORT SIDE: DETAILS STUB ── */}
+            {/* ── SHORT SIDE: DETAILS STUB (MINIMAL LUXURY) ── */}
             <div className="mm-ticket-stub">
               <div>
-                {/* Top Row: Serial Number and Admit One Stamp */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
-                  <div style={{
-                    fontFamily: 'monospace', fontSize: 11, fontWeight: 700, letterSpacing: '0.15em',
-                    color: 'var(--crimson-400)', textTransform: 'uppercase',
+                {/* Minimal Header: Month Badge & Serial */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
+                  <span style={{
+                    fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em',
+                    textTransform: 'uppercase', color: 'var(--crimson-400)',
                   }}>
-                    NO. SF-09482
-                  </div>
-                  <div style={{
-                    border: '1px solid rgba(200, 160, 80, 0.55)',
-                    color: 'var(--case-amber)',
-                    padding: '2px 8px',
-                    borderRadius: 4,
-                    fontSize: 9,
-                    fontWeight: 800,
-                    letterSpacing: '0.15em',
-                    textTransform: 'uppercase',
-                    background: 'rgba(200, 160, 80, 0.08)',
+                    {promoSettings?.month || 'PROMOTION'}
+                  </span>
+                  <span style={{
+                    fontFamily: 'monospace', fontSize: 10, letterSpacing: '0.15em',
+                    color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase',
                   }}>
-                    ADMIT ONE
-                  </div>
-                </div>
-
-                {/* Eyebrow */}
-                <div style={{
-                  display: 'inline-flex', alignItems: 'center', gap: 7, padding: '4px 12px', borderRadius: 999,
-                  background: 'rgba(198,36,25,0.12)', border: '1px solid rgba(198,36,25,0.28)',
-                  color: 'var(--crimson-400)', fontSize: 10, fontWeight: 800, letterSpacing: '0.14em',
-                  textTransform: 'uppercase', marginBottom: 12, width: 'fit-content',
-                }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--crimson-500)', boxShadow: '0 0 6px var(--crimson-500)' }} />
-                  <span>SPECIAL PASS · {promoSettings?.month || 'สิทธิพิเศษประจำเดือน'}</span>
+                    SF-09482
+                  </span>
                 </div>
 
                 {/* Heading */}
                 <h2 style={{
                   fontFamily: "'Bebas Neue',sans-serif",
-                  fontSize: 'clamp(28px, 2.8vw, 42px)',
-                  lineHeight: 0.95,
+                  fontSize: 'clamp(28px, 2.8vw, 40px)',
+                  lineHeight: 1,
                   textTransform: 'uppercase',
                   color: '#fff',
                   margin: '0 0 14px 0',
-                  letterSpacing: '-0.01em',
+                  letterSpacing: '0.02em',
                 }}>
                   {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
                 </h2>
 
-                {/* Stamped Voucher Discount Box */}
+                {/* Minimal Voucher Discount Row */}
                 {promoSettings?.discountAmount && (
                   <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10,
-                    padding: '12px 14px', background: 'linear-gradient(135deg, rgba(198,36,25,0.18) 0%, rgba(198,36,25,0.05) 100%)',
-                    border: '1.5px dashed rgba(198,36,25,0.45)', borderRadius: 12, marginBottom: 14,
+                    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+                    padding: '10px 14px', borderRadius: 8,
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                    marginBottom: 14,
                   }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <div style={{
-                        width: 34, height: 34, borderRadius: 8, background: 'rgba(198,36,25,0.25)',
-                        color: 'var(--crimson-400)', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: 14, flexShrink: 0,
-                      }}>
-                        <i className="fas fa-ticket-alt" />
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 9, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.5)' }}>
-                          VOUCHER DISCOUNT
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#fff', marginTop: 1 }}>
-                          {promoSettings.discountType === 'person' ? 'ลดต่อคนในรอบเล่น' : 'ส่วนลดทั้งปาร์ตี้'}
-                        </div>
-                      </div>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--crimson-400)' }}>฿</span>
-                        <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, lineHeight: 1, color: '#fff' }}>
-                          {promoSettings.discountAmount}
-                        </span>
-                      </div>
-                      <span style={{
-                        fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase',
-                        padding: '3px 8px', borderRadius: 999, background: C, color: '#fff',
-                      }}>
-                        {promoSettings.discountType === 'person' ? 'ลดต่อคน' : 'ลดทั้งตี้'}
+                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
+                      {promoSettings.discountType === 'person' ? 'ลดต่อคนในรอบเล่น' : 'ส่วนลดทั้งปาร์ตี้'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--crimson-400)' }}>฿</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1, color: '#fff' }}>
+                        {promoSettings.discountAmount}
                       </span>
                     </div>
                   </div>
@@ -1132,71 +1093,60 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
                 {/* Description */}
                 <p style={{
-                  fontSize: 'clamp(12.5px, 1.1vw, 13.5px)', color: 'rgba(255,255,255,0.7)',
+                  fontSize: 'clamp(12.5px, 1.1vw, 13.5px)', color: 'rgba(255,255,255,0.6)',
                   lineHeight: 1.6, margin: '0 0 14px 0',
                 }}>
                   {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
                 </p>
 
-                {/* Feature Badges - Text and FontAwesome Icons only */}
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                {/* Minimal Feature Tags - Clean inline text */}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
                   {([promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean).length > 0
                     ? [promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean)
                     : ['สคริปต์ยอดนิยม', 'ส่วนลดพิเศษ', 'จำนวนจำกัด']
-                  ).map((b, i) => {
+                  ).map((b, i, arr) => {
                     const cleanText = b.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
-                    const badgeIcons = ['fas fa-theater-masks', 'fas fa-tags', 'fas fa-hourglass-half'];
                     return (
                       <span key={i} style={{
-                        fontSize: 9.5, fontWeight: 700, letterSpacing: '0.05em',
-                        padding: '4px 9px', borderRadius: 16,
-                        background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.09)',
-                        color: 'rgba(255,255,255,0.85)', display: 'inline-flex', alignItems: 'center', gap: 5,
+                        fontSize: 10.5, color: 'rgba(255,255,255,0.45)',
+                        display: 'inline-flex', alignItems: 'center', gap: 6,
                       }}>
-                        <i className={badgeIcons[i % badgeIcons.length]} style={{ fontSize: 9, color: 'var(--case-amber)' }} />
-                        {cleanText}
+                        {i > 0 && <span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span>}
+                        <span>{cleanText}</span>
                       </span>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Action Button */}
+              {/* Action Button & Sleek Barcode */}
               <div>
                 <button
                   onClick={() => showPage(promoSettings?.buttonLink || 'booking')}
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, var(--crimson-500) 0%, var(--crimson-600) 100%)',
+                    background: 'var(--crimson-500)',
                     color: '#fff', border: 'none', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
-                    fontFamily: "'Sarabun',sans-serif", padding: '13px 20px', borderRadius: 10,
-                    transition: 'all 0.22s ease', textAlign: 'center',
+                    fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+                    fontFamily: "'Sarabun',sans-serif", padding: '12px 20px', borderRadius: 8,
+                    transition: 'all 0.2s ease', textAlign: 'center',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: '0 8px 20px rgba(198,36,25,0.4)',
                   }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(198,36,25,0.55)';
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 20px rgba(198,36,25,0.4)';
-                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = 'var(--crimson-600)'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'var(--crimson-500)'}
                 >
-                  <i className="fas fa-ticket-alt" style={{ fontSize: 11 }} />
-                  <span>{promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย'}</span>
+                  <span>{(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย').replace(/→|->/g, '').trim()}</span>
                   <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
                 </button>
 
-                {/* Barcode & Serial Stamp */}
-                <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                  <div className="mm-ticket-barcode-lines" />
+                {/* Minimal Barcode */}
+                <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                  <div className="mm-ticket-barcode-lines" style={{ height: 22, opacity: 0.45 }} />
                   <div style={{
-                    fontFamily: 'monospace', fontSize: 9.5, letterSpacing: '0.22em',
-                    color: 'rgba(255,255,255,0.45)', textAlign: 'center', marginTop: 4, textTransform: 'uppercase',
+                    fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.22em',
+                    color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 4, textTransform: 'uppercase',
                   }}>
-                    * SF - VOUCHER - 2026 *
+                    * SF-VOUCHER-2026 *
                   </div>
                 </div>
               </div>
