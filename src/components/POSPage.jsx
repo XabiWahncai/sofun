@@ -283,6 +283,7 @@ export default function POSPage({
   const [mobilePanel, setMobilePanel] = useState('members') // 'members' | 'menu' | 'order' — mobile only
   const [expandedMembers, setExpandedMembers] = useState(() => new Set())
   const [editingUnlocked, setEditingUnlocked] = useState(false)
+  const [confirmCloseSession, setConfirmCloseSession] = useState(null)
   const [isPrimaryPrinter, setIsPrimaryPrinter] = useState(() => {
     try { return localStorage.getItem('sofun_pos_primary_printer') === '1' } catch { return false }
   })
@@ -2250,7 +2251,14 @@ export default function POSPage({
                     aria-label="ปิดปาร์ตี้"
                     onClick={(e) => {
                       e.stopPropagation()
-                      removeSession(s.id)
+                      const game = allGames.find(g => g.id === s.scriptId)
+                      const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
+                      const label = game ? `${game.title} ${date}` : s.label
+                      setConfirmCloseSession({
+                        id: s.id,
+                        title: label,
+                        confirmedOrderId: s.confirmedOrderId,
+                      })
                     }}
                   >
                     <i className="fas fa-times" style={{ pointerEvents: 'none', fontSize: 11 }} />
@@ -4064,6 +4072,91 @@ export default function POSPage({
                 onClick={() => doCloseTable(selectedEnding)}
               >
                 <i className="fas fa-door-closed" /> ยืนยันปิดตี้
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Close Session Modal ── */}
+      {confirmCloseSession && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setConfirmCloseSession(null)}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: 16,
+            padding: '24px 22px',
+            maxWidth: 380,
+            width: '90%',
+            boxShadow: '0 20px 48px rgba(0,0,0,0.3)',
+            textAlign: 'center',
+            animation: 'posModalIn 0.16s ease-out',
+            fontFamily: "'Sarabun', sans-serif",
+          }}>
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: 'rgba(198,36,25,0.1)',
+              color: '#c62419',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 14px',
+              fontSize: 22,
+            }}>
+              <i className="fas fa-question-circle" />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#1a1a1a' }}>
+              ว่าจะปิดจริงๆ หรอ?
+            </h3>
+            <p style={{ margin: '0 0 20px', fontSize: 13.5, color: 'rgba(26,26,26,0.65)', lineHeight: 1.5 }}>
+              คุณต้องการปิด <strong>{confirmCloseSession.title}</strong> จริงๆ ใช่หรือไม่?
+              {confirmCloseSession.confirmedOrderId && (
+                <span style={{ display: 'block', marginTop: 4, color: '#c62419', fontSize: 12.5 }}>
+                  * ออเดอร์ของปาร์ตี้นี้จะถูกปิดด้วย
+                </span>
+              )}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmCloseSession(null)}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(26,26,26,0.15)',
+                  background: '#ffffff',
+                  color: '#1a1a1a',
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                ไม่ปิด
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = confirmCloseSession.id
+                  setConfirmCloseSession(null)
+                  removeSession(id)
+                }}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#c62419',
+                  color: '#ffffff',
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                ปิดจริงๆ
               </button>
             </div>
           </div>
