@@ -6,6 +6,7 @@ import {
 import { db } from '../firebase'
 import { QRCodeSVG } from 'qrcode.react'
 import { Html5Qrcode } from 'html5-qrcode'
+import emergencyMeetingAudioUrl from '../assets/emergency-meeting.mp3'
 
 // ── Web Audio Sound Synthesis (Zero external dependencies) ───
 let audioCtx = null
@@ -39,7 +40,42 @@ function playAlarmSound() {
   } catch {}
 }
 
+let meetingAudio = null
+function getMeetingAudio() {
+  if (typeof Audio === 'undefined') return null
+  if (!meetingAudio) {
+    meetingAudio = new Audio(emergencyMeetingAudioUrl)
+    meetingAudio.preload = 'auto'
+  }
+  return meetingAudio
+}
+
 function playMeetingBuzzer() {
+  try {
+    const audio = getMeetingAudio()
+    if (audio) {
+      audio.currentTime = 0
+      audio.play().catch(() => {
+        playMeetingBuzzerSynth()
+      })
+    } else {
+      playMeetingBuzzerSynth()
+    }
+  } catch {
+    playMeetingBuzzerSynth()
+  }
+}
+
+function stopMeetingBuzzer() {
+  try {
+    if (meetingAudio) {
+      meetingAudio.pause()
+      meetingAudio.currentTime = 0
+    }
+  } catch {}
+}
+
+function playMeetingBuzzerSynth() {
   try {
     const ctx = getAudioContext()
     if (!ctx) return
@@ -515,12 +551,21 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     if (prevStatusRef.current !== 'meeting_called' && gameDoc.status === 'meeting_called') {
       playMeetingBuzzer()
     }
+    if (prevStatusRef.current === 'meeting_called' && gameDoc.status !== 'meeting_called') {
+      stopMeetingBuzzer()
+    }
     if (!prevSabotageRef.current && gameDoc.sabotage?.active && gameDoc.sabotage?.status === 'active') {
       playAlarmSound()
     }
     prevStatusRef.current = gameDoc.status
     prevSabotageRef.current = gameDoc.sabotage?.active
   }, [gameDoc?.status, gameDoc?.sabotage?.active, gameDoc?.sabotage?.status])
+
+  useEffect(() => {
+    return () => {
+      stopMeetingBuzzer()
+    }
+  }, [])
 
   // ── Derived Player Information ──────────────────────────
   const me = (gameDoc?.players && myUid) ? gameDoc.players[myUid] : null
@@ -2885,6 +2930,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       รอแอดมินเริ่มการประชุม...
                     </div>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={stopMeetingBuzzer}
+                    className="au-btn au-btn-dark"
+                    style={{ marginTop: 14, padding: '7px 16px', fontSize: 11.5, display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                    title="ปิดเสียงไซเรนบนเครื่องนี้"
+                  >
+                    <i className="fas fa-volume-mute" />
+                    <span>ปิดเสียงไซเรน</span>
+                  </button>
                 </div>
               )}
 
