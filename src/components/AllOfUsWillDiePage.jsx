@@ -538,7 +538,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  // Admin starts the game: randomly distributes 3 tasks per player
+  // Admin starts the game: randomly distributes 3 tasks per player (unique floors guaranteed)
   const handleStartGame = async () => {
     if (allPlayersList.length === 0) {
       showToast('ยังไม่มีผู้เล่นในล็อบบี้', 'error')
@@ -550,19 +550,45 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       return
     }
 
+    // Group tasks by floor to guarantee 3 unique floors
+    const tasksByFloor = {}
+    pool.forEach(t => {
+      const f = Number(t.floor) || 1
+      if (!tasksByFloor[f]) tasksByFloor[f] = []
+      tasksByFloor[f].push(t)
+    })
+    const availableFloors = Object.keys(tasksByFloor).map(Number)
+
+    if (availableFloors.length < 3) {
+      showToast('ต้องมีภารกิจในคลังอย่างน้อย 3 ชั้นที่แตกต่างกัน (เพื่อให้สุ่มได้ชั้นไม่ซ้ำกัน)', 'error')
+      return
+    }
+
     const durationMins = gameDoc.gameDurationMinutes || 20
     const durationSecs = durationMins * 60
 
-    // Randomize 3 tasks for each player
+    // Randomize 3 tasks with unique floors for each player
     const updatedPlayers = { ...gameDoc.players }
     allPlayersList.forEach(p => {
-      const shuffled = [...pool].sort(() => 0.5 - Math.random())
-      const assigned = shuffled.slice(0, 3).map((t, idx) => ({
+      // Pick 3 unique floors randomly
+      const shuffledFloors = [...availableFloors].sort(() => 0.5 - Math.random())
+      const chosenFloors = shuffledFloors.slice(0, 3)
+
+      // Pick 1 random task from each chosen floor
+      const assignedTasks = chosenFloors.map(floorNum => {
+        const floorTasks = tasksByFloor[floorNum]
+        return floorTasks[Math.floor(Math.random() * floorTasks.length)]
+      })
+
+      // Sort by floor ascending for clean player roadmap
+      assignedTasks.sort((a, b) => (Number(a.floor) || 1) - (Number(b.floor) || 1))
+
+      const assigned = assignedTasks.map((t, idx) => ({
         id: `${p.uid}_t${idx + 1}_${Date.now()}`,
         poolTaskId: t.id,
         title: t.title,
         desc: t.desc,
-        floor: t.floor || 1,
+        floor: Number(t.floor) || 1,
         room: t.room || 'โซนหน้า',
         verified: false,
         verifiedAt: null,
