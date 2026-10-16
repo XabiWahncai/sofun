@@ -244,6 +244,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [meetingTimeSec, setMeetingTimeSec] = useState(0)
   const [sabotageTimeSec, setSabotageTimeSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
+  const [showRolePicker, setShowRolePicker] = useState(false)
 
   // Determine effective admin permission
   const hasAdminPerm = isAppAdmin || lineUser?.role === 'admin' || !!firebaseUser
@@ -489,6 +490,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         [`players.${myUid}.role`]: role,
         [`players.${myUid}.ready`]: true,
       })
+      setShowRolePicker(false)
       showToast(`เลือกบทบาทเรียบร้อย`)
     } catch (e) {
       showToast('บันทึกบทบาทล้มเหลว: ' + e.message, 'error')
@@ -1203,7 +1205,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         zIndex: 50,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={30} />
+          <AmongUsVisor
+            role={gameDoc.status === 'waiting' ? 'crewmate' : (myRole || 'crewmate')}
+            color={gameDoc.status === 'waiting' ? '#546e7a' : null}
+            isAlive={isAlive}
+            size={30}
+          />
           <div>
             <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.08em', color: '#ff5252', lineHeight: 1.1 }}>
               ALL OF US WILL DIE
@@ -2166,147 +2173,251 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         {/* ─────────────────────────────────────────────────────────── */}
         {/* ─── PLAYER VIEW: LOBBY (WAITING STATE) ─────────────────── */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {!isAdminView && gameDoc.status === 'waiting' && me && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {!isAdminView && gameDoc.status === 'waiting' && me && (() => {
+          const hasSelectedRole = Boolean(me.ready && me.role)
+          const isWaitingScreen = hasSelectedRole && !showRolePicker
 
-            {/* Player Identity Card */}
-            <div className="au-card" style={{
-              padding: 18,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={48} />
-                <div>
-                  {editingName ? (
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <input
-                        type="text"
-                        value={nameInput}
-                        onChange={e => setNameInput(e.target.value)}
-                        placeholder="พิมพ์ชื่อของคุณ"
-                        style={{ padding: '6px 10px', borderRadius: 8, background: '#0d131d', color: '#fff', border: '2px solid #233147', fontSize: 13, fontFamily: 'inherit' }}
-                      />
-                      <button
-                        type="button"
-                        onClick={saveMyName}
-                        className="au-btn au-btn-red"
-                        style={{ padding: '6px 12px', fontSize: 11 }}
-                      >บันทึก</button>
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+              {/* Player Identity Card */}
+              <div className="au-card" style={{
+                padding: 18,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                  <AmongUsVisor color="#546e7a" isAlive={isAlive} size={48} />
+                  <div>
+                    {editingName ? (
+                      <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                        <input
+                          type="text"
+                          value={nameInput}
+                          onChange={e => setNameInput(e.target.value)}
+                          placeholder="พิมพ์ชื่อของคุณ"
+                          style={{ padding: '6px 10px', borderRadius: 8, background: '#0d131d', color: '#fff', border: '2px solid #233147', fontSize: 13, fontFamily: 'inherit' }}
+                        />
+                        <button
+                          type="button"
+                          onClick={saveMyName}
+                          className="au-btn au-btn-red"
+                          style={{ padding: '6px 12px', fontSize: 11 }}
+                        >บันทึก</button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ fontSize: 17, fontWeight: 900, color: '#fff' }}>{me.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => { setNameInput(me.name); setEditingName(true) }}
+                          style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2 }}
+                          title="แก้ไขชื่อ"
+                        >
+                          <i className="fas fa-pencil-alt" style={{ fontSize: 12 }} />
+                        </button>
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
+                      สมาชิกตี้ Special Event · {hasSelectedRole ? 'บันทึกบทบาทลับแล้ว' : 'ยังไม่เลือกบทบาท'}
                     </div>
-                  ) : (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ fontSize: 17, fontWeight: 900, color: '#fff' }}>{me.name}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    localStorage.removeItem('allofus_player_uid')
+                    setMyUid('')
+                  }}
+                  className="au-btn au-btn-dark"
+                  style={{ padding: '6px 10px', fontSize: 11 }}
+                >
+                  สลับชื่อ
+                </button>
+              </div>
+
+              {isWaitingScreen ? (
+                /* Private Waiting Screen (Anti-peeking mode) */
+                <div className="au-card" style={{ padding: '26px 20px', textAlign: 'center' }}>
+                  <div style={{
+                    width: 64, height: 64, borderRadius: '50%',
+                    background: 'rgba(41, 182, 246, 0.12)',
+                    border: '2px solid rgba(41, 182, 246, 0.3)',
+                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    marginBottom: 16,
+                  }}>
+                    <i className="fas fa-shield-alt" style={{ fontSize: 28, color: '#29b6f6' }} />
+                  </div>
+
+                  <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', marginBottom: 6 }}>
+                    บันทึกบทบาทเรียบร้อยแล้ว
+                  </div>
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', lineHeight: 1.6, maxWidth: 360, margin: '0 auto' }}>
+                    ระบบได้บันทึกข้อมูลบทบาทของคุณเรียบร้อยแล้ว กรุณารอแอดมินเริ่มเกมเพื่อเปิดเผยภารกิจ
+                  </div>
+
+                  {/* Anti-Peeking Alert */}
+                  <div style={{
+                    background: 'rgba(255, 193, 7, 0.08)',
+                    border: '1px solid rgba(255, 193, 7, 0.25)',
+                    borderRadius: 14,
+                    padding: '12px 16px',
+                    margin: '20px 0',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    textAlign: 'left',
+                  }}>
+                    <div style={{
+                      width: 36, height: 36, borderRadius: 10,
+                      background: 'rgba(255, 193, 7, 0.15)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <i className="fas fa-eye-slash" style={{ color: '#ffc107', fontSize: 16 }} />
+                    </div>
+                    <div style={{ fontSize: 12, color: '#ffecb3', lineHeight: 1.5 }}>
+                      <strong>คำแนะนำ:</strong> คว่ำหน้าจอโทรศัพท์ลงเพื่อไม่ให้เพื่อนร่วมตี้แอบมองเห็นบทบาทของคุณ
+                    </div>
+                  </div>
+
+                  {/* Waiting Indicator */}
+                  <div style={{
+                    padding: '14px 18px',
+                    background: 'rgba(255,255,255,0.03)',
+                    borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.07)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    color: '#fff',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    marginBottom: 20,
+                  }}>
+                    <i className="fas fa-spinner fa-spin" style={{ color: '#ff5252' }} />
+                    กำลังรอแอดมินเริ่มเกม...
+                  </div>
+
+                  {/* Back button to change role */}
+                  <button
+                    type="button"
+                    onClick={() => setShowRolePicker(true)}
+                    className="au-btn au-btn-dark"
+                    style={{
+                      width: '100%',
+                      padding: '12px 16px',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <i className="fas fa-undo" />
+                    ย้อนกลับไปเลือกบทบาทใหม่
+                  </button>
+                </div>
+              ) : (
+                /* Role Picker View */
+                <div className="au-card" style={{ padding: 18 }}>
+                  {hasSelectedRole && (
+                    <div style={{ marginBottom: 14 }}>
                       <button
                         type="button"
-                        onClick={() => { setNameInput(me.name); setEditingName(true) }}
-                        style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 2 }}
-                        title="แก้ไขชื่อ"
+                        onClick={() => setShowRolePicker(false)}
+                        className="au-btn au-btn-dark"
+                        style={{ width: '100%', padding: '10px 14px', fontSize: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                       >
-                        <i className="fas fa-pencil-alt" style={{ fontSize: 12 }} />
+                        <i className="fas fa-arrow-left" />
+                        กลับไปหน้ารอเริ่มเกม (ไม่เปลี่ยนบทบาท)
                       </button>
                     </div>
                   )}
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                    สมาชิกตี้ Special Event · {myRole === 'impostor' ? 'คนร้าย' : (myRole === 'dodo' ? 'โดโด้' : 'คนดี')}
+
+                  <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
+                    เลือกบทบาทที่คุณได้รับในชีวิตจริง
+                  </div>
+                  <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
+                    เลือกบทบาทที่สุ่มได้จากการจับฉลาก เพื่อให้ระบบแสดงปุ่มและความสามารถที่ถูกต้อง
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Crewmate */}
+                    <button
+                      type="button"
+                      onClick={() => setMyRole('crewmate')}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
+                        background: myRole === 'crewmate' && hasSelectedRole ? 'rgba(2, 136, 209, 0.18)' : 'rgba(255,255,255,0.03)',
+                        border: `2.5px solid ${myRole === 'crewmate' && hasSelectedRole ? '#0288d1' : '#1f2c42'}`,
+                        color: '#fff', cursor: 'pointer', textAlign: 'left',
+                        transition: 'all 0.12s ease',
+                      }}
+                    >
+                      <AmongUsVisor role="crewmate" size={40} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>ฝ่ายคนดี (Crewmate)</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>ทำภารกิจส่วนตัวให้ครบ 100% หรือจับคนร้าย</div>
+                      </div>
+                      {myRole === 'crewmate' && hasSelectedRole && <i className="fas fa-check-circle" style={{ color: '#29b6f6', fontSize: 18 }} />}
+                    </button>
+
+                    {/* Impostor */}
+                    <button
+                      type="button"
+                      onClick={() => setMyRole('impostor')}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
+                        background: myRole === 'impostor' && hasSelectedRole ? 'rgba(197, 17, 17, 0.2)' : 'rgba(255,255,255,0.03)',
+                        border: `2.5px solid ${myRole === 'impostor' && hasSelectedRole ? '#c51111' : '#1f2c42'}`,
+                        color: '#fff', cursor: 'pointer', textAlign: 'left',
+                        transition: 'all 0.12s ease',
+                      }}
+                    >
+                      <AmongUsVisor role="impostor" size={40} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>คนร้าย (Impostor)</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>เนียนทำภารกิจ และแอบกด Sabotage ป่วนระบบ</div>
+                      </div>
+                      {myRole === 'impostor' && hasSelectedRole && <i className="fas fa-check-circle" style={{ color: '#e53935', fontSize: 18 }} />}
+                    </button>
+
+                    {/* Dodo */}
+                    <button
+                      type="button"
+                      onClick={() => setMyRole('dodo')}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
+                        background: myRole === 'dodo' && hasSelectedRole ? 'rgba(142, 36, 170, 0.2)' : 'rgba(255,255,255,0.03)',
+                        border: `2.5px solid ${myRole === 'dodo' && hasSelectedRole ? '#8e24aa' : '#1f2c42'}`,
+                        color: '#fff', cursor: 'pointer', textAlign: 'left',
+                        transition: 'all 0.12s ease',
+                      }}
+                    >
+                      <AmongUsVisor role="dodo" size={40} />
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>โดโด้ (Dodo / Jester)</div>
+                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>ทำตัวให้สงสัยเพื่อให้ที่ประชุมโหวตคุณออก ชนะทันที!</div>
+                      </div>
+                      {myRole === 'dodo' && hasSelectedRole && <i className="fas fa-check-circle" style={{ color: '#ce93d8', fontSize: 18 }} />}
+                    </button>
+                  </div>
+
+                  <div style={{
+                    textAlign: 'center', padding: '14px 0 4px',
+                    color: 'rgba(255,255,255,0.45)', fontSize: 12,
+                  }}>
+                    <i className="fas fa-lock" style={{ marginRight: 6 }} />
+                    ระบบจะสลับเข้าสู่หน้าจอปิดบังข้อมูลทันทีที่เลือก
                   </div>
                 </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => {
-                  localStorage.removeItem('allofus_player_uid')
-                  setMyUid('')
-                }}
-                className="au-btn au-btn-dark"
-                style={{ padding: '6px 10px', fontSize: 11 }}
-              >
-                สลับชื่อ
-              </button>
+              )}
             </div>
-
-            {/* Secret Role Selection (In Real Life) */}
-            <div className="au-card" style={{ padding: 18 }}>
-              <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
-                เลือกบทบาทที่คุณได้รับในชีวิตจริง
-              </div>
-              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
-                เลือกบทบาทที่สุ่มได้จากการจับฉลาก เพื่อให้ระบบแสดงปุ่มและความสามารถที่ถูกต้อง
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {/* Crewmate */}
-                <button
-                  type="button"
-                  onClick={() => setMyRole('crewmate')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
-                    background: myRole === 'crewmate' ? 'rgba(2, 136, 209, 0.18)' : 'rgba(255,255,255,0.03)',
-                    border: `2.5px solid ${myRole === 'crewmate' ? '#0288d1' : '#1f2c42'}`,
-                    color: '#fff', cursor: 'pointer', textAlign: 'left',
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  <AmongUsVisor role="crewmate" size={40} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>ฝ่ายคนดี (Crewmate)</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>ทำภารกิจส่วนตัวให้ครบ 100% หรือจับคนร้าย</div>
-                  </div>
-                  {myRole === 'crewmate' && <i className="fas fa-check-circle" style={{ color: '#29b6f6', fontSize: 18 }} />}
-                </button>
-
-                {/* Impostor */}
-                <button
-                  type="button"
-                  onClick={() => setMyRole('impostor')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
-                    background: myRole === 'impostor' ? 'rgba(197, 17, 17, 0.2)' : 'rgba(255,255,255,0.03)',
-                    border: `2.5px solid ${myRole === 'impostor' ? '#c51111' : '#1f2c42'}`,
-                    color: '#fff', cursor: 'pointer', textAlign: 'left',
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  <AmongUsVisor role="impostor" size={40} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>คนร้าย (Impostor)</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>เนียนทำภารกิจ และแอบกด Sabotage ป่วนระบบ</div>
-                  </div>
-                  {myRole === 'impostor' && <i className="fas fa-check-circle" style={{ color: '#e53935', fontSize: 18 }} />}
-                </button>
-
-                {/* Dodo */}
-                <button
-                  type="button"
-                  onClick={() => setMyRole('dodo')}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', borderRadius: 14,
-                    background: myRole === 'dodo' ? 'rgba(142, 36, 170, 0.2)' : 'rgba(255,255,255,0.03)',
-                    border: `2.5px solid ${myRole === 'dodo' ? '#8e24aa' : '#1f2c42'}`,
-                    color: '#fff', cursor: 'pointer', textAlign: 'left',
-                    transition: 'all 0.12s ease',
-                  }}
-                >
-                  <AmongUsVisor role="dodo" size={40} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14.5, fontWeight: 900, color: '#fff' }}>โดโด้ (Dodo / Jester)</div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>ทำตัวให้สงสัยเพื่อให้ที่ประชุมโหวตคุณออก ชนะทันที!</div>
-                  </div>
-                  {myRole === 'dodo' && <i className="fas fa-check-circle" style={{ color: '#ce93d8', fontSize: 18 }} />}
-                </button>
-              </div>
-            </div>
-
-            {/* Waiting for admin indicator */}
-            <div style={{
-              textAlign: 'center', padding: '18px 0',
-              color: 'rgba(255,255,255,0.5)', fontSize: 13,
-            }}>
-              <i className="fas fa-spinner fa-spin" style={{ marginRight: 8, color: '#ff5252' }} />
-              รอแอดมินตรวจสอบรายชื่อและเริ่มเกม...
-            </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* ─────────────────────────────────────────────────────────── */}
         {/* ─── PLAYER VIEW: IN-GAME HUD (CREWMATE / IMPOSTOR / DODO) ── */}
