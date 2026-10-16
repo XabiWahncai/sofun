@@ -1347,27 +1347,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           </div>
         </div>
 
-        {/* Right Action: Admin Toggle & Secret Impostor Button */}
+        {/* Right Action: Admin Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {/* Secret Impostor Sabotage Icon Button (Clean and natural) */}
-          {myRole === 'impostor' && gameDoc.status === 'playing' && isAlive && (
-            <button
-              type="button"
-              onClick={() => setShowSabotageModal(true)}
-              title="Sabotage"
-              style={{
-                width: 36, height: 36, borderRadius: 10,
-                background: 'rgba(197, 17, 17, 0.2)',
-                border: '1.5px solid #c51111',
-                color: '#ff5252',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer',
-              }}
-            >
-              <i className="fas fa-radiation" style={{ fontSize: 14 }} />
-            </button>
-          )}
-
           {/* Admin Switcher */}
           {hasAdminPerm && (
             <button
@@ -1414,13 +1395,22 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         padding: '0 16px',
         boxSizing: 'border-box',
       }}>
-        <div style={{
-          background: '#0d131d',
-          border: '2.5px solid #233147',
-          borderRadius: 14,
-          padding: '8px 12px',
-          boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
-        }}>
+        <div
+          onClick={() => {
+            if (myRole === 'impostor' && gameDoc.status === 'playing' && isAlive) {
+              setShowSabotageModal(true)
+            }
+          }}
+          style={{
+            background: '#0d131d',
+            border: '2.5px solid #233147',
+            borderRadius: 14,
+            padding: '8px 12px',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
+            cursor: (myRole === 'impostor' && gameDoc.status === 'playing' && isAlive) ? 'pointer' : 'default',
+            userSelect: 'none',
+          }}
+        >
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
@@ -2633,29 +2623,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 </div>
               </div>
 
-              {/* Action Buttons: Emergency Dome & Sabotage Trigger */}
+              {/* Action Button: Emergency Dome */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                {/* Impostor Sabotage Quick Button */}
-                {myRole === 'impostor' && isAlive && (
-                  <button
-                    type="button"
-                    onClick={() => setShowSabotageModal(true)}
-                    className="au-btn"
-                    style={{
-                      width: 58, height: 58, borderRadius: '50%',
-                      background: 'radial-gradient(circle at 40% 30%, #b71c1c 0%, #7a0813 100%)',
-                      border: '3px solid #ff5252',
-                      boxShadow: '0 4px 14px rgba(183, 28, 28, 0.6)',
-                      color: '#fff',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                    }}
-                    title="Sabotage"
-                  >
-                    <i className="fas fa-radiation" style={{ fontSize: 17, color: '#ffebee' }} />
-                    <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.04em' }}>SABOTAGE</span>
-                  </button>
-                )}
-
                 {/* Iconic Big Red Emergency Dome Button */}
                 {isAlive && (
                   <button
