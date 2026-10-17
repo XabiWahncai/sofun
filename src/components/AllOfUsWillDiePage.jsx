@@ -7,6 +7,7 @@ import { db } from '../firebase'
 import { QRCodeSVG } from 'qrcode.react'
 import { Html5Qrcode } from 'html5-qrcode'
 import emergencyMeetingAudioUrl from '../assets/emergency-meeting.mp3'
+import sabotageAlertAudioUrl from '../assets/sabotage-alert.mp3'
 
 // ── Web Audio Sound Synthesis (Zero external dependencies) ───
 let audioCtx = null
@@ -21,23 +22,78 @@ function getAudioContext() {
   return audioCtx
 }
 
-function playAlarmSound() {
+let sabotageAudio = null
+function getSabotageAudio() {
+  if (typeof Audio === 'undefined') return null
+  if (!sabotageAudio) {
+    sabotageAudio = new Audio(sabotageAlertAudioUrl)
+    sabotageAudio.preload = 'auto'
+    sabotageAudio.loop = true
+  }
+  return sabotageAudio
+}
+
+let sabotageSynthInterval = null
+function playSabotageAlarmSynth() {
+  stopSabotageAlarmSynth()
+  const beep = () => {
+    try {
+      const ctx = getAudioContext()
+      if (!ctx) return
+      const now = ctx.currentTime
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sawtooth'
+      osc.frequency.setValueAtTime(880, now)
+      osc.frequency.exponentialRampToValueAtTime(440, now + 0.3)
+      gain.gain.setValueAtTime(0.3, now)
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now)
+      osc.stop(now + 0.31)
+    } catch {}
+  }
+  beep()
+  sabotageSynthInterval = setInterval(beep, 600)
+}
+
+function stopSabotageAlarmSynth() {
+  if (sabotageSynthInterval) {
+    clearInterval(sabotageSynthInterval)
+    sabotageSynthInterval = null
+  }
+}
+
+function playSabotageAlarm() {
   try {
-    const ctx = getAudioContext()
-    if (!ctx) return
-    const osc = ctx.createOscillator()
-    const gain = ctx.createGain()
-    osc.type = 'sawtooth'
-    const now = ctx.currentTime
-    osc.frequency.setValueAtTime(800, now)
-    osc.frequency.exponentialRampToValueAtTime(300, now + 0.35)
-    gain.gain.setValueAtTime(0.3, now)
-    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35)
-    osc.connect(gain)
-    gain.connect(ctx.destination)
-    osc.start(now)
-    osc.stop(now + 0.36)
+    const audio = getSabotageAudio()
+    if (audio) {
+      audio.loop = true
+      audio.currentTime = 0
+      audio.play().catch(() => {
+        playSabotageAlarmSynth()
+      })
+    } else {
+      playSabotageAlarmSynth()
+    }
+  } catch {
+    playSabotageAlarmSynth()
+  }
+}
+
+function stopSabotageAlarm() {
+  try {
+    if (sabotageAudio) {
+      sabotageAudio.pause()
+      sabotageAudio.currentTime = 0
+    }
   } catch {}
+  stopSabotageAlarmSynth()
+}
+
+function playAlarmSound() {
+  playSabotageAlarm()
 }
 
 let meetingAudio = null
@@ -545,25 +601,66 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
   // Play audio alerts on meeting call or sabotage
   const prevStatusRef = useRef(gameDoc?.status)
-  const prevSabotageRef = useRef(gameDoc?.sabotage?.active)
+  const prevSabotageActiveRef = useRef(false)
   useEffect(() => {
     if (!gameDoc) return
+    const isSabotageActive = Boolean(
+      gameDoc.status === 'playing' &&
+      gameDoc.sabotage?.active &&
+      gameDoc.sabotage?.status === 'active'
+    )
+
+    // Meeting buzzer alert
     if (prevStatusRef.current !== 'meeting_called' && gameDoc.status === 'meeting_called') {
       playMeetingBuzzer()
     }
     if (prevStatusRef.current === 'meeting_called' && gameDoc.status !== 'meeting_called') {
       stopMeetingBuzzer()
     }
-    if (!prevSabotageRef.current && gameDoc.sabotage?.active && gameDoc.sabotage?.status === 'active') {
-      playAlarmSound()
+
+    // Sabotage siren alert - loops continuously while sabotage is active
+    if (!prevSabotageActiveRef.current && isSabotageActive) {
+      playSabotageAlarm()
     }
+    if (prevSabotageActiveRef.current && !isSabotageActive) {
+      stopSabotageAlarm()
+    }
+
+    // If game ended or returned to lobby, ensure all alarms are stopped
+    if (gameDoc.status === 'ended' || gameDoc.status === 'lobby') {
+      stopMeetingBuzzer()
+      stopSabotageAlarm()
+    }
+
     prevStatusRef.current = gameDoc.status
-    prevSabotageRef.current = gameDoc.sabotage?.active
+    prevSabotageActiveRef.current = isSabotageActive
   }, [gameDoc?.status, gameDoc?.sabotage?.active, gameDoc?.sabotage?.status])
 
+  // Pre-unlock audio on user touch or click so mobile browsers allow background alarms
   useEffect(() => {
+    const unlockAudio = () => {
+      try {
+        const mAudio = getMeetingAudio()
+        if (mAudio && mAudio.paused && mAudio.currentTime === 0) {
+          mAudio.load()
+        }
+        const sAudio = getSabotageAudio()
+        if (sAudio && sAudio.paused && sAudio.currentTime === 0) {
+          sAudio.load()
+        }
+        const ctx = getAudioContext()
+        if (ctx && ctx.state === 'suspended') {
+          ctx.resume().catch(() => {})
+        }
+      } catch {}
+    }
+    window.addEventListener('click', unlockAudio, { passive: true })
+    window.addEventListener('touchstart', unlockAudio, { passive: true })
     return () => {
+      window.removeEventListener('click', unlockAudio)
+      window.removeEventListener('touchstart', unlockAudio)
       stopMeetingBuzzer()
+      stopSabotageAlarm()
     }
   }, [])
 
@@ -857,6 +954,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 }
       })
+      stopSabotageAlarm()
       showToast('ยกเลิก Sabotage สำเร็จ คนดีกู้ภัยเรียบร้อย')
     } catch (e) {
       showToast('ยกเลิกล้มเหลว', 'error')
@@ -1543,22 +1641,34 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
       {/* ─── ACTIVE SABOTAGE BANNER ─── */}
       {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
-        <div style={{
-          background: 'linear-gradient(90deg, #b71c1c 0%, #d32f2f 50%, #b71c1c 100%)',
-          color: '#fff',
-          padding: '10px 16px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          borderBottom: '2.5px solid #ff5252',
-          animation: 'auAlarmBlink 1.2s infinite',
-          marginTop: 8,
-        }}>
+        <div
+          onClick={() => playSabotageAlarm()}
+          style={{
+            background: 'linear-gradient(90deg, #b71c1c 0%, #d32f2f 50%, #b71c1c 100%)',
+            color: '#fff',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            borderBottom: '2.5px solid #ff5252',
+            animation: 'auAlarmBlink 1.2s infinite',
+            marginTop: 8,
+            cursor: 'pointer',
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <i className="fas fa-exclamation-triangle" style={{ fontSize: 18, color: '#ffebee' }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 900 }}>
-                {gameDoc.sabotage.title}
+              <div style={{ fontSize: 13, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span>{gameDoc.sabotage.title}</span>
+                <span style={{
+                  fontSize: 10, background: 'rgba(0,0,0,0.3)',
+                  padding: '2px 7px', borderRadius: 6, fontWeight: 800,
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                }}>
+                  <i className="fas fa-volume-up" />
+                  ไซเรน
+                </span>
               </div>
               <div style={{ fontSize: 11, opacity: 0.9 }}>
                 {gameDoc.sabotage.desc || 'คนดีต้องรีบไปแก้ปัญหากับแอดมินในชีวิตจริง!'}

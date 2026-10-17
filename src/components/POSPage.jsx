@@ -425,13 +425,73 @@ export default function POSPage({
   }, [])
 
   // ── load today orders (client-side filter) ───────────────────────
+  // Includes orders created today OR any active orders still in progress (even across midnight)
   useEffect(() => {
     const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'))
     return onSnapshot(q, snap => {
       const start = new Date(); start.setHours(0, 0, 0, 0)
-      setTodayOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(o => o.createdAt?.toDate?.() >= start))
+      setTodayOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(o => {
+        if (o.status === 'active') return true
+        if (o.createdAt?.toDate?.() >= start) return true
+        return false
+      }))
     }, () => {})
   }, [])
+
+  // ── Auto-reconnect active orders into POS session tabs ───────────
+  useEffect(() => {
+    if (!Array.isArray(todayOrders) || todayOrders.length === 0) return
+    const activeOrders = todayOrders.filter(o => o.status === 'active')
+    if (activeOrders.length === 0) return
+
+    const currentSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+    const missingOrders = activeOrders.filter(ao => !currentSessions.some(s => s.confirmedOrderId === ao.id))
+
+    if (missingOrders.length > 0) {
+      setSessions(prev => {
+        const list = Array.isArray(prev) ? [...prev] : []
+        let changed = false
+        missingOrders.forEach(mo => {
+          if (!list.some(s => s.confirmedOrderId === mo.id)) {
+            const orderItems = (mo.foodItems || []).map(x => ({
+              key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+              menuId: x.menuId || '',
+              name: x.name,
+              basePrice: x.price ?? x.totalPrice ?? 0,
+              addons: x.addons || [],
+              totalPrice: x.price ?? x.totalPrice ?? 0,
+              qty: x.qty || 1,
+              orderedBy: x.orderedBy || null,
+              note: x.note || '',
+            }))
+            const newTab = {
+              id: Date.now() + Math.random(),
+              label: mo.scriptTitle ? `${mo.scriptTitle} (${mo.room || 'ตี้'})` : 'ปาร์ตี้',
+              createdAt: mo.createdAt?.toDate ? mo.createdAt.toDate().toISOString() : new Date().toISOString(),
+              members: mo.members || [],
+              scriptId: mo.scriptId || '',
+              eventName: '',
+              customPrice: '',
+              dm: mo.dm || '',
+              npc: mo.npc || '',
+              room: mo.room || '',
+              order: orderItems,
+              confirmedOrderId: mo.id,
+              promoName: mo.promoName || '',
+              discount: mo.discount || 0,
+            }
+            if (list.length === 1 && !list[0].confirmedOrderId && (!list[0].members || list[0].members.length === 0) && (!list[0].order || list[0].order.length === 0) && !list[0].scriptId) {
+              list[0] = newTab
+            } else {
+              list.push(newTab)
+            }
+            changed = true
+          }
+        })
+        return changed ? list : prev
+      })
+    }
+  }, [todayOrders, sessions])
 
   // ── fetch member and add to a session ───────────────────────────
   const fetchAndAddMember = async (sessionId, uid) => {
@@ -660,6 +720,16 @@ export default function POSPage({
           })
         if (isDiff) {
           updateActive({ order: firestoreItems })
+        }
+      }
+
+      // Keep activeSession.members in sync with Firestore orders.members
+      if (Array.isArray(data.members) && data.members.length > 0) {
+        const curMembers = activeSession?.members || []
+        const isMembersDiff = data.members.length !== curMembers.length ||
+          data.members.some((m, idx) => !curMembers[idx] || curMembers[idx].uid !== m.uid || curMembers[idx].name !== m.name)
+        if (isMembersDiff) {
+          updateActive({ members: data.members })
         }
       }
     }, () => {})

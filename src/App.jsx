@@ -485,14 +485,11 @@ export default function App() {
     return onSnapshot(q, snap => {
       const start = new Date()
       start.setHours(0, 0, 0, 0)
-      const maxAgeMs = 18 * 60 * 60 * 1000
-      const now = Date.now()
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       const activeOrTodayOrders = orders.filter(o => {
+        if (o.status === 'active') return true
         if (o.createdAt?.toDate?.() >= start) return true
-        if (o.status !== 'active') return false
-        const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : 0)
-        return !orderTime || (now - orderTime) < maxAgeMs
+        return false
       })
       const totalPending = activeOrTodayOrders.reduce((sum, o) => {
         const count = Array.isArray(o.memberFoodQueue) ? o.memberFoodQueue.length : 0
@@ -500,15 +497,20 @@ export default function App() {
       }, 0)
       setGlobalPendingOrdersCount(totalPending)
 
-      // Auto-close stale active orders from previous days (> 18h) in the background
+      // Only clean up completely empty abandoned draft orders (0 members & 0 food items) older than 48h
+      const abandonedAgeMs = 48 * 60 * 60 * 1000
       orders.forEach(o => {
         if (o.status === 'active') {
+          const hasContent = (Array.isArray(o.members) && o.members.length > 0) ||
+                             (Array.isArray(o.foodItems) && o.foodItems.length > 0)
+          if (hasContent) return // Never auto-close orders with members or food items
+
           const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime() : (o.createdAt ? new Date(o.createdAt).getTime() : 0)
-          if (orderTime && (now - orderTime) >= maxAgeMs) {
+          if (orderTime && (now - orderTime) >= abandonedAgeMs) {
             updateDoc(doc(db, 'orders', o.id), {
               status: 'closed',
               closedAt: serverTimestamp(),
-              closedReason: 'auto_cleanup_stale'
+              closedReason: 'auto_cleanup_empty_abandoned'
             }).catch(() => {})
           }
         }
