@@ -171,21 +171,141 @@ function playTaskSuccessSound() {
   } catch {}
 }
 
-// ── Player color palette ─────────────────────────────────
-export const PLAYER_COLORS = [
-  { id: 'red',    label: 'แดง',    hex: '#c62419' },
-  { id: 'blue',   label: 'น้ำเงิน', hex: '#1565c0' },
-  { id: 'green',  label: 'เขียว',  hex: '#2e7d32' },
-  { id: 'yellow', label: 'เหลือง', hex: '#f9a825' },
-  { id: 'purple', label: 'ม่วง',   hex: '#6a1b9a' },
-  { id: 'orange', label: 'ส้ม',    hex: '#e65100' },
-  { id: 'pink',   label: 'ชมพู',   hex: '#c2185b' },
-  { id: 'cyan',   label: 'ฟ้า',    hex: '#0097a7' },
-  { id: 'lime',   label: 'มะนาว',  hex: '#558b2f' },
-  { id: 'maroon', label: 'น้ำตาล', hex: '#6d4c41' },
-  { id: 'white',  label: 'ขาว',    hex: '#eceff1' },
-  { id: 'black',  label: 'ดำ',     hex: '#37474f' },
-]
+// ── Color wheel helpers ───────────────────────────────────
+function hexToHsv(hex) {
+  const c = (hex || '#ff0000').replace('#', '').padEnd(6, '0')
+  const r = parseInt(c.slice(0,2),16)/255
+  const g = parseInt(c.slice(2,4),16)/255
+  const b = parseInt(c.slice(4,6),16)/255
+  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min
+  const v = max, s = max === 0 ? 0 : d/max
+  let h = 0
+  if (d !== 0) {
+    if (max === r) h = ((g-b)/d + (g<b?6:0)) / 6
+    else if (max === g) h = ((b-r)/d + 2) / 6
+    else h = ((r-g)/d + 4) / 6
+  }
+  return { h: h*360, s, v }
+}
+function hsvToHex(h, s, v) {
+  const i = Math.floor(h/60) % 6, f = h/60 - Math.floor(h/60)
+  const p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s)
+  let r,g,b
+  if(i===0){r=v;g=t;b=p}else if(i===1){r=q;g=v;b=p}
+  else if(i===2){r=p;g=v;b=t}else if(i===3){r=p;g=q;b=v}
+  else if(i===4){r=t;g=p;b=v}else{r=v;g=p;b=q}
+  const x = n => Math.round(Math.max(0,Math.min(255,n*255))).toString(16).padStart(2,'0')
+  return `#${x(r)}${x(g)}${x(b)}`
+}
+
+function ColorWheelPicker({ value, onChange }) {
+  const canvasRef = useRef(null)
+  const dragging = useRef(false)
+  const [hsv, setHsv] = useState(() => hexToHsv(value))
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    const W = canvas.width, H = canvas.height
+    const cx = W/2, cy = H/2, r = cx - 4
+    const img = ctx.createImageData(W, H)
+    for (let py = 0; py < H; py++) {
+      for (let px = 0; px < W; px++) {
+        const dx = px-cx, dy = py-cy, dist = Math.sqrt(dx*dx+dy*dy)
+        if (dist > r) continue
+        const h = (Math.atan2(dy,dx)*180/Math.PI+360)%360
+        const s = dist/r, v = hsv.v
+        const i = Math.floor(h/60)%6, f = h/60-Math.floor(h/60)
+        const p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s)
+        let rr,gg,bb
+        if(i===0){rr=v;gg=t;bb=p}else if(i===1){rr=q;gg=v;bb=p}
+        else if(i===2){rr=p;gg=v;bb=t}else if(i===3){rr=p;gg=q;bb=v}
+        else if(i===4){rr=t;gg=p;bb=v}else{rr=v;gg=p;bb=q}
+        const idx = (py*W+px)*4
+        img.data[idx]=Math.round(rr*255); img.data[idx+1]=Math.round(gg*255)
+        img.data[idx+2]=Math.round(bb*255); img.data[idx+3]=255
+      }
+    }
+    ctx.putImageData(img, 0, 0)
+    // Indicator ring
+    const ax = cx + hsv.s*r*Math.cos(hsv.h*Math.PI/180)
+    const ay = cy + hsv.s*r*Math.sin(hsv.h*Math.PI/180)
+    ctx.beginPath(); ctx.arc(ax,ay,10,0,Math.PI*2)
+    ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fill()
+    ctx.beginPath(); ctx.arc(ax,ay,9,0,Math.PI*2)
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke()
+  }, [hsv])
+
+  const pick = (e) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const rect = canvas.getBoundingClientRect()
+    const touch = e.touches?.[0] || e.changedTouches?.[0]
+    const px = ((touch?touch.clientX:e.clientX)-rect.left)/rect.width*canvas.width
+    const py = ((touch?touch.clientY:e.clientY)-rect.top)/rect.height*canvas.height
+    const cx=canvas.width/2, cy=canvas.height/2, r=cx-4
+    const dx=px-cx, dy=py-cy
+    const h=(Math.atan2(dy,dx)*180/Math.PI+360)%360
+    const s=Math.min(Math.sqrt(dx*dx+dy*dy)/r,1)
+    const next={h,s,v:hsv.v}
+    setHsv(next); onChange(hsvToHex(h,s,next.v))
+  }
+
+  const currentHex = hsvToHex(hsv.h, hsv.s, hsv.v)
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:14 }}>
+      <canvas
+        ref={canvasRef} width={240} height={240}
+        style={{ borderRadius:'50%', touchAction:'none', cursor:'crosshair', maxWidth:'100%', boxShadow:'0 4px 24px rgba(0,0,0,0.5)' }}
+        onMouseDown={e=>{dragging.current=true;pick(e)}}
+        onMouseMove={e=>{if(dragging.current)pick(e)}}
+        onMouseUp={()=>{dragging.current=false}}
+        onMouseLeave={()=>{dragging.current=false}}
+        onTouchStart={e=>{e.preventDefault();pick(e)}}
+        onTouchMove={e=>{e.preventDefault();pick(e)}}
+      />
+      {/* Brightness slider */}
+      <div style={{ width:'100%' }}>
+        <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>ความสว่าง</div>
+        <div style={{
+          position:'relative', height:20, borderRadius:10, overflow:'hidden',
+          background:`linear-gradient(to right,#000,${hsvToHex(hsv.h,hsv.s,1)})`,
+          border:'1px solid rgba(255,255,255,0.12)',
+        }}>
+          <input type="range" min={0} max={100} value={Math.round(hsv.v*100)}
+            onChange={e=>{
+              const v=Number(e.target.value)/100
+              const next={...hsv,v}; setHsv(next); onChange(hsvToHex(next.h,next.s,v))
+            }}
+            style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, cursor:'pointer', margin:0 }}
+          />
+          {/* Thumb indicator */}
+          <div style={{
+            position:'absolute', top:'50%', transform:'translate(-50%,-50%)',
+            left:`${Math.round(hsv.v*100)}%`,
+            width:18, height:18, borderRadius:'50%',
+            background:currentHex, border:'2px solid #fff',
+            boxShadow:'0 1px 4px rgba(0,0,0,0.5)',
+            pointerEvents:'none', transition:'left 0.05s',
+          }}/>
+        </div>
+      </div>
+      {/* Preview */}
+      <div style={{
+        width:'100%', height:48, borderRadius:14,
+        background:currentHex, border:'2px solid rgba(255,255,255,0.15)',
+        display:'flex', alignItems:'center', justifyContent:'center',
+        boxShadow:`0 4px 18px ${currentHex}88`,
+      }}>
+        <span style={{ fontSize:13, fontWeight:800, color:'#fff', textShadow:'0 1px 4px rgba(0,0,0,0.7)', letterSpacing:1 }}>
+          {currentHex.toUpperCase()}
+        </span>
+      </div>
+    </div>
+  )
+}
 
 // ── Among Us Visor / Crewmate Bean Component ────────────
 export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, color = null }) {
@@ -721,18 +841,21 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
   // ── Game Flow Actions ───────────────────────────────────
 
-  // Player color selection in lobby
-  const saveMyColor = async (colorHex) => {
-    if (!myUid || !gameDoc) return
-    try {
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-        [`players.${myUid}.color`]: colorHex,
-        [`players.${myUid}.ready`]: true,
-      })
-      showToast('เลือกสีเรียบร้อย')
-    } catch (e) {
-      showToast('บันทึกสีล้มเหลว: ' + e.message, 'error')
-    }
+  // Player color selection in lobby (debounced — avoids flood of Firestore writes while dragging)
+  const colorSaveTimer = useRef(null)
+  const saveMyColor = (colorHex) => {
+    clearTimeout(colorSaveTimer.current)
+    colorSaveTimer.current = setTimeout(async () => {
+      if (!myUid || !gameDoc) return
+      try {
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          [`players.${myUid}.color`]: colorHex,
+          [`players.${myUid}.ready`]: true,
+        })
+      } catch (e) {
+        showToast('บันทึกสีล้มเหลว: ' + e.message, 'error')
+      }
+    }, 500)
   }
 
   // Update player name
@@ -2600,7 +2723,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       </div>
                     )}
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-                      Special Event · {hasPickedColor ? `สี${PLAYER_COLORS.find(c => c.hex === myColor)?.label || 'ที่เลือก'}` : 'ยังไม่เลือกสี'}
+                      Special Event · {hasPickedColor ? `สี ${myColor?.toUpperCase()}` : 'ยังไม่เลือกสี'}
                     </div>
                   </div>
                 </div>
@@ -2612,46 +2735,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 >สลับชื่อ</button>
               </div>
 
-              {/* Color Picker — always visible in lobby */}
+              {/* Color Wheel Picker */}
               <div className="au-card" style={{ padding: 18 }}>
                 <div style={{ fontSize: 13, fontWeight: 900, color: '#fff', marginBottom: 4 }}>เลือกสีตัวละครของคุณ</div>
-                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
                   ฝ่ายของคุณจะถูกสุ่มโดยระบบเมื่อแอดมินกดเริ่ม — ห้ามบอกคนอื่น!
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10 }}>
-                  {PLAYER_COLORS.map(c => {
-                    const isMe = myColor === c.hex
-                    const takenBy = Object.values(gameDoc.players || {}).find(p => p.uid !== myUid && p.color === c.hex)
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        disabled={Boolean(takenBy)}
-                        onClick={() => saveMyColor(c.hex)}
-                        title={takenBy ? `${takenBy.name} ใช้สีนี้แล้ว` : c.label}
-                        style={{
-                          width: '100%', aspectRatio: '1', borderRadius: 12,
-                          background: c.hex,
-                          border: isMe ? '3px solid #fff' : '3px solid transparent',
-                          cursor: takenBy ? 'not-allowed' : 'pointer',
-                          opacity: takenBy ? 0.3 : 1,
-                          boxShadow: isMe ? `0 0 0 2px ${c.hex}, 0 0 12px ${c.hex}88` : 'none',
-                          transition: 'transform 0.12s, box-shadow 0.12s',
-                          position: 'relative',
-                          transform: isMe ? 'scale(1.15)' : 'scale(1)',
-                        }}
-                      >
-                        {isMe && (
-                          <i className="fas fa-check" style={{
-                            position: 'absolute', inset: 0, display: 'flex',
-                            alignItems: 'center', justifyContent: 'center',
-                            color: '#fff', fontSize: 14, textShadow: '0 1px 4px rgba(0,0,0,0.6)',
-                          }} />
-                        )}
-                      </button>
-                    )
-                  })}
-                </div>
+                <ColorWheelPicker
+                  value={myColor || '#c62419'}
+                  onChange={saveMyColor}
+                />
               </div>
 
               {/* Stealth Waiting Screen */}
