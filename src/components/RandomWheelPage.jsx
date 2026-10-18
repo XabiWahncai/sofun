@@ -130,6 +130,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
   const confettiCanvasRef = useRef(null)
   const animFrameRef = useRef(null)
   const confettiFrameRef = useRef(null)
+  const idleFrameRef = useRef(null)
 
   // Physical angle tracking
   const rotationRef = useRef(0)
@@ -659,6 +660,24 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
   useEffect(() => {
     drawWheel()
   }, [drawWheel])
+
+  // Idle slow rotation when not spinning
+  useEffect(() => {
+    if (isSpinning || candidates.length === 0) {
+      if (idleFrameRef.current) cancelAnimationFrame(idleFrameRef.current)
+      return
+    }
+    const IDLE_SPEED = 0.3
+    const tick = () => {
+      rotationRef.current = (rotationRef.current + IDLE_SPEED) % 360
+      drawWheel(rotationRef.current)
+      idleFrameRef.current = requestAnimationFrame(tick)
+    }
+    idleFrameRef.current = requestAnimationFrame(tick)
+    return () => {
+      if (idleFrameRef.current) cancelAnimationFrame(idleFrameRef.current)
+    }
+  }, [isSpinning, candidates.length, drawWheel])
 
   // ── Find Slice under Top Needle (at 270° / 12 o'clock) ──────────────────────
   const getSliceUnderNeedle = useCallback((rotationDeg) => {

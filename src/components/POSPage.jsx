@@ -493,6 +493,31 @@ export default function POSPage({
     }
   }, [todayOrders, sessions])
 
+  const sessionHydratedRef = useRef(new Set())
+
+  // ── Hydrate sessions that have confirmedOrderId but lost their members ──
+  // Happens when pos_live/current sync drops member data (race condition / stale write)
+  useEffect(() => {
+    safeSessions.forEach(session => {
+      if (!session.confirmedOrderId || (session.members || []).length > 0) return
+      const key = `${session.id}:${session.confirmedOrderId}`
+      if (sessionHydratedRef.current.has(key)) return
+      sessionHydratedRef.current.add(key)
+      getDoc(doc(db, 'orders', session.confirmedOrderId)).then(snap => {
+        if (!snap.exists()) return
+        const orderData = snap.data()
+        if ((orderData.members || []).length > 0) {
+          updateSession(session.id, {
+            members: orderData.members,
+            scriptId: orderData.scriptId || session.scriptId,
+            dm: orderData.dm || session.dm,
+            room: orderData.room || session.room,
+          })
+        }
+      }).catch(() => {})
+    })
+  }, [sessions])
+
   // ── fetch member and add to a session ───────────────────────────
   const fetchAndAddMember = async (sessionId, uid) => {
     const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
@@ -1407,6 +1432,10 @@ export default function POSPage({
       if (orderItems.length > 0) {
         updateSession(existing.id, { order: orderItems })
       }
+      // Re-hydrate members if session lost them (e.g. from stale pos_live/current sync)
+      if ((existing.members || []).length === 0 && (order.members || []).length > 0) {
+        updateSession(existing.id, { members: order.members })
+      }
       setActiveId(existing.id)
       return
     }
@@ -2266,19 +2295,36 @@ export default function POSPage({
         {showHistory && (
           <div className="pos-today-list">
             {todayOrders.length === 0 && <div className="pos-empty">ยังไม่มีออเดอร์วันนี้</div>}
-            {todayOrders.map(o => (
-              <div key={o.id} className="pos-today-item">
-                <div className="pos-today-item-left">
-                  <div className="pos-today-game">{o.scriptTitle || 'ไม่ระบุ'}</div>
-                  <div className="pos-today-members">
-                    <i className="fas fa-users" /> {o.members?.length || 0} คน
-                    {o.dm && <span> · DM: {o.dm}</span>}
-                    {o.room && <span> · {o.room}</span>}
+            {todayOrders.map(o => {
+              const isAlreadyOpen = safeSessions.some(s => s.confirmedOrderId === o.id)
+              const isClosed = o.status === 'paid' || o.status === 'closed'
+              return (
+                <div
+                  key={o.id}
+                  className="pos-today-item"
+                  onClick={() => { if (!isClosed) { openExistingOrder(o); setShowHistory(false) } }}
+                  style={{ cursor: isClosed ? 'default' : 'pointer' }}
+                >
+                  <div className="pos-today-item-left">
+                    <div className="pos-today-game">{o.scriptTitle || 'ไม่ระบุ'}</div>
+                    <div className="pos-today-members">
+                      <i className="fas fa-users" /> {o.members?.length || 0} คน
+                      {o.dm && <span> · DM: {o.dm}</span>}
+                      {o.room && <span> · {o.room}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                    <div className="pos-today-price">฿{(o.grandTotal || 0).toLocaleString()}</div>
+                    {isClosed
+                      ? <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.35)', fontWeight: 700 }}>ปิดแล้ว</span>
+                      : isAlreadyOpen
+                        ? <span style={{ fontSize: 10, color: '#c62419', fontWeight: 700 }}>เปิดอยู่</span>
+                        : <span style={{ fontSize: 10, color: '#555555', fontWeight: 700 }}>แตะเพื่อเปิด</span>
+                    }
                   </div>
                 </div>
-                <div className="pos-today-price">฿{(o.grandTotal || 0).toLocaleString()}</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
@@ -2528,12 +2574,12 @@ export default function POSPage({
                     }}
                   >
                     {m.avatar
-                      ? <img src={m.avatar} alt="" className="pos-member-avatar" />
-                      : <div className="pos-member-avatar-ph">{(m.name || '?')[0]}</div>
-                    }
+                      ? <img src={m.avatar} alt="" className="pos-member-avatar" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }} />
+                      : null}
+                    <div className="pos-member-avatar-ph" style={{ display: m.avatar ? 'none' : 'flex' }}>{(m.name || '?')[0]}</div>
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <div className="pos-member-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</span>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name || 'ไม่ระบุ'}</span>
                         {m.unpaidDeposit && (
                           <span
                             style={{
@@ -2872,12 +2918,12 @@ export default function POSPage({
                 {showPaidMembers && activeSession.members.filter(m => memberPayments[m.uid]?.verified).map(m => (
                   <div key={m.uid} className="pos-member-row" style={{ opacity: 0.5 }}>
                     {m.avatar
-                      ? <img src={m.avatar} alt="" className="pos-member-avatar" />
-                      : <div className="pos-member-avatar-ph">{m.name[0]}</div>
-                    }
+                      ? <img src={m.avatar} alt="" className="pos-member-avatar" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }} />
+                      : null}
+                    <div className="pos-member-avatar-ph" style={{ display: m.avatar ? 'none' : 'flex' }}>{(m.name || '?')[0]}</div>
                     <div className="pos-member-info">
                       <div className="pos-member-name">
-                        {m.name}
+                        {m.name || 'ไม่ระบุ'}
                         <span className="pos-member-paid-badge">
                           <i className="fas fa-check-circle" /> ฿{Number(memberPayments[m.uid].amount || 0).toLocaleString()}
                         </span>
