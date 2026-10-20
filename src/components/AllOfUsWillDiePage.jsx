@@ -932,7 +932,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
       return
     }
-    const shots = me?.sheriffShots ?? 1
+    const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
     if (shots <= 0) {
       showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
       return
@@ -1092,13 +1092,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const durationMins = gameDoc.gameDurationMinutes || 20
     const durationSecs = durationMins * 60
 
-    // ── Randomly assign roles ──────────────────────────────
+    // ── Randomly assign roles (Preserve if admin manually configured) ────────
+    // Check if admin manually configured roles (at least 1 player has non-crewmate role set in lobby)
+    const hasManualRoles = allPlayersList.some(p => p.role && p.role !== 'crewmate')
+
     // Formula: 15 players → 3 impostors, 1 dodo, 1 sheriff, 10 crewmates
-    // General: 20% imposters (min 1), 1 dodo if ≥4 players, 1 sheriff if ≥4 players, rest crewmates
+    // General: 20% imposters (min 1), 1 dodo if ≥4 players, 1 sheriff if ≥3 players, rest crewmates
     const n = allPlayersList.length
     const impostorCount = Math.max(1, Math.floor(n * 0.2))
     const dodoCount = n >= 4 ? 1 : 0
-    const sheriffCount = n >= 4 ? 1 : 0
+    const sheriffCount = n >= 3 ? 1 : 0
 
     const shuffledPlayers = [...allPlayersList].sort(() => Math.random() - 0.5)
     const roleMap = {}
@@ -1200,11 +1203,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         verified: false,
         verifiedAt: null,
       }))
+      const finalRole = (hasManualRoles ? (p.role || 'crewmate') : (roleMap[p.uid] || 'crewmate'))
       updatedPlayers[p.uid] = {
         ...p,
         color: finalColorMap[p.uid] || p.color || '#c62828',
-        role: roleMap[p.uid],
-        sheriffShots: roleMap[p.uid] === 'sheriff' ? 1 : 0,
+        role: finalRole,
+        sheriffShots: finalRole === 'sheriff' ? 1 : 0,
         isAlive: true,
         tasks: assigned,
       }
@@ -1529,6 +1533,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           isAlive: true,
           tasks: [],
           ready: false,
+          sheriffShots: p.role === 'sheriff' ? 1 : 0,
         }
       })
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -1968,7 +1973,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
                 return
               }
-              const shots = me?.sheriffShots ?? 1
+              const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
               if (shots <= 0) {
                 showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
                 return
@@ -2781,7 +2786,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                               {p.name} {!p.isAlive && <span style={{ color: '#9e9e9e', fontSize: 10 }}>(ตาย)</span>}
                             </div>
                             <div style={{ fontSize: 11, color: roleColor, fontWeight: 800 }}>
-                              {roleLabel}
+                              {roleLabel} {p.role === 'sheriff' && (
+                                <span style={{ color: '#ffd54f', fontSize: 10, marginLeft: 4 }}>
+                                  ({(p.sheriffShots !== undefined ? p.sheriffShots : 1) > 0 ? 'เหลือ 1 สิทธิ์' : 'ยิงแล้ว'})
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -2798,7 +2807,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                                 type="button"
                                 onClick={() => {
                                   const updates = { [`players.${p.uid}.role`]: r }
-                                  if (r === 'sheriff' && (p.sheriffShots === undefined || p.sheriffShots === null)) {
+                                  if (r === 'sheriff') {
                                     updates[`players.${p.uid}.sheriffShots`] = 1
                                   }
                                   updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
@@ -3527,17 +3536,68 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     {/* Sheriff hint reveal */}
                     {myRole === 'sheriff' && (
                       <div style={{
-                        padding: '6px 8px',
-                        background: 'rgba(255,193,7,0.1)',
-                        borderRadius: 8,
-                        border: '1px solid rgba(255,193,7,0.3)',
-                        fontSize: 10,
+                        padding: '8px 10px',
+                        background: 'rgba(255,193,7,0.12)',
+                        borderRadius: 10,
+                        border: '1.5px solid rgba(255,193,7,0.35)',
+                        fontSize: 10.5,
                         color: '#ffe082',
-                        maxWidth: 220,
+                        maxWidth: 240,
                         textAlign: 'left',
-                        lineHeight: 1.3,
+                        lineHeight: 1.4,
                       }}>
-                        แตะที่แถบภารกิจด้านบนเพื่อยิงคนร้าย (ยิงคนดีตายทั้งคู่ / 1 นัดต่อรอบประชุม)
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontWeight: 900, color: '#ffd54f' }}>
+                            <i className="fas fa-crosshairs" style={{ marginRight: 5 }} />
+                            สิทธิ์ยิงคนร้าย:
+                          </span>
+                          <span style={{
+                            padding: '2px 7px',
+                            borderRadius: 6,
+                            background: (me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '#fbc02d' : 'rgba(255,255,255,0.1)',
+                            color: (me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '#111' : '#aaa',
+                            fontWeight: 900,
+                            fontSize: 10,
+                          }}>
+                            {(me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? 'มี 1 สิทธิ์ (พร้อมยิง)' : 'ใช้สิทธิ์แล้ว'}
+                          </span>
+                        </div>
+                        <div style={{ marginBottom: 6 }}>
+                          เริ่มเกมได้รับทันที 1 สิทธิ์ (แตะที่แถบภารกิจด้านบน หรือกดปุ่มด้านล่างเพื่อเลือกยิง)
+                        </div>
+                        {gameDoc.status === 'playing' && isAlive && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              if (killCooldownSec > 0) {
+                                showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
+                                return
+                              }
+                              const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
+                              if (shots <= 0) {
+                                showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
+                                return
+                              }
+                              setSelectedSheriffTarget(null)
+                              setShowSheriffKillModal(true)
+                            }}
+                            className="au-btn au-btn-yellow"
+                            style={{
+                              width: '100%',
+                              padding: '6px 10px',
+                              fontSize: 11,
+                              fontWeight: 800,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 6,
+                            }}
+                          >
+                            <i className="fas fa-crosshairs" />
+                            <span>เปิดเป้าหมายสั่งยิง</span>
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
