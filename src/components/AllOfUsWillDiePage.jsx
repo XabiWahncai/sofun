@@ -419,34 +419,35 @@ export const DEFAULT_SABOTAGE_POOL = [
 // ── Default Tasks Pool for Real Life Boardgame Cafe ───
 export const DEFAULT_TASKS_POOL = [
   // Floor 1 (4 tasks)
-  { id: 't1', title: 'จัดเรียงแก้วน้ำ 5 ใบ', desc: 'ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่มให้เป็นระเบียบเรียบร้อย', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
-  { id: 't2', title: 'ตรวจสอบชุดแต่งตัว', desc: 'เดินไปเช็คความเรียบร้อยของชุดแต่งตัวในห้อง', floor: 1, room: 'ห้องแต่งตัว', maxAssignedCount: 3 },
-  { id: 't3', title: 'นับกล่องเกมโซนหลัง', desc: 'เดินไปนับกล่องเกมที่วางอยู่บริเวณโซนหลัง 3 กล่อง', floor: 1, room: 'โซนหลัง', maxAssignedCount: 3 },
-  { id: 't4', title: 'เช็คความเรียบร้อยเคาน์เตอร์บาร์', desc: 'เดินสำรวจความสะอาดบริเวณเคาน์เตอร์บาร์ชั้น 1', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
+  { id: 't_1792141608337', title: 'เรียงเกม', desc: 'เรียงเกมตามหลักพจนานุกรมให้หน่อยนะ', floor: 1, room: 'โซนหน้า', maxAssignedCount: 1 },
+  { id: 't_1792141723910', title: 'india game', desc: 'เรียงป๋อง', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
+  { id: 't_1792405836582', title: 'dress impress', desc: 'แต่งตัวตามใจฉัน', floor: 1, room: 'ห้องแต่งตัว', maxAssignedCount: 3 },
+  { id: 't_1792406781996', title: 'เกมนี้ใช้หัวเล่น', desc: 'ทำภารกิจให้สำเร็จและให้แอดมินสแกนยืนยัน', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
 
   // Floor 2 (4 tasks)
-  { id: 't5', title: 'ตรวจตราโถงทางเดินชั้น 2', desc: 'เดินสำรวจความเรียบร้อยบริเวณโถงทางเดินชั้น 2', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
-  { id: 't6', title: 'นับเบาะนั่งห้องญี่ปุ่น', desc: 'เดินไปนับจำนวนเบาะนั่งในห้องญี่ปุ่นแล้วจำมาตอบ', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
-  { id: 't7', title: 'จัดเรียงรองเท้าหน้าห้องญี่ปุ่น', desc: 'เดินไปเช็คความเรียบร้อยของจุดวางรองเท้าหน้าห้องญี่ปุ่น', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
-  { id: 't8', title: 'ตรวจเช็คป้ายบอกทางชั้น 2', desc: 'เดินสำรวจป้ายบอกทางบริเวณบันไดทางขึ้นชั้น 2', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  { id: 't_1792140868891', title: 'Dice ไหม', desc: 'ทอยลูกเต๋า ให้ได้ผลรวมมากกว่า 10 แต้ม', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
+  { id: 't_1792141070591', title: 'Nut\'s Yes', desc: 'แยกถั่วเขียวออกจากถั่วดำ', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
+  { id: 't_1792141159126', title: 'โกโกวาหมากเก็บ', desc: 'ลุ้นเอา555', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
+  { id: 't_1792413517992', title: 'Titanic', desc: 'แช่น้ำเย็นๆ ชื่นใจ', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
 
-  // Floor 3 (4 tasks)
-  { id: 't9', title: 'ตรวจตราโต๊ะห้องจีน', desc: 'เดินไปสำรวจโต๊ะเล่นเกมในห้องจีน', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
-  { id: 't10', title: 'ถ่ายรูปคู่กับ DM ห้องยุโรป', desc: 'เดินไปหา DM ประจำห้องยุโรปแล้วขอถ่ายรูปคู่เป็นหลักฐาน', floor: 3, room: 'ห้องยุโรป', maxAssignedCount: 3 },
-  { id: 't11', title: 'ตรวจเช็คโคมไฟห้องจีน', desc: 'เดินไปสำรวจโคมไฟประดับและบรรยากาศในห้องจีน', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
-  { id: 't12', title: 'สำรวจโถงทางเดินชั้น 3', desc: 'เดินสำรวจความสงบเรียบร้อยบริเวณโถงทางเดินชั้น 3', floor: 3, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  // Floor 3 (5 tasks)
+  { id: 't_1792141131072', title: 'Rubik', desc: 'แก้ รูบิค', floor: 3, room: 'ห้องจีน', maxAssignedCount: 1 },
+  { id: 't_1792141204443', title: 'สีสันบันเทิง', desc: 'ทายสีให้ถูก', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
+  { id: 't_1792141452064', title: 'Davinci Code', desc: 'ถอดรหัสลับ อัจฉริยะ', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
+  { id: 't_1792307270299', title: 'ขวดหกคะเมนตีลังกา', desc: 'ทำภารกิจให้สำเร็จและให้แอดมินสแกนยืนยัน', floor: 3, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  { id: 't_1792406727706', title: 'ไม่นะ! ซีอิ๋วหายไป!', desc: 'ไปรับภารกิจจาก Dm AJ', floor: 3, room: 'ห้องยุโรป', maxAssignedCount: 3 },
 
   // Floor 4 (4 tasks)
-  { id: 't13', title: 'สำรวจห้องผี', desc: 'เดินเข้าไปในห้องผีและถ่ายรูปสัญลักษณ์ที่กำหนด', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
-  { id: 't14', title: 'สำรวจห้องแคบ', desc: 'เดินไปส่องดูความเรียบร้อยในห้องแคบชั้น 4', floor: 4, room: 'ห้องแคบ', maxAssignedCount: 3 },
-  { id: 't15', title: 'ส่องไฟฉายห้องผี', desc: 'เดินไปส่องดูความเรียบร้อยในมุมมืดของห้องผี', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
-  { id: 't16', title: 'ตรวจตราโถงทางเดินชั้น 4', desc: 'เดินสำรวจทางเดินหน้าห้องแคบชั้น 4', floor: 4, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  { id: 't_1792310392031', title: 'ดนตรีนั้นคือชีวิต', desc: 'ทดสอบจังหวะในหัวใจ', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
+  { id: 't_1792310774935', title: 'สืบสัตว์', desc: 'หาคนร้ายจาเหล่าเฟอร์รี่หน้าขน', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
+  { id: 't_1792311172049', title: 'หรีเสียง', desc: 'จัดเรียงและแยกสีชิปจากในกองให้ครบ', floor: 4, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  { id: 't_1792406637497', title: 'Shot me if you can', desc: 'รับโจทย์จาก DM Fune และกลับมาส่งภารกิจ', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
 
   // Floor 5 (4 tasks)
-  { id: 't17', title: 'ตรวจห้องวินเทจ', desc: 'เดินไปสำรวจของตกแต่งในห้องวินเทจชั้น 5', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
-  { id: 't18', title: 'เช็คห้องโปรเจคเตอร์', desc: 'เดินขึ้นไปดูภาพโปรเจคเตอร์ที่ห้องโปรเจคเตอร์ชั้น 5', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
-  { id: 't19', title: 'เช็คลำโพงห้องโปรเจคเตอร์', desc: 'เดินไปตรวจสอบระดับเสียงและลำโพงในห้องโปรเจคเตอร์', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
-  { id: 't20', title: 'ตรวจนาฬิกาโบราณห้องวินเทจ', desc: 'เดินไปดูเวลาบนนาฬิกาโบราณในห้องวินเทจ', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
+  { id: 't_1792141240476', title: 'แคทเทอรีนยิงมัน', desc: 'ยิงพี่ฟินิกซ์ให้ร่วง', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
+  { id: 't_1792141535726', title: 'เกมนี้เราใช้หัวเล่น', desc: 'เกมใช้หัว', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
+  { id: 't_1792307316696', title: 'อวัยวะที่หายไป', desc: 'ทำภารกิจให้สำเร็จและให้แอดมินสแกนยืนยัน', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
+  { id: 't_1792397757958', title: 'ไม่นะ! ต๋งหายไป!', desc: 'รับภารกิจจาก DM. Smooth Imposter', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
 ]
 
 export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: isAppAdmin, showToast, showPage }) {
