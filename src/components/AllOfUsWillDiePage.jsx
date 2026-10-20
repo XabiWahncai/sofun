@@ -482,6 +482,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [showSheriffKillModal, setShowSheriffKillModal] = useState(false)
   const [selectedSheriffTarget, setSelectedSheriffTarget] = useState(null)
   const [scannerOpen, setScannerOpen] = useState(false)
+  const [showRulesModal, setShowRulesModal] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDesc, setNewTaskDesc] = useState('')
   const [newTaskFloor, setNewTaskFloor] = useState(1)
@@ -1884,6 +1885,23 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             </button>
           )}
 
+          {/* Rules Guide button */}
+          <button
+            type="button"
+            onClick={() => setShowRulesModal(true)}
+            style={{
+              padding: '6px 10px', borderRadius: 10,
+              background: 'rgba(255,255,255,0.06)',
+              border: '1.5px solid rgba(255,255,255,0.15)',
+              color: '#80d8ff', fontSize: 11, fontWeight: 800,
+              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+            }}
+            title="เปิดอ่านกฎและกติกาการเล่น"
+          >
+            <i className="fas fa-book-open" style={{ fontSize: 11 }} />
+            <span>กติกา</span>
+          </button>
+
           {/* Exit / Return button */}
           <button
             type="button"
@@ -3219,6 +3237,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       <strong>คำแนะนำ:</strong> คว่ำหน้าจอโทรศัพท์ลงเพื่อไม่ให้เพื่อนแอบดู
                     </div>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowRulesModal(true)}
+                    className="au-btn au-btn-blue"
+                    style={{ width: '100%', padding: '10px 16px', fontSize: 12.5, marginBottom: 14 }}
+                  >
+                    <i className="fas fa-book-open" />
+                    <span>อ่านกฎและกติกาเกมฉบับเต็ม</span>
+                  </button>
+
                   <div style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                     color: '#fff', fontSize: 12, fontWeight: 700,
@@ -4718,6 +4747,117 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 ยกเลิก
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── OFFICIAL GAME RULES MODAL ─── */}
+      {showRulesModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 140,
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setShowRulesModal(false)}>
+          <div className="au-card" style={{
+            padding: 22,
+            maxWidth: 480, width: '100%',
+            maxHeight: '85vh', overflowY: 'auto',
+            border: '2.5px solid #0288d1',
+            boxSizing: 'border-box',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>
+                  กฎและกติกาการเล่น All Of Us Will Die
+                </div>
+                <div style={{ fontSize: 11, color: '#80d8ff', fontWeight: 700, marginTop: 2 }}>
+                  Among Us ในชีวิตจริง ณ คาเฟ่บอร์ดเกม SOFUN
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowRulesModal(false)}
+                style={{
+                  background: 'rgba(255,255,255,0.08)', border: 'none',
+                  color: 'rgba(255,255,255,0.7)', width: 28, height: 28, borderRadius: 8,
+                  cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <i className="fas fa-times" style={{ fontSize: 12 }} />
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14, fontSize: 12, lineHeight: 1.6, color: 'rgba(255,255,255,0.85)' }}>
+
+              {/* Roles Section */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 900, color: '#ffd54f', marginBottom: 8 }}>
+                  <i className="fas fa-users" style={{ marginRight: 6 }} /> บทบาทและเป้าหมายการเอาชนะ
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div>
+                    <strong style={{ color: '#29b6f6' }}>คนดี (Crewmate):</strong> ปฏิบัติภารกิจในสถานที่จริงให้ครบ 100% หรือจับคนร้ายโหวตออกให้หมดทุกคน
+                  </div>
+                  <div>
+                    <strong style={{ color: '#e53935' }}>คนร้าย (Impostor):</strong> ลอบกำจัดคนดีให้จำนวนเท่ากับคนร้าย ปะปนเนียน และลอบส่งสัญญาณก่อกวนระบบ (Sabotage)
+                  </div>
+                  <div>
+                    <strong style={{ color: '#ffd54f' }}>นายอำเภอ (Sheriff):</strong> อยู่ฝ่ายคนดี มีสิทธิ์ลั่นไกกำจัดคนร้าย 1 นัดต่อ 1 รอบประชุม โดยแตะที่แถบ TOTAL TASKS ด้านบน (<span style={{ color: '#ff5252' }}>คำเตือน: หากยิงคนดีจะตายตกตามกันทันที</span>)
+                  </div>
+                  <div>
+                    <strong style={{ color: '#ce93d8' }}>โดโด้ (Dodo):</strong> ฝ่ายอิสระ ชนะเดี่ยวทันทีหากสามารถปั่นหัวหลอกให้ที่ประชุมโหวตขับไล่ตนเองออกได้สำเร็จ
+                  </div>
+                </div>
+              </div>
+
+              {/* Tasks Section */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 900, color: '#81c784', marginBottom: 8 }}>
+                  <i className="fas fa-tasks" style={{ marginRight: 6 }} /> กฎภารกิจและการกระจายตัว
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <li>ผู้เล่นแต่ละคนจะได้รับ 3 ภารกิจ กระจายอยู่คนละชั้นแบบสุ่ม (3 ชั้นไม่ซ้ำกันต่อคน)</li>
+                  <li>แต่ละภารกิจจำกัดโควตาผู้เล่นทำซ้ำตามที่แอดมินกำหนด (1 - 3 คน) ห้ามเกินโควตา</li>
+                  <li>เมื่อทำภารกิจในสถานที่จริงเสร็จ ให้แสดง QR Code ภารกิจให้แอดมินหรือ DM สแกนเพื่อยืนยัน</li>
+                </ul>
+              </div>
+
+              {/* Silent Death Report Section */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 900, color: '#ff8a80', marginBottom: 8 }}>
+                  <i className="fas fa-skull" style={{ marginRight: 6 }} /> กฎการถูกกำจัดและการรายงานตัว
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <li>หากถูกคนร้ายกำจัด ให้กดปุ่ม "ฉันถูกกำจัดแล้ว" บนหน้าจอเงียบๆ โดยไม่มีสัญญาณเตือนดังรบกวน</li>
+                  <li>ผู้เล่นอื่นจะไม่ทราบว่าใครเสียชีวิตจนกว่าจะมีการกดประชุมฉุกเฉิน</li>
+                  <li>ผู้ตายจะกลายเป็นวิญญาณ ไม่สามารถโหวตได้ แต่สามารถเป็นผู้สังเกตการณ์ดูได้สดๆ ว่าใครโหวตใครในที่ประชุม</li>
+                </ul>
+              </div>
+
+              {/* Anonymous Meeting & Voting Section */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', padding: 12, borderRadius: 12, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: 12.5, fontWeight: 900, color: '#64b5f6', marginBottom: 8 }}>
+                  <i className="fas fa-vote-yea" style={{ marginRight: 6 }} /> กฎการประชุมฉุกเฉินและการโหวต (Anonymous Voting)
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  <li>เมื่อกดปุ่ม Emergency Meeting ทุกคนต้องมารวมตัวกันที่โต๊ะประชุมทันที</li>
+                  <li>ผู้เล่นที่เสียชีวิตจะขึ้นป้าย DEAD ชัดเจน และถูกล็อคไม่ให้ลงคะแนนโหวต</li>
+                  <li>ระหว่างการโหวต คะแนนจะถูกปิดเป็นความลับ เห็นเฉพาะสถานะว่าใครโหวตแล้ว</li>
+                  <li>ผลคะแนนจะสรุปเมื่อหมดเวลาหรือทุกคนโหวตเสร็จ โดยแจ้งจำนวนเสียงของแต่ละคน แต่ไม่เปิดเผยว่าใครโหวตใคร</li>
+                </ul>
+              </div>
+
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowRulesModal(false)}
+              className="au-btn au-btn-blue"
+              style={{ width: '100%', marginTop: 16, padding: '10px', fontSize: 13 }}
+            >
+              รับทราบกฎกติกา
+            </button>
           </div>
         </div>
       )}
