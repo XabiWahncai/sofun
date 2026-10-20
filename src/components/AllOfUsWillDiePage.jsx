@@ -312,6 +312,8 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
     ? '#c51111'
     : role === 'dodo'
     ? '#8e24aa'
+    : role === 'sheriff'
+    ? '#fbc02d'
     : '#0288d1'
 
   const bodyColor = color || defaultBody
@@ -322,6 +324,8 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
     ? '#7a0813'
     : role === 'dodo'
     ? '#4a148c'
+    : role === 'sheriff'
+    ? '#f57f17'
     : (color ? '#000000' : '#01579b')
 
   return (
@@ -387,6 +391,22 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
           <i className="fas fa-ghost" />
         </div>
       )}
+
+      {/* Sheriff Golden Star Pin */}
+      {isAlive && role === 'sheriff' && (
+        <i
+          className="fas fa-star"
+          style={{
+            position: 'absolute',
+            top: -2,
+            right: -2,
+            fontSize: Math.max(9, Math.round(size * 0.3)),
+            color: '#ffd54f',
+            textShadow: '0 0 3px rgba(0,0,0,0.8)',
+            pointerEvents: 'none',
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -451,6 +471,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [showSabotageModal, setShowSabotageModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
   const [selectedReportVictim, setSelectedReportVictim] = useState(null)
+  const [showSelfDeathConfirm, setShowSelfDeathConfirm] = useState(false)
+  const [showSheriffKillModal, setShowSheriffKillModal] = useState(false)
+  const [selectedSheriffTarget, setSelectedSheriffTarget] = useState(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDesc, setNewTaskDesc] = useState('')
@@ -497,45 +520,31 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }, [hasAdminPerm])
 
-  // ── 1. Find Special Event Active Party / Order (pos_live or orders) ───
+  // ── 1. Find Special Event Active Party / Order (Strictly special event) ───
   useEffect(() => {
     let posSession = null
     let orderSession = null
 
+    const isSpecialMatch = (item) => {
+      if (!item) return false
+      const title = (item.scriptTitle || item.eventName || item.label || '').toLowerCase().trim()
+      const scriptId = (item.scriptId || '').toLowerCase().trim()
+      const room = (item.room || '').toLowerCase().trim()
+      return (
+        title.includes('special event') ||
+        title.includes('secial event') ||
+        title.includes('spacial event') ||
+        title.includes('all of us') ||
+        scriptId.includes('special') ||
+        scriptId.includes('allofus') ||
+        room.includes('special')
+      )
+    }
+
     const evaluateParty = (pos, ord) => {
-      if (pos) {
-        const title = (pos.scriptTitle || pos.eventName || pos.label || '').toLowerCase().trim()
-        const scriptId = (pos.scriptId || '').toLowerCase().trim()
-        const room = (pos.room || '').toLowerCase().trim()
-        const isSpecial = (
-          title.includes('special event') ||
-          title.includes('secial event') ||
-          title.includes('spacial event') ||
-          title.includes('all of us') ||
-          scriptId.includes('special') ||
-          scriptId.includes('allofus') ||
-          room.includes('special')
-        )
-        if (isSpecial) return pos
-      }
-
-      if (ord) {
-        const title = (ord.scriptTitle || '').toLowerCase().trim()
-        const scriptId = (ord.scriptId || '').toLowerCase().trim()
-        const room = (ord.room || '').toLowerCase().trim()
-        const isSpecial = (
-          title.includes('special event') ||
-          title.includes('secial event') ||
-          title.includes('spacial event') ||
-          title.includes('all of us') ||
-          scriptId.includes('special') ||
-          scriptId.includes('allofus') ||
-          room.includes('special')
-        )
-        if (isSpecial) return ord
-      }
-
-      return pos || ord || null
+      if (pos && isSpecialMatch(pos)) return pos
+      if (ord && isSpecialMatch(ord)) return ord
+      return null
     }
 
     // 1. Listen to pos_live/current (active real-time session from POS)
@@ -543,21 +552,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       if (snap.exists()) {
         const data = snap.data()
         const sessions = data.sessions || []
-        const special = sessions.find(s => {
-          const title = (s.scriptTitle || s.eventName || s.label || '').toLowerCase().trim()
-          const scriptId = (s.scriptId || '').toLowerCase().trim()
-          const room = (s.room || '').toLowerCase().trim()
-          return (
-            title.includes('special event') ||
-            title.includes('secial event') ||
-            title.includes('spacial event') ||
-            title.includes('all of us') ||
-            scriptId.includes('special') ||
-            scriptId.includes('allofus') ||
-            room.includes('special')
-          )
-        })
-        posSession = special || (sessions.length > 0 ? sessions[0] : null)
+        const special = sessions.find(s => isSpecialMatch(s))
+        posSession = special || null
       } else {
         posSession = null
       }
@@ -568,21 +564,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const q = query(collection(db, 'orders'), where('status', '==', 'active'))
     const unsubOrders = onSnapshot(q, snap => {
       const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const specialEvent = orders.find(o => {
-        const title = (o.scriptTitle || '').toLowerCase().trim()
-        const scriptId = (o.scriptId || '').toLowerCase().trim()
-        const room = (o.room || '').toLowerCase().trim()
-        return (
-          title.includes('special event') ||
-          title.includes('secial event') ||
-          title.includes('spacial event') ||
-          title.includes('all of us') ||
-          scriptId.includes('special') ||
-          scriptId.includes('allofus') ||
-          room.includes('special')
-        )
-      })
-      orderSession = specialEvent || orders[0] || null
+      const specialEvent = orders.find(o => isSpecialMatch(o))
+      orderSession = specialEvent || null
       setActiveParty(evaluateParty(posSession, orderSession))
     }, err => console.warn('Special event party query error:', err))
 
@@ -723,9 +706,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           }).catch(() => {})
         }
 
-        // Automatically conclude votes when time hits 0
-        if (meetRem === 0 && gameDoc.status === 'meeting_voting' && hasAdminPerm) {
-          concludeVoting()
+        // Conclude votes when time hits 0 OR when all living players have cast their votes
+        if (gameDoc.status === 'meeting_voting' && hasAdminPerm) {
+          const livingPlayers = Object.values(gameDoc.players || {}).filter(p => p.isAlive)
+          const allVoted = livingPlayers.length > 0 && livingPlayers.every(p => Boolean(gameDoc.meeting?.votes?.[p.uid]))
+          if (meetRem === 0 || allVoted) {
+            concludeVoting()
+          }
         }
       }
     }, 500)
@@ -903,6 +890,86 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
+  // Player self-reports eliminated in real life (silent ghost mode, revealed in meeting)
+  const handleConfirmSelfDeath = async () => {
+    if (!myUid || !gameDoc) return
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        [`players.${myUid}.isAlive`]: false,
+      })
+      setShowSelfDeathConfirm(false)
+      showToast('คุณเข้าสู่สถานะวิญญาณแล้ว ทำภารกิจต่อได้เงียบๆ (ทุกคนจะทราบตอนประชุม)')
+    } catch (e) {
+      showToast('อัปเดตสถานะล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Sheriff secret kill execution
+  const handleSheriffKill = async (targetUid) => {
+    if (!myUid || myRole !== 'sheriff' || !isAlive || gameDoc.status !== 'playing') return
+    const shots = me?.sheriffShots ?? 1
+    if (shots <= 0) {
+      showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
+      return
+    }
+    const target = gameDoc.players?.[targetUid]
+    if (!target) return
+    if (!target.isAlive) {
+      showToast('ผู้เล่นคนนี้เสียชีวิตแล้ว ไม่สามารถยิงได้', 'error')
+      return
+    }
+
+    const updatedPlayers = { ...(gameDoc.players || {}) }
+    // Sheriff consumes their 1 shot for this meeting cycle
+    updatedPlayers[myUid] = { ...updatedPlayers[myUid], sheriffShots: 0 }
+
+    if (target.role === 'crewmate') {
+      // Misfire! Target dies AND Sheriff dies
+      updatedPlayers[targetUid] = { ...target, isAlive: false }
+      updatedPlayers[myUid] = { ...updatedPlayers[myUid], isAlive: false }
+
+      // Check win condition
+      const remainingCrew = Object.values(updatedPlayers).filter(p => p.role !== 'impostor' && p.isAlive)
+      const remainingImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor' && p.isAlive)
+
+      if (remainingImpostors.length >= remainingCrew.length && remainingImpostors.length > 0) {
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          players: updatedPlayers,
+          status: 'ended',
+          winner: 'impostor',
+          winReason: 'นายอำเภอยิงผิดคนทำให้จำนวนคนร้ายเท่ากับฝ่ายคนดี! ฝ่ายคนร้ายชนะ!',
+        })
+      } else {
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          players: updatedPlayers,
+        })
+      }
+      showToast(`คุณยิงคนบริสุทธิ์ (${target.name} คือฝ่ายคนดี)! ทั้งคุณและเป้าหมายเสียชีวิตทันที`, 'error')
+    } else {
+      // Hit Impostor or Dodo! Target dies, Sheriff survives
+      updatedPlayers[targetUid] = { ...target, isAlive: false }
+
+      const remainingImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor' && p.isAlive)
+      if (remainingImpostors.length === 0) {
+        // All impostors eliminated -> Crewmates win!
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          players: updatedPlayers,
+          status: 'ended',
+          winner: 'crewmate',
+          winReason: 'นายอำเภอยิงกำจัดคนร้ายคนสุดท้ายสำเร็จ! ฝ่ายคนดีเป็นผู้ชนะ!',
+        })
+      } else {
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          players: updatedPlayers,
+        })
+      }
+      showToast(`คุณยิงกำจัดคนร้าย (${target.name}) สำเร็จ!`, 'success')
+    }
+
+    setShowSheriffKillModal(false)
+    setSelectedSheriffTarget(null)
+  }
+
   // Admin: Delete / Kick single player from game
   const handleDeletePlayer = async (playerUid) => {
     if (!window.confirm('ยืนยันลบผู้เล่นนี้ออกจากเกม?')) return
@@ -994,17 +1061,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const durationSecs = durationMins * 60
 
     // ── Randomly assign roles ──────────────────────────────
-    // Formula: 15 players → 3 imposters, 1 dodo, 11 crewmates
-    // General: 20% imposters (min 1), 1 dodo if ≥4 players, rest crewmates
+    // Formula: 15 players → 3 impostors, 1 dodo, 1 sheriff, 10 crewmates
+    // General: 20% imposters (min 1), 1 dodo if ≥4 players, 1 sheriff if ≥4 players, rest crewmates
     const n = allPlayersList.length
     const impostorCount = Math.max(1, Math.floor(n * 0.2))
     const dodoCount = n >= 4 ? 1 : 0
+    const sheriffCount = n >= 4 ? 1 : 0
 
     const shuffledPlayers = [...allPlayersList].sort(() => Math.random() - 0.5)
     const roleMap = {}
     shuffledPlayers.forEach((p, i) => {
       if (i < impostorCount) roleMap[p.uid] = 'impostor'
       else if (i < impostorCount + dodoCount) roleMap[p.uid] = 'dodo'
+      else if (i < impostorCount + dodoCount + sheriffCount) roleMap[p.uid] = 'sheriff'
       else roleMap[p.uid] = 'crewmate'
     })
 
@@ -1068,6 +1137,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         ...p,
         color: finalColorMap[p.uid] || p.color || '#c62828',
         role: roleMap[p.uid],
+        sheriffShots: roleMap[p.uid] === 'sheriff' ? 1 : 0,
         isAlive: true,
         tasks: assigned,
       }
@@ -1294,7 +1364,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           players: updatedPlayers,
           winner: 'dodo',
           winReason: outcomeText,
-          'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: true },
+          'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: true, voteCounts: counts },
         })
       } else {
         // Check if all impostors eliminated
@@ -1308,7 +1378,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             players: updatedPlayers,
             winner: 'crewmate',
             winReason: 'โหวตคนร้ายออกหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget },
+            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         } else if (remainingImpostors.length >= remainingCrew.length) {
           // Impostors win!
@@ -1317,14 +1387,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             players: updatedPlayers,
             winner: 'impostor',
             winReason: 'จำนวนคนร้ายเท่ากับคนดีแล้ว! ฝ่ายคนร้ายชนะ!',
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget },
+            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         } else {
           // Move to meeting result screen
           await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
             status: 'meeting_result',
             players: updatedPlayers,
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget },
+            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         }
       }
@@ -1337,12 +1407,26 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   // Resume game after meeting result
   const handleResumeGame = async () => {
     try {
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+      const updatedPlayers = { ...(gameDoc.players || {}) }
+      let sheriffUpdated = false
+      Object.keys(updatedPlayers).forEach(uid => {
+        if (updatedPlayers[uid].role === 'sheriff' && updatedPlayers[uid].isAlive) {
+          updatedPlayers[uid] = { ...updatedPlayers[uid], sheriffShots: 1 }
+          sheriffUpdated = true
+        }
+      })
+
+      const payload = {
         status: 'playing',
         gameTimerRunning: true,
         timerUpdatedAt: Date.now(),
         meeting: null,
-      })
+      }
+      if (sheriffUpdated) {
+        payload.players = updatedPlayers
+      }
+
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), payload)
       showToast('เล่นเกมต่อแล้ว เวลาเดินต่อ')
     } catch (e) {
       showToast('กลับสู่เกมล้มเหลว', 'error')
@@ -1764,8 +1848,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       }}>
         <div
           onClick={() => {
-            if (myRole === 'impostor' && gameDoc.status === 'playing' && isAlive) {
+            if (gameDoc.status !== 'playing' || !isAlive) return
+            if (myRole === 'impostor') {
               setShowSabotageModal(true)
+            } else if (myRole === 'sheriff') {
+              const shots = me?.sheriffShots ?? 1
+              if (shots <= 0) {
+                showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
+                return
+              }
+              setSelectedSheriffTarget(null)
+              setShowSheriffKillModal(true)
             }
           }}
           style={{
@@ -1774,7 +1867,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             borderRadius: 14,
             padding: '8px 12px',
             boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
-            cursor: (myRole === 'impostor' && gameDoc.status === 'playing' && isAlive) ? 'pointer' : 'default',
+            cursor: (gameDoc.status === 'playing' && isAlive && (myRole === 'impostor' || myRole === 'sheriff')) ? 'pointer' : 'default',
             userSelect: 'none',
           }}
         >
@@ -3064,35 +3157,81 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   {fmtTime(currentTimeSec)}
                 </div>
                 {revealedRole ? (
-                  <button
-                    type="button"
-                    onClick={handleToggleRevealRole}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      marginTop: 6,
-                      padding: '4px 10px',
-                      borderRadius: 10,
-                      background: myRole === 'impostor'
-                        ? 'rgba(197, 17, 17, 0.25)'
-                        : (myRole === 'dodo' ? 'rgba(142, 36, 170, 0.25)' : 'rgba(2, 136, 209, 0.25)'),
-                      border: `1.5px solid ${myRole === 'impostor' ? '#c51111' : (myRole === 'dodo' ? '#8e24aa' : '#0288d1')}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                    title="แตะเพื่อซ่อนบทบาททันที (จะซ่อนเองอัตโนมัติใน 5 วินาที)"
-                  >
-                    <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={22} color={me?.color || null} />
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 800,
-                      color: myRole === 'impostor' ? '#ff5252' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff')
-                    }}>
-                      {myRole === 'impostor' ? 'ฝ่ายคนร้าย' : (myRole === 'dodo' ? 'ฝ่ายโดโด้' : 'ฝ่ายคนดี')}
-                    </span>
-                    <i className="fas fa-eye-slash" style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginLeft: 3 }} />
-                  </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                    <button
+                      type="button"
+                      onClick={handleToggleRevealRole}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '4px 10px',
+                        borderRadius: 10,
+                        background: myRole === 'impostor'
+                          ? 'rgba(197, 17, 17, 0.25)'
+                          : (myRole === 'sheriff' ? 'rgba(255, 193, 7, 0.25)' : (myRole === 'dodo' ? 'rgba(142, 36, 170, 0.25)' : 'rgba(2, 136, 209, 0.25)')),
+                        border: `1.5px solid ${myRole === 'impostor' ? '#c51111' : (myRole === 'sheriff' ? '#fbc02d' : (myRole === 'dodo' ? '#8e24aa' : '#0288d1'))}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                      }}
+                      title="แตะเพื่อซ่อนบทบาททันที"
+                    >
+                      <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={22} color={me?.color || null} />
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        color: myRole === 'impostor' ? '#ff5252' : (myRole === 'sheriff' ? '#ffd54f' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff'))
+                      }}>
+                        {myRole === 'impostor' ? 'ฝ่ายคนร้าย' : (myRole === 'sheriff' ? 'นายอำเภอ' : (myRole === 'dodo' ? 'ฝ่ายโดโด้' : 'ฝ่ายคนดี'))}
+                      </span>
+                      <i className="fas fa-eye-slash" style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginLeft: 3 }} />
+                    </button>
+
+                    {/* Impostor teammate list reveal */}
+                    {myRole === 'impostor' && (
+                      <div style={{
+                        padding: '8px 10px',
+                        background: 'rgba(0,0,0,0.5)',
+                        borderRadius: 10,
+                        border: '1px solid rgba(255,82,82,0.3)',
+                        textAlign: 'left',
+                        maxWidth: 220,
+                      }}>
+                        <div style={{ fontSize: 10, fontWeight: 900, color: '#ff8a80', marginBottom: 4, letterSpacing: '0.04em' }}>
+                          ทีมคนร้ายของคุณ (IMPOSTORS):
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                          {Object.values(gameDoc.players || {})
+                            .filter(p => p.role === 'impostor')
+                            .map(imp => (
+                              <div key={imp.uid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#fff' }}>
+                                <AmongUsVisor color={imp.color || '#c62828'} size={18} isAlive={imp.isAlive} />
+                                <span style={{ fontWeight: imp.uid === myUid ? 800 : 600 }}>
+                                  {imp.name} {imp.uid === myUid ? '(คุณ)' : ''}
+                                </span>
+                              </div>
+                            ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sheriff hint reveal */}
+                    {myRole === 'sheriff' && (
+                      <div style={{
+                        padding: '6px 8px',
+                        background: 'rgba(255,193,7,0.1)',
+                        borderRadius: 8,
+                        border: '1px solid rgba(255,193,7,0.3)',
+                        fontSize: 10,
+                        color: '#ffe082',
+                        maxWidth: 220,
+                        textAlign: 'left',
+                        lineHeight: 1.3,
+                      }}>
+                        แตะที่แถบภารกิจด้านบนเพื่อยิงคนร้าย (ยิงคนดีตายทั้งคู่ / 1 นัดต่อรอบประชุม)
+                      </div>
+                    )}
+                  </div>
                 ) : (
                   <button
                     type="button"
@@ -3120,8 +3259,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 )}
               </div>
 
-              {/* Action Button: Report Body Only (Emergency button is GM only) */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {/* Action Buttons: Report Body & Self-Report Death */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                 {isAlive && (
                   (() => {
                     const isSabotageActive = Boolean(gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')
@@ -3181,6 +3320,32 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       </button>
                     )
                   })()
+                )}
+
+                {/* Self-Report Eliminated Button */}
+                {isAlive && (
+                  <button
+                    type="button"
+                    onClick={() => setShowSelfDeathConfirm(true)}
+                    style={{
+                      padding: '7px 12px',
+                      borderRadius: 10,
+                      background: 'rgba(255, 255, 255, 0.04)',
+                      border: '1.5px solid rgba(255, 255, 255, 0.12)',
+                      color: '#b0bec5',
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="แจ้งว่าคุณถูกกำจัดในชีวิตจริงแล้ว (ไม่มีแจ้งเตือนคนอื่น รู้พร้อมกันตอนประชุม)"
+                  >
+                    <i className="fas fa-skull" style={{ fontSize: 11, color: '#ef5350' }} />
+                    <span>ฉันถูกกำจัดแล้ว</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -3412,11 +3577,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     </button>
                   )}
 
-                  {/* Skeld Voting Candidates Grid */}
+                  {/* Skeld Voting Candidates Grid (Shows All Players with Dead Status) */}
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8, marginBottom: 14 }}>
-                    {allPlayersList.filter(p => p.isAlive).map(p => {
+                    {allPlayersList.map(p => {
+                      const isTargetDead = !p.isAlive
                       const hasMyVote = gameDoc.meeting?.votes?.[myUid] === p.uid
-                      const voteCount = Object.values(gameDoc.meeting?.votes || {}).filter(v => v === p.uid).length
                       const hasVotedAnyone = !!gameDoc.meeting?.votes?.[p.uid]
                       const isSelected = selectedVoteTarget === p.uid
 
@@ -3424,39 +3589,62 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         <div
                           key={p.uid}
                           onClick={() => {
-                            if (gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid]) {
+                            if (!isTargetDead && gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid]) {
                               setSelectedVoteTarget(isSelected ? null : p.uid)
                             }
                           }}
                           style={{
                             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                             padding: '10px 12px', borderRadius: 12,
-                            background: hasMyVote ? 'rgba(229, 57, 53, 0.25)' : (isSelected ? '#1c283c' : '#0d131d'),
-                            border: `2.5px solid ${hasMyVote ? '#ff5252' : (isSelected ? '#0288d1' : '#1f2c42')}`,
+                            background: isTargetDead
+                              ? 'rgba(20, 20, 20, 0.45)'
+                              : (hasMyVote ? 'rgba(229, 57, 53, 0.25)' : (isSelected ? '#1c283c' : '#0d131d')),
+                            border: isTargetDead
+                              ? '1.5px dashed rgba(255, 82, 82, 0.35)'
+                              : `2.5px solid ${hasMyVote ? '#ff5252' : (isSelected ? '#0288d1' : '#1f2c42')}`,
                             color: '#fff',
-                            cursor: (gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid]) ? 'pointer' : 'default',
+                            opacity: isTargetDead ? 0.55 : 1,
+                            cursor: (!isTargetDead && gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid]) ? 'pointer' : 'default',
                             transition: 'all 0.1s ease',
                           }}
                         >
                           <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
                             <AmongUsVisor role={p.role} isAlive={p.isAlive} size={34} color={p.color || null} />
                             <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>
+                              <div style={{ fontSize: 13.5, fontWeight: 800, color: isTargetDead ? 'rgba(255,255,255,0.6)' : '#fff' }}>
                                 {p.name} {p.uid === myUid && <span style={{ fontSize: 10.5, color: '#80d8ff' }}>(คุณ)</span>}
                               </div>
                             </div>
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-                            {/* Live Vote Count Badge */}
-                            {voteCount > 0 && (
-                              <span style={{ fontSize: 11, fontWeight: 900, color: '#ff5252', background: 'rgba(229,57,53,0.18)', padding: '2px 7px', borderRadius: 8, border: '1px solid #ff5252' }}>
-                                {voteCount}
+                            {/* DEAD Badge if player was eliminated */}
+                            {isTargetDead && (
+                              <span style={{
+                                fontSize: 9.5, fontWeight: 900, color: '#fff',
+                                background: '#c62828', padding: '2px 6px', borderRadius: 4,
+                                letterSpacing: '0.04em',
+                              }}>
+                                DEAD
                               </span>
                             )}
 
-                            {/* Red VOTED stamp if this player has cast their vote */}
-                            {hasVotedAnyone && (
+                            {/* Ghost Spectator Mode: Dead players can see who voted for this target */}
+                            {!isAlive && (
+                              <div style={{ display: 'flex', gap: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+                                {Object.entries(gameDoc.meeting?.votes || {})
+                                  .filter(([voterUid, target]) => target === p.uid)
+                                  .map(([voterUid]) => {
+                                    const voter = gameDoc.players?.[voterUid]
+                                    return voter ? (
+                                      <AmongUsVisor key={voterUid} color={voter.color || '#fff'} size={18} isAlive={true} />
+                                    ) : null
+                                  })}
+                              </div>
+                            )}
+
+                            {/* Red VOTED stamp if this player has cast their vote (hides target from alive players) */}
+                            {!isTargetDead && hasVotedAnyone && (
                               <span style={{
                                 fontSize: 9, fontWeight: 900, color: '#fff',
                                 background: '#c51111', padding: '2px 5px', borderRadius: 4,
@@ -3466,8 +3654,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                               </span>
                             )}
 
-                            {/* Vote Confirmation Checkmark Button (Authentic Among Us Mechanic) */}
-                            {isSelected && gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid] && (
+                            {/* Vote Confirmation Checkmark Button (Only for living players) */}
+                            {!isTargetDead && isSelected && gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid] && (
                               <button
                                 type="button"
                                 onClick={(e) => {
@@ -3492,8 +3680,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   </div>
 
                   {/* Skip Vote Button Card */}
-                  {gameDoc.status === 'meeting_voting' && isAlive && (
-                    <div style={{ marginBottom: 14 }}>
+                  <div style={{ marginBottom: 14 }}>
+                    {gameDoc.status === 'meeting_voting' && isAlive && (
                       <button
                         type="button"
                         onClick={() => castVote('skip')}
@@ -3508,14 +3696,35 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       >
                         <i className="fas fa-forward" style={{ marginRight: 8 }} />
                         SKIP VOTE (งดออกเสียง)
-                        {Object.values(gameDoc.meeting?.votes || {}).filter(v => v === 'skip').length > 0 && (
-                          <span style={{ marginLeft: 8, fontSize: 11, background: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: 6 }}>
-                            {Object.values(gameDoc.meeting?.votes || {}).filter(v => v === 'skip').length} โหวต
-                          </span>
-                        )}
                       </button>
-                    </div>
-                  )}
+                    )}
+
+                    {/* Ghost Spectator Mode: Dead players see who skipped */}
+                    {!isAlive && (
+                      <div style={{
+                        marginTop: 6,
+                        padding: '8px 12px',
+                        background: 'rgba(255,255,255,0.03)',
+                        borderRadius: 10,
+                        border: '1px dashed rgba(255,255,255,0.1)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}>
+                        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>ผู้เล่นที่เลือก SKIP:</span>
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {Object.entries(gameDoc.meeting?.votes || {})
+                            .filter(([voterUid, target]) => target === 'skip')
+                            .map(([voterUid]) => {
+                              const voter = gameDoc.players?.[voterUid]
+                              return voter ? (
+                                <AmongUsVisor key={voterUid} color={voter.color || '#9e9e9e'} size={18} isAlive={true} />
+                              ) : null
+                            })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Admin Force Conclude Votes Button */}
                   {hasAdminPerm && (
@@ -3587,6 +3796,50 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       )
                     }
                   })()}
+
+                  {/* Anonymous Vote Tally Result Box (shows count per target, conceals voter identities) */}
+                  {res?.voteCounts && Object.keys(res.voteCounts).length > 0 && (
+                    <div style={{
+                      marginTop: 20,
+                      background: 'rgba(13, 19, 29, 0.85)',
+                      borderRadius: 14,
+                      padding: '12px 16px',
+                      border: '1.5px solid rgba(255,255,255,0.12)',
+                      maxWidth: 380,
+                      width: '100%',
+                      textAlign: 'left',
+                    }}>
+                      <div style={{ fontSize: 11.5, fontWeight: 900, color: 'rgba(255,255,255,0.7)', marginBottom: 8, letterSpacing: '0.04em' }}>
+                        <i className="fas fa-poll" style={{ marginRight: 6, color: '#ffd54f' }} />
+                        สรุปผลคะแนนโหวต (ANONYMOUS TALLY)
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {Object.entries(res.voteCounts).map(([targetUid, count]) => {
+                          const p = targetUid === 'skip' ? null : gameDoc.players?.[targetUid]
+                          return (
+                            <div key={targetUid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: '#fff' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                {p ? (
+                                  <>
+                                    <AmongUsVisor color={p.color || '#78909c'} size={24} isAlive={true} />
+                                    <span style={{ fontWeight: 700 }}>{p.name}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <i className="fas fa-forward" style={{ color: '#9e9e9e', fontSize: 13 }} />
+                                    <span style={{ fontWeight: 700, color: '#9e9e9e' }}>SKIP VOTE</span>
+                                  </>
+                                )}
+                              </div>
+                              <span style={{ fontWeight: 900, color: '#ff5252', background: 'rgba(255,82,82,0.18)', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(255,82,82,0.3)', fontSize: 11.5 }}>
+                                {count} เสียง
+                              </span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
 
                   {hasAdminPerm && (
                     <button
@@ -3933,6 +4186,185 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               >
                 <i className="fas fa-bullhorn" style={{ marginRight: 6 }} />
                 ยืนยันพบศพ {selectedReportVictim ? selectedReportVictim.name : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SELF-REPORT DEATH CONFIRMATION MODAL ─── */}
+      {showSelfDeathConfirm && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 130,
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setShowSelfDeathConfirm(false)}>
+          <div className="au-card" style={{
+            padding: 22,
+            maxWidth: 380, width: '100%',
+            border: '2.5px solid #ef5350',
+            textAlign: 'center',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{
+              width: 50, height: 50, borderRadius: '50%',
+              background: 'rgba(239, 83, 80, 0.2)', border: '2px solid #ef5350',
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              color: '#ef5350', fontSize: 24, marginBottom: 12,
+            }}>
+              <i className="fas fa-skull" />
+            </div>
+            <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginBottom: 6 }}>
+              ยืนยันว่าคุณถูกกำจัดแล้ว?
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: 18 }}>
+              หน้าจอของคุณจะเปลี่ยนเป็นสถานะวิญญาณ (Ghost) คุณยังสามารถทำภารกิจส่วนตัวช่วยฝ่ายคนดีได้เงียบๆ โดยจะไม่มีการแจ้งเตือนผู้อื่น และทุกคนจะทราบสถานะในที่ประชุมเท่านั้น
+            </div>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setShowSelfDeathConfirm(false)}
+                className="au-btn au-btn-dark"
+                style={{ flex: 1, padding: 11, fontSize: 12.5 }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmSelfDeath}
+                className="au-btn au-btn-red"
+                style={{ flex: 1.5, padding: 11, fontSize: 12.5 }}
+              >
+                ยืนยัน (ฉันถูกกำจัด)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── SHERIFF SECRET KILL MODAL ─── */}
+      {showSheriffKillModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 130,
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setShowSheriffKillModal(false)}>
+          <div className="au-card" style={{
+            padding: 22,
+            maxWidth: 420, width: '100%',
+            border: '2.5px solid #fbc02d',
+            maxHeight: '88vh',
+            display: 'flex',
+            flexDirection: 'column',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: 'rgba(251, 192, 45, 0.2)', border: '1.5px solid #fbc02d',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#ffd54f', fontSize: 18,
+              }}>
+                <i className="fas fa-star" />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>นายอำเภอสั่งยิง (SHERIFF SHOOT)</div>
+                <div style={{ fontSize: 11, color: '#ffe082' }}>กระสุน 1 นัดต่อรอบประชุม (ยิงคนดีตายทั้งคู่)</div>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(239, 83, 80, 0.1)',
+              border: '1px solid rgba(239, 83, 80, 0.3)',
+              borderRadius: 10,
+              padding: '8px 12px',
+              fontSize: 11,
+              color: '#ffcdd2',
+              marginBottom: 12,
+              lineHeight: 1.4,
+            }}>
+              <i className="fas fa-exclamation-triangle" style={{ marginRight: 6, color: '#ff5252' }} />
+              คำเตือน: หากเลือกยิงผู้เล่นฝ่ายคนดี ทั้งคุณและเป้าหมายจะเสียชีวิตทันที! ระบบปิดบังสถานะการมีชีวิตเพื่อความลับ
+            </div>
+
+            {/* Candidate list with identical neutral styling */}
+            <div style={{
+              flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8,
+              paddingRight: 4, marginBottom: 16, maxHeight: 300,
+            }}>
+              {[...allPlayersList]
+                .filter(p => p.uid !== myUid)
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .map(p => {
+                  const isSelected = selectedSheriffTarget?.uid === p.uid
+                  return (
+                    <button
+                      key={p.uid}
+                      type="button"
+                      onClick={() => setSelectedSheriffTarget(p)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderRadius: 12,
+                        background: isSelected ? 'rgba(251, 192, 45, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                        border: isSelected ? '2px solid #fbc02d' : '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <AmongUsVisor color={p.color || '#78909c'} size={32} isAlive={true} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{p.name}</div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)' }}>ผู้เล่น</div>
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%',
+                        border: isSelected ? '2px solid #fbc02d' : '2px solid rgba(255,255,255,0.3)',
+                        background: isSelected ? '#fbc02d' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {isSelected && <i className="fas fa-check" style={{ color: '#000', fontSize: 10 }} />}
+                      </div>
+                    </button>
+                  )
+                })}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSheriffKillModal(false)
+                  setSelectedSheriffTarget(null)
+                }}
+                className="au-btn au-btn-dark"
+                style={{ flex: 1, padding: 12, fontSize: 13 }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={!selectedSheriffTarget}
+                onClick={() => {
+                  if (!selectedSheriffTarget) return
+                  if (window.confirm(`ยืนยันยิง ${selectedSheriffTarget.name}? (หากคนนี้เป็นคนดี ทั้งคุณและเป้าหมายจะตายทันที)`)) {
+                    handleSheriffKill(selectedSheriffTarget.uid)
+                  }
+                }}
+                className="au-btn au-btn-yellow"
+                style={{
+                  flex: 2, padding: 12, fontSize: 13,
+                  opacity: selectedSheriffTarget ? 1 : 0.4,
+                  cursor: selectedSheriffTarget ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <i className="fas fa-crosshairs" style={{ marginRight: 6 }} />
+                ลั่นไกยิง {selectedSheriffTarget ? selectedSheriffTarget.name : ''}
               </button>
             </div>
           </div>
