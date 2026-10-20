@@ -430,17 +430,17 @@ export const DEFAULT_SABOTAGE_POOL = [
 
 // ── Default Tasks Pool for Real Life Boardgame Cafe ───
 export const DEFAULT_TASKS_POOL = [
-  { id: 't1', title: 'จัดเรียงแก้วน้ำ 5 ใบ', desc: 'ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่มให้เป็นระเบียบเรียบร้อย', floor: 1, room: 'โซนหน้า' },
-  { id: 't2', title: 'ตรวจสอบชุดแต่งตัว', desc: 'เดินไปเช็คความเรียบร้อยของชุดแต่งตัวในห้อง', floor: 1, room: 'ห้องแต่งตัว' },
-  { id: 't3', title: 'นับกล่องเกมโซนหลัง', desc: 'เดินไปนับกล่องเกมที่วางอยู่บริเวณโซนหลัง 3 กล่อง', floor: 1, room: 'โซนหลัง' },
-  { id: 't4', title: 'ตรวจตราโถงทางเดินชั้น 2', desc: 'เดินสำรวจความเรียบร้อยบริเวณโถงทางเดินชั้น 2', floor: 2, room: 'โถงทางเดิน' },
-  { id: 't5', title: 'นับเบาะนั่งห้องญี่ปุ่น', desc: 'เดินไปนับจำนวนเบาะนั่งในห้องญี่ปุ่นแล้วจำมาตอบ', floor: 2, room: 'ห้องญี่ปุ่น' },
-  { id: 't6', title: 'ตรวจตราโต๊ะห้องจีน', desc: 'เดินไปสำรวจโต๊ะเล่นเกมในห้องจีน', floor: 3, room: 'ห้องจีน' },
-  { id: 't7', title: 'ถ่ายรูปคู่กับ DM ห้องยุโรป', desc: 'เดินไปหา DM ประจำห้องยุโรปแล้วขอถ่ายรูปคู่เป็นหลักฐาน', floor: 3, room: 'ห้องยุโรป' },
-  { id: 't8', title: 'สำรวจห้องผี', desc: 'เดินเข้าไปในห้องผีและถ่ายรูปสัญลักษณ์ที่กำหนด', floor: 4, room: 'ห้องผี' },
-  { id: 't9', title: 'สำรวจห้องแคบ', desc: 'เดินไปส่องดูความเรียบร้อยในห้องแคบชั้น 4', floor: 4, room: 'ห้องแคบ' },
-  { id: 't10', title: 'ตรวจห้องวินเทจ', desc: 'เดินไปสำรวจของตกแต่งในห้องวินเทจชั้น 5', floor: 5, room: 'ห้องวินเทจ' },
-  { id: 't11', title: 'เช็คห้องโปรเจคเตอร์', desc: 'เดินขึ้นไปดูภาพโปรเจคเตอร์ที่ห้องโปรเจคเตอร์ชั้น 5', floor: 5, room: 'ห้องโปรเจคเตอร์' },
+  { id: 't1', title: 'จัดเรียงแก้วน้ำ 5 ใบ', desc: 'ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่มให้เป็นระเบียบเรียบร้อย', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
+  { id: 't2', title: 'ตรวจสอบชุดแต่งตัว', desc: 'เดินไปเช็คความเรียบร้อยของชุดแต่งตัวในห้อง', floor: 1, room: 'ห้องแต่งตัว', maxAssignedCount: 3 },
+  { id: 't3', title: 'นับกล่องเกมโซนหลัง', desc: 'เดินไปนับกล่องเกมที่วางอยู่บริเวณโซนหลัง 3 กล่อง', floor: 1, room: 'โซนหลัง', maxAssignedCount: 3 },
+  { id: 't4', title: 'ตรวจตราโถงทางเดินชั้น 2', desc: 'เดินสำรวจความเรียบร้อยบริเวณโถงทางเดินชั้น 2', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  { id: 't5', title: 'นับเบาะนั่งห้องญี่ปุ่น', desc: 'เดินไปนับจำนวนเบาะนั่งในห้องญี่ปุ่นแล้วจำมาตอบ', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
+  { id: 't6', title: 'ตรวจตราโต๊ะห้องจีน', desc: 'เดินไปสำรวจโต๊ะเล่นเกมในห้องจีน', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
+  { id: 't7', title: 'ถ่ายรูปคู่กับ DM ห้องยุโรป', desc: 'เดินไปหา DM ประจำห้องยุโรปแล้วขอถ่ายรูปคู่เป็นหลักฐาน', floor: 3, room: 'ห้องยุโรป', maxAssignedCount: 3 },
+  { id: 't8', title: 'สำรวจห้องผี', desc: 'เดินเข้าไปในห้องผีและถ่ายรูปสัญลักษณ์ที่กำหนด', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
+  { id: 't9', title: 'สำรวจห้องแคบ', desc: 'เดินไปส่องดูความเรียบร้อยในห้องแคบชั้น 4', floor: 4, room: 'ห้องแคบ', maxAssignedCount: 3 },
+  { id: 't10', title: 'ตรวจห้องวินเทจ', desc: 'เดินไปสำรวจของตกแต่งในห้องวินเทจชั้น 5', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
+  { id: 't11', title: 'เช็คห้องโปรเจคเตอร์', desc: 'เดินขึ้นไปดูภาพโปรเจคเตอร์ที่ห้องโปรเจคเตอร์ชั้น 5', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
 ]
 
 export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: isAppAdmin, showToast, showPage }) {
@@ -479,6 +479,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [newTaskDesc, setNewTaskDesc] = useState('')
   const [newTaskFloor, setNewTaskFloor] = useState(1)
   const [newTaskRoom, setNewTaskRoom] = useState(BUILDING_FLOORS[0].rooms[0])
+  const [newTaskMaxAssignedCount, setNewTaskMaxAssignedCount] = useState(3)
   const [taskFloorFilter, setTaskFloorFilter] = useState('all')
   const [editingTask, setEditingTask] = useState(null)
 
@@ -1107,18 +1108,58 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       finalColorMap[uid] = availableColors[idx] || TWENTY_PLAYER_COLORS[idx % TWENTY_PLAYER_COLORS.length].hex
     })
 
-    // Randomize 3 tasks with unique floors for each player
+    // Randomize 3 tasks with unique floors for each player while respecting maxAssignedCount
+    const taskAssignedCounts = {}
     const updatedPlayers = { ...gameDoc.players }
-    allPlayersList.forEach(p => {
-      // Pick 3 unique floors randomly
-      const shuffledFloors = [...availableFloors].sort(() => 0.5 - Math.random())
-      const chosenFloors = shuffledFloors.slice(0, 3)
 
-      // Pick 1 random task from each chosen floor
-      const assignedTasks = chosenFloors.map(floorNum => {
-        const floorTasks = tasksByFloor[floorNum]
-        return floorTasks[Math.floor(Math.random() * floorTasks.length)]
+    // Shuffle player processing order to ensure unbiased task distribution
+    const playersToAssign = [...allPlayersList].sort(() => 0.5 - Math.random())
+
+    playersToAssign.forEach(p => {
+      // Find floors that still have tasks with remaining capacity
+      const floorsWithRemainingCapacity = availableFloors.filter(floorNum => {
+        const floorTasks = tasksByFloor[floorNum] || []
+        return floorTasks.some(t => (taskAssignedCounts[t.id] || 0) < (t.maxAssignedCount || 3))
       })
+
+      // Pick 3 unique floors prioritizing floors with remaining capacity
+      let chosenFloors = []
+      if (floorsWithRemainingCapacity.length >= 3) {
+        const shuffled = [...floorsWithRemainingCapacity].sort(() => 0.5 - Math.random())
+        chosenFloors = shuffled.slice(0, 3)
+      } else {
+        const remainingFloors = availableFloors
+          .filter(f => !floorsWithRemainingCapacity.includes(f))
+          .sort(() => 0.5 - Math.random())
+        chosenFloors = [
+          ...floorsWithRemainingCapacity,
+          ...remainingFloors.slice(0, 3 - floorsWithRemainingCapacity.length)
+        ]
+      }
+
+      if (chosenFloors.length < 3) {
+        chosenFloors = [...availableFloors].sort(() => 0.5 - Math.random()).slice(0, 3)
+      }
+
+      // Pick 1 task from each chosen floor
+      const assignedTasks = chosenFloors.map(floorNum => {
+        const floorTasks = tasksByFloor[floorNum] || []
+        const eligibleTasks = floorTasks.filter(t => (taskAssignedCounts[t.id] || 0) < (t.maxAssignedCount || 3))
+
+        let selectedTask
+        if (eligibleTasks.length > 0) {
+          selectedTask = eligibleTasks[Math.floor(Math.random() * eligibleTasks.length)]
+        } else {
+          // Fallback: pick task with lowest assignment count on this floor
+          const sortedByUsage = [...floorTasks].sort((a, b) => (taskAssignedCounts[a.id] || 0) - (taskAssignedCounts[b.id] || 0))
+          selectedTask = sortedByUsage[0] || floorTasks[0]
+        }
+
+        if (selectedTask) {
+          taskAssignedCounts[selectedTask.id] = (taskAssignedCounts[selectedTask.id] || 0) + 1
+        }
+        return selectedTask
+      }).filter(Boolean)
 
       // Sort by floor ascending for clean player roadmap
       assignedTasks.sort((a, b) => (Number(a.floor) || 1) - (Number(b.floor) || 1))
@@ -1556,6 +1597,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       desc: newTaskDesc.trim() || 'ทำภารกิจให้สำเร็จและให้แอดมินสแกนยืนยัน',
       floor: Number(newTaskFloor) || 1,
       room: newTaskRoom || BUILDING_FLOORS[0].rooms[0],
+      maxAssignedCount: Math.min(3, Math.max(1, Number(newTaskMaxAssignedCount) || 3)),
     }
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -1563,6 +1605,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       })
       setNewTaskTitle('')
       setNewTaskDesc('')
+      setNewTaskMaxAssignedCount(3)
       showToast('เพิ่มภารกิจลงคลังสำเร็จ')
     } catch (e) {
       showToast('เพิ่มภารกิจล้มเหลว', 'error')
@@ -1578,6 +1621,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       desc: (editingTask.desc || '').trim(),
       floor: Number(editingTask.floor) || 1,
       room: editingTask.room || BUILDING_FLOORS[0].rooms[0],
+      maxAssignedCount: Math.min(3, Math.max(1, Number(editingTask.maxAssignedCount) || 3)),
     } : t)
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -2517,8 +2561,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {allPlayersList.map(p => {
-                  const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : '#29b6f6')
-                  const roleLabel = p.role === 'impostor' ? 'คนร้าย' : (p.role === 'dodo' ? 'โดโด้' : 'คนดี')
+                  const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'))
+                  const roleLabel = p.role === 'impostor' ? 'คนร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'คนดี'))
                   return (
                     <div
                       key={p.uid}
@@ -2529,7 +2573,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         opacity: p.isAlive ? 1 : 0.6,
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                           <AmongUsVisor role={p.role} isAlive={p.isAlive} size={32} color={p.color || null} />
                           <div>
@@ -2543,30 +2587,40 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         </div>
 
                         {/* Admin Role Changer Dropdown */}
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {['crewmate', 'impostor', 'dodo'].map(r => (
-                            <button
-                              key={r}
-                              type="button"
-                              onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-                                [`players.${p.uid}.role`]: r
-                              })}
-                              style={{
-                                padding: '3px 8px', borderRadius: 6,
-                                background: p.role === r ? roleColor : 'rgba(255,255,255,0.06)',
-                                color: '#fff', border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                              }}
-                            >
-                              {r === 'impostor' ? 'ร้าย' : (r === 'dodo' ? 'โดโด้' : 'ดี')}
-                            </button>
-                          ))}
+                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                          {['crewmate', 'impostor', 'dodo', 'sheriff'].map(r => {
+                            const btnColor = r === 'impostor' ? '#e53935' : (r === 'dodo' ? '#ab47bc' : (r === 'sheriff' ? '#fbc02d' : '#29b6f6'))
+                            const btnText = r === 'impostor' ? 'ร้าย' : (r === 'dodo' ? 'โดโด้' : (r === 'sheriff' ? 'นายอำเภอ' : 'ดี'))
+                            const isCurrent = p.role === r
+                            return (
+                              <button
+                                key={r}
+                                type="button"
+                                onClick={() => {
+                                  const updates = { [`players.${p.uid}.role`]: r }
+                                  if (r === 'sheriff' && (p.sheriffShots === undefined || p.sheriffShots === null)) {
+                                    updates[`players.${p.uid}.sheriffShots`] = 1
+                                  }
+                                  updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
+                                }}
+                                style={{
+                                  padding: '3px 7px', borderRadius: 6,
+                                  background: isCurrent ? btnColor : 'rgba(255,255,255,0.06)',
+                                  color: isCurrent && r === 'sheriff' ? '#111' : '#fff',
+                                  border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                                }}
+                              >
+                                {btnText}
+                              </button>
+                            )
+                          })}
                           <button
                             type="button"
                             onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
                               [`players.${p.uid}.isAlive`]: !p.isAlive
                             })}
                             style={{
-                              padding: '3px 8px', borderRadius: 6,
+                              padding: '3px 7px', borderRadius: 6,
                               background: p.isAlive ? '#c62828' : '#2e7d32',
                               color: '#fff', border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer',
                             }}
@@ -2687,7 +2741,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     fontFamily: 'inherit',
                   }}
                 />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                   <div>
                     <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
                       ชั้น (1 - 5)
@@ -2701,7 +2755,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         setNewTaskRoom(rooms[0] || '')
                       }}
                       style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 8,
+                        width: '100%', padding: '7px 8px', borderRadius: 8,
                         background: '#1c2230', color: '#fff',
                         border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
                         fontFamily: 'inherit',
@@ -2720,7 +2774,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       value={newTaskRoom}
                       onChange={e => setNewTaskRoom(e.target.value)}
                       style={{
-                        width: '100%', padding: '7px 10px', borderRadius: 8,
+                        width: '100%', padding: '7px 8px', borderRadius: 8,
                         background: '#1c2230', color: '#fff',
                         border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
                         fontFamily: 'inherit',
@@ -2729,6 +2783,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       {(BUILDING_FLOORS.find(b => b.floor === Number(newTaskFloor))?.rooms || []).map(r => (
                         <option key={r} value={r}>{r}</option>
                       ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                      ซ้ำได้สูงสุด
+                    </label>
+                    <select
+                      value={newTaskMaxAssignedCount}
+                      onChange={e => setNewTaskMaxAssignedCount(Number(e.target.value))}
+                      style={{
+                        width: '100%', padding: '7px 8px', borderRadius: 8,
+                        background: '#1c2230', color: '#fff',
+                        border: '1px solid rgba(255,255,255,0.15)', fontSize: 12,
+                        fontFamily: 'inherit',
+                      }}
+                    >
+                      <option value={1}>1 คน (ไม่ซ้ำ)</option>
+                      <option value={2}>2 คน</option>
+                      <option value={3}>3 คน (สูงสุด)</option>
                     </select>
                   </div>
                 </div>
@@ -2795,7 +2868,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       }}
                     >
                       <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, flexWrap: 'wrap' }}>
                           <span style={{
                             display: 'inline-flex', alignItems: 'center', gap: 3,
                             padding: '1px 6px', borderRadius: 4,
@@ -2804,6 +2877,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           }}>
                             <i className="fas fa-map-marker-alt" style={{ fontSize: 8 }} />
                             ชั้น {t.floor || 1} · {t.room || 'โซนหน้า'}
+                          </span>
+                          <span style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 3,
+                            padding: '1px 6px', borderRadius: 4,
+                            background: 'rgba(255, 193, 7, 0.15)',
+                            color: '#ffd54f', fontSize: 10, fontWeight: 800,
+                          }}>
+                            <i className="fas fa-users" style={{ fontSize: 8 }} />
+                            ซ้ำได้ {t.maxAssignedCount || 3} คน
                           </span>
                           <span style={{ fontSize: 12.5, fontWeight: 700, color: '#fff' }}>{t.title}</span>
                         </div>
@@ -2820,6 +2902,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                             desc: t.desc || '',
                             floor: t.floor || 1,
                             room: t.room || BUILDING_FLOORS[0].rooms[0],
+                            maxAssignedCount: t.maxAssignedCount || 3,
                           })}
                           style={{
                             background: 'rgba(255,255,255,0.06)', border: 'none', color: '#90caf9',
@@ -3900,8 +3983,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {allPlayersList.map(p => {
-                  const roleColor = p.role === 'impostor' ? '#ff5252' : (p.role === 'dodo' ? '#ce93d8' : '#80d8ff')
-                  const roleLabel = p.role === 'impostor' ? 'คนร้าย (Impostor)' : (p.role === 'dodo' ? 'โดโด้ (Dodo)' : 'คนดี (Crewmate)')
+                  const roleColor = p.role === 'impostor' ? '#ff5252' : (p.role === 'dodo' ? '#ce93d8' : (p.role === 'sheriff' ? '#ffd54f' : '#80d8ff'))
+                  const roleLabel = p.role === 'impostor' ? 'คนร้าย (Impostor)' : (p.role === 'dodo' ? 'โดโด้ (Dodo)' : (p.role === 'sheriff' ? 'นายอำเภอ (Sheriff)' : 'คนดี (Crewmate)'))
                   return (
                     <div key={p.uid} style={{
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -4422,7 +4505,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
                 <div>
                   <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
                     ชั้น (1 - 5)
@@ -4439,7 +4522,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       })
                     }}
                     style={{
-                      width: '100%', padding: '7px 10px', borderRadius: 8,
+                      width: '100%', padding: '7px 8px', borderRadius: 8,
                       background: '#0d131d', color: '#fff',
                       border: '2px solid #1f2c42', fontSize: 12,
                       fontFamily: 'inherit',
@@ -4458,7 +4541,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     value={editingTask.room}
                     onChange={e => setEditingTask({ ...editingTask, room: e.target.value })}
                     style={{
-                      width: '100%', padding: '7px 10px', borderRadius: 8,
+                      width: '100%', padding: '7px 8px', borderRadius: 8,
                       background: '#0d131d', color: '#fff',
                       border: '2px solid #1f2c42', fontSize: 12,
                       fontFamily: 'inherit',
@@ -4467,6 +4550,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     {(BUILDING_FLOORS.find(b => b.floor === Number(editingTask.floor))?.rooms || []).map(r => (
                       <option key={r} value={r}>{r}</option>
                     ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 3, display: 'block' }}>
+                    ซ้ำได้สูงสุด
+                  </label>
+                  <select
+                    value={editingTask.maxAssignedCount || 3}
+                    onChange={e => setEditingTask({ ...editingTask, maxAssignedCount: Number(e.target.value) })}
+                    style={{
+                      width: '100%', padding: '7px 8px', borderRadius: 8,
+                      background: '#0d131d', color: '#fff',
+                      border: '2px solid #1f2c42', fontSize: 12,
+                      fontFamily: 'inherit',
+                    }}
+                  >
+                    <option value={1}>1 คน (ไม่ซ้ำ)</option>
+                    <option value={2}>2 คน</option>
+                    <option value={3}>3 คน (สูงสุด)</option>
                   </select>
                 </div>
               </div>
