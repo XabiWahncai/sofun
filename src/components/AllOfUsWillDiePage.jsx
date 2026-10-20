@@ -320,13 +320,15 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
 
   const shadowColor = !isAlive
     ? '#455a64'
+    : color
+    ? '#000000'
     : role === 'impostor'
     ? '#7a0813'
     : role === 'dodo'
     ? '#4a148c'
     : role === 'sheriff'
     ? '#f57f17'
-    : (color ? '#000000' : '#01579b')
+    : '#01579b'
 
   return (
     <div
@@ -345,20 +347,6 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
         verticalAlign: 'middle',
       }}
     >
-      {/* Backpack on the side */}
-      <div
-        style={{
-          position: 'absolute',
-          left: -4,
-          top: '25%',
-          width: 5,
-          height: '50%',
-          borderRadius: 3,
-          background: shadowColor,
-          border: '1.5px solid #0a0e17',
-        }}
-      />
-
       {isAlive ? (
         // Glass Visor with Specular Highlight
         <div
