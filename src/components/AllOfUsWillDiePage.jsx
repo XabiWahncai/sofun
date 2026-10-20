@@ -171,137 +171,131 @@ function playTaskSuccessSound() {
   } catch {}
 }
 
-// ── Color wheel helpers ───────────────────────────────────
-function hexToHsv(hex) {
-  const c = (hex || '#ff0000').replace('#', '').padEnd(6, '0')
-  const r = parseInt(c.slice(0,2),16)/255
-  const g = parseInt(c.slice(2,4),16)/255
-  const b = parseInt(c.slice(4,6),16)/255
-  const max = Math.max(r,g,b), min = Math.min(r,g,b), d = max - min
-  const v = max, s = max === 0 ? 0 : d/max
-  let h = 0
-  if (d !== 0) {
-    if (max === r) h = ((g-b)/d + (g<b?6:0)) / 6
-    else if (max === g) h = ((b-r)/d + 2) / 6
-    else h = ((r-g)/d + 4) / 6
-  }
-  return { h: h*360, s, v }
-}
-function hsvToHex(h, s, v) {
-  const i = Math.floor(h/60) % 6, f = h/60 - Math.floor(h/60)
-  const p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s)
-  let r,g,b
-  if(i===0){r=v;g=t;b=p}else if(i===1){r=q;g=v;b=p}
-  else if(i===2){r=p;g=v;b=t}else if(i===3){r=p;g=q;b=v}
-  else if(i===4){r=t;g=p;b=v}else{r=v;g=p;b=q}
-  const x = n => Math.round(Math.max(0,Math.min(255,n*255))).toString(16).padStart(2,'0')
-  return `#${x(r)}${x(g)}${x(b)}`
-}
+// ── 20 Distinct Character Colors (Zero Duplicates Policy) ──
+export const TWENTY_PLAYER_COLORS = [
+  { id: 'red', hex: '#c62828', name: 'แดง' },
+  { id: 'blue', hex: '#1565c0', name: 'น้ำเงิน' },
+  { id: 'green', hex: '#2e7d32', name: 'เขียว' },
+  { id: 'pink', hex: '#e91e63', name: 'ชมพู' },
+  { id: 'orange', hex: '#ef6c00', name: 'ส้ม' },
+  { id: 'yellow', hex: '#fbc02d', name: 'เหลือง', darkText: true },
+  { id: 'black', hex: '#212121', name: 'ดำ' },
+  { id: 'white', hex: '#eceff1', name: 'ขาว', darkText: true },
+  { id: 'purple', hex: '#6a1b9a', name: 'ม่วง' },
+  { id: 'brown', hex: '#4e342e', name: 'น้ำตาล' },
+  { id: 'cyan', hex: '#00acc1', name: 'ฟ้าคราม' },
+  { id: 'lime', hex: '#7cb342', name: 'เขียวมะนาว', darkText: true },
+  { id: 'maroon', hex: '#880e4f', name: 'เลือดหมู' },
+  { id: 'rose', hex: '#f06292', name: 'กุหลาบ' },
+  { id: 'banana', hex: '#fff176', name: 'เหลืองกล้วย', darkText: true },
+  { id: 'gray', hex: '#78909c', name: 'เทา' },
+  { id: 'tan', hex: '#d7ccc8', name: 'เนื้อ', darkText: true },
+  { id: 'coral', hex: '#ff7043', name: 'คอรัล' },
+  { id: 'mint', hex: '#4db6ac', name: 'มิ้นท์' },
+  { id: 'lavender', hex: '#b39ddb', name: 'ลาเวนเดอร์', darkText: true },
+]
 
-function ColorWheelPicker({ value, onChange }) {
-  const canvasRef = useRef(null)
-  const dragging = useRef(false)
-  const [hsv, setHsv] = useState(() => hexToHsv(value))
-
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    const W = canvas.width, H = canvas.height
-    const cx = W/2, cy = H/2, r = cx - 4
-    const img = ctx.createImageData(W, H)
-    for (let py = 0; py < H; py++) {
-      for (let px = 0; px < W; px++) {
-        const dx = px-cx, dy = py-cy, dist = Math.sqrt(dx*dx+dy*dy)
-        if (dist > r) continue
-        const h = (Math.atan2(dy,dx)*180/Math.PI+360)%360
-        const s = dist/r, v = hsv.v
-        const i = Math.floor(h/60)%6, f = h/60-Math.floor(h/60)
-        const p = v*(1-s), q = v*(1-f*s), t = v*(1-(1-f)*s)
-        let rr,gg,bb
-        if(i===0){rr=v;gg=t;bb=p}else if(i===1){rr=q;gg=v;bb=p}
-        else if(i===2){rr=p;gg=v;bb=t}else if(i===3){rr=p;gg=q;bb=v}
-        else if(i===4){rr=t;gg=p;bb=v}else{rr=v;gg=p;bb=q}
-        const idx = (py*W+px)*4
-        img.data[idx]=Math.round(rr*255); img.data[idx+1]=Math.round(gg*255)
-        img.data[idx+2]=Math.round(bb*255); img.data[idx+3]=255
+export function TwentyColorPalette({ selectedColor, players = {}, currentUid, onSelect }) {
+  const takenMap = useMemo(() => {
+    const map = {}
+    Object.values(players || {}).forEach(p => {
+      if (p.color) {
+        const hex = p.color.toLowerCase()
+        if (p.uid !== currentUid) {
+          map[hex] = p
+        }
       }
-    }
-    ctx.putImageData(img, 0, 0)
-    // Indicator ring
-    const ax = cx + hsv.s*r*Math.cos(hsv.h*Math.PI/180)
-    const ay = cy + hsv.s*r*Math.sin(hsv.h*Math.PI/180)
-    ctx.beginPath(); ctx.arc(ax,ay,10,0,Math.PI*2)
-    ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fill()
-    ctx.beginPath(); ctx.arc(ax,ay,9,0,Math.PI*2)
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2.5; ctx.stroke()
-  }, [hsv])
-
-  const pick = (e) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const rect = canvas.getBoundingClientRect()
-    const touch = e.touches?.[0] || e.changedTouches?.[0]
-    const px = ((touch?touch.clientX:e.clientX)-rect.left)/rect.width*canvas.width
-    const py = ((touch?touch.clientY:e.clientY)-rect.top)/rect.height*canvas.height
-    const cx=canvas.width/2, cy=canvas.height/2, r=cx-4
-    const dx=px-cx, dy=py-cy
-    const h=(Math.atan2(dy,dx)*180/Math.PI+360)%360
-    const s=Math.min(Math.sqrt(dx*dx+dy*dy)/r,1)
-    const next={h,s,v:hsv.v}
-    setHsv(next); onChange(hsvToHex(h,s,next.v))
-  }
-
-  const currentHex = hsvToHex(hsv.h, hsv.s, hsv.v)
+    })
+    return map
+  }, [players, currentUid])
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:14 }}>
-      <canvas
-        ref={canvasRef} width={240} height={240}
-        style={{ borderRadius:'50%', touchAction:'none', cursor:'crosshair', maxWidth:'100%', boxShadow:'0 4px 24px rgba(0,0,0,0.5)' }}
-        onMouseDown={e=>{dragging.current=true;pick(e)}}
-        onMouseMove={e=>{if(dragging.current)pick(e)}}
-        onMouseUp={()=>{dragging.current=false}}
-        onMouseLeave={()=>{dragging.current=false}}
-        onTouchStart={e=>{e.preventDefault();pick(e)}}
-        onTouchMove={e=>{e.preventDefault();pick(e)}}
-      />
-      {/* Brightness slider */}
-      <div style={{ width:'100%' }}>
-        <div style={{ fontSize:11, color:'rgba(255,255,255,0.5)', marginBottom:6 }}>ความสว่าง</div>
-        <div style={{
-          position:'relative', height:20, borderRadius:10, overflow:'hidden',
-          background:`linear-gradient(to right,#000,${hsvToHex(hsv.h,hsv.s,1)})`,
-          border:'1px solid rgba(255,255,255,0.12)',
-        }}>
-          <input type="range" min={0} max={100} value={Math.round(hsv.v*100)}
-            onChange={e=>{
-              const v=Number(e.target.value)/100
-              const next={...hsv,v}; setHsv(next); onChange(hsvToHex(next.h,next.s,v))
-            }}
-            style={{ position:'absolute', inset:0, width:'100%', height:'100%', opacity:0, cursor:'pointer', margin:0 }}
-          />
-          {/* Thumb indicator */}
-          <div style={{
-            position:'absolute', top:'50%', transform:'translate(-50%,-50%)',
-            left:`${Math.round(hsv.v*100)}%`,
-            width:18, height:18, borderRadius:'50%',
-            background:currentHex, border:'2px solid #fff',
-            boxShadow:'0 1px 4px rgba(0,0,0,0.5)',
-            pointerEvents:'none', transition:'left 0.05s',
-          }}/>
-        </div>
-      </div>
-      {/* Preview */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{
-        width:'100%', height:48, borderRadius:14,
-        background:currentHex, border:'2px solid rgba(255,255,255,0.15)',
-        display:'flex', alignItems:'center', justifyContent:'center',
-        boxShadow:`0 4px 18px ${currentHex}88`,
+        display: 'grid',
+        gridTemplateColumns: 'repeat(4, 1fr)',
+        gap: 10,
       }}>
-        <span style={{ fontSize:13, fontWeight:800, color:'#fff', textShadow:'0 1px 4px rgba(0,0,0,0.7)', letterSpacing:1 }}>
-          {currentHex.toUpperCase()}
-        </span>
+        {TWENTY_PLAYER_COLORS.map(c => {
+          const hex = c.hex.toLowerCase()
+          const isSelected = selectedColor?.toLowerCase() === hex
+          const takenBy = takenMap[hex]
+          const isTaken = Boolean(takenBy)
+
+          return (
+            <button
+              key={c.id}
+              type="button"
+              disabled={isTaken}
+              onClick={() => {
+                if (isTaken) return
+                onSelect(c.hex)
+              }}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: 5,
+                padding: '9px 4px 7px',
+                borderRadius: 14,
+                background: isSelected
+                  ? 'rgba(255, 255, 255, 0.14)'
+                  : (isTaken ? 'rgba(0, 0, 0, 0.28)' : 'rgba(255, 255, 255, 0.04)'),
+                border: isSelected
+                  ? `2.5px solid ${c.hex}`
+                  : (isTaken ? '1.5px dashed rgba(255, 255, 255, 0.12)' : '1px solid rgba(255, 255, 255, 0.1)'),
+                boxShadow: isSelected ? `0 0 14px ${c.hex}66` : 'none',
+                cursor: isTaken ? 'not-allowed' : 'pointer',
+                opacity: isTaken ? 0.45 : 1,
+                position: 'relative',
+                transition: 'all 0.15s ease',
+              }}
+              title={isTaken ? `มีคนเลือกแล้วโดย ${takenBy.name}` : c.name}
+            >
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: '50%',
+                background: c.hex,
+                border: isSelected ? '2.5px solid #fff' : '2px solid rgba(0,0,0,0.3)',
+                boxShadow: isSelected ? `0 0 10px ${c.hex}` : '0 2px 5px rgba(0,0,0,0.4)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                {isSelected && (
+                  <i className="fas fa-check" style={{ color: c.darkText ? '#111' : '#fff', fontSize: 16 }} />
+                )}
+                {isTaken && !isSelected && (
+                  <i className="fas fa-check" style={{ color: c.darkText ? '#333' : '#fff', fontSize: 14, opacity: 0.8 }} />
+                )}
+              </div>
+              <span style={{
+                fontSize: 11,
+                fontWeight: isSelected ? 800 : 600,
+                color: isSelected ? '#fff' : (isTaken ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.75)'),
+                textAlign: 'center',
+                lineHeight: 1.1,
+              }}>
+                {c.name}
+              </span>
+              {isTaken && (
+                <span style={{
+                  fontSize: 8.5,
+                  fontWeight: 700,
+                  color: '#ff8a80',
+                  lineHeight: 1,
+                  maxWidth: 60,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}>
+                  {takenBy.name}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -455,6 +449,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [isAdminView, setIsAdminView] = useState(false)
   const [activeTaskModal, setActiveTaskModal] = useState(null)
   const [showSabotageModal, setShowSabotageModal] = useState(false)
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [selectedReportVictim, setSelectedReportVictim] = useState(null)
   const [scannerOpen, setScannerOpen] = useState(false)
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDesc, setNewTaskDesc] = useState('')
@@ -694,9 +690,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         const elapsedSec = Math.floor((now - (gameDoc.timerUpdatedAt || now)) / 1000)
         const rem = Math.max(0, (gameDoc.gameSecondsRemaining || 0) - elapsedSec)
         setCurrentTimeSec(rem)
-        if (rem === 0 && hasAdminPerm && gameDoc.winner === null) {
-          // Time expired -> Impostors Win!
-          handleEndGame('impostor', 'หมดเวลาเกม! ฝ่ายคนร้ายชนะ!')
+        if (rem === 0 && hasAdminPerm && gameDoc.gameTimerRunning) {
+          // Pause timer when expired; GM declares winner manually via GM controls
+          updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+            gameTimerRunning: false,
+            gameSecondsRemaining: 0,
+            timerUpdatedAt: now,
+          }).catch(() => {})
         }
       } else {
         setCurrentTimeSec(gameDoc.gameSecondsRemaining || 0)
@@ -707,9 +707,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         const sabElapsed = Math.floor((now - (gameDoc.sabotage.startedAt || now)) / 1000)
         const sabRem = Math.max(0, (gameDoc.sabotage.countdownSeconds || 90) - sabElapsed)
         setSabotageTimeSec(sabRem)
-        if (sabRem === 0 && hasAdminPerm && gameDoc.winner === null) {
-          handleEndGame('impostor', `กู้สถานการณ์ Sabotage ไม่ทัน! ${gameDoc.sabotage.title} ทำให้ฝ่ายคนร้ายชนะ!`)
-        }
       }
 
       // Meeting Discussion / Voting Timer
@@ -841,21 +838,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
   // ── Game Flow Actions ───────────────────────────────────
 
-  // Player color selection in lobby (debounced — avoids flood of Firestore writes while dragging)
-  const colorSaveTimer = useRef(null)
-  const saveMyColor = (colorHex) => {
-    clearTimeout(colorSaveTimer.current)
-    colorSaveTimer.current = setTimeout(async () => {
-      if (!myUid || !gameDoc) return
-      try {
-        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-          [`players.${myUid}.color`]: colorHex,
-          [`players.${myUid}.ready`]: true,
-        })
-      } catch (e) {
-        showToast('บันทึกสีล้มเหลว: ' + e.message, 'error')
-      }
-    }, 500)
+  // Player color selection from 20 discrete colors (Zero Duplicates Policy)
+  const saveMyColor = async (colorHex) => {
+    if (!myUid || !gameDoc) return
+    const taken = Object.values(gameDoc.players || {}).some(
+      p => p.color?.toLowerCase() === colorHex?.toLowerCase() && p.uid !== myUid
+    )
+    if (taken) {
+      showToast('สีนี้มีผู้เล่นคนอื่นเลือกไปแล้ว กรุณาเลือกสีอื่น', 'error')
+      return
+    }
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        [`players.${myUid}.color`]: colorHex,
+        [`players.${myUid}.ready`]: true,
+      })
+      showToast('เลือกสีเรียบร้อย')
+    } catch (e) {
+      showToast('บันทึกสีล้มเหลว: ' + e.message, 'error')
+    }
   }
 
   // Update player name
@@ -1007,6 +1008,36 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       else roleMap[p.uid] = 'crewmate'
     })
 
+    // ── Guarantee Unique Colors from TWENTY_PLAYER_COLORS ──
+    const usedColors = new Set()
+    const playersNeedColor = []
+
+    allPlayersList.forEach(p => {
+      const c = (p.color || '').toLowerCase()
+      const isValidColor = TWENTY_PLAYER_COLORS.some(tc => tc.hex.toLowerCase() === c)
+      if (isValidColor && !usedColors.has(c)) {
+        usedColors.add(c)
+      } else {
+        playersNeedColor.push(p.uid)
+      }
+    })
+
+    const availableColors = TWENTY_PLAYER_COLORS
+      .map(c => c.hex)
+      .filter(hex => !usedColors.has(hex.toLowerCase()))
+      .sort(() => Math.random() - 0.5)
+
+    const finalColorMap = {}
+    allPlayersList.forEach(p => {
+      const c = (p.color || '').toLowerCase()
+      if (usedColors.has(c) && !playersNeedColor.includes(p.uid)) {
+        finalColorMap[p.uid] = p.color
+      }
+    })
+    playersNeedColor.forEach((uid, idx) => {
+      finalColorMap[uid] = availableColors[idx] || TWENTY_PLAYER_COLORS[idx % TWENTY_PLAYER_COLORS.length].hex
+    })
+
     // Randomize 3 tasks with unique floors for each player
     const updatedPlayers = { ...gameDoc.players }
     allPlayersList.forEach(p => {
@@ -1035,6 +1066,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       }))
       updatedPlayers[p.uid] = {
         ...p,
+        color: finalColorMap[p.uid] || p.color || '#c62828',
         role: roleMap[p.uid],
         isAlive: true,
         tasks: assigned,
@@ -1118,8 +1150,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   }
 
   // Call Emergency Meeting or Report Body
-  const callEmergencyMeeting = async (isReport = false) => {
+  const callEmergencyMeeting = async (isReport = false, victim = null) => {
     if (gameDoc.status !== 'playing') return
+    if (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
+      showToast('ไม่สามารถเรียกประชุมหรือ Report ศพได้ขณะมีสัญญาณ Sabotage! ต้องแก้ไขก่อน', 'error')
+      return
+    }
     try {
       const now = Date.now()
       // Pause main game timer during meeting
@@ -1131,7 +1167,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         gameSecondsRemaining: currentRemaining,
         gameTimerRunning: false,
         meeting: {
-          calledBy: { uid: myUid, name: me?.name || 'ผู้เล่น' },
+          calledBy: {
+            uid: myUid || 'admin',
+            name: me?.name || (hasAdminPerm ? 'Game Master' : 'ผู้เล่น'),
+            color: me?.color || '#ff0000',
+          },
+          reportedVictim: victim ? {
+            uid: victim.uid,
+            name: victim.name,
+            color: victim.color || '#888888',
+          } : null,
           type: isReport ? 'body_report' : 'emergency_button',
           startTime: now,
           durationSeconds: 180, // 3 minutes
@@ -1140,7 +1185,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         }
       })
       playMeetingBuzzer()
-      showToast(isReport ? 'REPORT ศพสำเร็จ! เรียกทุกคนเข้าที่ประชุม' : 'เปิดประชุมฉุกเฉินสำเร็จ')
+      showToast(isReport ? `REPORT ศพ ${victim ? victim.name : ''} สำเร็จ! เรียกทุกคนเข้าที่ประชุม` : 'เปิดประชุมฉุกเฉินสำเร็จ')
     } catch (e) {
       showToast('เรียกประชุมล้มเหลว: ' + e.message, 'error')
     }
@@ -2049,6 +2094,66 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {/* Alert when main game timer hits 00:00 */}
+                  {currentTimeSec === 0 && gameDoc.status === 'playing' && (
+                    <div style={{
+                      background: 'rgba(197, 17, 17, 0.25)',
+                      border: '2px solid #ff5252',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      textAlign: 'center',
+                      animation: 'auEmergencyPulse 1.5s infinite ease-in-out',
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#ff5252', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <i className="fas fa-hourglass-end" /> หมดเวลาการเล่นหลัก (00:00) แล้ว!
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#ffcdd2', marginTop: 2 }}>
+                        กรุณาให้ Game Master ตัดสินฝ่ายที่ชนะด้านล่าง หรือกดเพิ่มเวลาเพื่อเล่นต่อ
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Alert when Sabotage timer hits 00:00 */}
+                  {sabotageTimeSec === 0 && gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
+                    <div style={{
+                      background: 'rgba(183, 28, 28, 0.35)',
+                      border: '2px solid #ff1744',
+                      borderRadius: 12,
+                      padding: '12px 14px',
+                      textAlign: 'center',
+                      animation: 'auAlarmBlink 1s infinite ease-in-out',
+                    }}>
+                      <div style={{ fontSize: 14, fontWeight: 900, color: '#ff1744', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                        <i className="fas fa-radiation fa-spin" /> SABOTAGE หมดเวลาแล้ว (00:00)!
+                      </div>
+                      <div style={{ fontSize: 11.5, color: '#ffcdd2', marginTop: 2, marginBottom: 8 }}>
+                        ลูกเรือกู้สถานการณ์ไม่ทัน — GM สามารถกดตัดสินฝ่ายคนร้ายชนะ หรือกดแก้ไข Sabotage
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (window.confirm('ยืนยันตัดสินให้ ฝ่ายคนร้ายชนะ จากผล Sabotage หมดเวลา?')) {
+                              handleEndGame('impostor', `กู้สถานการณ์ Sabotage ไม่ทัน! ${gameDoc.sabotage.title} ทำให้ฝ่ายคนร้ายชนะ!`)
+                            }
+                          }}
+                          className="au-btn au-btn-red"
+                          style={{ flex: 1, padding: '8px', fontSize: 11.5 }}
+                        >
+                          ตัดสินคนร้ายชนะ
+                        </button>
+                        <button
+                          type="button"
+                          onClick={resolveSabotage}
+                          className="au-btn au-btn-dark"
+                          style={{ flex: 1, padding: '8px', fontSize: 11.5 }}
+                        >
+                          แก้ไข Sabotage
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: 24, fontWeight: 900, color: '#ff5252', fontFamily: 'monospace' }}>
                       {fmtTime(currentTimeSec)}
@@ -2087,14 +2192,31 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   </div>
 
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
-                    <button
-                      type="button"
-                      onClick={() => callEmergencyMeeting(false)}
-                      className="au-btn au-btn-red"
-                      style={{ flex: 1, padding: '11px', fontSize: 12.5 }}
-                    >
-                      <i className="fas fa-bullhorn" style={{ marginRight: 6 }} /> เรียกประชุมด่วน
-                    </button>
+                    {(() => {
+                      const isSabotageActive = Boolean(gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')
+                      return (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isSabotageActive) {
+                              showToast('มีสัญญาณ Sabotage อยู่ ต้องแก้ไข Sabotage ก่อนจึงจะเรียกประชุมได้', 'error')
+                              return
+                            }
+                            callEmergencyMeeting(false)
+                          }}
+                          className={`au-btn ${isSabotageActive ? 'au-btn-dark' : 'au-btn-red'}`}
+                          style={{
+                            flex: 1, padding: '11px', fontSize: 12.5,
+                            opacity: isSabotageActive ? 0.6 : 1,
+                            cursor: isSabotageActive ? 'not-allowed' : 'pointer',
+                          }}
+                          title={isSabotageActive ? 'ติดสถานะ Sabotage ไม่สามารถเรียกประชุมได้' : 'เรียกประชุมฉุกเฉิน'}
+                        >
+                          <i className={`fas fa-${isSabotageActive ? 'lock' : 'bullhorn'}`} style={{ marginRight: 6 }} />
+                          {isSabotageActive ? 'เรียกประชุม (ติด Sabotage)' : 'เรียกประชุมด่วน'}
+                        </button>
+                      )
+                    })()}
                     <button
                       type="button"
                       onClick={handleResetGame}
@@ -2103,6 +2225,110 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     >
                       รีเซ็ตเกม
                     </button>
+                  </div>
+
+                  {/* Resume game button if meeting has concluded and on meeting_result screen */}
+                  {gameDoc.status === 'meeting_result' && (
+                    <button
+                      type="button"
+                      onClick={handleResumeGame}
+                      className="au-btn au-btn-green"
+                      style={{ width: '100%', padding: '11px', fontSize: 13, marginTop: 4 }}
+                    >
+                      <i className="fas fa-play" style={{ marginRight: 6 }} />
+                      เล่นเกมต่อ (หมดช่วงประชุม ให้เวลาเดินต่อ)
+                    </button>
+                  )}
+
+                  {/* GM Winner Declaration Controls */}
+                  <div style={{
+                    background: 'rgba(0, 0, 0, 0.35)',
+                    border: '1.5px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: 14,
+                    padding: '12px 14px',
+                    marginTop: 6,
+                  }}>
+                    <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(255,255,255,0.6)', letterSpacing: '0.06em', marginBottom: 8, textTransform: 'uppercase' }}>
+                      <i className="fas fa-gavel" style={{ marginRight: 6, color: '#ffd54f' }} />
+                      ตัดสินผลแพ้ชนะ (GM DECLARE WINNER)
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('ยืนยันตัดสินให้ ฝ่ายคนดี (CREWMATES) ชนะ?')) {
+                            handleEndGame('crewmate', 'Game Master ตัดสินให้ฝ่ายคนดีชนะ!')
+                          }
+                        }}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: 10,
+                          background: 'rgba(2, 136, 209, 0.2)',
+                          border: '1.5px solid #0288d1',
+                          color: '#80d8ff',
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <i className="fas fa-shield-alt" style={{ fontSize: 14 }} />
+                        <span>ฝ่ายคนดีชนะ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('ยืนยันตัดสินให้ ฝ่ายคนร้าย (IMPOSTORS) ชนะ?')) {
+                            handleEndGame('impostor', 'Game Master ตัดสินให้ฝ่ายคนร้ายชนะ!')
+                          }
+                        }}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: 10,
+                          background: 'rgba(197, 17, 17, 0.2)',
+                          border: '1.5px solid #c51111',
+                          color: '#ff5252',
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <i className="fas fa-skull" style={{ fontSize: 14 }} />
+                        <span>ฝ่ายคนร้ายชนะ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm('ยืนยันตัดสินให้ ฝ่ายโดโด้ (DODO) ชนะ?')) {
+                            handleEndGame('dodo', 'Game Master ตัดสินให้โดโด้ชนะ!')
+                          }
+                        }}
+                        style={{
+                          padding: '10px 6px',
+                          borderRadius: 10,
+                          background: 'rgba(142, 36, 170, 0.2)',
+                          border: '1.5px solid #8e24aa',
+                          color: '#ce93d8',
+                          fontSize: 11.5,
+                          fontWeight: 800,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        <i className="fas fa-crow" style={{ fontSize: 14 }} />
+                        <span>โดโด้ชนะ</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -2735,15 +2961,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 >สลับชื่อ</button>
               </div>
 
-              {/* Color Wheel Picker */}
+              {/* 20 Distinct Character Colors Palette */}
               <div className="au-card" style={{ padding: 18 }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: '#fff', marginBottom: 4 }}>เลือกสีตัวละครของคุณ</div>
-                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-                  ฝ่ายของคุณจะถูกสุ่มโดยระบบเมื่อแอดมินกดเริ่ม — ห้ามบอกคนอื่น!
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 900, color: '#fff' }}>เลือกสีตัวละครของคุณ (20 สีไม่ซ้ำกัน)</div>
+                  {myColor && (
+                    <span style={{ fontSize: 11, color: '#81c784', fontWeight: 800 }}>
+                      <i className="fas fa-check-circle" style={{ marginRight: 4 }} />
+                      เลือกสีแล้ว
+                    </span>
+                  )}
                 </div>
-                <ColorWheelPicker
-                  value={myColor || '#c62419'}
-                  onChange={saveMyColor}
+                <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
+                  สีที่มีคนเลือกแล้วจะมีชื่อกำกับและติ๊กถูก ห้ามเลือกสีซ้ำกัน — ฝ่ายจะถูกสุ่มเมื่อแอดมินเริ่มเกม
+                </div>
+                <TwentyColorPalette
+                  selectedColor={myColor}
+                  players={gameDoc.players}
+                  currentUid={myUid}
+                  onSelect={saveMyColor}
                 />
               </div>
 
@@ -2884,44 +3120,67 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 )}
               </div>
 
-              {/* Action Button: Emergency Dome */}
+              {/* Action Button: Report Body Only (Emergency button is GM only) */}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                {/* Iconic Big Red Emergency Dome Button */}
                 {isAlive && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (window.confirm('ยืนยัน REPORT ศพหรือกดปุ่มเรียกประชุมฉุกเฉิน?')) {
-                        callEmergencyMeeting(true)
-                      }
-                    }}
-                    style={{
-                      width: 76, height: 76,
-                      borderRadius: '50%',
-                      background: 'repeating-linear-gradient(45deg, #181818, #181818 7px, #fbc02d 7px, #fbc02d 14px)',
-                      padding: 5,
-                      border: '3px solid #080d16',
-                      boxShadow: '0 6px 18px rgba(0,0,0,0.7)',
-                      cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0,
-                    }}
-                    title="Emergency Meeting / Report"
-                  >
-                    <div style={{
-                      width: '100%', height: '100%',
-                      borderRadius: '50%',
-                      background: 'radial-gradient(circle at 40% 30%, #ff5252 0%, #c62828 60%, #7a0813 100%)',
-                      border: '2px solid rgba(255,255,255,0.4)',
-                      boxShadow: 'inset 0 3px 6px rgba(255,255,255,0.6), 0 3px 6px rgba(0,0,0,0.6)',
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                      color: '#fff',
-                      animation: 'auEmergencyPulse 2s infinite ease-in-out',
-                    }}>
-                      <i className="fas fa-bullhorn" style={{ fontSize: 20 }} />
-                      <span style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: '0.04em' }}>REPORT</span>
-                    </div>
-                  </button>
+                  (() => {
+                    const isSabotageActive = Boolean(gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isSabotageActive) {
+                            showToast('มีเหตุการณ์ Sabotage อยู่ ต้องแก้ไขก่อนจึงจะรายงานศพได้', 'error')
+                            return
+                          }
+                          setSelectedReportVictim(null)
+                          setShowReportModal(true)
+                        }}
+                        style={{
+                          padding: '10px 16px',
+                          borderRadius: 14,
+                          background: isSabotageActive
+                            ? 'rgba(40, 40, 40, 0.7)'
+                            : 'linear-gradient(135deg, #c62828 0%, #b71c1c 100%)',
+                          border: isSabotageActive
+                            ? '2px solid rgba(255, 255, 255, 0.15)'
+                            : '2.5px solid #ff5252',
+                          boxShadow: isSabotageActive
+                            ? 'none'
+                            : '0 4px 18px rgba(198, 40, 40, 0.45)',
+                          color: '#fff',
+                          cursor: isSabotageActive ? 'not-allowed' : 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          opacity: isSabotageActive ? 0.6 : 1,
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={isSabotageActive ? 'ติดสถานะ Sabotage ไม่สามารถ Report ได้' : 'รายงานการพบศพ'}
+                      >
+                        <div style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: '50%',
+                          background: isSabotageActive ? 'rgba(255,255,255,0.1)' : 'rgba(255, 255, 255, 0.2)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 16,
+                        }}>
+                          {isSabotageActive ? <i className="fas fa-lock" /> : <i className="fas fa-bullhorn" />}
+                        </div>
+                        <div style={{ textAlign: 'left' }}>
+                          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.04em' }}>
+                            {isSabotageActive ? 'SABOTAGE LOCK' : 'REPORT ศพ'}
+                          </div>
+                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
+                            {isSabotageActive ? 'ต้องแก้ปัญหาไฟ/ออกซิเจนก่อน' : 'แจ้งพบผู้เล่นเสียชีวิต'}
+                          </div>
+                        </div>
+                      </button>
+                    )
+                  })()
                 )}
               </div>
             </div>
@@ -3052,18 +3311,33 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     animation: 'auEmergencyPulse 1.5s infinite ease-in-out',
                     boxShadow: '0 0 35px rgba(229, 57, 53, 0.9)',
                   }}>
-                    <i className="fas fa-bullhorn" />
+                    <i className={`fas fa-${gameDoc.meeting?.type === 'body_report' ? 'skull' : 'bullhorn'}`} />
                   </div>
                   <div style={{ fontSize: 28, fontWeight: 900, color: '#ff5252', letterSpacing: '0.08em', textShadow: '0 0 15px rgba(255, 82, 82, 0.6)' }}>
-                    EMERGENCY MEETING
+                    {gameDoc.meeting?.type === 'body_report' ? 'DEAD BODY REPORTED!' : 'EMERGENCY MEETING'}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 14 }}>
-                    <AmongUsVisor size={38} />
-                    <span style={{ fontSize: 17, color: '#fff', fontWeight: 800 }}>
-                      {gameDoc.meeting?.calledBy?.name} กดเรียกประชุมฉุกเฉิน!
-                    </span>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <AmongUsVisor size={34} color={gameDoc.meeting?.calledBy?.color} isAlive={true} />
+                      <span style={{ fontSize: 15, color: '#fff', fontWeight: 800 }}>
+                        {gameDoc.meeting?.calledBy?.name}
+                      </span>
+                    </div>
+                    {gameDoc.meeting?.type === 'body_report' && gameDoc.meeting?.reportedVictim ? (
+                      <>
+                        <span style={{ fontSize: 13, color: '#ff8a80', fontWeight: 700 }}>รายงานพบศพ</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <AmongUsVisor size={34} color={gameDoc.meeting?.reportedVictim?.color} isAlive={false} />
+                          <span style={{ fontSize: 15, color: '#eceff1', fontWeight: 800 }}>
+                            {gameDoc.meeting?.reportedVictim?.name}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 14, color: '#ffd54f', fontWeight: 700 }}>กดเรียกประชุมฉุกเฉิน!</span>
+                    )}
                   </div>
-                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 8, maxWidth: 360 }}>
+                  <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,0.6)', marginTop: 10, maxWidth: 360 }}>
                     เวลาเกมหลักหยุดเดินชั่วคราว ให้ลูกเรือทุกคนมารวมตัวกันที่ห้องประชุม
                   </div>
 
@@ -3527,6 +3801,140 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             >
               ยกเลิก
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── REPORT DEAD BODY MODAL (FOR PLAYERS) ─── */}
+      {showReportModal && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 130,
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setShowReportModal(false)}>
+          <div className="au-card" style={{
+            padding: 22,
+            maxWidth: 420, width: '100%',
+            border: '2.5px solid #ff5252',
+            maxHeight: '88vh',
+            display: 'flex',
+            flexDirection: 'column',
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: '50%',
+                background: 'rgba(255, 82, 82, 0.2)', border: '1.5px solid #ff5252',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: '#ff5252', fontSize: 18,
+              }}>
+                <i className="fas fa-bullhorn" />
+              </div>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 900, color: '#fff' }}>รายงานการพบศพ (REPORT BODY)</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>เลือกผู้เล่นที่คุณพบศพในบริเวณร้าน</div>
+              </div>
+            </div>
+
+            <div style={{
+              background: 'rgba(255, 193, 7, 0.1)',
+              border: '1px solid rgba(255, 193, 7, 0.3)',
+              borderRadius: 10,
+              padding: '8px 12px',
+              fontSize: 11,
+              color: '#ffe082',
+              marginBottom: 12,
+              lineHeight: 1.4,
+            }}>
+              <i className="fas fa-info-circle" style={{ marginRight: 6 }} />
+              ระบบแสดงรายชื่อผู้เล่นทุกคนโดยปิดบังสถานะการมีชีวิต เพื่อความลับในเกม
+            </div>
+
+            {/* Candidate list with identical neutral styling */}
+            <div style={{
+              flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8,
+              paddingRight: 4, marginBottom: 16, maxHeight: 300,
+            }}>
+              {[...allPlayersList]
+                .filter(p => p.uid !== myUid)
+                .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+                .map(p => {
+                  const isSelected = selectedReportVictim?.uid === p.uid
+                  return (
+                    <button
+                      key={p.uid}
+                      type="button"
+                      onClick={() => setSelectedReportVictim(p)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 14px',
+                        borderRadius: 12,
+                        background: isSelected ? 'rgba(255, 82, 82, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                        border: isSelected ? '2px solid #ff5252' : '1px solid rgba(255, 255, 255, 0.1)',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <AmongUsVisor color={p.color || '#78909c'} size={32} isAlive={true} />
+                        <div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>{p.name}</div>
+                          <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)' }}>ผู้เล่น</div>
+                        </div>
+                      </div>
+                      <div style={{
+                        width: 20, height: 20, borderRadius: '50%',
+                        border: isSelected ? '2px solid #ff5252' : '2px solid rgba(255,255,255,0.3)',
+                        background: isSelected ? '#ff5252' : 'transparent',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {isSelected && <i className="fas fa-check" style={{ color: '#fff', fontSize: 10 }} />}
+                      </div>
+                    </button>
+                  )
+                })}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowReportModal(false)
+                  setSelectedReportVictim(null)
+                }}
+                className="au-btn au-btn-dark"
+                style={{ flex: 1, padding: 12, fontSize: 13 }}
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                disabled={!selectedReportVictim}
+                onClick={async () => {
+                  if (!selectedReportVictim) return
+                  if (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
+                    showToast('มีสัญญาณ Sabotage อยู่ ต้องแก้ไขก่อนจึงจะ Report ศพได้', 'error')
+                    setShowReportModal(false)
+                    return
+                  }
+                  await callEmergencyMeeting(true, selectedReportVictim)
+                  setShowReportModal(false)
+                  setSelectedReportVictim(null)
+                }}
+                className="au-btn au-btn-red"
+                style={{
+                  flex: 2, padding: 12, fontSize: 13,
+                  opacity: selectedReportVictim ? 1 : 0.4,
+                  cursor: selectedReportVictim ? 'pointer' : 'not-allowed',
+                }}
+              >
+                <i className="fas fa-bullhorn" style={{ marginRight: 6 }} />
+                ยืนยันพบศพ {selectedReportVictim ? selectedReportVictim.name : ''}
+              </button>
+            </div>
           </div>
         </div>
       )}
