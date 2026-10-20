@@ -418,17 +418,35 @@ export const DEFAULT_SABOTAGE_POOL = [
 
 // ── Default Tasks Pool for Real Life Boardgame Cafe ───
 export const DEFAULT_TASKS_POOL = [
+  // Floor 1 (4 tasks)
   { id: 't1', title: 'จัดเรียงแก้วน้ำ 5 ใบ', desc: 'ไปจัดเรียงแก้วน้ำที่จุดบริการน้ำดื่มให้เป็นระเบียบเรียบร้อย', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
   { id: 't2', title: 'ตรวจสอบชุดแต่งตัว', desc: 'เดินไปเช็คความเรียบร้อยของชุดแต่งตัวในห้อง', floor: 1, room: 'ห้องแต่งตัว', maxAssignedCount: 3 },
   { id: 't3', title: 'นับกล่องเกมโซนหลัง', desc: 'เดินไปนับกล่องเกมที่วางอยู่บริเวณโซนหลัง 3 กล่อง', floor: 1, room: 'โซนหลัง', maxAssignedCount: 3 },
-  { id: 't4', title: 'ตรวจตราโถงทางเดินชั้น 2', desc: 'เดินสำรวจความเรียบร้อยบริเวณโถงทางเดินชั้น 2', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
-  { id: 't5', title: 'นับเบาะนั่งห้องญี่ปุ่น', desc: 'เดินไปนับจำนวนเบาะนั่งในห้องญี่ปุ่นแล้วจำมาตอบ', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
-  { id: 't6', title: 'ตรวจตราโต๊ะห้องจีน', desc: 'เดินไปสำรวจโต๊ะเล่นเกมในห้องจีน', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
-  { id: 't7', title: 'ถ่ายรูปคู่กับ DM ห้องยุโรป', desc: 'เดินไปหา DM ประจำห้องยุโรปแล้วขอถ่ายรูปคู่เป็นหลักฐาน', floor: 3, room: 'ห้องยุโรป', maxAssignedCount: 3 },
-  { id: 't8', title: 'สำรวจห้องผี', desc: 'เดินเข้าไปในห้องผีและถ่ายรูปสัญลักษณ์ที่กำหนด', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
-  { id: 't9', title: 'สำรวจห้องแคบ', desc: 'เดินไปส่องดูความเรียบร้อยในห้องแคบชั้น 4', floor: 4, room: 'ห้องแคบ', maxAssignedCount: 3 },
-  { id: 't10', title: 'ตรวจห้องวินเทจ', desc: 'เดินไปสำรวจของตกแต่งในห้องวินเทจชั้น 5', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
-  { id: 't11', title: 'เช็คห้องโปรเจคเตอร์', desc: 'เดินขึ้นไปดูภาพโปรเจคเตอร์ที่ห้องโปรเจคเตอร์ชั้น 5', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
+  { id: 't4', title: 'เช็คความเรียบร้อยเคาน์เตอร์บาร์', desc: 'เดินสำรวจความสะอาดบริเวณเคาน์เตอร์บาร์ชั้น 1', floor: 1, room: 'โซนหน้า', maxAssignedCount: 3 },
+
+  // Floor 2 (4 tasks)
+  { id: 't5', title: 'ตรวจตราโถงทางเดินชั้น 2', desc: 'เดินสำรวจความเรียบร้อยบริเวณโถงทางเดินชั้น 2', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+  { id: 't6', title: 'นับเบาะนั่งห้องญี่ปุ่น', desc: 'เดินไปนับจำนวนเบาะนั่งในห้องญี่ปุ่นแล้วจำมาตอบ', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
+  { id: 't7', title: 'จัดเรียงรองเท้าหน้าห้องญี่ปุ่น', desc: 'เดินไปเช็คความเรียบร้อยของจุดวางรองเท้าหน้าห้องญี่ปุ่น', floor: 2, room: 'ห้องญี่ปุ่น', maxAssignedCount: 3 },
+  { id: 't8', title: 'ตรวจเช็คป้ายบอกทางชั้น 2', desc: 'เดินสำรวจป้ายบอกทางบริเวณบันไดทางขึ้นชั้น 2', floor: 2, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+
+  // Floor 3 (4 tasks)
+  { id: 't9', title: 'ตรวจตราโต๊ะห้องจีน', desc: 'เดินไปสำรวจโต๊ะเล่นเกมในห้องจีน', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
+  { id: 't10', title: 'ถ่ายรูปคู่กับ DM ห้องยุโรป', desc: 'เดินไปหา DM ประจำห้องยุโรปแล้วขอถ่ายรูปคู่เป็นหลักฐาน', floor: 3, room: 'ห้องยุโรป', maxAssignedCount: 3 },
+  { id: 't11', title: 'ตรวจเช็คโคมไฟห้องจีน', desc: 'เดินไปสำรวจโคมไฟประดับและบรรยากาศในห้องจีน', floor: 3, room: 'ห้องจีน', maxAssignedCount: 3 },
+  { id: 't12', title: 'สำรวจโถงทางเดินชั้น 3', desc: 'เดินสำรวจความสงบเรียบร้อยบริเวณโถงทางเดินชั้น 3', floor: 3, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+
+  // Floor 4 (4 tasks)
+  { id: 't13', title: 'สำรวจห้องผี', desc: 'เดินเข้าไปในห้องผีและถ่ายรูปสัญลักษณ์ที่กำหนด', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
+  { id: 't14', title: 'สำรวจห้องแคบ', desc: 'เดินไปส่องดูความเรียบร้อยในห้องแคบชั้น 4', floor: 4, room: 'ห้องแคบ', maxAssignedCount: 3 },
+  { id: 't15', title: 'ส่องไฟฉายห้องผี', desc: 'เดินไปส่องดูความเรียบร้อยในมุมมืดของห้องผี', floor: 4, room: 'ห้องผี', maxAssignedCount: 3 },
+  { id: 't16', title: 'ตรวจตราโถงทางเดินชั้น 4', desc: 'เดินสำรวจทางเดินหน้าห้องแคบชั้น 4', floor: 4, room: 'โถงทางเดิน', maxAssignedCount: 3 },
+
+  // Floor 5 (4 tasks)
+  { id: 't17', title: 'ตรวจห้องวินเทจ', desc: 'เดินไปสำรวจของตกแต่งในห้องวินเทจชั้น 5', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
+  { id: 't18', title: 'เช็คห้องโปรเจคเตอร์', desc: 'เดินขึ้นไปดูภาพโปรเจคเตอร์ที่ห้องโปรเจคเตอร์ชั้น 5', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
+  { id: 't19', title: 'เช็คลำโพงห้องโปรเจคเตอร์', desc: 'เดินไปตรวจสอบระดับเสียงและลำโพงในห้องโปรเจคเตอร์', floor: 5, room: 'ห้องโปรเจคเตอร์', maxAssignedCount: 3 },
+  { id: 't20', title: 'ตรวจนาฬิกาโบราณห้องวินเทจ', desc: 'เดินไปดูเวลาบนนาฬิกาโบราณในห้องวินเทจ', floor: 5, room: 'ห้องวินเทจ', maxAssignedCount: 3 },
 ]
 
 export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: isAppAdmin, showToast, showPage }) {
@@ -1032,6 +1050,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       return
     }
 
+    const totalPoolCapacity = pool.reduce((sum, t) => sum + (Number(t.maxAssignedCount) || 3), 0)
+    const requiredSlots = allPlayersList.length * 3
+    if (totalPoolCapacity < requiredSlots) {
+      showToast(`โควตาภารกิจในคลังไม่เพียงพอ (${totalPoolCapacity}/${requiredSlots} ตำแหน่ง) กรุณาเพิ่มภารกิจหรือปรับโควตาภารกิจ`, 'error')
+      return
+    }
+
     // Group tasks by floor to guarantee 3 unique floors
     const tasksByFloor = {}
     pool.forEach(t => {
@@ -1104,35 +1129,30 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const playersToAssign = [...allPlayersList].sort(() => 0.5 - Math.random())
 
     playersToAssign.forEach(p => {
-      // Find floors that still have tasks with remaining capacity
-      const floorsWithRemainingCapacity = availableFloors.filter(floorNum => {
+      // Calculate remaining capacity per floor to keep load evenly distributed
+      const floorCapacities = availableFloors.map(floorNum => {
         const floorTasks = tasksByFloor[floorNum] || []
-        return floorTasks.some(t => (taskAssignedCounts[t.id] || 0) < (t.maxAssignedCount || 3))
-      })
+        const remainingSlots = floorTasks.reduce((sum, t) => {
+          const assigned = taskAssignedCounts[t.id] || 0
+          const cap = Number(t.maxAssignedCount) || 3
+          return sum + Math.max(0, cap - assigned)
+        }, 0)
+        return { floorNum, remainingSlots }
+      }).filter(fc => fc.remainingSlots > 0)
 
-      // Pick 3 unique floors prioritizing floors with remaining capacity
-      let chosenFloors = []
-      if (floorsWithRemainingCapacity.length >= 3) {
-        const shuffled = [...floorsWithRemainingCapacity].sort(() => 0.5 - Math.random())
-        chosenFloors = shuffled.slice(0, 3)
-      } else {
-        const remainingFloors = availableFloors
-          .filter(f => !floorsWithRemainingCapacity.includes(f))
-          .sort(() => 0.5 - Math.random())
-        chosenFloors = [
-          ...floorsWithRemainingCapacity,
-          ...remainingFloors.slice(0, 3 - floorsWithRemainingCapacity.length)
-        ]
-      }
+      // Sort floors by remaining capacity descending with slight random jitter for variety
+      floorCapacities.sort((a, b) => (b.remainingSlots + Math.random() * 0.8) - (a.remainingSlots + Math.random() * 0.8))
 
+      let chosenFloors = floorCapacities.slice(0, 3).map(fc => fc.floorNum)
       if (chosenFloors.length < 3) {
-        chosenFloors = [...availableFloors].sort(() => 0.5 - Math.random()).slice(0, 3)
+        const otherFloors = availableFloors.filter(f => !chosenFloors.includes(f)).sort(() => 0.5 - Math.random())
+        chosenFloors = [...chosenFloors, ...otherFloors.slice(0, 3 - chosenFloors.length)]
       }
 
-      // Pick 1 task from each chosen floor
+      // Pick 1 task from each chosen floor (strictly enforcing maxAssignedCount)
       const assignedTasks = chosenFloors.map(floorNum => {
         const floorTasks = tasksByFloor[floorNum] || []
-        const eligibleTasks = floorTasks.filter(t => (taskAssignedCounts[t.id] || 0) < (t.maxAssignedCount || 3))
+        const eligibleTasks = floorTasks.filter(t => (taskAssignedCounts[t.id] || 0) < (Number(t.maxAssignedCount) || 3))
 
         let selectedTask
         if (eligibleTasks.length > 0) {
@@ -1633,6 +1653,18 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast('ลบภารกิจออกจากคลังแล้ว')
     } catch (e) {
       showToast('ลบภารกิจล้มเหลว', 'error')
+    }
+  }
+
+  const handleResetTasksToDefault = async () => {
+    if (!window.confirm('ยืนยันรีเซ็ตคลังภารกิจกลับเป็นค่าเริ่มต้น (20 ภารกิจ กระจายครบ 5 ชั้น ชั้นละ 4 ภารกิจ)?')) return
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        taskPool: DEFAULT_TASKS_POOL
+      })
+      showToast('รีเซ็ตคลังภารกิจสำเร็จ (20 ภารกิจ)')
+    } catch (e) {
+      showToast('รีเซ็ตคลังภารกิจล้มเหลว', 'error')
     }
   }
 
@@ -2681,7 +2713,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               background: '#121722', borderRadius: 16, padding: 16,
               border: '1px solid rgba(255,255,255,0.08)',
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
                 <div>
                   <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
                     คลังภารกิจทั้งหมด ({gameDoc.taskPool?.length || 0} ภารกิจ)
@@ -2690,6 +2722,21 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     กำหนดชื่อ รายละเอียด ชั้น 1-5 และห้อง เพื่อให้คนดีไปทำภารกิจในสถานที่จริง
                   </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleResetTasksToDefault}
+                  style={{
+                    padding: '5px 10px', borderRadius: 8,
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.15)',
+                    color: '#90caf9', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                  }}
+                  title="รีเซ็ตคลังภารกิจเป็นค่าเริ่มต้น 20 ภารกิจ (4 ภารกิจต่อชั้น ครบ 5 ชั้น)"
+                >
+                  <i className="fas fa-undo-alt" style={{ fontSize: 10 }} />
+                  <span>รีเซ็ตค่าเริ่มต้น (20 ภารกิจ)</span>
+                </button>
               </div>
 
               {/* Add New Task Form */}
