@@ -499,6 +499,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [currentTimeSec, setCurrentTimeSec] = useState(0)
   const [meetingTimeSec, setMeetingTimeSec] = useState(0)
   const [sabotageTimeSec, setSabotageTimeSec] = useState(0)
+  const [killCooldownSec, setKillCooldownSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
   const [revealedRole, setRevealedRole] = useState(false)
@@ -602,6 +603,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           gameSecondsRemaining: 1200,
           gameTimerRunning: false,
           timerUpdatedAt: Date.now(),
+          killCooldownSeconds: 30,
+          killCooldownUntil: 0,
           players: {},
           taskPool: DEFAULT_TASKS_POOL,
           sabotagePool: DEFAULT_SABOTAGE_POOL,
@@ -699,6 +702,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         const sabElapsed = Math.floor((now - (gameDoc.sabotage.startedAt || now)) / 1000)
         const sabRem = Math.max(0, (gameDoc.sabotage.countdownSeconds || 90) - sabElapsed)
         setSabotageTimeSec(sabRem)
+      }
+
+      // Kill Cooldown / Peace Period Timer (No kills allowed after game start or meetings)
+      if (gameDoc.status === 'playing' && gameDoc.killCooldownUntil && gameDoc.killCooldownUntil > now) {
+        const cdRem = Math.max(0, Math.ceil((gameDoc.killCooldownUntil - now) / 1000))
+        setKillCooldownSec(cdRem)
+      } else {
+        setKillCooldownSec(0)
       }
 
       // Meeting Discussion / Voting Timer
@@ -802,12 +813,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     return Object.values(gameDoc?.players || {})
   }, [gameDoc?.players])
 
-  // Total Task Progress Calculation
+  // Total Task Progress Calculation (Impostor and Dodo tasks are excluded from progress)
   const { totalTasksCount, completedTasksCount, progressPercent } = useMemo(() => {
     let total = 0
     let completed = 0
     allPlayersList.forEach(p => {
-      // Calculate progress based on all non-impostor players or all tasks
+      // Exclude Impostor and Dodo tasks from progress and victory condition
+      if (p.role === 'impostor' || p.role === 'dodo') return
       (p.tasks || []).forEach(t => {
         total++
         if (t.verified) completed++
@@ -817,10 +829,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     return { totalTasksCount: total, completedTasksCount: completed, progressPercent: pct }
   }, [allPlayersList])
 
-  // Auto-check Crewmate win condition on 100% tasks
+  // Auto-check Crewmate win condition on 100% tasks before time runs out
   useEffect(() => {
     if (hasAdminPerm && gameDoc?.status === 'playing' && totalTasksCount > 0 && completedTasksCount >= totalTasksCount && !gameDoc.winner) {
-      handleEndGame('crewmate', 'ภารกิจทั้งหมดเสร็จสมบูรณ์ 100%! ฝ่ายคนดีชนะ!')
+      handleEndGame('crewmate', 'ฝ่ายคนดีทำภารกิจครบ 100% สำเร็จก่อนหมดเวลา! ฝ่ายคนดีชนะ!')
     }
   }, [hasAdminPerm, gameDoc?.status, totalTasksCount, completedTasksCount, gameDoc?.winner])
 
@@ -916,6 +928,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   // Sheriff secret kill execution
   const handleSheriffKill = async (targetUid) => {
     if (!myUid || myRole !== 'sheriff' || !isAlive || gameDoc.status !== 'playing') return
+    if (killCooldownSec > 0) {
+      showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
+      return
+    }
     const shots = me?.sheriffShots ?? 1
     if (shots <= 0) {
       showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
@@ -1195,12 +1211,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     })
 
     try {
+      const cooldownSec = Number(gameDoc.killCooldownSeconds) > 0 ? Number(gameDoc.killCooldownSeconds) : 30
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         status: 'playing',
         players: updatedPlayers,
         gameSecondsRemaining: durationSecs,
         gameTimerRunning: true,
         timerUpdatedAt: Date.now(),
+        killCooldownUntil: Date.now() + (cooldownSec * 1000),
         sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 },
         meeting: null,
         winner: null,
@@ -1467,10 +1485,12 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         }
       })
 
+      const cooldownSec = Number(gameDoc.killCooldownSeconds) > 0 ? Number(gameDoc.killCooldownSeconds) : 30
       const payload = {
         status: 'playing',
         gameTimerRunning: true,
         timerUpdatedAt: Date.now(),
+        killCooldownUntil: Date.now() + (cooldownSec * 1000),
         meeting: null,
       }
       if (sheriffUpdated) {
@@ -1515,6 +1535,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         status: 'waiting',
         gameSecondsRemaining: (gameDoc.gameDurationMinutes || 20) * 60,
         gameTimerRunning: false,
+        killCooldownUntil: 0,
         players: resetPlayers,
         sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 },
         meeting: null,
@@ -1538,9 +1559,34 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       return t
     })
     try {
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-        [`players.${playerUid}.tasks`]: updatedTasks
+      const updatedPlayers = {
+        ...(gameDoc.players || {}),
+        [playerUid]: { ...player, tasks: updatedTasks },
+      }
+
+      // Check if all Crewmate/Sheriff tasks are 100% completed
+      let totalGoodTasks = 0
+      let completedGoodTasks = 0
+      Object.values(updatedPlayers).forEach(p => {
+        if (p.role === 'impostor' || p.role === 'dodo') return
+        (p.tasks || []).forEach(t => {
+          totalGoodTasks++
+          if (t.verified) completedGoodTasks++
+        })
       })
+
+      const updates = {
+        [`players.${playerUid}.tasks`]: updatedTasks,
+      }
+
+      if (gameDoc.status === 'playing' && totalGoodTasks > 0 && completedGoodTasks >= totalGoodTasks) {
+        updates.status = 'ended'
+        updates.winner = 'crewmate'
+        updates.winReason = 'ฝ่ายคนดีทำภารกิจครบ 100% สำเร็จก่อนหมดเวลา! ฝ่ายคนดีชนะ!'
+        updates.gameTimerRunning = false
+      }
+
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
       playTaskSuccessSound()
       showToast(`ยืนยันภารกิจของ ${player.name} สำเร็จ`)
     } catch (e) {
@@ -1885,23 +1931,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             </button>
           )}
 
-          {/* Rules Guide button */}
-          <button
-            type="button"
-            onClick={() => setShowRulesModal(true)}
-            style={{
-              padding: '6px 10px', borderRadius: 10,
-              background: 'rgba(255,255,255,0.06)',
-              border: '1.5px solid rgba(255,255,255,0.15)',
-              color: '#80d8ff', fontSize: 11, fontWeight: 800,
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
-            }}
-            title="เปิดอ่านกฎและกติกาการเล่น"
-          >
-            <i className="fas fa-book-open" style={{ fontSize: 11 }} />
-            <span>กติกา</span>
-          </button>
-
           {/* Exit / Return button */}
           <button
             type="button"
@@ -1935,6 +1964,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             if (myRole === 'impostor') {
               setShowSabotageModal(true)
             } else if (myRole === 'sheriff') {
+              if (killCooldownSec > 0) {
+                showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
+                return
+              }
               const shots = me?.sheriffShots ?? 1
               if (shots <= 0) {
                 showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
@@ -2015,6 +2048,69 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           </div>
         </div>
       </div>
+
+      {/* ─── KILL COOLDOWN / PEACE PERIOD BANNER ─── */}
+      {gameDoc.status === 'playing' && killCooldownSec > 0 && (
+        <div style={{
+          maxWidth: 640,
+          width: '100%',
+          margin: '10px auto 0',
+          padding: '0 16px',
+          boxSizing: 'border-box',
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(255, 152, 0, 0.22) 0%, rgba(245, 124, 0, 0.12) 100%)',
+            border: '2px solid #ff9800',
+            borderRadius: 14,
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            boxShadow: '0 4px 18px rgba(255, 152, 0, 0.25)',
+            animation: 'auEmergencyPulse 1.8s infinite ease-in-out',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'rgba(255, 152, 0, 0.25)',
+                border: '1.5px solid #ffb74d',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <i className="fas fa-shield-alt" style={{ fontSize: 18, color: '#ffb74d' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: '#ffe082', letterSpacing: '0.02em' }}>
+                  ช่วงเวลาห้ามฆ่า (PEACE PERIOD)
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2 }}>
+                  ทุกคนไม่สามารถฆ่าใครได้ในขณะนี้
+                </div>
+              </div>
+            </div>
+            <div style={{
+              background: '#0d131d',
+              border: '2px solid #ff9800',
+              borderRadius: 10,
+              padding: '6px 12px',
+              textAlign: 'center',
+              flexShrink: 0,
+            }}>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: '#ffb74d', textTransform: 'uppercase' }}>
+                เหลืออีก
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', fontFamily: 'monospace', lineHeight: 1.1 }}>
+                {killCooldownSec}s
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── ACTIVE SABOTAGE BANNER ─── */}
       {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
@@ -2258,6 +2354,35 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     </div>
                   </div>
 
+                  {/* Kill Cooldown (Peace Period) Setting */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 13, color: '#fff', fontWeight: 700 }}>เวลาห้ามฆ่า (Peace Period):</span>
+                      <span style={{ fontSize: 10.5, color: '#ffb74d' }}>นับถอยหลังตอนเริ่มเกม & หลังประชุม</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          killCooldownSeconds: Math.max(5, (Number(gameDoc.killCooldownSeconds) || 30) - 5),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ width: 34, height: 34, fontSize: 13 }}
+                      >-5s</button>
+                      <span style={{ fontSize: 17, fontWeight: 900, color: '#ff9800', fontFamily: 'monospace', minWidth: 46, textAlign: 'center' }}>
+                        {Number(gameDoc.killCooldownSeconds) || 30}s
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          killCooldownSeconds: Math.min(180, (Number(gameDoc.killCooldownSeconds) || 30) + 5),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ width: 34, height: 34, fontSize: 13 }}
+                      >+5s</button>
+                    </div>
+                  </div>
+
                   <button
                     type="button"
                     onClick={handleStartGame}
@@ -2415,6 +2540,42 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       เล่นเกมต่อ (หมดช่วงประชุม ให้เวลาเดินต่อ)
                     </button>
                   )}
+
+                  {/* Cooldown duration setting during active game */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'rgba(255, 152, 0, 0.08)',
+                    border: '1px solid rgba(255, 152, 0, 0.25)',
+                    borderRadius: 10,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="fas fa-shield-alt" style={{ color: '#ff9800', fontSize: 12 }} />
+                      <span style={{ fontSize: 12, color: '#ffe082', fontWeight: 700 }}>
+                        เวลาห้ามฆ่า (Peace Period): {Number(gameDoc.killCooldownSeconds) || 30}s
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          killCooldownSeconds: Math.max(5, (Number(gameDoc.killCooldownSeconds) || 30) - 5),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >-5s</button>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          killCooldownSeconds: Math.min(180, (Number(gameDoc.killCooldownSeconds) || 30) + 5),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >+5s</button>
+                    </div>
+                  </div>
 
                   {/* GM Winner Declaration Controls */}
                   <div style={{
@@ -3474,7 +3635,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 {isAlive && (
                   <button
                     type="button"
-                    onClick={() => setShowSelfDeathConfirm(true)}
+                    onClick={() => {
+                      if (killCooldownSec > 0) {
+                        showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที) ยังไม่มีใครสามารถฆ่าได้`, 'error')
+                        return
+                      }
+                      setShowSelfDeathConfirm(true)
+                    }}
                     style={{
                       padding: '7px 12px',
                       borderRadius: 10,
