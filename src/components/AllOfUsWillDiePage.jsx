@@ -523,6 +523,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [meetingTimeSec, setMeetingTimeSec] = useState(0)
   const [sabotageTimeSec, setSabotageTimeSec] = useState(0)
   const [killCooldownSec, setKillCooldownSec] = useState(0)
+  const [emergencyCooldownSec, setEmergencyCooldownSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
   const [revealedRole, setRevealedRole] = useState(false)
@@ -572,7 +573,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           gameTimerRunning: false,
           timerUpdatedAt: Date.now(),
           killCooldownSeconds: 30,
+          emergencyCooldownSeconds: 60,
           killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
           players: {},
           taskPool: DEFAULT_TASKS_POOL,
           sabotagePool: DEFAULT_SABOTAGE_POOL,
@@ -615,6 +618,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             gameTimerRunning: false,
             gameSecondsRemaining: 0,
             killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
             timerUpdatedAt: now,
           }).catch(() => {})
         }
@@ -635,6 +639,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         setKillCooldownSec(cdRem)
       } else {
         setKillCooldownSec(0)
+      }
+
+      // Emergency Meeting Cooldown Timer (No emergency meetings allowed right after game start or meetings)
+      if (gameDoc.status === 'playing' && gameDoc.emergencyCooldownUntil && gameDoc.emergencyCooldownUntil > now) {
+        const emCdRem = Math.max(0, Math.ceil((gameDoc.emergencyCooldownUntil - now) / 1000))
+        setEmergencyCooldownSec(emCdRem)
+      } else {
+        setEmergencyCooldownSec(0)
       }
 
       // Meeting Discussion / Voting Timer
@@ -904,6 +916,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           winReason: `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
           gameTimerRunning: false,
           killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
         })
       } else {
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -957,6 +970,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           winReason: `นายอำเภอยิงผิดคนทำให้จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${remainingNonImpostors.length} คน)! ฝ่ายคนร้ายชนะทันที!`,
           gameTimerRunning: false,
           killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
         })
       } else {
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -980,6 +994,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           winReason: 'นายอำเภอยิงกำจัดคนร้ายคนสุดท้ายสำเร็จ! ฝ่ายคนดีเป็นผู้ชนะ!',
           gameTimerRunning: false,
           killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
         })
       } else if (remainingImpostors.length >= remainingNonImpostors.length && remainingImpostors.length > 0) {
         // Shooting Dodo tipped parity in favor of Impostors
@@ -990,6 +1005,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           winReason: `นายอำเภอยิงกำจัดโดโด้ทำให้จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดี (${remainingNonImpostors.length} คน)! ฝ่ายคนร้ายชนะทันที!`,
           gameTimerRunning: false,
           killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
         })
       } else {
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -1308,6 +1324,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
     try {
       const cooldownSec = Number(gameDoc.killCooldownSeconds) > 0 ? Number(gameDoc.killCooldownSeconds) : 30
+      const emergencyCdSec = Number(gameDoc.emergencyCooldownSeconds) > 0 ? Number(gameDoc.emergencyCooldownSeconds) : 60
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         status: 'playing',
         players: updatedPlayers,
@@ -1315,6 +1332,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         gameTimerRunning: true,
         timerUpdatedAt: Date.now(),
         killCooldownUntil: Date.now() + (cooldownSec * 1000),
+        emergencyCooldownUntil: Date.now() + (emergencyCdSec * 1000),
         sabotage: { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 },
         meeting: null,
         winner: null,
@@ -1394,6 +1412,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     // Standard Among Us Rule: Emergency Meeting button is blocked during Sabotage, but Dead Body Report is allowed
     if (!isReport && gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
       showToast('ไม่สามารถกดปุ่มเรียกประชุมฉุกเฉินได้ขณะมีสัญญาณ Sabotage! ต้องแก้ไขก่อน', 'error')
+      return
+    }
+    // Standard Among Us Rule: Emergency Meeting button is blocked during Emergency Cooldown, but Dead Body Report is allowed
+    if (!isReport && emergencyCooldownSec > 0) {
+      showToast(`อยู่ในช่วงคูลดาวน์ห้ามเรียกประชุมฉุกเฉิน (เหลืออีก ${emergencyCooldownSec} วินาที)`, 'error')
       return
     }
     try {
@@ -1555,6 +1578,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           winReason: outcomeText,
           gameTimerRunning: false,
           killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
           'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: true, isTie: false, electedTarget, voteCounts: counts },
         })
       } else {
@@ -1572,6 +1596,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             winReason: 'โหวตคนร้ายออกหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
             gameTimerRunning: false,
             killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
             'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         } else if (remainingImpostors.length >= remainingCrew.length && remainingImpostors.length > 0) {
@@ -1583,6 +1608,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             winReason: `จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${remainingCrew.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
             gameTimerRunning: false,
             killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
             'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         } else {
@@ -1613,11 +1639,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       })
 
       const cooldownSec = Number(gameDoc.killCooldownSeconds) > 0 ? Number(gameDoc.killCooldownSeconds) : 30
+      const emergencyCdSec = Number(gameDoc.emergencyCooldownSeconds) > 0 ? Number(gameDoc.emergencyCooldownSeconds) : 60
       const payload = {
         status: 'playing',
         gameTimerRunning: true,
         timerUpdatedAt: Date.now(),
         killCooldownUntil: Date.now() + (cooldownSec * 1000),
+        emergencyCooldownUntil: Date.now() + (emergencyCdSec * 1000),
         meeting: null,
       }
       if (sheriffUpdated) {
@@ -1625,7 +1653,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       }
 
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), payload)
-      showToast('เล่นเกมต่อแล้ว เวลาเดินต่อ')
+      const emTimeText = emergencyCdSec >= 60 ? `${Math.floor(emergencyCdSec / 60)} นาที` : `${emergencyCdSec} วินาที`
+      showToast(`เล่นเกมต่อแล้ว! ห้ามเรียกประชุมฉุกเฉิน ${emTimeText} (ห้ามฆ่า ${cooldownSec} วินาที)`)
     } catch (e) {
       showToast('กลับสู่เกมล้มเหลว', 'error')
     }
@@ -2251,6 +2280,69 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         </div>
       )}
 
+      {/* ─── EMERGENCY MEETING COOLDOWN BANNER ─── */}
+      {gameDoc.status === 'playing' && emergencyCooldownSec > 0 && (
+        <div style={{
+          maxWidth: 640,
+          width: '100%',
+          margin: '10px auto 0',
+          padding: '0 16px',
+          boxSizing: 'border-box',
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(229, 57, 53, 0.22) 0%, rgba(198, 40, 40, 0.12) 100%)',
+            border: '2px solid #ef5350',
+            borderRadius: 14,
+            padding: '10px 14px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            boxShadow: '0 4px 18px rgba(239, 83, 80, 0.25)',
+            animation: 'auEmergencyPulse 1.8s infinite ease-in-out',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'rgba(229, 57, 53, 0.25)',
+                border: '1.5px solid #ff7961',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}>
+                <i className="fas fa-bullhorn" style={{ fontSize: 18, color: '#ff7961' }} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: '#ffcdd2', letterSpacing: '0.02em' }}>
+                  ห้าม EMERGENCY MEETING
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255, 255, 255, 0.85)', marginTop: 2 }}>
+                  คูลดาวน์ห้ามเรียกประชุมฉุกเฉินหลังการประชุม (แจ้งพบศพได้ตามปกติ)
+                </div>
+              </div>
+            </div>
+            <div style={{
+              background: '#0d131d',
+              border: '2px solid #ef5350',
+              borderRadius: 10,
+              padding: '6px 12px',
+              textAlign: 'center',
+              flexShrink: 0,
+            }}>
+              <div style={{ fontSize: 9.5, fontWeight: 800, color: '#ff7961', textTransform: 'uppercase' }}>
+                เหลืออีก
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 900, color: '#fff', fontFamily: 'monospace', lineHeight: 1.1 }}>
+                {emergencyCooldownSec >= 60 ? `${Math.floor(emergencyCooldownSec / 60)}m ${emergencyCooldownSec % 60}s` : `${emergencyCooldownSec}s`}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── ACTIVE SABOTAGE BANNER ─── */}
       {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
         <div
@@ -2638,6 +2730,35 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     </div>
                   </div>
 
+                  {/* Emergency Meeting Cooldown Setting */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: 13, color: '#fff', fontWeight: 700 }}>เวลาห้ามประชุม (Emergency Cooldown):</span>
+                      <span style={{ fontSize: 10.5, color: '#ff8a80' }}>นับถอยหลังห้ามกดประชุมหลังเริ่มเกม & หลังประชุม</span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          emergencyCooldownSeconds: Math.max(10, (Number(gameDoc.emergencyCooldownSeconds) || 60) - 10),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ width: 34, height: 34, fontSize: 13 }}
+                      >-10s</button>
+                      <span style={{ fontSize: 17, fontWeight: 900, color: '#ef5350', fontFamily: 'monospace', minWidth: 54, textAlign: 'center' }}>
+                        {Number(gameDoc.emergencyCooldownSeconds) || 60}s
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          emergencyCooldownSeconds: Math.min(300, (Number(gameDoc.emergencyCooldownSeconds) || 60) + 10),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ width: 34, height: 34, fontSize: 13 }}
+                      >+10s</button>
+                    </div>
+                  </div>
+
                   {/* Fixed Role Distribution Breakdown Banner */}
                   <div style={{
                     display: 'flex',
@@ -2775,6 +2896,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
                     {(() => {
                       const isSabotageActive = Boolean(gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')
+                      const isEmergencyCoolingDown = emergencyCooldownSec > 0
+                      const isBlocked = isSabotageActive || isEmergencyCoolingDown
                       return (
                         <button
                           type="button"
@@ -2783,18 +2906,32 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                               showToast('มีสัญญาณ Sabotage อยู่ ต้องแก้ไข Sabotage ก่อนจึงจะเรียกประชุมได้', 'error')
                               return
                             }
+                            if (isEmergencyCoolingDown) {
+                              showToast(`อยู่ในช่วงคูลดาวน์ห้ามเรียกประชุมฉุกเฉิน (เหลืออีก ${emergencyCooldownSec} วินาที)`, 'error')
+                              return
+                            }
                             callEmergencyMeeting(false)
                           }}
-                          className={`au-btn ${isSabotageActive ? 'au-btn-dark' : 'au-btn-red'}`}
+                          className={`au-btn ${isBlocked ? 'au-btn-dark' : 'au-btn-red'}`}
                           style={{
                             flex: 1, padding: '11px', fontSize: 12.5,
-                            opacity: isSabotageActive ? 0.6 : 1,
-                            cursor: isSabotageActive ? 'not-allowed' : 'pointer',
+                            opacity: isBlocked ? 0.65 : 1,
+                            cursor: isBlocked ? 'not-allowed' : 'pointer',
                           }}
-                          title={isSabotageActive ? 'ติดสถานะ Sabotage ไม่สามารถเรียกประชุมได้' : 'เรียกประชุมฉุกเฉิน'}
+                          title={
+                            isSabotageActive
+                              ? 'ติดสถานะ Sabotage ไม่สามารถเรียกประชุมได้'
+                              : isEmergencyCoolingDown
+                                ? `อยู่ในช่วงคูลดาวน์ห้ามเรียกประชุม (เหลืออีก ${emergencyCooldownSec} วินาที)`
+                                : 'เรียกประชุมฉุกเฉิน'
+                          }
                         >
-                          <i className={`fas fa-${isSabotageActive ? 'lock' : 'bullhorn'}`} style={{ marginRight: 6 }} />
-                          {isSabotageActive ? 'เรียกประชุม (ติด Sabotage)' : 'เรียกประชุมด่วน'}
+                          <i className={`fas fa-${isSabotageActive ? 'lock' : (isEmergencyCoolingDown ? 'clock' : 'bullhorn')}`} style={{ marginRight: 6 }} />
+                          {isSabotageActive
+                            ? 'เรียกประชุม (ติด Sabotage)'
+                            : isEmergencyCoolingDown
+                              ? `ห้ามประชุม (${emergencyCooldownSec}s)`
+                              : 'เรียกประชุมด่วน'}
                         </button>
                       )
                     })()}
@@ -2854,6 +2991,43 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         className="au-btn au-btn-dark"
                         style={{ padding: '4px 8px', fontSize: 11 }}
                       >+5s</button>
+                    </div>
+                  </div>
+
+                  {/* Emergency Meeting Cooldown duration setting during active game */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'rgba(239, 83, 80, 0.08)',
+                    border: '1px solid rgba(239, 83, 80, 0.25)',
+                    borderRadius: 10,
+                    marginTop: 6,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <i className="fas fa-bullhorn" style={{ color: '#ef5350', fontSize: 12 }} />
+                      <span style={{ fontSize: 12, color: '#ffcdd2', fontWeight: 700 }}>
+                        เวลาห้ามประชุม (Emergency Cooldown): {Number(gameDoc.emergencyCooldownSeconds) || 60}s
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          emergencyCooldownSeconds: Math.max(10, (Number(gameDoc.emergencyCooldownSeconds) || 60) - 10),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >-10s</button>
+                      <button
+                        type="button"
+                        onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                          emergencyCooldownSeconds: Math.min(300, (Number(gameDoc.emergencyCooldownSeconds) || 60) + 10),
+                        })}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '4px 8px', fontSize: 11 }}
+                      >+10s</button>
                     </div>
                   </div>
 
@@ -3142,6 +3316,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                                     winReason: `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
                                     gameTimerRunning: false,
                                     killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
                                   })
                                   return
                                 } else if (allImpostors.length > 0 && livingImpostors.length === 0) {
@@ -3152,6 +3327,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                                     winReason: 'คนร้ายถูกกำจัดหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
                                     gameTimerRunning: false,
                                     killCooldownUntil: 0,
+          emergencyCooldownUntil: 0,
                                   })
                                   return
                                 }
@@ -4039,6 +4215,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 <i className="fas fa-shield-alt" style={{ color: '#ffb74d', fontSize: 16 }} />
                 <div style={{ flex: 1, fontSize: 11.5, color: '#ffe082', lineHeight: 1.4 }}>
                   <strong>ช่วงเวลาห้ามฆ่า (Peace Period):</strong> เหลืออีก <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 13, color: '#fff' }}>{killCooldownSec}</span> วินาที — ห้ามทุกคนกระทำการกำจัดหรือสั่งยิง
+                </div>
+              </div>
+            )}
+
+            {/* Emergency Meeting Cooldown Alert Banner */}
+            {emergencyCooldownSec > 0 && isAlive && (
+              <div style={{
+                background: 'rgba(239, 83, 80, 0.15)',
+                border: '2px solid #ef5350',
+                borderRadius: 14,
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                boxShadow: '0 4px 16px rgba(239, 83, 80, 0.25)',
+              }}>
+                <i className="fas fa-bullhorn" style={{ color: '#ff7961', fontSize: 16 }} />
+                <div style={{ flex: 1, fontSize: 11.5, color: '#ffcdd2', lineHeight: 1.4 }}>
+                  <strong>ห้าม EMERGENCY MEETING:</strong> คูลดาวน์เหลืออีก <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 13, color: '#fff' }}>{emergencyCooldownSec}</span> วินาที — ห้ามกดปุ่มเรียกประชุมฉุกเฉิน
                 </div>
               </div>
             )}
@@ -5283,6 +5478,46 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     </button>
                   )
                 })}
+            </div>
+
+            {/* Optional Player Emergency Button inside Modal */}
+            <div style={{ marginBottom: 12, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
+              <button
+                type="button"
+                disabled={emergencyCooldownSec > 0 || Boolean(gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')}
+                onClick={async () => {
+                  if (emergencyCooldownSec > 0) {
+                    showToast(`อยู่ในช่วงคูลดาวน์ห้ามเรียกประชุมฉุกเฉิน (เหลืออีก ${emergencyCooldownSec} วินาที)`, 'error')
+                    return
+                  }
+                  if (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
+                    showToast('ไม่สามารถกดปุ่มเรียกประชุมฉุกเฉินได้ขณะมีสัญญาณ Sabotage! ต้องแก้ไขก่อน', 'error')
+                    return
+                  }
+                  if (!window.confirm('ยืนยันกดปุ่มเรียกประชุมฉุกเฉิน (Emergency Meeting)?')) return
+                  await callEmergencyMeeting(false)
+                  setShowReportModal(false)
+                }}
+                className="au-btn au-btn-dark"
+                style={{
+                  width: '100%',
+                  padding: '9px 12px',
+                  fontSize: 11.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  opacity: (emergencyCooldownSec > 0 || (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')) ? 0.5 : 1,
+                  cursor: (emergencyCooldownSec > 0 || (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                <i className={`fas fa-${emergencyCooldownSec > 0 ? 'clock' : 'bullhorn'}`} style={{ color: '#ef5350' }} />
+                <span>
+                  {emergencyCooldownSec > 0
+                    ? `คูลดาวน์ห้ามประชุมฉุกเฉิน (${emergencyCooldownSec}s)`
+                    : 'กดปุ่มประชุมฉุกเฉิน (EMERGENCY MEETING)'}
+                </span>
+              </button>
             </div>
 
             <div style={{ display: 'flex', gap: 10 }}>
