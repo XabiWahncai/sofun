@@ -1495,6 +1495,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   // Call Emergency Meeting or Report Body
   const callEmergencyMeeting = async (isReport = false, victim = null) => {
     if (gameDoc.status !== 'playing') return
+    if (!isAlive && !hasAdminPerm) {
+      showToast('คุณเสียชีวิตแล้ว ไม่สามารถแจ้งพบศพหรือกดปุ่มประชุมได้', 'error')
+      return
+    }
     // Standard Among Us Rule: Emergency Meeting button is blocked during Sabotage, but Dead Body Report is allowed
     if (!isReport && gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
       showToast('ไม่สามารถกดปุ่มเรียกประชุมฉุกเฉินได้ขณะมีสัญญาณ Sabotage! ต้องแก้ไขก่อน', 'error')
@@ -1526,6 +1530,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           durationSeconds: 180, // 3 minutes
           votes: {},
           result: null,
+        }
+      }
+
+      // If reporting a dead body, ensure victim is officially marked dead in players state
+      if (isReport && victim?.uid && gameDoc.players?.[victim.uid]) {
+        updateData.players = {
+          ...(gameDoc.players || {}),
+          [victim.uid]: {
+            ...gameDoc.players[victim.uid],
+            isAlive: false,
+          }
         }
       }
 
