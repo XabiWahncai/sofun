@@ -507,6 +507,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [killCooldownSec, setKillCooldownSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
+  const [posSyncSessions, setPosSyncSessions] = useState([])
   const [revealedRole, setRevealedRole] = useState(false)
   const revealRoleTimeoutRef = useRef(null)
 
@@ -1109,15 +1110,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   }
 
   // Admin: Sync / Overwrite players strictly from active POS party
-  const handleSyncFromPos = async () => {
-    if (!activeParty || !activeParty.members || activeParty.members.length === 0) {
-      showToast('ไม่พบสมาชิกในปาร์ตี้ POS ปัจจุบัน', 'error')
+  const doSyncFromSession = async (session) => {
+    const members = session.members || []
+    if (members.length === 0) {
+      showToast('Session นี้ไม่มีสมาชิก', 'error')
       return
     }
-    if (!window.confirm(`ยืนยันซิงค์รายชื่อจาก POS (${activeParty.members.length} คน) แทนที่รายชื่อเดิม?`)) return
+    if (!window.confirm(`ยืนยันซิงค์รายชื่อจาก POS (${members.length} คน) แทนที่รายชื่อเดิม?`)) return
     try {
       const newPlayers = {}
-      activeParty.members.forEach(m => {
+      members.forEach(m => {
+        if (!m.uid) return
         newPlayers[m.uid] = {
           uid: m.uid,
           name: m.name || 'ผู้เล่น',
@@ -1126,14 +1129,39 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           isAlive: true,
           tasks: [],
           ready: false,
+          emergencyUsed: 0,
+          sabotageUsed: 0,
         }
       })
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-        players: newPlayers
-      })
-      showToast(`ซิงค์สมาชิก ${activeParty.members.length} คนจาก POS เรียบร้อย`)
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), { players: newPlayers })
+      setPosSyncSessions([])
+      showToast(`ซิงค์สมาชิก ${Object.keys(newPlayers).length} คนจาก POS เรียบร้อย`)
     } catch (e) {
       showToast('ซิงค์ล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  const handleSyncFromPos = async () => {
+    if (activeParty && (activeParty.members || []).length > 0) {
+      doSyncFromSession(activeParty)
+      return
+    }
+    // activeParty is null or empty → read pos_live directly and let admin pick
+    try {
+      const snap = await getDoc(doc(db, 'pos_live', 'current'))
+      const sessions = snap.exists() ? (snap.data().sessions || []) : []
+      const withMembers = sessions.filter(s => (s.members || []).length > 0)
+      if (withMembers.length === 0) {
+        showToast('ไม่พบสมาชิกในปาร์ตี้ POS ปัจจุบัน — ลองเพิ่มสมาชิกที่ POS ก่อน', 'error')
+        return
+      }
+      if (withMembers.length === 1) {
+        doSyncFromSession(withMembers[0])
+        return
+      }
+      setPosSyncSessions(withMembers)
+    } catch (e) {
+      showToast('โหลด POS ล้มเหลว: ' + e.message, 'error')
     }
   }
 
@@ -5264,6 +5292,53 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       )}
 
       {/* ─── SECRET SABOTAGE PICKER MODAL (FOR IMPOSTOR) ─── */}
+      {posSyncSessions.length > 0 && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 130,
+          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          padding: 16,
+        }} onClick={() => setPosSyncSessions([])}>
+          <div className="au-card" style={{ borderRadius: '22px 22px 0 0', width: '100%', maxWidth: 500, padding: 20 }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 4 }}>เลือกปาร์ตี้ POS</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
+              พบหลาย session — เลือก session ที่ต้องการซิงค์
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {posSyncSessions.map((s, i) => (
+                <button key={i} type="button"
+                  onClick={() => doSyncFromSession(s)}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 14px', borderRadius: 12,
+                    background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)',
+                    color: '#fff', cursor: 'pointer', textAlign: 'left',
+                  }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 800 }}>
+                      {s.label || s.scriptTitle || s.eventName || `ปาร์ตี้ ${i + 1}`}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      {(s.members || []).length} คน
+                      {s.room ? ` · ${s.room}` : ''}
+                      {s.scriptTitle ? ` · ${s.scriptTitle}` : ''}
+                    </div>
+                  </div>
+                  <i className="fas fa-chevron-right" style={{ fontSize: 11, opacity: 0.4 }} />
+                </button>
+              ))}
+            </div>
+            <button type="button" onClick={() => setPosSyncSessions([])}
+              style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.6)',
+                fontSize: 13, cursor: 'pointer' }}>
+              ยกเลิก
+            </button>
+          </div>
+        </div>
+      )}
+
       {showSabotageModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 120,
