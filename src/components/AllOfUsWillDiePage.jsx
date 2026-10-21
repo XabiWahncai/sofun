@@ -171,6 +171,27 @@ function playTaskSuccessSound() {
   } catch {}
 }
 
+function playVictoryFanfare(isEvil) {
+  try {
+    const ctx = getAudioContext()
+    if (!ctx) return
+    const now = ctx.currentTime
+    const notes = isEvil ? [440, 415, 392, 349] : [523.25, 659.25, 783.99, 1046.50]
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'triangle'
+      osc.frequency.setValueAtTime(freq, now + idx * 0.18)
+      gain.gain.setValueAtTime(0.25, now + idx * 0.18)
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.18 + 0.35)
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.start(now + idx * 0.18)
+      osc.stop(now + idx * 0.18 + 0.36)
+    })
+  } catch {}
+}
+
 // ── 20 Distinct Character Colors (Zero Duplicates Policy) ──
 export const TWENTY_PLAYER_COLORS = [
   { id: 'red', hex: '#c62828', name: 'แดง' },
@@ -771,6 +792,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     if (gameDoc.status === 'ended' || gameDoc.status === 'lobby') {
       stopMeetingBuzzer()
       stopSabotageAlarm()
+      if (prevStatusRef.current !== 'ended' && gameDoc.status === 'ended') {
+        playVictoryFanfare(gameDoc.winner === 'impostor')
+      }
     }
 
     prevStatusRef.current = gameDoc.status
@@ -1099,44 +1123,29 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const targetDodo = n >= 4 ? 1 : 0
     const targetSheriff = n >= 3 ? 1 : 0
 
-    // Priority 1: Respect explicit manual role picks from lobby if within target limits
+    // Randomize all players freshly on game start so roles are unpredictable every round
+    const shuffledPool = [...allPlayersList].sort(() => Math.random() - 0.5)
     const assignedRoles = {}
-    const unassignedPlayers = []
 
-    allPlayersList.forEach(p => {
-      if (p.role === 'sheriff' && Object.values(assignedRoles).filter(r => r === 'sheriff').length < targetSheriff) {
-        assignedRoles[p.uid] = 'sheriff'
-      } else if (p.role === 'dodo' && Object.values(assignedRoles).filter(r => r === 'dodo').length < targetDodo) {
-        assignedRoles[p.uid] = 'dodo'
-      } else if (p.role === 'impostor' && Object.values(assignedRoles).filter(r => r === 'impostor').length < targetImpostors) {
-        assignedRoles[p.uid] = 'impostor'
-      } else {
-        unassignedPlayers.push(p)
-      }
-    })
-
-    // Priority 2: Shuffle remaining unassigned players to guarantee exact counts
-    const shuffledPool = [...unassignedPlayers].sort(() => Math.random() - 0.5)
-
-    // Fill remaining Impostors up to targetImpostors (3)
-    while (Object.values(assignedRoles).filter(r => r === 'impostor').length < targetImpostors && shuffledPool.length > 0) {
+    // 1. Assign Impostors (3 for 15 players)
+    for (let i = 0; i < targetImpostors && shuffledPool.length > 0; i++) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'impostor'
     }
 
-    // Fill remaining Dodo up to targetDodo (1)
-    while (Object.values(assignedRoles).filter(r => r === 'dodo').length < targetDodo && shuffledPool.length > 0) {
+    // 2. Assign Dodo (1 for 15 players)
+    for (let i = 0; i < targetDodo && shuffledPool.length > 0; i++) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'dodo'
     }
 
-    // Fill remaining Sheriff up to targetSheriff (1)
-    while (Object.values(assignedRoles).filter(r => r === 'sheriff').length < targetSheriff && shuffledPool.length > 0) {
+    // 3. Assign Sheriff (1 for 15 players)
+    for (let i = 0; i < targetSheriff && shuffledPool.length > 0; i++) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'sheriff'
     }
 
-    // All remaining players become Crewmates (10 players for 15 total)
+    // 4. All remaining players are Crewmates (10 players for 15 total)
     while (shuffledPool.length > 0) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'crewmate'
@@ -1450,7 +1459,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
         if (victim.role === 'dodo') {
           dodoWon = true
-          outcomeText = `${victim.name} คือโดโด้! โดโด้ถูกโหวตออกและเป็นผู้ชนะเกมทันที!`
+          outcomeText = `${victim.name} คือโดโด้! ที่ประชุมโหวตโดโด้ออกตามเป้าหมาย ทำให้ฝ่ายโดโด้ชนะเกมทันที!`
         } else if (victim.role === 'impostor') {
           outcomeText = `${victim.name} ถูกขับออกจากยาน! ผู้เล่นคนนี้คือคนร้าย!`
         } else {
@@ -1467,7 +1476,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           players: updatedPlayers,
           winner: 'dodo',
           winReason: outcomeText,
-          'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: true, voteCounts: counts },
+          gameTimerRunning: false,
+          killCooldownUntil: 0,
+          'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: true, isTie: false, electedTarget, voteCounts: counts },
         })
       } else {
         // Check if all impostors eliminated
@@ -1481,6 +1492,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             players: updatedPlayers,
             winner: 'crewmate',
             winReason: 'โหวตคนร้ายออกหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
+            gameTimerRunning: false,
+            killCooldownUntil: 0,
             'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         } else if (remainingImpostors.length >= remainingCrew.length) {
@@ -1490,6 +1503,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             players: updatedPlayers,
             winner: 'impostor',
             winReason: 'จำนวนคนร้ายเท่ากับคนดีแล้ว! ฝ่ายคนร้ายชนะ!',
+            gameTimerRunning: false,
+            killCooldownUntil: 0,
             'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
         } else {
@@ -1560,10 +1575,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       allPlayersList.forEach(p => {
         resetPlayers[p.uid] = {
           ...p,
+          role: 'crewmate',
           isAlive: true,
           tasks: [],
           ready: false,
-          sheriffShots: p.role === 'sheriff' ? 1 : 0,
+          sheriffShots: 0,
         }
       })
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -4202,12 +4218,22 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     {victim ? (
                       <div style={{ maxWidth: 420, padding: '0 16px' }}>
                         <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', lineHeight: 1.3, marginBottom: 6 }}>
-                          {victim.name} was {wasImpostor ? 'An Impostor.' : 'not An Impostor.'}
+                          {res?.eliminatedRole === 'dodo'
+                            ? `${victim.name} was The Dodo!`
+                            : wasImpostor
+                            ? `${victim.name} was An Impostor.`
+                            : `${victim.name} was not An Impostor.`}
                         </div>
-                        <div style={{ fontSize: 15, fontWeight: 800, color: '#80d8ff', marginBottom: 12 }}>
-                          {remainingImpostorsCount} Impostor{remainingImpostorsCount === 1 ? '' : 's'} remain{remainingImpostorsCount === 1 ? 's' : ''}.
-                        </div>
-                        <div style={{ fontSize: 14, color: wasImpostor ? '#ff5252' : '#a5d6a7', fontWeight: 800 }}>
+                        {res?.eliminatedRole === 'dodo' ? (
+                          <div style={{ fontSize: 16, fontWeight: 900, color: '#ce93d8', marginBottom: 12 }}>
+                            ฝ่ายโดโด้ชนะเกมทันที!
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 15, fontWeight: 800, color: '#80d8ff', marginBottom: 12 }}>
+                            {remainingImpostorsCount} Impostor{remainingImpostorsCount === 1 ? '' : 's'} remain{remainingImpostorsCount === 1 ? 's' : ''}.
+                          </div>
+                        )}
+                        <div style={{ fontSize: 14, color: res?.eliminatedRole === 'dodo' ? '#ce93d8' : wasImpostor ? '#ff5252' : '#a5d6a7', fontWeight: 800 }}>
                           {res?.outcomeText}
                         </div>
                       </div>
@@ -4288,75 +4314,229 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         {/* ─────────────────────────────────────────────────────────── */}
         {/* ─── GAME OVER / VICTORY SCREEN (AUTHENTIC AMONG US) ─────── */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {gameDoc.status === 'ended' && (
-          <div className="au-card" style={{
-            padding: 26,
-            textAlign: 'center', marginTop: 10,
-            border: `3px solid ${gameDoc.winner === 'dodo' ? '#8e24aa' : (gameDoc.winner === 'crewmate' ? '#0288d1' : '#c51111')}`,
-          }}>
-            <div style={{ marginBottom: 16 }}>
-              <AmongUsVisor
-                role={gameDoc.winner || 'crewmate'}
-                size={70}
-              />
-            </div>
+        {gameDoc.status === 'ended' && (() => {
+          const isDodoWin = gameDoc.winner === 'dodo'
+          const isCrewWin = gameDoc.winner === 'crewmate'
+          const isImpWin = gameDoc.winner === 'impostor'
 
+          const dodoPlayer = isDodoWin ? Object.values(gameDoc.players || {}).find(p => p.role === 'dodo') : null
+          const themeColor = isDodoWin ? '#ab47bc' : (isCrewWin ? '#0288d1' : '#c51111')
+          const themeTextColor = isDodoWin ? '#ce93d8' : (isCrewWin ? '#80d8ff' : '#ff5252')
+          const titleText = isDodoWin ? 'VICTORY' : (isCrewWin ? 'VICTORY' : 'DEFEAT / VICTORY')
+          const badgeText = isDodoWin
+            ? 'ฝ่ายโดโด้ชนะเกมทันที! (DODO SOLO WIN)'
+            : isCrewWin
+            ? 'ฝ่ายคนดีเป็นผู้ชนะ! (CREWMATES WIN)'
+            : 'ฝ่ายคนร้ายเป็นผู้ชนะ! (IMPOSTORS WIN)'
+
+          return (
             <div style={{
-              fontSize: 26, fontWeight: 900,
-              color: gameDoc.winner === 'dodo' ? '#ce93d8' : (gameDoc.winner === 'crewmate' ? '#80d8ff' : '#ff5252'),
-              letterSpacing: '0.06em',
-              textShadow: '0 0 12px rgba(255,255,255,0.3)',
+              position: 'fixed',
+              inset: 0,
+              zIndex: 130,
+              background: 'rgba(5, 8, 16, 0.98)',
+              backdropFilter: 'blur(16px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'flex-start',
+              overflowY: 'auto',
+              padding: '36px 16px 80px',
+              boxSizing: 'border-box',
             }}>
-              {gameDoc.winner === 'dodo' ? 'VICTORY - โดโด้ชนะ!' : (gameDoc.winner === 'crewmate' ? 'VICTORY - ฝ่ายคนดีชนะ!' : 'VICTORY - ฝ่ายคนร้ายชนะ!')}
-            </div>
+              <div style={{ maxWidth: 460, width: '100%', textAlign: 'center' }}>
+                {/* Giant Animated Visor */}
+                <div style={{
+                  margin: '0 auto 16px',
+                  width: 90, height: 90,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  filter: `drop-shadow(0 0 24px ${themeColor})`,
+                }}>
+                  <AmongUsVisor
+                    role={gameDoc.winner || 'crewmate'}
+                    size={84}
+                    color={isDodoWin ? (dodoPlayer?.color || '#8e24aa') : null}
+                    isAlive={true}
+                  />
+                </div>
 
-            <div style={{ fontSize: 13.5, color: 'rgba(255,255,255,0.75)', marginTop: 6, marginBottom: 20 }}>
-              {gameDoc.winReason}
-            </div>
+                {/* Title */}
+                <div style={{
+                  fontSize: 34,
+                  fontWeight: 900,
+                  color: themeTextColor,
+                  letterSpacing: '0.08em',
+                  textShadow: `0 0 20px ${themeColor}, 0 0 40px ${themeColor}`,
+                  lineHeight: 1.1,
+                }}>
+                  {titleText}
+                </div>
 
-            {/* Reveal All Roles */}
-            <div style={{
-              background: '#0d131d', borderRadius: 16, padding: 16,
-              border: '2px solid #1f2c42',
-              textAlign: 'left', marginBottom: 20,
-            }}>
-              <div style={{ fontSize: 11, fontWeight: 900, color: '#fbc02d', marginBottom: 10, letterSpacing: '0.06em' }}>
-                <i className="fas fa-id-card" style={{ marginRight: 6 }} />
-                เฉลยบทบาทผู้เล่นทุกคน
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {allPlayersList.map(p => {
-                  const roleColor = p.role === 'impostor' ? '#ff5252' : (p.role === 'dodo' ? '#ce93d8' : (p.role === 'sheriff' ? '#ffd54f' : '#80d8ff'))
-                  const roleLabel = p.role === 'impostor' ? 'คนร้าย (Impostor)' : (p.role === 'dodo' ? 'โดโด้ (Dodo)' : (p.role === 'sheriff' ? 'นายอำเภอ (Sheriff)' : 'คนดี (Crewmate)'))
-                  return (
-                    <div key={p.uid} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                      padding: '8px 10px', borderRadius: 10,
-                      background: 'rgba(255,255,255,0.03)',
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <AmongUsVisor role={p.role} isAlive={p.isAlive} size={26} color={p.color || null} />
-                        <span style={{ fontWeight: 800, color: '#fff', fontSize: 13 }}>{p.name}</span>
-                      </div>
-                      <span style={{ fontWeight: 900, color: roleColor, fontSize: 12 }}>{roleLabel}</span>
+                {/* Subtitle Badge */}
+                <div style={{
+                  display: 'inline-block',
+                  background: `rgba(${isDodoWin ? '171, 71, 188' : isCrewWin ? '2, 136, 209' : '197, 17, 17'}, 0.22)`,
+                  border: `1.5px solid ${themeColor}`,
+                  borderRadius: 20,
+                  padding: '6px 18px',
+                  color: '#fff',
+                  fontSize: 13.5,
+                  fontWeight: 900,
+                  marginTop: 10,
+                  marginBottom: 16,
+                  letterSpacing: '0.04em',
+                }}>
+                  {badgeText}
+                </div>
+
+                {/* Win Reason Box */}
+                <div style={{
+                  fontSize: 14,
+                  color: '#fff',
+                  lineHeight: 1.6,
+                  fontWeight: 700,
+                  marginBottom: 20,
+                  background: 'rgba(255, 255, 255, 0.04)',
+                  border: `1.5px solid ${themeColor}`,
+                  borderRadius: 14,
+                  padding: '12px 16px',
+                }}>
+                  {gameDoc.winReason || (isDodoWin && dodoPlayer ? `${dodoPlayer.name} คือโดโด้! หลอกให้ที่ประชุมโหวตขับตนเองออกได้สำเร็จ ทำให้ฝ่ายโดโด้ชนะเกมทันที!` : 'จบเกม')}
+                </div>
+
+                {/* Vote Tally Box (if game ended via vote) */}
+                {gameDoc.meeting?.result?.voteCounts && Object.keys(gameDoc.meeting.result.voteCounts).length > 0 && (
+                  <div style={{
+                    background: '#0d131d',
+                    borderRadius: 14,
+                    padding: '14px 16px',
+                    border: '1.5px solid #1f2c42',
+                    textAlign: 'left',
+                    marginBottom: 20,
+                  }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 900, color: '#ffd54f', marginBottom: 10, letterSpacing: '0.04em' }}>
+                      <i className="fas fa-poll" style={{ marginRight: 6 }} />
+                      สรุปผลคะแนนโหวตในที่ประชุม (VOTE TALLY)
                     </div>
-                  )
-                })}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {Object.entries(gameDoc.meeting.result.voteCounts).map(([targetUid, count]) => {
+                        const p = targetUid === 'skip' ? null : gameDoc.players?.[targetUid]
+                        const isTargetDodo = p?.role === 'dodo'
+                        return (
+                          <div key={targetUid} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            fontSize: 13, color: '#fff',
+                            padding: '6px 10px', borderRadius: 8,
+                            background: isTargetDodo ? 'rgba(171, 71, 188, 0.25)' : 'rgba(255, 255, 255, 0.03)',
+                            border: isTargetDodo ? '1px solid #ab47bc' : '1px solid rgba(255, 255, 255, 0.05)',
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              {p ? (
+                                <>
+                                  <AmongUsVisor color={p.color || '#78909c'} size={24} isAlive={p.isAlive} />
+                                  <span style={{ fontWeight: 800 }}>
+                                    {p.name} {isTargetDodo && <span style={{ color: '#ce93d8', fontSize: 11.5 }}>(โดโด้)</span>}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <i className="fas fa-forward" style={{ color: '#9e9e9e', fontSize: 12 }} />
+                                  <span style={{ fontWeight: 800, color: '#9e9e9e' }}>SKIP VOTE</span>
+                                </>
+                              )}
+                            </div>
+                            <span style={{
+                              fontWeight: 900,
+                              color: isTargetDodo ? '#ce93d8' : '#ff5252',
+                              background: isTargetDodo ? 'rgba(171, 71, 188, 0.35)' : 'rgba(255, 82, 82, 0.18)',
+                              padding: '2px 8px', borderRadius: 6,
+                              border: `1px solid ${isTargetDodo ? '#ab47bc' : 'rgba(255, 82, 82, 0.3)'}`,
+                              fontSize: 12,
+                            }}>
+                              {count} เสียง
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Reveal All Roles */}
+                <div style={{
+                  background: '#0d131d',
+                  borderRadius: 16,
+                  padding: 16,
+                  border: '2px solid #1f2c42',
+                  textAlign: 'left',
+                  marginBottom: 20,
+                }}>
+                  <div style={{ fontSize: 11.5, fontWeight: 900, color: '#fbc02d', marginBottom: 12, letterSpacing: '0.06em' }}>
+                    <i className="fas fa-id-card" style={{ marginRight: 6 }} />
+                    เฉลยบทบาทผู้เล่นทุกคน ({allPlayersList.length} คน)
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {allPlayersList.map(p => {
+                      const roleColor = p.role === 'impostor' ? '#ff5252' : (p.role === 'dodo' ? '#ce93d8' : (p.role === 'sheriff' ? '#ffd54f' : '#80d8ff'))
+                      const roleLabel = p.role === 'impostor' ? 'คนร้าย (Impostor)' : (p.role === 'dodo' ? 'โดโด้ (Dodo)' : (p.role === 'sheriff' ? 'นายอำเภอ (Sheriff)' : 'คนดี (Crewmate)'))
+                      return (
+                        <div key={p.uid} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          padding: '8px 12px', borderRadius: 10,
+                          background: p.role === 'dodo' ? 'rgba(171, 71, 188, 0.18)' : 'rgba(255,255,255,0.03)',
+                          border: p.role === 'dodo' ? '1px solid rgba(206, 147, 216, 0.4)' : '1px solid rgba(255,255,255,0.04)',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <AmongUsVisor role={p.role} isAlive={p.isAlive} size={28} color={p.color || null} />
+                            <div>
+                              <div style={{ fontWeight: 800, color: '#fff', fontSize: 13.5 }}>{p.name}</div>
+                              <div style={{ fontSize: 10.5, color: p.isAlive ? '#81c784' : '#e57373', fontWeight: 700 }}>
+                                {p.isAlive ? 'รอดชีวิต' : 'ถูกกำจัด'}
+                              </div>
+                            </div>
+                          </div>
+                          <span style={{ fontWeight: 900, color: roleColor, fontSize: 12, letterSpacing: '0.02em' }}>
+                            {roleLabel}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                {hasAdminPerm ? (
+                  <button
+                    type="button"
+                    onClick={handleResetGame}
+                    className="au-btn au-btn-red"
+                    style={{ width: '100%', padding: '14px', fontSize: 14.5, fontWeight: 900 }}
+                  >
+                    <i className="fas fa-redo-alt" style={{ marginRight: 8 }} />
+                    เริ่มเกมรอบใหม่ (กลับสู่ล็อบบี้)
+                  </button>
+                ) : (
+                  <div style={{
+                    padding: '14px',
+                    borderRadius: 12,
+                    background: 'rgba(255,255,255,0.04)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.7)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}>
+                    <i className="fas fa-spinner fa-spin" style={{ color: themeTextColor }} />
+                    กำลังรอ Game Master เริ่มเกมรอบใหม่...
+                  </div>
+                )}
               </div>
             </div>
-
-            {hasAdminPerm && (
-              <button
-                type="button"
-                onClick={handleResetGame}
-                className="au-btn au-btn-red"
-                style={{ width: '100%', padding: '13px', fontSize: 14 }}
-              >
-                เริ่มเกมรอบใหม่ (กลับสู่ล็อบบี้)
-              </button>
-            )}
-          </div>
-        )}
+          )
+        })()}
 
       </main>
 
