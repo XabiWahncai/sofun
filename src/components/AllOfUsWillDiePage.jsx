@@ -431,10 +431,10 @@ export const BUILDING_FLOORS = [
 
 // ── Default Sabotages Pool ─────────────────────────────
 export const DEFAULT_SABOTAGE_POOL = [
-  { id: 'sab_lights', title: 'ไฟดับ (Lights Out)', desc: 'ลดการมองเห็น คนดีต้องรีบไปแก้ปัญหากับแอดมินที่เคาน์เตอร์', countdownSeconds: 90 },
-  { id: 'sab_o2', title: 'อากาศรั่ว (O2 Depletion)', desc: 'มีเวลานับถอยหลัง คนดีต้องรีบไปกู้สถานการณ์กับแอดมิน', countdownSeconds: 90 },
-  { id: 'sab_doors', title: 'ประตูล็อค (Doors Locked)', desc: 'ประตูปิดกั้น คนดีต้องช่วยกันเคลียร์ทางกับแอดมิน', countdownSeconds: 90 },
-  { id: 'sab_comms', title: 'ป่วนระบบสื่อสาร (Comms Jammed)', desc: 'แถบความคืบหน้าภารกิจจะถูกซ่อนชั่วคราว', countdownSeconds: 90 },
+  { id: 'sab_lights', title: 'ไฟดับ (Lights Out)', desc: 'ลดการมองเห็น คนดีต้องรีบไปแก้ปัญหากับแอดมินที่เคาน์เตอร์', countdownSeconds: 90, timeoutAction: 'continue' },
+  { id: 'sab_o2', title: 'อากาศรั่ว (O2 Depletion)', desc: 'มีเวลานับถอยหลัง คนดีต้องรีบไปกู้สถานการณ์กับแอดมิน', countdownSeconds: 90, timeoutAction: 'end_game' },
+  { id: 'sab_doors', title: 'ประตูล็อค (Doors Locked)', desc: 'ประตูปิดกั้น คนดีต้องช่วยกันเคลียร์ทางกับแอดมิน', countdownSeconds: 90, timeoutAction: 'continue' },
+  { id: 'sab_comms', title: 'ป่วนระบบสื่อสาร (Comms Jammed)', desc: 'แถบความคืบหน้าภารกิจจะถูกซ่อนชั่วคราว', countdownSeconds: 90, timeoutAction: 'continue' },
 ]
 
 // ── Default Tasks Pool for Real Life Boardgame Cafe ───
@@ -518,6 +518,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [newSabDesc, setNewSabDesc] = useState('')
   const [newSabCountdown, setNewSabCountdown] = useState(90)
   const [editingSabotage, setEditingSabotage] = useState(null)
+  const [newSabTimeoutAction, setNewSabTimeoutAction] = useState('continue')
+  const [adminMeetingMinimized, setAdminMeetingMinimized] = useState(false)
 
   const [currentTimeSec, setCurrentTimeSec] = useState(0)
   const [meetingTimeSec, setMeetingTimeSec] = useState(0)
@@ -631,6 +633,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         const sabElapsed = Math.floor((now - (gameDoc.sabotage.startedAt || now)) / 1000)
         const sabRem = Math.max(0, (gameDoc.sabotage.countdownSeconds || 90) - sabElapsed)
         setSabotageTimeSec(sabRem)
+
+        // Check timeout action when countdown reaches 0
+        if (sabRem === 0 && hasAdminPerm) {
+          if (gameDoc.sabotage.timeoutAction === 'end_game') {
+            handleEndGame('impostor', `กู้สถานการณ์ Sabotage ไม่ทัน! ${gameDoc.sabotage.title} ทำให้ฝ่ายคนร้ายชนะ!`)
+          } else {
+            resolveSabotage()
+            showToast(`หมดเวลา Sabotage (${gameDoc.sabotage.title}) แล้ว! ระบบเคลียร์สถานะคืนปกติและเกมดำเนินต่อไป`)
+          }
+        }
       }
 
       // Kill Cooldown / Peace Period Timer (No kills allowed after game start or meetings)
@@ -652,7 +664,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       // Meeting Discussion / Voting Timer
       if (gameDoc.meeting && (gameDoc.status === 'meeting_discussion' || gameDoc.status === 'meeting_voting')) {
         const meetElapsed = Math.floor((now - (gameDoc.meeting.startTime || now)) / 1000)
-        const totalDuration = gameDoc.meeting.durationSeconds || 180 // 3 minutes total
+        const totalDuration = gameDoc.meeting.durationSeconds || 210 // 3 minutes 30 seconds total (210s)
         const meetRem = Math.max(0, totalDuration - meetElapsed)
         setMeetingTimeSec(meetRem)
 
@@ -1119,7 +1131,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   }
 
   // Admin: Trigger preset classic sabotage
-  const handleTriggerPresetSabotage = async (id, title, desc, countdown = 90) => {
+  const handleTriggerPresetSabotage = async (id, title, desc, countdown = 90, timeoutAction = 'continue') => {
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         sabotage: {
@@ -1129,6 +1141,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           desc,
           status: 'active',
           countdownSeconds: countdown,
+          timeoutAction: timeoutAction || 'continue',
           startedAt: Date.now(),
         }
       })
@@ -1185,10 +1198,22 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const durationMins = gameDoc.gameDurationMinutes || 20
     const durationSecs = durationMins * 60
 
-    // ── Guaranteed Role Distribution: 3 Impostors, 1 Dodo, 1 Sheriff, 10 Crewmates ──
+    // ── Scalable Role Distribution based on Player Count ──
+    // • 8 – 9 players: Impostors 1-2 (Admin choice, default 1), Sheriff 1, Dodo 1, remainder Crewmates
+    // • 10 – 12 players: Impostors 2, Sheriff 1, Dodo 1, remainder Crewmates
+    // • 13 – 15 players: Impostors 3, Sheriff 1, Dodo 1, remainder Crewmates
+    // • < 8 players (testing/few players): Impostors 1, Sheriff 1 (if >=3), Dodo 1 (if >=4), remainder Crewmates
     const n = allPlayersList.length
-    // In a 15-player game, strictly enforce: 3 Impostors, 1 Dodo, 1 Sheriff, 10 Crewmates
-    const targetImpostors = n >= 15 ? 3 : Math.min(3, Math.max(1, Math.floor(n * 0.2)))
+    let targetImpostors = 1
+    if (n >= 13) {
+      targetImpostors = 3
+    } else if (n >= 10) {
+      targetImpostors = 2
+    } else if (n >= 8) {
+      targetImpostors = Number(gameDoc.impostorCountChoice89) === 2 ? 2 : 1
+    } else {
+      targetImpostors = 1
+    }
     const targetDodo = n >= 4 ? 1 : 0
     const targetSheriff = n >= 3 ? 1 : 0
 
@@ -1345,7 +1370,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   }
 
   // Impostor requests Sabotage - sends request to admin for confirmation
-  const requestSabotage = async (title, desc, countdownSeconds = 90) => {
+  const requestSabotage = async (title, desc, countdownSeconds = 90, timeoutAction = 'continue') => {
     if (gameDoc.sabotage?.active) {
       showToast('มีเหตุการณ์ Sabotage ในระบบอยู่แล้ว', 'error')
       return
@@ -1360,6 +1385,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           requestedBy: myUid,
           status: 'pending_approval',
           countdownSeconds: Number(countdownSeconds) || 90,
+          timeoutAction: timeoutAction || 'continue',
           startedAt: 0,
         }
       })
@@ -1442,7 +1468,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           } : null,
           type: isReport ? 'body_report' : 'emergency_button',
           startTime: now,
-          durationSeconds: 180, // 3 minutes
+          durationSeconds: 210, // 3 minutes 30 seconds (210s)
           votes: {},
           result: null,
         }
@@ -1473,15 +1499,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  // Admin officially starts discussion countdown (3 mins)
+  // Admin officially starts discussion countdown (3.5 mins = 210s)
   const startDiscussionPhase = async () => {
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         status: 'meeting_discussion',
         'meeting.startTime': Date.now(),
-        'meeting.durationSeconds': 180,
+        'meeting.durationSeconds': 210,
       })
-      showToast('เริ่มจับเวลาประชุม 3 นาทีแล้ว')
+      showToast('เริ่มจับเวลาประชุม 3 นาทีครึ่งแล้ว')
     } catch (e) {
       showToast('เริ่มประชุมล้มเหลว', 'error')
     }
@@ -1492,7 +1518,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         status: 'meeting_voting',
-        'meeting.startTime': Date.now() - 120000, // advance clock to last 60s
+        'meeting.startTime': Date.now() - 150000, // advance clock to last 60s (210s - 60s = 150s)
       })
       showToast('เปิดให้ลงคะแนนโหวตทันที')
     } catch (e) {
@@ -1629,14 +1655,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   // Resume game after meeting result
   const handleResumeGame = async () => {
     try {
+      // Sheriff has only 1 shot per entire game - no reloading after meetings
       const updatedPlayers = { ...(gameDoc.players || {}) }
       let sheriffUpdated = false
-      Object.keys(updatedPlayers).forEach(uid => {
-        if (updatedPlayers[uid].role === 'sheriff' && updatedPlayers[uid].isAlive) {
-          updatedPlayers[uid] = { ...updatedPlayers[uid], sheriffShots: 1 }
-          sheriffUpdated = true
-        }
-      })
 
       const cooldownSec = Number(gameDoc.killCooldownSeconds) > 0 ? Number(gameDoc.killCooldownSeconds) : 30
       const emergencyCdSec = Number(gameDoc.emergencyCooldownSeconds) > 0 ? Number(gameDoc.emergencyCooldownSeconds) : 60
@@ -1689,6 +1710,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           sheriffShots: 0,
         }
       })
+      setAdminMeetingMinimized(false)
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
         status: 'waiting',
         gameSecondsRemaining: (gameDoc.gameDurationMinutes || 20) * 60,
@@ -1886,6 +1908,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       title: newSabTitle.trim(),
       desc: newSabDesc.trim() || 'สถานการณ์ฉุกเฉิน คนดีต้องรีบไปแก้ปัญหากับแอดมิน',
       countdownSeconds: Math.max(10, Number(newSabCountdown) || 90),
+      timeoutAction: newSabTimeoutAction || 'continue',
     }
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -1908,6 +1931,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       title: editingSabotage.title.trim(),
       desc: (editingSabotage.desc || '').trim(),
       countdownSeconds: Math.max(10, Number(editingSabotage.countdownSeconds) || 90),
+      timeoutAction: editingSabotage.timeoutAction || 'continue',
     } : s)
     try {
       await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -2128,17 +2152,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       }}>
         <div
           onClick={() => {
-            if (gameDoc.status !== 'playing' || !isAlive) return
+            if (gameDoc.status !== 'playing') return
             if (myRole === 'impostor') {
+              // Dead Impostors can still sabotage in Among Us
               setShowSabotageModal(true)
             } else if (myRole === 'sheriff') {
+              if (!isAlive) return
               if (killCooldownSec > 0) {
                 showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
                 return
               }
               const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
               if (shots <= 0) {
-                showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
+                showToast('คุณใช้สิทธิ์ยิงไปแล้ว (มีสิทธิ์ยิง 1 นัดต่อทั้งเกม)', 'error')
                 return
               }
               setSelectedSheriffTarget(null)
@@ -2365,6 +2391,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             <div>
               <div style={{ fontSize: 13, fontWeight: 900, display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span>{gameDoc.sabotage.title}</span>
+                <span style={{
+                  fontSize: 10,
+                  background: gameDoc.sabotage.timeoutAction === 'end_game' ? 'rgba(183, 28, 28, 0.7)' : 'rgba(46, 125, 50, 0.7)',
+                  border: `1px solid ${gameDoc.sabotage.timeoutAction === 'end_game' ? '#ff5252' : '#81c784'}`,
+                  padding: '1px 6px', borderRadius: 4, fontWeight: 800,
+                }}>
+                  {gameDoc.sabotage.timeoutAction === 'end_game' ? 'หมดเวลา: เกมจบ' : 'หมดเวลา: เกมเดินต่อ'}
+                </span>
                 <span style={{
                   fontSize: 10, background: 'rgba(0,0,0,0.3)',
                   padding: '2px 7px', borderRadius: 6, fontWeight: 800,
@@ -2759,30 +2793,78 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     </div>
                   </div>
 
-                  {/* Fixed Role Distribution Breakdown Banner */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    background: 'rgba(255, 255, 255, 0.04)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                    borderRadius: 10,
-                    marginBottom: 14,
-                    fontSize: 11,
-                    fontWeight: 700,
-                  }}>
-                    <span style={{ color: 'rgba(255,255,255,0.7)' }}>สัดส่วนบทบาท (15 คน):</span>
-                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                      <span style={{ color: '#ff5252' }}>คนร้าย 3</span>
-                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
-                      <span style={{ color: '#ce93d8' }}>โดโด้ 1</span>
-                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
-                      <span style={{ color: '#ffd54f' }}>นายอำเภอ 1</span>
-                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
-                      <span style={{ color: '#80d8ff' }}>คนดี 10</span>
-                    </div>
-                  </div>
+                  {/* Dynamic Scalable Role Distribution Breakdown Banner */}
+                  {(() => {
+                    const n = allPlayersList.length
+                    let impostorCount = 1
+                    if (n >= 13) impostorCount = 3
+                    else if (n >= 10) impostorCount = 2
+                    else if (n >= 8) impostorCount = Number(gameDoc.impostorCountChoice89) === 2 ? 2 : 1
+                    else impostorCount = 1
+
+                    const dodoCount = n >= 4 ? 1 : 0
+                    const sheriffCount = n >= 3 ? 1 : 0
+                    const crewCount = Math.max(0, n - (impostorCount + dodoCount + sheriffCount))
+
+                    return (
+                      <div style={{
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: 10,
+                        padding: '10px 12px',
+                        marginBottom: 14,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: (n >= 8 && n <= 9) ? 8 : 0 }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.7)' }}>
+                            สัดส่วนบทบาท ({n} คน):
+                          </span>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 11, fontWeight: 800 }}>
+                            <span style={{ color: '#ff5252' }}>คนร้าย {impostorCount}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                            <span style={{ color: '#ce93d8' }}>โดโด้ {dodoCount}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                            <span style={{ color: '#ffd54f' }}>นายอำเภอ {sheriffCount}</span>
+                            <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                            <span style={{ color: '#80d8ff' }}>ลูกเรือ {crewCount}</span>
+                          </div>
+                        </div>
+
+                        {/* Admin Selector for 8-9 players: choose 1 or 2 Impostors */}
+                        {n >= 8 && n <= 9 && (
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            paddingTop: 8,
+                            borderTop: '1px solid rgba(255,255,255,0.08)',
+                            fontSize: 11,
+                          }}>
+                            <span style={{ color: '#ffcdd2', fontWeight: 700 }}>
+                              จำนวนคนร้าย (8-9 คน):
+                            </span>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                type="button"
+                                onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), { impostorCountChoice89: 1 })}
+                                className={`au-btn ${impostorCount === 1 ? 'au-btn-red' : 'au-btn-dark'}`}
+                                style={{ padding: '3px 10px', fontSize: 11 }}
+                              >
+                                1 คน
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), { impostorCountChoice89: 2 })}
+                                className={`au-btn ${impostorCount === 2 ? 'au-btn-red' : 'au-btn-dark'}`}
+                                style={{ padding: '3px 10px', fontSize: 11 }}
+                              >
+                                2 คน
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
 
                   <button
                     type="button"
@@ -3916,6 +3998,30 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   }}
                 />
 
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '4px 2px' }}>
+                  <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>
+                    ผลเมื่อหมดเวลา:
+                  </span>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => setNewSabTimeoutAction('end_game')}
+                      className={`au-btn ${newSabTimeoutAction === 'end_game' ? 'au-btn-red' : 'au-btn-dark'}`}
+                      style={{ padding: '4px 10px', fontSize: 11 }}
+                    >
+                      เกมจบ (คนร้ายชนะ)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewSabTimeoutAction('continue')}
+                      className={`au-btn ${newSabTimeoutAction !== 'end_game' ? 'au-btn-green' : 'au-btn-dark'}`}
+                      style={{ padding: '4px 10px', fontSize: 11 }}
+                    >
+                      เกมเดินต่อ (เคลียร์ปกติ)
+                    </button>
+                  </div>
+                </div>
+
                 <button
                   type="button"
                   onClick={handleAddSabotageToPool}
@@ -3953,6 +4059,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         }}>
                           {s.countdownSeconds || 90} วินาที
                         </span>
+                        <span style={{
+                          padding: '1px 6px', borderRadius: 4,
+                          fontSize: 9.5, fontWeight: 800,
+                          background: s.timeoutAction === 'end_game' ? 'rgba(239, 83, 80, 0.25)' : 'rgba(76, 175, 80, 0.25)',
+                          color: s.timeoutAction === 'end_game' ? '#ff8a80' : '#81c784',
+                          border: `1px solid ${s.timeoutAction === 'end_game' ? '#ef5350' : '#66bb6a'}`,
+                        }}>
+                          {s.timeoutAction === 'end_game' ? 'หมดเวลา: คนร้ายชนะ' : 'หมดเวลา: เกมเดินต่อ'}
+                        </span>
                       </div>
                       <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {s.desc}
@@ -3966,6 +4081,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           title: s.title,
                           desc: s.desc || '',
                           countdownSeconds: s.countdownSeconds || 90,
+                          timeoutAction: s.timeoutAction || 'continue',
                         })}
                         style={{
                           background: 'rgba(255,255,255,0.06)', border: 'none', color: '#90caf9',
@@ -4612,10 +4728,38 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         {/* ─────────────────────────────────────────────────────────── */}
         {/* ─── MEETING FULL-SCREEN OVERLAY (THE SKELD TABLET) ──────── */}
         {/* ─────────────────────────────────────────────────────────── */}
-        {(gameDoc.status === 'meeting_called' ||
+        {/* Floating Meeting Pill for Admin when Minimized */}
+        {adminMeetingMinimized && hasAdminPerm && (gameDoc.status === 'meeting_called' ||
           gameDoc.status === 'meeting_discussion' ||
           gameDoc.status === 'meeting_voting' ||
           gameDoc.status === 'meeting_result') && (
+          <div style={{
+            position: 'fixed', top: 12, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 9999, background: '#121722', border: '2px solid #ef5350',
+            borderRadius: 30, padding: '8px 16px', display: 'flex', alignItems: 'center', gap: 12,
+            boxShadow: '0 6px 24px rgba(0,0,0,0.85)',
+            animation: 'auEmergencyPulse 1.8s infinite',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontSize: 12, fontWeight: 800 }}>
+              <i className="fas fa-bullhorn" style={{ color: '#ef5350' }} />
+              <span>การประชุมกำลังดำเนินอยู่ ({fmtTime(meetingTimeSec)})</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAdminMeetingMinimized(false)}
+              className="au-btn au-btn-yellow"
+              style={{ padding: '4px 12px', fontSize: 11, borderRadius: 20 }}
+            >
+              <i className="fas fa-expand-alt" style={{ marginRight: 4 }} />
+              กลับเข้าห้องประชุม
+            </button>
+          </div>
+        )}
+
+        {(gameDoc.status === 'meeting_called' ||
+          gameDoc.status === 'meeting_discussion' ||
+          gameDoc.status === 'meeting_voting' ||
+          gameDoc.status === 'meeting_result') && !adminMeetingMinimized && (
           <div style={{
             position: 'fixed', inset: 0, zIndex: 100,
             background: 'rgba(4, 7, 15, 0.98)',
@@ -4631,6 +4775,31 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             display: 'flex', flexDirection: 'column',
             padding: '16px 12px', overflowY: 'auto',
           }}>
+            {/* Admin Minimize Button */}
+            {hasAdminPerm && (
+              <button
+                type="button"
+                onClick={() => setAdminMeetingMinimized(true)}
+                className="au-btn au-btn-dark"
+                style={{
+                  position: 'fixed',
+                  top: 14,
+                  right: 14,
+                  padding: '7px 12px',
+                  fontSize: 11.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  zIndex: 130,
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.6)',
+                }}
+                title="ย่อหน้าต่างประชุมเพื่อกลับไปดูแดชบอร์ดหลักของแอดมิน"
+              >
+                <i className="fas fa-compress-alt" />
+                <span>ย่อหน้าต่าง / แดชบอร์ดแอดมิน</span>
+              </button>
+            )}
+
             <div style={{ maxWidth: 560, width: '100%', margin: '0 auto', flex: 1, display: 'flex', flexDirection: 'column' }}>
 
               {/* Meeting Phase 1: Siren Alarm / Called */}
@@ -4707,27 +4876,93 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               {/* Meeting Phase 2 & 3: Discussion & Skeld Voting Table */}
               {(gameDoc.status === 'meeting_discussion' || gameDoc.status === 'meeting_voting') && (
                 <div className="au-card" style={{ padding: 18, border: '3.5px solid #28374d', borderRadius: 22 }}>
-                  {/* Tablet Header */}
+                  {/* Tablet Header & 3-Phase Informative Banner */}
                   <div style={{ textAlign: 'center', marginBottom: 14 }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.08em', color: '#fff' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.08em', color: '#fff', marginBottom: 8 }}>
                       WHO IS AN IMPOSTOR?
                     </div>
-                    <div style={{
-                      display: 'inline-block',
-                      marginTop: 4,
-                      padding: '2px 10px',
-                      borderRadius: 6,
-                      fontSize: 11,
-                      fontWeight: 900,
-                      background: gameDoc.status === 'meeting_voting' ? 'rgba(229, 57, 53, 0.2)' : 'rgba(251, 192, 45, 0.15)',
-                      color: gameDoc.status === 'meeting_voting' ? '#ff5252' : '#fbc02d',
-                      border: `1px solid ${gameDoc.status === 'meeting_voting' ? '#ff5252' : '#fbc02d'}`,
-                    }}>
-                      {gameDoc.status === 'meeting_voting' ? 'ช่วงลงคะแนนโหวต (1 นาทีสุดท้าย)' : 'ช่วงสอบสวนและอภิปราย (ยังไม่เปิดโหวต)'}
+
+                    {/* 3-Phase Meeting Flow Indicator */}
+                    {(() => {
+                      const isVoting = gameDoc.status === 'meeting_voting' || meetingTimeSec <= 60
+                      const isReporterBriefing = !isVoting && meetingTimeSec > 180
+                      const reporterName = gameDoc.meeting?.calledBy?.name || 'ผู้แจ้ง'
+                      const isReportType = gameDoc.meeting?.type === 'body_report'
+
+                      if (isReporterBriefing) {
+                        return (
+                          <div style={{
+                            background: 'rgba(239, 83, 80, 0.2)',
+                            border: '2px solid #ef5350',
+                            borderRadius: 14,
+                            padding: '10px 14px',
+                            marginBottom: 10,
+                            boxShadow: '0 4px 16px rgba(239, 83, 80, 0.25)',
+                            animation: 'auEmergencyPulse 1.8s infinite',
+                          }}>
+                            <div style={{ fontSize: 13, fontWeight: 900, color: '#ffcdd2', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                              <i className="fas fa-microphone" style={{ color: '#ff5252' }} />
+                              <span>ช่วง 30 วินาทีแรก: ให้เฉพาะผู้แจ้งพูดเท่านั้น!</span>
+                            </div>
+                            <div style={{ fontSize: 11.5, color: '#fff', marginTop: 3, fontWeight: 700 }}>
+                              {isReportType ? `ผู้พบศพ (${reporterName})` : `ผู้เรียกประชุม (${reporterName})`} กำลังอธิบายเหตุการณ์ — ห้ามผู้อื่นขัดจังหวะ
+                            </div>
+                            <div style={{ fontSize: 10.5, color: '#ffab91', marginTop: 3 }}>
+                              เหลือเวลาชี้แจงเดี่ยวอีก: <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 12.5, color: '#fff' }}>{meetingTimeSec - 180}</span>s
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      if (!isVoting) {
+                        return (
+                          <div style={{
+                            background: 'rgba(251, 192, 45, 0.15)',
+                            border: '2px solid #fbc02d',
+                            borderRadius: 14,
+                            padding: '10px 14px',
+                            marginBottom: 10,
+                          }}>
+                            <div style={{ fontSize: 13, fontWeight: 900, color: '#ffe082', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                              <i className="fas fa-comments" style={{ color: '#fbc02d' }} />
+                              <span>ช่วงพูดคุยสอบสวนและอภิปรายทั่วไป (2 นาที)</span>
+                            </div>
+                            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+                              ทุกคนพูดคุย ซักถาม และแลกเปลี่ยนข้อมูลได้อิสระ (ยังไม่เปิดโหวต)
+                            </div>
+                            <div style={{ fontSize: 10.5, color: '#ffe082', marginTop: 2 }}>
+                              เหลือเวลาคุยอีก: <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 12, color: '#fff' }}>{meetingTimeSec - 60}</span>s ก่อนเริ่มโหวต
+                            </div>
+                          </div>
+                        )
+                      }
+
+                      return (
+                        <div style={{
+                          background: 'rgba(229, 57, 53, 0.2)',
+                          border: '2px solid #ff5252',
+                          borderRadius: 14,
+                          padding: '10px 14px',
+                          marginBottom: 10,
+                          animation: 'auEmergencyPulse 1.5s infinite',
+                        }}>
+                          <div style={{ fontSize: 13, fontWeight: 900, color: '#ff5252', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <i className="fas fa-vote-yea" />
+                            <span>ช่วงลงคะแนนโหวต (1 นาทีสุดท้าย)</span>
+                          </div>
+                          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', marginTop: 2 }}>
+                            กดเลือกผู้เล่นที่ต้องการโหวตออก หรือกด SKIP VOTE เพื่อข้าม
+                          </div>
+                        </div>
+                      )
+                    })()}
+
+                    <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                      เวลาประชุมที่เหลือ
                     </div>
                     <div style={{
                       fontSize: 34, fontWeight: 900, color: '#ff5252',
-                      fontFamily: 'monospace', letterSpacing: '0.06em', marginTop: 4,
+                      fontFamily: 'monospace', letterSpacing: '0.06em', marginTop: 2,
                       textShadow: '0 0 10px rgba(255, 82, 82, 0.5)',
                     }}>
                       {fmtTime(meetingTimeSec)}
@@ -4787,6 +5022,43 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           </div>
 
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            {/* Admin In-Meeting Alive/Dead Toggle */}
+                            {hasAdminPerm && (
+                              <button
+                                type="button"
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const newAlive = !p.isAlive
+                                  const updates = {
+                                    [`players.${p.uid}.isAlive`]: newAlive,
+                                  }
+                                  // If marking player dead during voting, remove their vote if they already voted
+                                  if (!newAlive && gameDoc.meeting?.votes?.[p.uid]) {
+                                    updates[`meeting.votes.${p.uid}`] = deleteField()
+                                  }
+                                  try {
+                                    await updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
+                                    showToast(`ปรับสถานะ ${p.name} เป็น ${newAlive ? 'ยังมีชีวิต' : 'เสียชีวิตแล้ว'}`)
+                                  } catch (err) {
+                                    showToast('ปรับสถานะล้มเหลว: ' + err.message, 'error')
+                                  }
+                                }}
+                                style={{
+                                  padding: '4px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 10,
+                                  fontWeight: 800,
+                                  background: p.isAlive ? 'rgba(239, 83, 80, 0.2)' : 'rgba(76, 175, 80, 0.25)',
+                                  color: p.isAlive ? '#ff8a80' : '#81c784',
+                                  border: `1px solid ${p.isAlive ? '#ef5350' : '#66bb6a'}`,
+                                  cursor: 'pointer',
+                                }}
+                                title={p.isAlive ? 'คลิกเพื่อเปลี่ยนเป็นสถานะ: ตาย' : 'คลิกเพื่อเปลี่ยนเป็นสถานะ: ชุบชีวิต'}
+                              >
+                                {p.isAlive ? 'ระบุว่าตาย' : 'ชุบชีวิต'}
+                              </button>
+                            )}
+
                             {/* DEAD Badge if player was eliminated */}
                             {isTargetDead && (
                               <span style={{
@@ -5355,7 +5627,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 <button
                   key={s.id || s.title}
                   type="button"
-                  onClick={() => requestSabotage(s.title, s.desc, s.countdownSeconds)}
+                  onClick={() => requestSabotage(s.title, s.desc, s.countdownSeconds, s.timeoutAction)}
                   style={{
                     padding: '11px 14px', borderRadius: 12,
                     background: '#0d131d',
@@ -5942,6 +6214,30 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     color: '#fff', fontSize: 12, fontFamily: 'inherit',
                   }}
                 />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 5, display: 'block' }}>
+                  ผลเมื่อหมดเวลา (Timeout Action)
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  <button
+                    type="button"
+                    onClick={() => setEditingSabotage({ ...editingSabotage, timeoutAction: 'end_game' })}
+                    className={`au-btn ${editingSabotage.timeoutAction === 'end_game' ? 'au-btn-red' : 'au-btn-dark'}`}
+                    style={{ padding: '8px 10px', fontSize: 11 }}
+                  >
+                    เกมจบ (คนร้ายชนะ)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingSabotage({ ...editingSabotage, timeoutAction: 'continue' })}
+                    className={`au-btn ${editingSabotage.timeoutAction !== 'end_game' ? 'au-btn-green' : 'au-btn-dark'}`}
+                    style={{ padding: '8px 10px', fontSize: 11 }}
+                  >
+                    เกมเดินต่อ (เคลียร์ปกติ)
+                  </button>
+                </div>
               </div>
             </div>
 
