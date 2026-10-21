@@ -495,6 +495,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [nameInput, setNameInput] = useState('')
   const [directJoinName, setDirectJoinName] = useState('')
   const [isAdminView, setIsAdminView] = useState(false)
+  const [adminTab, setAdminTab] = useState('control') // 'control' | 'players' | 'tasks' | 'sabotage'
+  const [holdRevealed, setHoldRevealed] = useState(false)
   const [activeTaskModal, setActiveTaskModal] = useState(null)
   const [showSabotageModal, setShowSabotageModal] = useState(false)
   const [showReportModal, setShowReportModal] = useState(false)
@@ -1138,6 +1140,104 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast(`ซิงค์สมาชิก ${activeParty.members.length} คนจาก POS เรียบร้อย`)
     } catch (e) {
       showToast('ซิงค์ล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Admin: Add mock players to reach exactly 15 players
+  const handleAddMockPlayers = async () => {
+    try {
+      const currentPlayers = { ...(gameDoc.players || {}) }
+      const existingCount = Object.keys(currentPlayers).length
+      const needed = Math.max(0, 15 - existingCount)
+      if (needed === 0) {
+        showToast('มีผู้เล่นครบ 15 คนอยู่แล้ว')
+        return
+      }
+      const mockNames = [
+        'ก้อง', 'พลอย', 'บอส', 'แนน', 'อาร์ม',
+        'มายด์', 'เจมส์', 'พิม', 'ท็อป', 'ฟ้า',
+        'นัท', 'เบลล์', 'โอ๊ค', 'ดิว', 'เอก'
+      ]
+      const mockColors = [
+        '#c62828', '#2e7d32', '#e91e63', '#ef6c00', '#fbc02d',
+        '#212121', '#eceff1', '#6a1b9a', '#4e342e', '#00acc1',
+        '#7cb342', '#880e4f', '#f06292', '#4db6ac', '#546e7a'
+      ]
+      const updates = {}
+      for (let i = 0; i < needed; i++) {
+        const uid = `mock_player_${String(existingCount + i + 1).padStart(2, '0')}`
+        updates[`players.${uid}`] = {
+          uid,
+          name: mockNames[(existingCount + i) % mockNames.length],
+          avatar: '',
+          role: 'crewmate',
+          color: mockColors[(existingCount + i) % mockColors.length],
+          isAlive: true,
+          ready: true,
+          tasks: [],
+          sheriffShots: 0,
+          isMockup: true,
+        }
+      }
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
+      showToast(`เติมผู้เล่น Mockup เพิ่ม ${needed} คน (ครบ 15 คนแล้ว)`)
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการเพิ่ม Mockup: ' + e.message, 'error')
+    }
+  }
+
+  // Admin: Remove all mock players
+  const handleRemoveMockPlayers = async () => {
+    try {
+      const currentPlayers = gameDoc.players || {}
+      const updates = {}
+      let count = 0
+      Object.keys(currentPlayers).forEach(uid => {
+        const p = currentPlayers[uid]
+        if (p.isMockup || uid.startsWith('mock_')) {
+          updates[`players.${uid}`] = deleteField()
+          count++
+        }
+      })
+      if (count === 0) {
+        showToast('ไม่พบผู้เล่นที่เป็น Mockup ในห้อง')
+        return
+      }
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
+      showToast(`ลบผู้เล่น Mockup ออก ${count} คนเรียบร้อย`)
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการลบ Mockup: ' + e.message, 'error')
+    }
+  }
+
+  // Admin: Trigger preset classic sabotage
+  const handleTriggerPresetSabotage = async (id, title, desc, countdown = 90) => {
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        sabotage: {
+          active: true,
+          id,
+          title,
+          desc,
+          status: 'active',
+          countdownSeconds: countdown,
+          startedAt: Date.now(),
+        }
+      })
+      try {
+        const audio = getSabotageAudio()
+        if (audio) {
+          audio.currentTime = 0
+          audio.play().catch(() => playSabotageAlarmSynth())
+        } else {
+          playSabotageAlarmSynth()
+        }
+      } catch (err) {
+        playSabotageAlarmSynth()
+      }
+      showToast(`เปิดใช้งาน Sabotage: ${title}`)
+    } catch (e) {
+      showToast('เริ่ม Sabotage ล้มเหลว: ' + e.message, 'error')
     }
   }
 
@@ -1944,60 +2044,70 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           background: #141c2a;
           border: 2.5px solid #233146;
           border-radius: 18px;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+          box-shadow: 0 6px 0 #0a0e17, 0 10px 24px rgba(0, 0, 0, 0.6);
         }
         .au-btn {
           font-family: inherit;
           font-weight: 900;
-          border: 2.5px solid #080d16;
+          border: 2.5px solid #0a0e17;
           border-radius: 12px;
           cursor: pointer;
-          transition: all 0.08s ease-in-out;
+          transition: transform 0.08s ease, box-shadow 0.08s ease;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
           user-select: none;
+          letter-spacing: 0.02em;
         }
         .au-btn:active {
-          transform: translateY(2px);
+          transform: translateY(3px);
           box-shadow: none !important;
         }
         .au-btn-red {
           background: #c51111;
           color: #ffffff;
-          border-bottom: 4.5px solid #7a0813;
-          box-shadow: 0 4px 0 #7a0813, 0 6px 16px rgba(197, 17, 17, 0.4);
+          border-bottom: 5px solid #7a0813;
+          box-shadow: 0 4px 0 #7a0813, 0 6px 16px rgba(197, 17, 17, 0.45);
         }
         .au-btn-green {
           background: #2e7d32;
           color: #ffffff;
-          border-bottom: 4.5px solid #1b5e20;
-          box-shadow: 0 4px 0 #1b5e20, 0 6px 16px rgba(46, 125, 50, 0.4);
+          border-bottom: 5px solid #1b5e20;
+          box-shadow: 0 4px 0 #1b5e20, 0 6px 16px rgba(46, 125, 50, 0.45);
         }
         .au-btn-blue {
           background: #0288d1;
           color: #ffffff;
-          border-bottom: 4.5px solid #01579b;
-          box-shadow: 0 4px 0 #01579b, 0 6px 16px rgba(2, 136, 209, 0.4);
+          border-bottom: 5px solid #01579b;
+          box-shadow: 0 4px 0 #01579b, 0 6px 16px rgba(2, 136, 209, 0.45);
         }
         .au-btn-purple {
           background: #8e24aa;
           color: #ffffff;
-          border-bottom: 4.5px solid #4a148c;
-          box-shadow: 0 4px 0 #4a148c, 0 6px 16px rgba(142, 36, 170, 0.4);
+          border-bottom: 5px solid #4a148c;
+          box-shadow: 0 4px 0 #4a148c, 0 6px 16px rgba(142, 36, 170, 0.45);
         }
         .au-btn-yellow {
           background: #fbc02d;
-          color: #111827;
-          border-bottom: 4.5px solid #f57f17;
-          box-shadow: 0 4px 0 #f57f17, 0 6px 16px rgba(251, 192, 45, 0.4);
+          color: #0a0e17;
+          border-bottom: 5px solid #c47100;
+          box-shadow: 0 4px 0 #c47100, 0 6px 16px rgba(251, 192, 45, 0.45);
         }
         .au-btn-dark {
           background: #1e293b;
           color: #ffffff;
-          border-bottom: 4.5px solid #0f172a;
-          box-shadow: 0 4px 0 #0f172a;
+          border-bottom: 5px solid #0a0e17;
+          box-shadow: 0 4px 0 #0a0e17;
+        }
+        @keyframes scanPulse {
+          0%, 100% { opacity: 0.35; transform: scale(0.96); }
+          50% { opacity: 1; transform: scale(1.05); }
+        }
+        .au-role-hidden {
+          user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
         }
       `}</style>
 
@@ -2402,7 +2512,124 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         {/* ─── ADMIN / GAME MASTER CONTROL PANEL ─────────────────── */}
         {/* ─────────────────────────────────────────────────────────── */}
         {isAdminView && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* Admin Menubar (4 Tabs) */}
+            <div style={{
+              position: 'sticky',
+              top: 54,
+              zIndex: 40,
+              background: 'rgba(12, 16, 28, 0.96)',
+              backdropFilter: 'blur(10px)',
+              border: '2.5px solid #233146',
+              borderRadius: 16,
+              padding: '6px',
+              boxShadow: '0 6px 0 #0a0e17, 0 8px 24px rgba(0,0,0,0.6)',
+              marginBottom: 4,
+            }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(4, 1fr)',
+                gap: 6,
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('control')}
+                  className="au-btn"
+                  style={{
+                    padding: '8px 4px',
+                    fontSize: 11,
+                    borderRadius: 10,
+                    background: adminTab === 'control' ? '#fbc02d' : '#141c2a',
+                    color: adminTab === 'control' ? '#0a0e17' : 'rgba(255,255,255,0.7)',
+                    border: `2px solid ${adminTab === 'control' ? '#f57f17' : '#233146'}`,
+                    borderBottom: `3.5px solid ${adminTab === 'control' ? '#c47100' : '#0a0e17'}`,
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                >
+                  <i className="fas fa-gamepad" style={{ fontSize: 13 }} />
+                  <span>ควบคุมเกม</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('players')}
+                  className="au-btn"
+                  style={{
+                    padding: '8px 4px',
+                    fontSize: 11,
+                    borderRadius: 10,
+                    background: adminTab === 'players' ? '#0288d1' : '#141c2a',
+                    color: adminTab === 'players' ? '#fff' : 'rgba(255,255,255,0.7)',
+                    border: `2px solid ${adminTab === 'players' ? '#40c4ff' : '#233146'}`,
+                    borderBottom: `3.5px solid ${adminTab === 'players' ? '#01579b' : '#0a0e17'}`,
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                >
+                  <i className="fas fa-users" style={{ fontSize: 13 }} />
+                  <span>ลูกเรือ ({allPlayersList.length}/15)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('tasks')}
+                  className="au-btn"
+                  style={{
+                    padding: '8px 4px',
+                    fontSize: 11,
+                    borderRadius: 10,
+                    background: adminTab === 'tasks' ? '#2e7d32' : '#141c2a',
+                    color: adminTab === 'tasks' ? '#fff' : 'rgba(255,255,255,0.7)',
+                    border: `2px solid ${adminTab === 'tasks' ? '#66bb6a' : '#233146'}`,
+                    borderBottom: `3.5px solid ${adminTab === 'tasks' ? '#1b5e20' : '#0a0e17'}`,
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                >
+                  <i className="fas fa-tasks" style={{ fontSize: 13 }} />
+                  <span>ภารกิจ/QR</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAdminTab('sabotage')}
+                  className="au-btn"
+                  style={{
+                    padding: '8px 4px',
+                    fontSize: 11,
+                    borderRadius: 10,
+                    background: adminTab === 'sabotage' ? '#c51111' : '#141c2a',
+                    color: adminTab === 'sabotage' ? '#fff' : 'rgba(255,255,255,0.7)',
+                    border: `2px solid ${adminTab === 'sabotage' ? '#ff5252' : '#233146'}`,
+                    borderBottom: `3.5px solid ${adminTab === 'sabotage' ? '#7a0813' : '#0a0e17'}`,
+                    flexDirection: 'column',
+                    gap: 3,
+                    position: 'relative',
+                  }}
+                >
+                  {gameDoc.sabotage?.active && (
+                    <span style={{
+                      position: 'absolute',
+                      top: 3,
+                      right: 3,
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      background: '#ff1744',
+                      boxShadow: '0 0 8px #ff1744',
+                    }} />
+                  )}
+                  <i className="fas fa-radiation" style={{ fontSize: 13 }} />
+                  <span>ซาโบตาจ/กฎ</span>
+                </button>
+              </div>
+            </div>
+
+            {/* ─── TAB 1: ควบคุมเกม (MISSION CONTROL) ─── */}
+            {adminTab === 'control' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
             {/* Admin Header Card */}
             <div className="au-card" style={{
@@ -2870,42 +3097,77 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               </div>
             )}
 
-            {/* Admin Player List & Role Inspector */}
-            <div className="au-card" style={{ padding: 18 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
-                    รายชื่อผู้เล่น ({allPlayersList.length} คน)
-                  </div>
-                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>
-                    ความคืบหน้าภารกิจรวม: {progressPercent}% ({completedTasksCount}/{totalTasksCount})
-                  </div>
-                </div>
-                <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    type="button"
-                    onClick={handleSyncFromPos}
-                    className="au-btn au-btn-dark"
-                    style={{ padding: '6px 10px', fontSize: 11, display: 'flex', alignItems: 'center', gap: 5 }}
-                    title="ซิงค์รายชื่อจากปาร์ตี้ POS ปัจจุบัน"
-                  >
-                    <i className="fas fa-sync-alt" />
-                    <span>ซิงค์จาก POS</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleClearAllPlayers}
-                    className="au-btn au-btn-dark"
-                    style={{ padding: '6px 10px', fontSize: 11, color: '#ff5252', display: 'flex', alignItems: 'center', gap: 5 }}
-                    title="ล้างรายชื่อผู้เล่นทั้งหมดในห้อง"
-                  >
-                    <i className="fas fa-trash-alt" />
-                    <span>ล้างทั้งหมด</span>
-                  </button>
-                </div>
               </div>
+            )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {/* ─── TAB 2: จัดการลูกเรือ (CREW ROSTER) ─── */}
+            {adminTab === 'players' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Crew Roster Header & Actions Card */}
+                <div className="au-card" style={{ padding: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#80d8ff', fontWeight: 900, letterSpacing: '0.06em' }}>
+                        CREW ROSTER MANIFEST
+                      </div>
+                      <div style={{ fontSize: 16, fontWeight: 900, color: '#fff', marginTop: 2 }}>
+                        รายชื่อลูกเรือ: {allPlayersList.length}/15 คน
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                        มีชีวิต: <span style={{ color: '#69f0ae', fontWeight: 800 }}>{allPlayersList.filter(p => p.isAlive).length} คน</span> · เสียชีวิต: <span style={{ color: '#ff5252', fontWeight: 800 }}>{allPlayersList.filter(p => !p.isAlive).length} คน</span> · ภารกิจรวม: <span style={{ color: '#ffd54f', fontWeight: 800 }}>{progressPercent}%</span>
+                      </div>
+                    </div>
+
+                    {/* Quick Mockup and Room Management Buttons */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={handleAddMockPlayers}
+                        className="au-btn au-btn-blue"
+                        style={{ padding: '6px 10px', fontSize: 11 }}
+                        title="เติมผู้เล่นจำลอง (Mockup) ให้ครบ 15 คนทันที"
+                      >
+                        <i className="fas fa-user-plus" />
+                        <span>+ เติม Mockup ให้ครบ 15</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRemoveMockPlayers}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '6px 10px', fontSize: 11, color: '#ff8a80' }}
+                        title="ลบผู้เล่น Mockup ทั้งหมดในห้องออก"
+                      >
+                        <i className="fas fa-user-minus" />
+                        <span>ลบ Mockup ทั้งหมด</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSyncFromPos}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '6px 10px', fontSize: 11 }}
+                        title="ซิงค์รายชื่อจากปาร์ตี้ POS ปัจจุบัน"
+                      >
+                        <i className="fas fa-sync-alt" />
+                        <span>ซิงค์ POS</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClearAllPlayers}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '6px 10px', fontSize: 11, color: '#ff5252' }}
+                        title="ล้างรายชื่อผู้เล่นทั้งหมดในห้อง"
+                      >
+                        <i className="fas fa-trash-alt" />
+                        <span>ล้างทั้งหมด</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Admin Player List & Role Inspector */}
+                <div className="au-card" style={{ padding: 18 }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 {allPlayersList.map(p => {
                   const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'))
                   const roleLabel = p.role === 'impostor' ? 'คนร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'คนดี'))
@@ -3069,8 +3331,45 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 })}
               </div>
             </div>
+            </div>
+            )}
 
-            {/* Task Pool Management */}
+            {/* ─── TAB 3: คลังภารกิจและ QR สแกน (TASKS DECK & SCAN) ─── */}
+            {adminTab === 'tasks' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* GM Camera Scanner Trigger Card */}
+                <div className="au-card" style={{
+                  padding: 16,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  border: '2.5px solid #2e7d32',
+                  background: 'linear-gradient(135deg, #101f16 0%, #141c2a 100%)',
+                }}>
+                  <div>
+                    <div style={{ fontSize: 11, color: '#81c784', fontWeight: 900, letterSpacing: '0.06em' }}>
+                      GM VERIFICATION TERMINAL
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', marginTop: 2 }}>
+                      กล้องสแกนตรวจยืนยันภารกิจ
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>
+                      สแกน QR Code หน้าจอผู้เล่น เพื่ออนุมัติภารกิจให้สำเร็จทันที
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setScannerOpen(true)}
+                    className="au-btn au-btn-green"
+                    style={{ padding: '10px 16px', fontSize: 13, flexShrink: 0 }}
+                  >
+                    <i className="fas fa-qrcode" />
+                    <span>เปิดกล้องสแกน</span>
+                  </button>
+                </div>
+
+                {/* Task Pool Management */}
             <div style={{
               background: '#121722', borderRadius: 16, padding: 16,
               border: '1px solid rgba(255,255,255,0.08)',
@@ -3331,8 +3630,147 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 )}
               </div>
             </div>
+            </div>
+            )}
 
-            {/* Sabotage Pool Management */}
+            {/* ─── TAB 4: ซาโบตาจและกติกา (SABOTAGE & RULES) ─── */}
+            {adminTab === 'sabotage' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+                {/* Admin Sabotage Pending Approval Alert */}
+                {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'pending_approval' && (
+                  <div className="au-card" style={{
+                    background: '#211216', border: '2.5px solid #c51111',
+                    padding: 16,
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#ff5252', fontSize: 13, fontWeight: 900, marginBottom: 6 }}>
+                      <i className="fas fa-radiation fa-spin" /> มีคำขอ Sabotage จากคนร้าย!
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 800, color: '#fff' }}>{gameDoc.sabotage.title}</div>
+                    <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginTop: 2 }}>{gameDoc.sabotage.desc}</div>
+                    <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+                      <button
+                        type="button"
+                        onClick={approveSabotage}
+                        className="au-btn au-btn-red"
+                        style={{ flex: 1, padding: '10px', fontSize: 12.5 }}
+                      >
+                        อนุมัติ Sabotage
+                      </button>
+                      <button
+                        type="button"
+                        onClick={resolveSabotage}
+                        className="au-btn au-btn-dark"
+                        style={{ padding: '10px 16px', fontSize: 12.5 }}
+                      >
+                        ปฏิเสธ / ปิด
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Admin Active Sabotage Controls */}
+                {gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active' && (
+                  <div className="au-card" style={{
+                    background: '#1b1318', border: '2.5px solid #d32f2f',
+                    padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 11, color: '#ff5252', fontWeight: 900 }}>SABOTAGE กำลังทำงาน</div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>{gameDoc.sabotage.title}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={resolveSabotage}
+                      className="au-btn au-btn-green"
+                      style={{ padding: '9px 14px', fontSize: 12 }}
+                    >
+                      <i className="fas fa-check" style={{ marginRight: 6 }} /> คนดีแก้สำเร็จ
+                    </button>
+                  </div>
+                )}
+
+                {/* Quick GM Sabotage Triggers */}
+                <div className="au-card" style={{ padding: 16 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 900, color: '#ff8a80', marginBottom: 6, letterSpacing: '0.04em' }}>
+                    <i className="fas fa-bolt" style={{ marginRight: 6 }} />
+                    จุดชนวน SABOTAGE ทันที (GM OVERRIDE)
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 12 }}>
+                    แอดมินสามารถกดส่งสัญญาณ Sabotage ประจำยาน Among Us ให้ลูกเรือทุกคนได้ทันที
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerPresetSabotage('sab_lights', 'ระบบไฟดับ (ELECTRICAL)', 'ไฟฟ้าดับสนิท ลูกเรือไม่สามารถทำภารกิจได้จนกว่าจะสับสวิตช์แก้ไฟที่จุดกำหนด', 90)}
+                      className="au-btn au-btn-red"
+                      style={{ padding: '10px 8px', fontSize: 11.5, flexDirection: 'column', gap: 2 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <i className="fas fa-lightbulb" />
+                        <span>ระบบไฟดับ</span>
+                      </div>
+                      <span style={{ fontSize: 9.5, opacity: 0.85 }}>นับถอยหลัง 90 วิ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerPresetSabotage('sab_o2', 'ออกซิเจนรั่ว (O2 DEPLETION)', 'ระบบออกซิเจนล้มเหลว ลูกเรือต้องรีบไปแตะจุดกู้ภัยภายในเวลา', 60)}
+                      className="au-btn au-btn-red"
+                      style={{ padding: '10px 8px', fontSize: 11.5, flexDirection: 'column', gap: 2 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <i className="fas fa-wind" />
+                        <span>ออกซิเจนรั่ว</span>
+                      </div>
+                      <span style={{ fontSize: 9.5, opacity: 0.85 }}>นับถอยหลัง 60 วิ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerPresetSabotage('sab_doors', 'ประตูล็อคฉุกเฉิน (DOORS LOCKDOWN)', 'ประตูกั้นห้องปิดล็อค ลูกเรือติดค้างในห้องเป็นเวลา 45 วินาที', 45)}
+                      className="au-btn au-btn-red"
+                      style={{ padding: '10px 8px', fontSize: 11.5, flexDirection: 'column', gap: 2 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <i className="fas fa-door-closed" />
+                        <span>ประตูล็อค</span>
+                      </div>
+                      <span style={{ fontSize: 9.5, opacity: 0.85 }}>นับถอยหลัง 45 วิ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleTriggerPresetSabotage('sab_comms', 'สัญญาณขัดข้อง (COMMS SABOTAGED)', 'ระบบสื่อสารล่ม หลอดภารกิจถูกซ่อนและตำแหน่งห้องไม่แสดง', 90)}
+                      className="au-btn au-btn-red"
+                      style={{ padding: '10px 8px', fontSize: 11.5, flexDirection: 'column', gap: 2 }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                        <i className="fas fa-broadcast-tower" />
+                        <span>สัญญาณขัดข้อง</span>
+                      </div>
+                      <span style={{ fontSize: 9.5, opacity: 0.85 }}>นับถอยหลัง 90 วิ</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Full Rules Trigger Button */}
+                <div className="au-card" style={{ padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 900, color: '#fff' }}>กฎและกติกา Among Us สากล</div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                      อ่านเงื่อนไขชัยชนะ สัดส่วนบทบาท 15 คน และกติกาการโหวต
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowRulesModal(true)}
+                    className="au-btn au-btn-blue"
+                    style={{ padding: '8px 14px', fontSize: 12 }}
+                  >
+                    <i className="fas fa-book-open" />
+                    <span>เปิดอ่านกฎ</span>
+                  </button>
+                </div>
+
+                {/* Sabotage Pool Management */}
             <div style={{
               background: '#121722', borderRadius: 16, padding: 16,
               border: '1px solid rgba(229, 57, 53, 0.25)',
@@ -3479,6 +3917,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 ))}
               </div>
             </div>
+
+            </div>
+          )}
 
           </div>
         )}
@@ -3628,224 +4069,411 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               </div>
             )}
 
-            {/* Futuristic Spaceship Monitor & Big Red Emergency Dome Button */}
+            {/* Player In-Game HUD: Game Time & Identity Card */}
             <div className="au-card" style={{
-              padding: 18,
+              padding: '16px 18px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               gap: 16,
+              background: 'linear-gradient(135deg, #101726 0%, #151d2e 100%)',
             }}>
-              <div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', fontWeight: 800, letterSpacing: '0.06em' }}>
-                  GAME TIME REMAINING
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <AmongUsVisor
+                  role={myRole || 'crewmate'}
+                  color={me?.color || '#0288d1'}
+                  isAlive={isAlive}
+                  size={42}
+                />
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 16, fontWeight: 900, color: '#fff' }}>{me.name}</span>
+                    <span style={{
+                      padding: '2px 7px',
+                      borderRadius: 6,
+                      background: isAlive ? 'rgba(76, 175, 80, 0.15)' : 'rgba(158, 158, 158, 0.15)',
+                      border: `1px solid ${isAlive ? '#4caf50' : '#757575'}`,
+                      color: isAlive ? '#81c784' : '#bdbdbd',
+                      fontSize: 10,
+                      fontWeight: 800,
+                    }}>
+                      {isAlive ? 'ALIVE' : 'GHOST'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                    ลูกเรือ Special Event · {me?.color ? `สี ${me.color.toUpperCase()}` : ''}
+                  </div>
+                </div>
+              </div>
+
+              {/* Game Clock Display */}
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)', fontWeight: 800, letterSpacing: '0.06em' }}>
+                  TIME REMAINING
                 </div>
                 <div style={{
-                  fontSize: 32, fontWeight: 900, color: '#ff5252',
-                  fontFamily: 'monospace', letterSpacing: '0.04em', lineHeight: 1.1, marginTop: 4,
-                  textShadow: '0 0 10px rgba(255, 82, 82, 0.4)',
+                  fontSize: 26,
+                  fontWeight: 900,
+                  color: currentTimeSec <= 120 ? '#ff1744' : '#ff5252',
+                  fontFamily: 'monospace',
+                  letterSpacing: '0.04em',
+                  lineHeight: 1.1,
+                  marginTop: 2,
+                  textShadow: '0 0 12px rgba(255, 82, 82, 0.5)',
                 }}>
                   {fmtTime(currentTimeSec)}
                 </div>
-                {revealedRole ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
-                    <button
-                      type="button"
-                      onClick={handleToggleRevealRole}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: 6,
-                        padding: '4px 10px',
-                        borderRadius: 10,
-                        background: myRole === 'impostor'
-                          ? 'rgba(197, 17, 17, 0.25)'
-                          : (myRole === 'sheriff' ? 'rgba(255, 193, 7, 0.25)' : (myRole === 'dodo' ? 'rgba(142, 36, 170, 0.25)' : 'rgba(2, 136, 209, 0.25)')),
-                        border: `1.5px solid ${myRole === 'impostor' ? '#c51111' : (myRole === 'sheriff' ? '#fbc02d' : (myRole === 'dodo' ? '#8e24aa' : '#0288d1'))}`,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      title="แตะเพื่อซ่อนบทบาททันที"
-                    >
-                      <AmongUsVisor role={myRole || 'crewmate'} isAlive={isAlive} size={22} color={me?.color || null} />
-                      <span style={{
-                        fontSize: 11,
-                        fontWeight: 800,
-                        color: myRole === 'impostor' ? '#ff5252' : (myRole === 'sheriff' ? '#ffd54f' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff'))
-                      }}>
-                        {myRole === 'impostor' ? 'ฝ่ายคนร้าย' : (myRole === 'sheriff' ? 'นายอำเภอ' : (myRole === 'dodo' ? 'ฝ่ายโดโด้' : 'ฝ่ายคนดี'))}
-                      </span>
-                      <i className="fas fa-eye-slash" style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', marginLeft: 3 }} />
-                    </button>
+              </div>
+            </div>
 
-                    {/* Impostor teammate list reveal */}
-                    {myRole === 'impostor' && (
-                      <div style={{
-                        padding: '8px 10px',
-                        background: 'rgba(0,0,0,0.5)',
-                        borderRadius: 10,
-                        border: '1px solid rgba(255,82,82,0.3)',
-                        textAlign: 'left',
-                        maxWidth: 220,
-                      }}>
-                        <div style={{ fontSize: 10, fontWeight: 900, color: '#ff8a80', marginBottom: 4, letterSpacing: '0.04em' }}>
-                          ทีมคนร้ายของคุณ (IMPOSTORS):
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                          {Object.values(gameDoc.players || {})
-                            .filter(p => p.role === 'impostor')
-                            .map(imp => (
-                              <div key={imp.uid} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#fff' }}>
-                                <AmongUsVisor color={imp.color || '#c62828'} size={18} isAlive={imp.isAlive} />
-                                <span style={{ fontWeight: imp.uid === myUid ? 800 : 600 }}>
-                                  {imp.name} {imp.uid === myUid ? '(คุณ)' : ''}
-                                </span>
-                              </div>
-                            ))}
-                        </div>
-                      </div>
-                    )}
+            {/* Peace Period Alert Banner (if Kill Cooldown is Active) */}
+            {killCooldownSec > 0 && isAlive && (
+              <div style={{
+                background: 'rgba(255, 152, 0, 0.15)',
+                border: '2px solid #ff9800',
+                borderRadius: 14,
+                padding: '10px 14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                boxShadow: '0 4px 16px rgba(255, 152, 0, 0.25)',
+              }}>
+                <i className="fas fa-shield-alt" style={{ color: '#ffb74d', fontSize: 16 }} />
+                <div style={{ flex: 1, fontSize: 11.5, color: '#ffe082', lineHeight: 1.4 }}>
+                  <strong>ช่วงเวลาห้ามฆ่า (Peace Period):</strong> เหลืออีก <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 13, color: '#fff' }}>{killCooldownSec}</span> วินาที — ห้ามทุกคนกระทำการกำจัดหรือสั่งยิง
+                </div>
+              </div>
+            )}
 
-                    {/* Sheriff hint reveal */}
-                    {myRole === 'sheriff' && (
+            {/* ─── SECRET ROLE CARD: HOLD TO REVEAL ─── */}
+            {(revealedRole || holdRevealed) ? (
+              <div
+                className="au-card"
+                style={{
+                  padding: 16,
+                  background: myRole === 'impostor'
+                    ? 'linear-gradient(135deg, #2b0b11 0%, #17090c 100%)'
+                    : (myRole === 'sheriff'
+                        ? 'linear-gradient(135deg, #2e240a 0%, #191407 100%)'
+                        : (myRole === 'dodo'
+                            ? 'linear-gradient(135deg, #250b2e 0%, #140719 100%)'
+                            : 'linear-gradient(135deg, #091c2b 0%, #06111a 100%)')),
+                  border: `2.5px solid ${myRole === 'impostor' ? '#ff5252' : (myRole === 'sheriff' ? '#fbc02d' : (myRole === 'dodo' ? '#ab47bc' : '#29b6f6'))}`,
+                  boxShadow: `0 6px 0 #0a0e17, 0 8px 24px ${myRole === 'impostor' ? 'rgba(255,82,82,0.3)' : (myRole === 'sheriff' ? 'rgba(251,192,45,0.3)' : (myRole === 'dodo' ? 'rgba(171,71,188,0.3)' : 'rgba(41,182,246,0.3)'))}`,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <AmongUsVisor
+                      role={myRole || 'crewmate'}
+                      isAlive={isAlive}
+                      size={34}
+                      color={me?.color || null}
+                    />
+                    <div>
                       <div style={{
-                        padding: '8px 10px',
-                        background: 'rgba(255,193,7,0.12)',
-                        borderRadius: 10,
-                        border: '1.5px solid rgba(255,193,7,0.35)',
-                        fontSize: 10.5,
-                        color: '#ffe082',
-                        maxWidth: 240,
-                        textAlign: 'left',
-                        lineHeight: 1.4,
+                        fontSize: 15,
+                        fontWeight: 900,
+                        color: myRole === 'impostor' ? '#ff5252' : (myRole === 'sheriff' ? '#ffd54f' : (myRole === 'dodo' ? '#ce93d8' : '#80d8ff')),
+                        letterSpacing: '0.04em',
                       }}>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span style={{ fontWeight: 900, color: '#ffd54f' }}>
-                            <i className="fas fa-crosshairs" style={{ marginRight: 5 }} />
-                            สิทธิ์ยิงคนร้าย:
-                          </span>
-                          <span style={{
-                            padding: '2px 7px',
-                            borderRadius: 6,
-                            background: (me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '#fbc02d' : 'rgba(255,255,255,0.1)',
-                            color: (me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '#111' : '#aaa',
-                            fontWeight: 900,
-                            fontSize: 10,
-                          }}>
-                            {(me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? 'มี 1 สิทธิ์ (พร้อมยิง)' : 'ใช้สิทธิ์แล้ว'}
-                          </span>
-                        </div>
-                        <div style={{ marginBottom: 6 }}>
-                          เริ่มเกมได้รับทันที 1 สิทธิ์ (แตะที่แถบภารกิจด้านบน หรือกดปุ่มด้านล่างเพื่อเลือกยิง)
-                        </div>
-                        {gameDoc.status === 'playing' && isAlive && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              if (killCooldownSec > 0) {
-                                showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
-                                return
-                              }
-                              const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
-                              if (shots <= 0) {
-                                showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
-                                return
-                              }
-                              setSelectedSheriffTarget(null)
-                              setShowSheriffKillModal(true)
-                            }}
-                            className="au-btn au-btn-yellow"
-                            style={{
-                              width: '100%',
-                              padding: '6px 10px',
-                              fontSize: 11,
-                              fontWeight: 800,
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: 6,
-                            }}
-                          >
-                            <i className="fas fa-crosshairs" />
-                            <span>เปิดเป้าหมายสั่งยิง</span>
-                          </button>
-                        )}
+                        {myRole === 'impostor' ? 'ฝ่ายคนร้าย (IMPOSTOR)' : (myRole === 'sheriff' ? 'นายอำเภอ (SHERIFF)' : (myRole === 'dodo' ? 'ฝ่ายโดโด้ (DODO BIRD)' : 'ฝ่ายคนดี (CREWMATE)'))}
                       </div>
-                    )}
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                        {myRole === 'impostor'
+                          ? 'เป้าหมาย: กำจัดลูกเรือให้หมด หรือก่อวินาศกรรมให้หมดเวลา'
+                          : (myRole === 'sheriff'
+                              ? 'เป้าหมาย: สืบหาและยิงคนร้าย (มี 1 นัด หากยิงคนดีจะตายคู่)'
+                              : (myRole === 'dodo'
+                                  ? 'เป้าหมาย: จงทำตัวให้น่าสงสัย เพื่อให้ทุกคนโหวตขับไล่คุณในที่ประชุม'
+                                  : 'เป้าหมาย: ซ่อมแซมยาน ทำภารกิจส่วนตัว 3 อย่างให้เสร็จสมบูรณ์'))}
+                      </div>
+                    </div>
                   </div>
-                ) : (
+
                   <button
                     type="button"
-                    onClick={handleToggleRevealRole}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      marginTop: 6,
-                      padding: '5px 12px',
-                      borderRadius: 10,
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1.5px solid rgba(255, 255, 255, 0.15)',
-                      color: 'rgba(255, 255, 255, 0.75)',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
+                    onClick={() => {
+                      setRevealedRole(false)
+                      setHoldRevealed(false)
                     }}
-                    title="แตะเพื่อเช็คฝ่ายที่คุณได้รับ"
+                    className="au-btn au-btn-dark"
+                    style={{ padding: '6px 10px', fontSize: 11, flexShrink: 0 }}
+                    title="แตะเพื่อซ่อนบทบาททันที"
                   >
-                    <i className="fas fa-eye" style={{ fontSize: 11, color: '#90caf9' }} />
-                    <span>แตะเพื่อเช็คฝ่าย</span>
+                    <i className="fas fa-eye-slash" />
+                    <span>ซ่อน</span>
                   </button>
+                </div>
+
+                {/* Impostor Teammate Roster */}
+                {myRole === 'impostor' && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: '10px 12px',
+                    background: 'rgba(0,0,0,0.45)',
+                    borderRadius: 12,
+                    border: '1.5px solid rgba(255,82,82,0.3)',
+                  }}>
+                    <div style={{ fontSize: 10.5, fontWeight: 900, color: '#ff8a80', marginBottom: 6, letterSpacing: '0.06em' }}>
+                      <i className="fas fa-users" style={{ marginRight: 5 }} />
+                      ทีมคนร้ายของคุณ (IMPOSTORS TEAM):
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 6 }}>
+                      {Object.values(gameDoc.players || {})
+                        .filter(p => p.role === 'impostor')
+                        .map(imp => (
+                          <div
+                            key={imp.uid}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              fontSize: 11.5,
+                              color: '#fff',
+                              background: 'rgba(255,255,255,0.05)',
+                              padding: '5px 8px',
+                              borderRadius: 8,
+                            }}
+                          >
+                            <AmongUsVisor color={imp.color || '#c62828'} size={18} isAlive={imp.isAlive} />
+                            <span style={{ fontWeight: imp.uid === myUid ? 900 : 600 }}>
+                              {imp.name} {imp.uid === myUid ? '(คุณ)' : ''}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Sheriff Ammo Status */}
+                {myRole === 'sheriff' && (
+                  <div style={{
+                    marginTop: 10,
+                    padding: '8px 12px',
+                    background: 'rgba(255,193,7,0.12)',
+                    borderRadius: 12,
+                    border: '1.5px solid rgba(255,193,7,0.35)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: '#ffe082', fontWeight: 800 }}>
+                      <i className="fas fa-crosshairs" style={{ color: '#ffd54f' }} />
+                      <span>สถานะกระสุน:</span>
+                      <span style={{
+                        padding: '2px 8px',
+                        borderRadius: 6,
+                        background: (me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '#fbc02d' : 'rgba(255,255,255,0.1)',
+                        color: (me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '#111' : '#aaa',
+                        fontWeight: 900,
+                        fontSize: 11,
+                      }}>
+                        {(me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '1 นัด พร้อมยิง' : 'ใช้สิทธิ์แล้ว'}
+                      </span>
+                    </div>
+                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)' }}>
+                      กดปุ่ม SHOOT ใน Action Hub ด้านล่างเพื่อยิง
+                    </span>
+                  </div>
                 )}
               </div>
+            ) : (
+              <div
+                onPointerDown={() => setHoldRevealed(true)}
+                onPointerUp={() => setHoldRevealed(false)}
+                onPointerCancel={() => setHoldRevealed(false)}
+                onPointerLeave={() => setHoldRevealed(false)}
+                onTouchStart={() => setHoldRevealed(true)}
+                onTouchEnd={() => setHoldRevealed(false)}
+                onClick={handleToggleRevealRole}
+                className="au-role-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, #101726 0%, #172033 100%)',
+                  border: '2.5px dashed #384d6b',
+                  borderRadius: 16,
+                  padding: '14px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  boxShadow: '0 6px 0 #0a0e17, 0 8px 18px rgba(0,0,0,0.5)',
+                  transition: 'all 0.15s ease',
+                }}
+                title="แตะค้างไว้เพื่อดูบทบาท (ปล่อยมือเพื่อซ่อนทันที)"
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 44,
+                    height: 44,
+                    borderRadius: 12,
+                    background: '#090e17',
+                    border: '2px solid #28374d',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: '#80d8ff',
+                    fontSize: 20,
+                    boxShadow: 'inset 0 2px 6px rgba(0,0,0,0.6)',
+                  }}>
+                    <i className="fas fa-fingerprint" style={{ animation: 'scanPulse 1.8s infinite ease-in-out' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', letterSpacing: '0.04em' }}>
+                      ความลับบทบาท (SECRET ROLE)
+                    </div>
+                    <div style={{ fontSize: 11, color: '#80d8ff', marginTop: 2, fontWeight: 700 }}>
+                      แตะค้างเพื่อสแกนดูบทบาท (HOLD TO REVEAL)
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  padding: '6px 12px',
+                  borderRadius: 8,
+                  background: 'rgba(128, 216, 255, 0.12)',
+                  border: '1.5px solid rgba(128, 216, 255, 0.3)',
+                  color: '#80d8ff',
+                  fontSize: 11,
+                  fontWeight: 900,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}>
+                  <i className="fas fa-hand-pointer" />
+                  <span>แตะค้าง</span>
+                </div>
+              </div>
+            )}
 
-              {/* Action Buttons: Report Body & Self-Report Death */}
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                {isAlive && (
+            {/* ─── ACTION HUB (PROMINENT CENTER STAGE) ─── */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 10,
+              margin: '2px 0',
+            }}>
+              {isAlive && (
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: (myRole === 'sheriff' || myRole === 'impostor') ? '1.35fr 1fr' : '1fr',
+                  gap: 10,
+                }}>
+                  {/* Giant 3D Beveled Red REPORT Button */}
                   <button
                     type="button"
                     onClick={() => {
                       setSelectedReportVictim(null)
                       setShowReportModal(true)
                     }}
+                    className="au-btn au-btn-red"
                     style={{
-                      padding: '10px 16px',
-                      borderRadius: 14,
-                      background: 'linear-gradient(135deg, #c62828 0%, #b71c1c 100%)',
-                      border: '2.5px solid #ff5252',
-                      boxShadow: '0 4px 18px rgba(198, 40, 40, 0.45)',
-                      color: '#fff',
-                      cursor: 'pointer',
+                      padding: '14px 16px',
+                      borderRadius: 16,
                       display: 'flex',
                       alignItems: 'center',
-                      gap: 10,
-                      transition: 'all 0.15s ease',
+                      justifyContent: 'center',
+                      gap: 12,
                     }}
                     title="รายงานการพบศพ (Report Dead Body)"
                   >
                     <div style={{
-                      width: 36,
-                      height: 36,
+                      width: 38,
+                      height: 38,
                       borderRadius: '50%',
-                      background: 'rgba(255, 255, 255, 0.2)',
+                      background: 'rgba(255, 255, 255, 0.25)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      fontSize: 16,
+                      fontSize: 18,
+                      boxShadow: 'inset 0 1px 3px rgba(255,255,255,0.4)',
                     }}>
                       <i className="fas fa-bullhorn" />
                     </div>
-                    <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.04em' }}>REPORT ศพ</div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>แจ้งพบผู้เล่นเสียชีวิต</div>
+                    <div style={{ textAlign: 'left', lineHeight: 1.2 }}>
+                      <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: '0.04em' }}>REPORT ศพ</div>
+                      <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>แจ้งพบลูกเรือเสียชีวิต</div>
                     </div>
                   </button>
-                )}
 
-                {/* Self-Report Eliminated Button */}
-                {isAlive && (
+                  {/* Role-Specific Action: Sheriff SHOOT */}
+                  {myRole === 'sheriff' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (killCooldownSec > 0) {
+                          showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
+                          return
+                        }
+                        const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
+                        if (shots <= 0) {
+                          showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
+                          return
+                        }
+                        setSelectedSheriffTarget(null)
+                        setShowSheriffKillModal(true)
+                      }}
+                      className="au-btn au-btn-yellow"
+                      style={{
+                        padding: '14px 10px',
+                        borderRadius: 16,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                      }}
+                      title="เล็งเป้าหมายยิงคนร้าย (มี 1 นัด)"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900 }}>
+                        <i className="fas fa-crosshairs" />
+                        <span>SHOOT</span>
+                      </div>
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        background: 'rgba(0,0,0,0.15)',
+                        padding: '1px 7px',
+                        borderRadius: 6,
+                      }}>
+                        {(me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '1 นัด พร้อมยิง' : 'ยิงแล้ว'}
+                      </span>
+                    </button>
+                  )}
+
+                  {/* Role-Specific Action: Impostor SABOTAGE */}
+                  {myRole === 'impostor' && (
+                    <button
+                      type="button"
+                      onClick={() => setShowSabotageModal(true)}
+                      className="au-btn au-btn-red"
+                      style={{
+                        padding: '14px 10px',
+                        borderRadius: 16,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 3,
+                        background: '#8a0a14',
+                        borderBottom: '5px solid #4a0309',
+                      }}
+                      title="ก่อวินาศกรรมระบบ (Sabotage)"
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 900 }}>
+                        <i className="fas fa-radiation" />
+                        <span>SABOTAGE</span>
+                      </div>
+                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
+                        ก่อวินาศกรรม
+                      </span>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Self-Report Eliminated Button */}
+              {isAlive && (
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
                   <button
                     type="button"
                     onClick={() => {
@@ -3855,27 +4483,20 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       }
                       setShowSelfDeathConfirm(true)
                     }}
+                    className="au-btn au-btn-dark"
                     style={{
-                      padding: '7px 12px',
-                      borderRadius: 10,
-                      background: 'rgba(255, 255, 255, 0.04)',
-                      border: '1.5px solid rgba(255, 255, 255, 0.12)',
-                      color: '#b0bec5',
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
+                      padding: '8px 16px',
                       fontSize: 11,
-                      fontWeight: 700,
-                      transition: 'all 0.15s ease',
+                      color: '#b0bec5',
+                      borderRadius: 12,
                     }}
                     title="แจ้งว่าคุณถูกกำจัดในชีวิตจริงแล้ว (ไม่มีแจ้งเตือนคนอื่น รู้พร้อมกันตอนประชุม)"
                   >
-                    <i className="fas fa-skull" style={{ fontSize: 11, color: '#ef5350' }} />
-                    <span>ฉันถูกกำจัดแล้ว</span>
+                    <i className="fas fa-skull" style={{ color: '#ef5350' }} />
+                    <span>ฉันถูกกำจัดแล้ว (Self-Report Death)</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
             </div>
 
             {/* My Personal Tasks List (Skeld Terminal Style) */}
