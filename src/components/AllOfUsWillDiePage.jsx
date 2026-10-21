@@ -738,7 +738,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const myRole = me?.role || 'crewmate'
   const isAlive = me?.isAlive !== false
   const allPlayersList = useMemo(() => {
-    return Object.values(gameDoc?.players || {})
+    return Object.entries(gameDoc?.players || {}).map(([key, val]) => ({
+      uid: val.uid || key,
+      ...val,
+    }))
   }, [gameDoc?.players])
 
   // Total Task Progress Calculation (Impostor and Dodo tasks are excluded from progress)
@@ -768,7 +771,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   useEffect(() => {
     const isMasterWriter = hasAdminPerm || (allPlayersList.length > 0 && allPlayersList[0].uid === myUid)
     if (isMasterWriter && gameDoc?.status === 'playing' && !gameDoc.winner) {
-      const livingImpostors = allPlayersList.filter(p => p.role === 'impostor' && p.isAlive)
+      const allImpostors = allPlayersList.filter(p => p.role === 'impostor')
+      const livingImpostors = allImpostors.filter(p => p.isAlive)
       const livingNonImpostors = allPlayersList.filter(p => p.role !== 'impostor' && p.isAlive)
 
       if (livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
@@ -776,10 +780,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           'impostor',
           `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`
         )
-      } else if (livingImpostors.length === 0 && allPlayersList.length > 0) {
+      } else if (allImpostors.length > 0 && livingImpostors.length === 0) {
         handleEndGame(
           'crewmate',
-          'คนร้ายถูกกำจัดหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!'
+          'คนร้ายถูกกำจัดหมดทุกคนแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!'
         )
       }
     }
@@ -1294,7 +1298,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       const finalRole = assignedRoles[p.uid] || 'crewmate'
       updatedPlayers[p.uid] = {
         ...p,
-        color: finalColorMap[p.uid] || p.color || '#c62828',
+        color: finalColorMap[p.uid] || p.color || TWENTY_PLAYER_COLORS[0].hex,
         role: finalRole,
         sheriffShots: finalRole === 'sheriff' ? 1 : 0,
         isAlive: true,
@@ -1555,10 +1559,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         })
       } else {
         // Check if all impostors eliminated
-        const remainingImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor' && p.isAlive)
+        const allImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor')
+        const remainingImpostors = allImpostors.filter(p => p.isAlive)
         const remainingCrew = Object.values(updatedPlayers).filter(p => p.role !== 'impostor' && p.isAlive)
 
-        if (remainingImpostors.length === 0) {
+        if (allImpostors.length > 0 && remainingImpostors.length === 0) {
           // Crewmates win!
           await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
             status: 'ended',
@@ -3125,7 +3130,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                               updated[p.uid] = { ...p, isAlive: !p.isAlive }
 
                               if (gameDoc.status === 'playing') {
-                                const livingImpostors = Object.values(updated).filter(pl => pl.role === 'impostor' && pl.isAlive)
+                                const allImpostors = Object.values(updated).filter(pl => pl.role === 'impostor')
+                                const livingImpostors = allImpostors.filter(pl => pl.isAlive)
                                 const livingNonImpostors = Object.values(updated).filter(pl => pl.role !== 'impostor' && pl.isAlive)
 
                                 if (livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
@@ -3138,7 +3144,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                                     killCooldownUntil: 0,
                                   })
                                   return
-                                } else if (livingImpostors.length === 0 && Object.keys(updated).length > 0) {
+                                } else if (allImpostors.length > 0 && livingImpostors.length === 0) {
                                   updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
                                     players: updated,
                                     status: 'ended',
