@@ -1092,25 +1092,55 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const durationMins = gameDoc.gameDurationMinutes || 20
     const durationSecs = durationMins * 60
 
-    // ── Randomly assign roles (Preserve if admin manually configured) ────────
-    // Check if admin manually configured roles (at least 1 player has non-crewmate role set in lobby)
-    const hasManualRoles = allPlayersList.some(p => p.role && p.role !== 'crewmate')
-
-    // Formula: 15 players → 3 impostors, 1 dodo, 1 sheriff, 10 crewmates
-    // General: 20% imposters (min 1), 1 dodo if ≥4 players, 1 sheriff if ≥3 players, rest crewmates
+    // ── Guaranteed Role Distribution: 3 Impostors, 1 Dodo, 1 Sheriff, 10 Crewmates ──
     const n = allPlayersList.length
-    const impostorCount = Math.max(1, Math.floor(n * 0.2))
-    const dodoCount = n >= 4 ? 1 : 0
-    const sheriffCount = n >= 3 ? 1 : 0
+    // In a 15-player game, strictly enforce: 3 Impostors, 1 Dodo, 1 Sheriff, 10 Crewmates
+    const targetImpostors = n >= 15 ? 3 : Math.min(3, Math.max(1, Math.floor(n * 0.2)))
+    const targetDodo = n >= 4 ? 1 : 0
+    const targetSheriff = n >= 3 ? 1 : 0
 
-    const shuffledPlayers = [...allPlayersList].sort(() => Math.random() - 0.5)
-    const roleMap = {}
-    shuffledPlayers.forEach((p, i) => {
-      if (i < impostorCount) roleMap[p.uid] = 'impostor'
-      else if (i < impostorCount + dodoCount) roleMap[p.uid] = 'dodo'
-      else if (i < impostorCount + dodoCount + sheriffCount) roleMap[p.uid] = 'sheriff'
-      else roleMap[p.uid] = 'crewmate'
+    // Priority 1: Respect explicit manual role picks from lobby if within target limits
+    const assignedRoles = {}
+    const unassignedPlayers = []
+
+    allPlayersList.forEach(p => {
+      if (p.role === 'sheriff' && Object.values(assignedRoles).filter(r => r === 'sheriff').length < targetSheriff) {
+        assignedRoles[p.uid] = 'sheriff'
+      } else if (p.role === 'dodo' && Object.values(assignedRoles).filter(r => r === 'dodo').length < targetDodo) {
+        assignedRoles[p.uid] = 'dodo'
+      } else if (p.role === 'impostor' && Object.values(assignedRoles).filter(r => r === 'impostor').length < targetImpostors) {
+        assignedRoles[p.uid] = 'impostor'
+      } else {
+        unassignedPlayers.push(p)
+      }
     })
+
+    // Priority 2: Shuffle remaining unassigned players to guarantee exact counts
+    const shuffledPool = [...unassignedPlayers].sort(() => Math.random() - 0.5)
+
+    // Fill remaining Impostors up to targetImpostors (3)
+    while (Object.values(assignedRoles).filter(r => r === 'impostor').length < targetImpostors && shuffledPool.length > 0) {
+      const p = shuffledPool.pop()
+      assignedRoles[p.uid] = 'impostor'
+    }
+
+    // Fill remaining Dodo up to targetDodo (1)
+    while (Object.values(assignedRoles).filter(r => r === 'dodo').length < targetDodo && shuffledPool.length > 0) {
+      const p = shuffledPool.pop()
+      assignedRoles[p.uid] = 'dodo'
+    }
+
+    // Fill remaining Sheriff up to targetSheriff (1)
+    while (Object.values(assignedRoles).filter(r => r === 'sheriff').length < targetSheriff && shuffledPool.length > 0) {
+      const p = shuffledPool.pop()
+      assignedRoles[p.uid] = 'sheriff'
+    }
+
+    // All remaining players become Crewmates (10 players for 15 total)
+    while (shuffledPool.length > 0) {
+      const p = shuffledPool.pop()
+      assignedRoles[p.uid] = 'crewmate'
+    }
 
     // ── Guarantee Unique Colors from TWENTY_PLAYER_COLORS ──
     const usedColors = new Set()
@@ -1203,7 +1233,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         verified: false,
         verifiedAt: null,
       }))
-      const finalRole = (hasManualRoles ? (p.role || 'crewmate') : (roleMap[p.uid] || 'crewmate'))
+      const finalRole = assignedRoles[p.uid] || 'crewmate'
       updatedPlayers[p.uid] = {
         ...p,
         color: finalColorMap[p.uid] || p.color || '#c62828',
@@ -2385,6 +2415,31 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         className="au-btn au-btn-dark"
                         style={{ width: 34, height: 34, fontSize: 13 }}
                       >+5s</button>
+                    </div>
+                  </div>
+
+                  {/* Fixed Role Distribution Breakdown Banner */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    background: 'rgba(255, 255, 255, 0.04)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    borderRadius: 10,
+                    marginBottom: 14,
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}>
+                    <span style={{ color: 'rgba(255,255,255,0.7)' }}>สัดส่วนบทบาท (15 คน):</span>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{ color: '#ff5252' }}>คนร้าย 3</span>
+                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                      <span style={{ color: '#ce93d8' }}>โดโด้ 1</span>
+                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                      <span style={{ color: '#ffd54f' }}>นายอำเภอ 1</span>
+                      <span style={{ color: 'rgba(255,255,255,0.3)' }}>|</span>
+                      <span style={{ color: '#80d8ff' }}>คนดี 10</span>
                     </div>
                   </div>
 
