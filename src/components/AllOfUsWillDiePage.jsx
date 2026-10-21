@@ -860,6 +860,27 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }, [hasAdminPerm, gameDoc?.status, totalTasksCount, completedTasksCount, gameDoc?.winner])
 
+  // Real-time Parity Check: If living Impostors >= living Non-Impostors (Crewmates + Dodo + Sheriff), Impostors win immediately
+  useEffect(() => {
+    const isMasterWriter = hasAdminPerm || (allPlayersList.length > 0 && allPlayersList[0].uid === myUid)
+    if (isMasterWriter && gameDoc?.status === 'playing' && !gameDoc.winner) {
+      const livingImpostors = allPlayersList.filter(p => p.role === 'impostor' && p.isAlive)
+      const livingNonImpostors = allPlayersList.filter(p => p.role !== 'impostor' && p.isAlive)
+
+      if (livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
+        handleEndGame(
+          'impostor',
+          `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`
+        )
+      } else if (livingImpostors.length === 0 && allPlayersList.length > 0) {
+        handleEndGame(
+          'crewmate',
+          'คนร้ายถูกกำจัดหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!'
+        )
+      }
+    }
+  }, [hasAdminPerm, myUid, gameDoc?.status, allPlayersList, gameDoc?.winner])
+
   // Format MM:SS
   const fmtTime = (secs) => {
     const s = Math.max(0, secs)
@@ -939,9 +960,29 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const handleConfirmSelfDeath = async () => {
     if (!myUid || !gameDoc) return
     try {
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-        [`players.${myUid}.isAlive`]: false,
-      })
+      const updatedPlayers = { ...(gameDoc.players || {}) }
+      if (updatedPlayers[myUid]) {
+        updatedPlayers[myUid] = { ...updatedPlayers[myUid], isAlive: false }
+      }
+
+      const livingImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor' && p.isAlive)
+      const livingNonImpostors = Object.values(updatedPlayers).filter(p => p.role !== 'impostor' && p.isAlive)
+
+      if (gameDoc.status === 'playing' && livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
+        // Immediate Impostor Win on parity
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          players: updatedPlayers,
+          status: 'ended',
+          winner: 'impostor',
+          winReason: `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
+          gameTimerRunning: false,
+          killCooldownUntil: 0,
+        })
+      } else {
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          [`players.${myUid}.isAlive`]: false,
+        })
+      }
       setShowSelfDeathConfirm(false)
       showToast('คุณเข้าสู่สถานะวิญญาณแล้ว ทำภารกิจต่อได้เงียบๆ (ทุกคนจะทราบตอนประชุม)')
     } catch (e) {
@@ -978,15 +1019,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       updatedPlayers[myUid] = { ...updatedPlayers[myUid], isAlive: false }
 
       // Check win condition
-      const remainingCrew = Object.values(updatedPlayers).filter(p => p.role !== 'impostor' && p.isAlive)
+      const remainingNonImpostors = Object.values(updatedPlayers).filter(p => p.role !== 'impostor' && p.isAlive)
       const remainingImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor' && p.isAlive)
 
-      if (remainingImpostors.length >= remainingCrew.length && remainingImpostors.length > 0) {
+      if (remainingImpostors.length >= remainingNonImpostors.length && remainingImpostors.length > 0) {
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
           players: updatedPlayers,
           status: 'ended',
           winner: 'impostor',
-          winReason: 'นายอำเภอยิงผิดคนทำให้จำนวนคนร้ายเท่ากับฝ่ายคนดี! ฝ่ายคนร้ายชนะ!',
+          winReason: `นายอำเภอยิงผิดคนทำให้จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${remainingNonImpostors.length} คน)! ฝ่ายคนร้ายชนะทันที!`,
+          gameTimerRunning: false,
+          killCooldownUntil: 0,
         })
       } else {
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -999,6 +1042,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       updatedPlayers[targetUid] = { ...target, isAlive: false }
 
       const remainingImpostors = Object.values(updatedPlayers).filter(p => p.role === 'impostor' && p.isAlive)
+      const remainingNonImpostors = Object.values(updatedPlayers).filter(p => p.role !== 'impostor' && p.isAlive)
+
       if (remainingImpostors.length === 0) {
         // All impostors eliminated -> Crewmates win!
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -1006,13 +1051,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           status: 'ended',
           winner: 'crewmate',
           winReason: 'นายอำเภอยิงกำจัดคนร้ายคนสุดท้ายสำเร็จ! ฝ่ายคนดีเป็นผู้ชนะ!',
+          gameTimerRunning: false,
+          killCooldownUntil: 0,
+        })
+      } else if (remainingImpostors.length >= remainingNonImpostors.length && remainingImpostors.length > 0) {
+        // Shooting Dodo tipped parity in favor of Impostors
+        await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          players: updatedPlayers,
+          status: 'ended',
+          winner: 'impostor',
+          winReason: `นายอำเภอยิงกำจัดโดโด้ทำให้จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดี (${remainingNonImpostors.length} คน)! ฝ่ายคนร้ายชนะทันที!`,
+          gameTimerRunning: false,
+          killCooldownUntil: 0,
         })
       } else {
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
           players: updatedPlayers,
         })
       }
-      showToast(`คุณยิงกำจัดคนร้าย (${target.name}) สำเร็จ!`, 'success')
+      showToast(`คุณยิงกำจัด ${target.role === 'impostor' ? 'คนร้าย' : 'โดโด้'} (${target.name}) สำเร็จ!`, 'success')
     }
 
     setShowSheriffKillModal(false)
@@ -1496,13 +1553,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             killCooldownUntil: 0,
             'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
           })
-        } else if (remainingImpostors.length >= remainingCrew.length) {
+        } else if (remainingImpostors.length >= remainingCrew.length && remainingImpostors.length > 0) {
           // Impostors win!
           await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
             status: 'ended',
             players: updatedPlayers,
             winner: 'impostor',
-            winReason: 'จำนวนคนร้ายเท่ากับคนดีแล้ว! ฝ่ายคนร้ายชนะ!',
+            winReason: `จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${remainingCrew.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
             gameTimerRunning: false,
             killCooldownUntil: 0,
             'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
@@ -2896,9 +2953,41 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           })}
                           <button
                             type="button"
-                            onClick={() => updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-                              [`players.${p.uid}.isAlive`]: !p.isAlive
-                            })}
+                            onClick={() => {
+                              const updated = { ...(gameDoc.players || {}) }
+                              updated[p.uid] = { ...p, isAlive: !p.isAlive }
+
+                              if (gameDoc.status === 'playing') {
+                                const livingImpostors = Object.values(updated).filter(pl => pl.role === 'impostor' && pl.isAlive)
+                                const livingNonImpostors = Object.values(updated).filter(pl => pl.role !== 'impostor' && pl.isAlive)
+
+                                if (livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
+                                  updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                                    players: updated,
+                                    status: 'ended',
+                                    winner: 'impostor',
+                                    winReason: `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
+                                    gameTimerRunning: false,
+                                    killCooldownUntil: 0,
+                                  })
+                                  return
+                                } else if (livingImpostors.length === 0 && Object.keys(updated).length > 0) {
+                                  updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                                    players: updated,
+                                    status: 'ended',
+                                    winner: 'crewmate',
+                                    winReason: 'คนร้ายถูกกำจัดหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
+                                    gameTimerRunning: false,
+                                    killCooldownUntil: 0,
+                                  })
+                                  return
+                                }
+                              }
+
+                              updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                                [`players.${p.uid}.isAlive`]: !p.isAlive
+                              })
+                            }}
                             style={{
                               padding: '3px 7px', borderRadius: 6,
                               background: p.isAlive ? '#c62828' : '#2e7d32',
@@ -5258,7 +5347,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     <strong style={{ color: '#29b6f6' }}>คนดี (Crewmate):</strong> ปฏิบัติภารกิจในสถานที่จริงให้ครบ 100% หรือจับคนร้ายโหวตออกให้หมดทุกคน
                   </div>
                   <div>
-                    <strong style={{ color: '#e53935' }}>คนร้าย (Impostor):</strong> ลอบกำจัดคนดีให้จำนวนเท่ากับคนร้าย ปะปนเนียน และลอบส่งสัญญาณก่อกวนระบบ (Sabotage)
+                    <strong style={{ color: '#e53935' }}>คนร้าย (Impostor):</strong> ลอบกำจัดคนดีและโดโด้จนเหลือจำนวนรอดชีวิตเท่ากันหรือน้อยกว่าคนร้าย ปะปนเนียน และลอบส่งสัญญาณก่อกวนระบบ (Sabotage)
                   </div>
                   <div>
                     <strong style={{ color: '#ffd54f' }}>นายอำเภอ (Sheriff):</strong> อยู่ฝ่ายคนดี มีสิทธิ์ลั่นไกกำจัดคนร้าย 1 นัดต่อ 1 รอบประชุม โดยแตะที่แถบ TOTAL TASKS ด้านบน (<span style={{ color: '#ff5252' }}>คำเตือน: หากยิงคนดีจะตายตกตามกันทันที</span>)
