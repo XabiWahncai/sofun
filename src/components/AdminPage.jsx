@@ -8495,6 +8495,7 @@ const NAV_SECTIONS = [
     label: 'กิจกรรม',
     items: [
       { key: 'random', icon: 'fa-dharmachakra', label: 'วงล้อสุ่ม' },
+      { key: 'allofuswilldie', icon: 'fa-user-secret', label: 'All of Us Will Die', href: '/allofuswilldie' },
     ],
   },
   {
@@ -8583,7 +8584,20 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
               {NAV_SECTIONS.map(sec => (
                 <div key={sec.label} className="adm-nav-section">
                   <div className="adm-nav-section-label">{sec.label}</div>
-                  {sec.items.map(item => (
+                  {sec.items.map(item => item.href ? (
+                    <a
+                      key={item.key}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="adm-nav-btn"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <span className="adm-nav-icon"><i className={`fas ${item.icon}`} /></span>
+                      <span className="adm-nav-label">{item.label}</span>
+                      <i className="fas fa-external-link-alt" style={{ fontSize: 9, opacity: 0.45, marginLeft: 'auto' }} />
+                    </a>
+                  ) : (
                     <button
                       key={item.key}
                       className={`adm-nav-btn${tab === item.key ? ' active' : ''}`}

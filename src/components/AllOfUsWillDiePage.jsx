@@ -327,29 +327,11 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
   const visorWidth = Math.round(size * 0.95)
   const visorHeight = Math.round(size * 1.1)
 
-  const defaultBody = !isAlive
-    ? '#78909c'
-    : role === 'impostor'
-    ? '#c51111'
-    : role === 'dodo'
-    ? '#8e24aa'
-    : role === 'sheriff'
-    ? '#fbc02d'
-    : '#0288d1'
+  const defaultBody = !isAlive ? '#78909c' : '#0288d1'
 
   const bodyColor = color || defaultBody
 
-  const shadowColor = !isAlive
-    ? '#455a64'
-    : color
-    ? '#000000'
-    : role === 'impostor'
-    ? '#7a0813'
-    : role === 'dodo'
-    ? '#4a148c'
-    : role === 'sheriff'
-    ? '#f57f17'
-    : '#01579b'
+  const shadowColor = !isAlive ? '#455a64' : (color ? '#000000' : '#01579b')
 
   return (
     <div
@@ -574,9 +556,21 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       )
     }
 
+    const mergeMembers = (a, b) => {
+      const map = {}
+      ;(a || []).forEach(m => { if (m.uid) map[m.uid] = m })
+      ;(b || []).forEach(m => { if (m.uid && !map[m.uid]) map[m.uid] = m })
+      return Object.values(map)
+    }
+
     const evaluateParty = (pos, ord) => {
-      if (pos && isSpecialMatch(pos)) return pos
-      if (ord && isSpecialMatch(ord)) return ord
+      const posSpecial = pos && isSpecialMatch(pos)
+      const ordSpecial = ord && isSpecialMatch(ord)
+      if (posSpecial || ordSpecial) {
+        const base = posSpecial ? pos : ord
+        const other = posSpecial ? ord : pos
+        return { ...base, members: mergeMembers(base?.members, other?.members) }
+      }
       return null
     }
 
@@ -2461,9 +2455,30 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   <button
                     key={m.uid}
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       setMyUid(m.uid)
                       localStorage.setItem('allofus_player_uid', m.uid)
+                      const alreadyIn = (gameDoc.players || {})[m.uid]
+                      if (!alreadyIn) {
+                        try {
+                          await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                            [`players.${m.uid}`]: {
+                              uid: m.uid,
+                              name: m.name || 'ผู้เล่น',
+                              avatar: m.avatar || '',
+                              role: 'crewmate',
+                              color: '',
+                              isAlive: true,
+                              tasks: [],
+                              ready: false,
+                              emergencyUsed: 0,
+                              sabotageUsed: 0,
+                            }
+                          })
+                        } catch (e) {
+                          showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
+                        }
+                      }
                       showToast(`ยินดีต้อนรับ ${m.name}`)
                     }}
                     style={{
