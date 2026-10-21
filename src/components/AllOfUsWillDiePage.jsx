@@ -327,11 +327,29 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
   const visorWidth = Math.round(size * 0.95)
   const visorHeight = Math.round(size * 1.1)
 
-  const defaultBody = !isAlive ? '#78909c' : '#0288d1'
+  const defaultBody = !isAlive
+    ? '#78909c'
+    : role === 'impostor'
+    ? '#c51111'
+    : role === 'dodo'
+    ? '#8e24aa'
+    : role === 'sheriff'
+    ? '#fbc02d'
+    : '#0288d1'
 
   const bodyColor = color || defaultBody
 
-  const shadowColor = !isAlive ? '#455a64' : (color ? '#000000' : '#01579b')
+  const shadowColor = !isAlive
+    ? '#455a64'
+    : color
+    ? '#000000'
+    : role === 'impostor'
+    ? '#7a0813'
+    : role === 'dodo'
+    ? '#4a148c'
+    : role === 'sheriff'
+    ? '#f57f17'
+    : '#01579b'
 
   return (
     <div
@@ -454,7 +472,7 @@ export const DEFAULT_TASKS_POOL = [
 ]
 
 export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: isAppAdmin, showToast, showPage }) {
-  const [activeParty, setActiveParty] = useState(null)
+  const [selectedJoinColor, setSelectedJoinColor] = useState('#c62828')
   const [gameDoc, setGameDoc] = useState(() => ({
     status: 'waiting',
     gameDurationMinutes: 20,
@@ -470,7 +488,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     winReason: '',
   }))
   const [myUid, setMyUid] = useState(() => {
-    return localStorage.getItem('allofus_player_uid') || lineUser?.uid || lineUser?.userId || lineUser?.id || ''
+    return localStorage.getItem('allofus_player_uid') || ''
   })
   const [myName, setMyName] = useState('')
   const [editingName, setEditingName] = useState(false)
@@ -507,7 +525,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [killCooldownSec, setKillCooldownSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
-  const [posSyncSessions, setPosSyncSessions] = useState([])
   const [revealedRole, setRevealedRole] = useState(false)
   const revealRoleTimeoutRef = useRef(null)
 
@@ -536,74 +553,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }, [hasAdminPerm])
 
-  // ── 1. Find Special Event Active Party / Order (Strictly special event) ───
-  useEffect(() => {
-    let posSession = null
-    let orderSession = null
-
-    const isSpecialMatch = (item) => {
-      if (!item) return false
-      const title = (item.scriptTitle || item.eventName || item.label || '').toLowerCase().trim()
-      const scriptId = (item.scriptId || '').toLowerCase().trim()
-      const room = (item.room || '').toLowerCase().trim()
-      return (
-        title.includes('special event') ||
-        title.includes('secial event') ||
-        title.includes('spacial event') ||
-        title.includes('all of us') ||
-        scriptId.includes('special') ||
-        scriptId.includes('allofus') ||
-        room.includes('special')
-      )
-    }
-
-    const mergeMembers = (a, b) => {
-      const map = {}
-      ;(a || []).forEach(m => { if (m.uid) map[m.uid] = m })
-      ;(b || []).forEach(m => { if (m.uid && !map[m.uid]) map[m.uid] = m })
-      return Object.values(map)
-    }
-
-    const evaluateParty = (pos, ord) => {
-      const posSpecial = pos && isSpecialMatch(pos)
-      const ordSpecial = ord && isSpecialMatch(ord)
-      if (posSpecial || ordSpecial) {
-        const base = posSpecial ? pos : ord
-        const other = posSpecial ? ord : pos
-        return { ...base, members: mergeMembers(base?.members, other?.members) }
-      }
-      return null
-    }
-
-    // 1. Listen to pos_live/current (active real-time session from POS)
-    const unsubPos = onSnapshot(doc(db, 'pos_live', 'current'), snap => {
-      if (snap.exists()) {
-        const data = snap.data()
-        const sessions = data.sessions || []
-        const special = sessions.find(s => isSpecialMatch(s))
-        posSession = special || null
-      } else {
-        posSession = null
-      }
-      setActiveParty(evaluateParty(posSession, orderSession))
-    }, err => console.warn('pos_live sync error:', err))
-
-    // 2. Listen to orders (confirmed active orders)
-    const q = query(collection(db, 'orders'), where('status', '==', 'active'))
-    const unsubOrders = onSnapshot(q, snap => {
-      const orders = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      const specialEvent = orders.find(o => isSpecialMatch(o))
-      orderSession = specialEvent || null
-      setActiveParty(evaluateParty(posSession, orderSession))
-    }, err => console.warn('Special event party query error:', err))
-
-    return () => {
-      unsubPos()
-      unsubOrders()
-    }
-  }, [])
-
-  // ── 2. Listen to Game State Document in Realtime ─────────
+  // ── 1. Listen to Game State Document in Realtime ─────────
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'all_of_us_games', 'active_game'), snap => {
       if (snap.exists()) {
@@ -637,52 +587,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }, err => console.warn('Game doc sync error:', err))
     return unsub
   }, [])
-
-  // ── 3. Auto-populate player into game if in party ────────
-  useEffect(() => {
-    if (!gameDoc || !activeParty) return
-    const members = activeParty.members || []
-    if (members.length === 0) return
-
-    // Ensure myUid has valid player in party
-    let effectiveUid = myUid
-    if (!effectiveUid && members.length > 0) {
-      const matchingLine = members.find(m => m.uid === lineUser?.uid)
-      if (matchingLine) {
-        effectiveUid = matchingLine.uid
-        setMyUid(matchingLine.uid)
-        localStorage.setItem('allofus_player_uid', matchingLine.uid)
-      }
-    }
-
-    // Synchronize party members into gameDoc.players if in waiting state
-    // Use dot-notation per player to avoid overwriting colors/ready flags of existing players
-    if (gameDoc.status === 'waiting') {
-      const currentPlayers = gameDoc.players || {}
-      const patch = {}
-
-      members.forEach(m => {
-        if (m.uid && !currentPlayers[m.uid]) {
-          patch[`players.${m.uid}`] = {
-            uid: m.uid,
-            name: m.name || 'ผู้เล่น',
-            avatar: m.avatar || '',
-            role: 'crewmate',
-            color: '',
-            isAlive: true,
-            tasks: [],
-            ready: false,
-            emergencyUsed: 0,
-            sabotageUsed: 0,
-          }
-        }
-      })
-
-      if (Object.keys(patch).length > 0) {
-        updateDoc(doc(db, 'all_of_us_games', 'active_game'), patch).catch(() => {})
-      }
-    }
-  }, [gameDoc?.status, activeParty, myUid, lineUser?.uid])
 
   // Sync current user's player name
   useEffect(() => {
@@ -926,31 +830,50 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  // Direct join game by entering name
+  // Direct join game by entering name and choosing character color
   const handleDirectJoin = async () => {
     const trimmed = (directJoinName || '').trim()
     if (!trimmed) {
       showToast('กรุณาระบุชื่อของคุณ', 'error')
       return
     }
+    const currentPlayers = gameDoc?.players || {}
+    const nameTaken = Object.values(currentPlayers).some(
+      p => p.name?.toLowerCase().trim() === trimmed.toLowerCase()
+    )
+    if (nameTaken) {
+      showToast('ชื่อนี้มีผู้เล่นคนอื่นใช้แล้วในห้อง กรุณาใช้ชื่ออื่น', 'error')
+      return
+    }
+
+    // Determine character color
+    const usedColors = new Set(Object.values(currentPlayers).map(p => (p.color || '').toLowerCase()))
+    let chosenColor = selectedJoinColor
+    if (!chosenColor || usedColors.has(chosenColor.toLowerCase())) {
+      const freeColor = TWENTY_PLAYER_COLORS.find(c => !usedColors.has(c.hex.toLowerCase()))
+      chosenColor = freeColor ? freeColor.hex : TWENTY_PLAYER_COLORS[0].hex
+    }
+
     const newUid = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6)
     setMyUid(newUid)
     localStorage.setItem('allofus_player_uid', newUid)
     try {
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-        [`players.${newUid}`]: {
-          uid: newUid,
-          name: trimmed,
-          avatar: '',
-          role: 'crewmate',
-          color: '',
-          isAlive: true,
-          tasks: [],
-          ready: false,
+      await setDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        players: {
+          [newUid]: {
+            uid: newUid,
+            name: trimmed,
+            avatar: '',
+            role: 'crewmate',
+            color: chosenColor,
+            isAlive: true,
+            tasks: [],
+            ready: true,
+          }
         }
-      })
+      }, { merge: true })
       setDirectJoinName('')
-      showToast(`ยินดีต้อนรับ ${trimmed}`)
+      showToast(`ยินดีต้อนรับ ${trimmed} เข้าสู่ยาน The Skeld`)
     } catch (e) {
       showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
     }
@@ -1105,62 +1028,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       showToast('ล้างรายชื่อผู้เล่นทั้งหมดแล้ว')
     } catch (e) {
       showToast('ล้างผู้เล่นล้มเหลว: ' + e.message, 'error')
-    }
-  }
-
-  // Admin: Sync / Overwrite players strictly from active POS party
-  const doSyncFromSession = async (session) => {
-    const members = session.members || []
-    if (members.length === 0) {
-      showToast('Session นี้ไม่มีสมาชิก', 'error')
-      return
-    }
-    if (!window.confirm(`ยืนยันซิงค์รายชื่อจาก POS (${members.length} คน) แทนที่รายชื่อเดิม?`)) return
-    try {
-      const newPlayers = {}
-      members.forEach(m => {
-        if (!m.uid) return
-        newPlayers[m.uid] = {
-          uid: m.uid,
-          name: m.name || 'ผู้เล่น',
-          avatar: m.avatar || '',
-          role: 'crewmate',
-          isAlive: true,
-          tasks: [],
-          ready: false,
-          emergencyUsed: 0,
-          sabotageUsed: 0,
-        }
-      })
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), { players: newPlayers })
-      setPosSyncSessions([])
-      showToast(`ซิงค์สมาชิก ${Object.keys(newPlayers).length} คนจาก POS เรียบร้อย`)
-    } catch (e) {
-      showToast('ซิงค์ล้มเหลว: ' + e.message, 'error')
-    }
-  }
-
-  const handleSyncFromPos = async () => {
-    if (activeParty && (activeParty.members || []).length > 0) {
-      doSyncFromSession(activeParty)
-      return
-    }
-    // activeParty is null or empty → read pos_live directly and let admin pick
-    try {
-      const snap = await getDoc(doc(db, 'pos_live', 'current'))
-      const sessions = snap.exists() ? (snap.data().sessions || []) : []
-      const withMembers = sessions.filter(s => (s.members || []).length > 0)
-      if (withMembers.length === 0) {
-        showToast('ไม่พบสมาชิกในปาร์ตี้ POS ปัจจุบัน — ลองเพิ่มสมาชิกที่ POS ก่อน', 'error')
-        return
-      }
-      if (withMembers.length === 1) {
-        doSyncFromSession(withMembers[0])
-        return
-      }
-      setPosSyncSessions(withMembers)
-    } catch (e) {
-      showToast('โหลด POS ล้มเหลว: ' + e.message, 'error')
     }
   }
 
@@ -2172,7 +2039,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               ALL OF US WILL DIE
             </div>
             <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 2 }}>
-              {activeParty ? `ตี้: ${activeParty.room || activeParty.scriptTitle || 'Special Event'}` : 'SPECIAL EVENT'}
+              THE SKELD MISSION
             </div>
           </div>
         </div>
@@ -2201,7 +2068,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           {/* Exit / Return button */}
           <button
             type="button"
-            onClick={() => showPage(activeParty ? 'order' : 'home')}
+            onClick={() => showPage('home')}
             style={{
               width: 34, height: 34, borderRadius: 10,
               background: 'rgba(255,255,255,0.06)',
@@ -2457,111 +2324,89 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       {/* ─── MAIN CONTENT CONTAINER ─── */}
       <main style={{ flex: 1, padding: '14px 16px 80px', maxWidth: 640, width: '100%', margin: '0 auto' }}>
 
-        {/* ── SELECT / IDENTIFY PLAYER MODAL (If player not bound yet) ── */}
+        {/* ─── CREW REGISTRATION (ENTER YOUR NAME) ─── */}
         {(!myUid || !me) && !isAdminView && (
           <div className="au-card" style={{
-            padding: 22,
+            padding: 24,
             marginBottom: 20,
+            border: '2.5px solid #29b6f6',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.1)',
             textAlign: 'center',
           }}>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-              <AmongUsVisor role="crewmate" isAlive={true} size={50} />
-            </div>
-            <div style={{ fontSize: 17, fontWeight: 900, color: '#fff', marginBottom: 4 }}>
-              เลือกตัวละครของคุณ
-            </div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginBottom: 16 }}>
-              แตะชื่อของคุณจากสมาชิกตี้ Special Event เพื่อเข้าสู่ยาน
+              <AmongUsVisor color={selectedJoinColor || '#c62828'} isAlive={true} size={64} />
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {(activeParty?.members || []).map((m, idx) => {
-                const colors = ['#0288d1', '#c51111', '#2e7d32', '#fbc02d', '#8e24aa', '#ff9800', '#009688', '#e91e63']
-                const assignedColor = colors[idx % colors.length]
-                return (
-                  <button
-                    key={m.uid}
-                    type="button"
-                    onClick={async () => {
-                      setMyUid(m.uid)
-                      localStorage.setItem('allofus_player_uid', m.uid)
-                      const alreadyIn = (gameDoc.players || {})[m.uid]
-                      if (!alreadyIn) {
-                        try {
-                          await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-                            [`players.${m.uid}`]: {
-                              uid: m.uid,
-                              name: m.name || 'ผู้เล่น',
-                              avatar: m.avatar || '',
-                              role: 'crewmate',
-                              color: '',
-                              isAlive: true,
-                              tasks: [],
-                              ready: false,
-                              emergencyUsed: 0,
-                              sabotageUsed: 0,
-                            }
-                          })
-                        } catch (e) {
-                          showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
-                        }
-                      }
-                      showToast(`ยินดีต้อนรับ ${m.name}`)
-                    }}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 12,
-                      padding: '10px 14px', borderRadius: 14,
-                      background: 'rgba(255,255,255,0.03)',
-                      border: '2px solid #1f2c42',
-                      color: '#fff', cursor: 'pointer', textAlign: 'left',
-                      transition: 'border-color 0.15s ease',
-                    }}
-                  >
-                    <AmongUsVisor size={36} color={assignedColor} />
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{m.name}</div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>สมาชิกตี้ Special Event</div>
-                    </div>
-                    <i className="fas fa-chevron-right" style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)' }} />
-                  </button>
-                )
-              })}
-
-              {(!activeParty?.members || activeParty.members.length === 0) && (
-                <div style={{ padding: '16px 0', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
-                  ไม่พบสมาชิกในตี้ Special Event กรุณาให้แอดมินเพิ่มสมาชิกที่ POS หรือพิมพ์ชื่อของคุณด้านล่าง
-                </div>
-              )}
+            <div style={{ fontSize: 19, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', marginBottom: 4 }}>
+              ลงทะเบียนลูกเรือ (CREW REGISTRATION)
+            </div>
+            <div style={{ fontSize: 12, color: '#80d8ff', marginBottom: 18, fontWeight: 700 }}>
+              กรอกชื่อของคุณเพื่อเข้าร่วมภารกิจในยาน THE SKELD
             </div>
 
-            <div style={{ marginTop: 18, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(255,255,255,0.7)', marginBottom: 8 }}>
-                หรือพิมพ์ชื่อเพื่อเข้าร่วมยานโดยตรง
+            <div style={{ textAlign: 'left', marginBottom: 16 }}>
+              <label style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.7)', marginBottom: 6, display: 'block', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <i className="fas fa-id-badge" style={{ marginRight: 6, color: '#ffd54f' }} />
+                ชื่อของคุณ (PLAYER NAME)
+              </label>
+              <input
+                type="text"
+                placeholder="พิมพ์ชื่อของคุณ (เช่น Red, ฟ้า, แบงค์)..."
+                value={directJoinName}
+                maxLength={18}
+                onChange={e => setDirectJoinName(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleDirectJoin() }}
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '12px 14px',
+                  borderRadius: 12,
+                  background: '#0a0f18',
+                  color: '#fff',
+                  border: '2px solid #384d6b',
+                  fontSize: 15,
+                  fontWeight: 700,
+                  fontFamily: 'inherit',
+                  boxSizing: 'border-box',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            <div style={{ textAlign: 'left', marginBottom: 18 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <label style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  <i className="fas fa-palette" style={{ marginRight: 6, color: '#ffd54f' }} />
+                  เลือกสีตัวละคร (CHOOSE COLOR)
+                </label>
+                <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.5)' }}>
+                  ห้ามเลือกสีซ้ำกัน
+                </span>
               </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="พิมพ์ชื่อของคุณ..."
-                  value={directJoinName}
-                  onChange={e => setDirectJoinName(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleDirectJoin() }}
-                  style={{
-                    flex: 1, padding: '10px 12px', borderRadius: 10,
-                    background: '#0d131d', color: '#fff',
-                    border: '2px solid #233147', fontSize: 13,
-                    fontFamily: 'inherit',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleDirectJoin}
-                  className="au-btn au-btn-red"
-                  style={{ padding: '10px 18px', fontSize: 13 }}
-                >
-                  เข้าร่วม
-                </button>
-              </div>
+              <TwentyColorPalette
+                selectedColor={selectedJoinColor}
+                players={gameDoc.players}
+                currentUid={null}
+                onSelect={(hex) => setSelectedJoinColor(hex)}
+              />
             </div>
+
+            <button
+              type="button"
+              onClick={handleDirectJoin}
+              className="au-btn au-btn-red"
+              style={{
+                width: '100%',
+                padding: '14px',
+                fontSize: 15,
+                fontWeight: 900,
+                letterSpacing: '0.06em',
+                borderRadius: 14,
+              }}
+            >
+              <i className="fas fa-rocket" style={{ marginRight: 8 }} />
+              เข้าร่วมภารกิจ (JOIN CREW)
+            </button>
           </div>
         )}
 
@@ -3197,16 +3042,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       >
                         <i className="fas fa-user-minus" />
                         <span>ลบ Mockup ทั้งหมด</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleSyncFromPos}
-                        className="au-btn au-btn-dark"
-                        style={{ padding: '6px 10px', fontSize: 11 }}
-                        title="ซิงค์รายชื่อจากปาร์ตี้ POS ปัจจุบัน"
-                      >
-                        <i className="fas fa-sync-alt" />
-                        <span>ซิงค์ POS</span>
                       </button>
                       <button
                         type="button"
@@ -5291,53 +5126,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       )}
 
       {/* ─── SECRET SABOTAGE PICKER MODAL (FOR IMPOSTOR) ─── */}
-      {posSyncSessions.length > 0 && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 130,
-          background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(10px)',
-          display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          padding: 16,
-        }} onClick={() => setPosSyncSessions([])}>
-          <div className="au-card" style={{ borderRadius: '22px 22px 0 0', width: '100%', maxWidth: 500, padding: 20 }}
-            onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 14, fontWeight: 900, color: '#fff', marginBottom: 4 }}>เลือกปาร์ตี้ POS</div>
-            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 14 }}>
-              พบหลาย session — เลือก session ที่ต้องการซิงค์
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {posSyncSessions.map((s, i) => (
-                <button key={i} type="button"
-                  onClick={() => doSyncFromSession(s)}
-                  style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 14px', borderRadius: 12,
-                    background: 'rgba(255,255,255,0.05)', border: '1.5px solid rgba(255,255,255,0.1)',
-                    color: '#fff', cursor: 'pointer', textAlign: 'left',
-                  }}>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800 }}>
-                      {s.label || s.scriptTitle || s.eventName || `ปาร์ตี้ ${i + 1}`}
-                    </div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
-                      {(s.members || []).length} คน
-                      {s.room ? ` · ${s.room}` : ''}
-                      {s.scriptTitle ? ` · ${s.scriptTitle}` : ''}
-                    </div>
-                  </div>
-                  <i className="fas fa-chevron-right" style={{ fontSize: 11, opacity: 0.4 }} />
-                </button>
-              ))}
-            </div>
-            <button type="button" onClick={() => setPosSyncSessions([])}
-              style={{ marginTop: 12, width: '100%', padding: '10px', borderRadius: 10,
-                background: 'rgba(255,255,255,0.06)', border: 'none', color: 'rgba(255,255,255,0.6)',
-                fontSize: 13, cursor: 'pointer' }}>
-              ยกเลิก
-            </button>
-          </div>
-        </div>
-      )}
-
       {showSabotageModal && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 120,
