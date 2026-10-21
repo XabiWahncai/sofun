@@ -2214,7 +2214,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             borderRadius: 14,
             padding: '8px 12px',
             boxShadow: '0 4px 16px rgba(0,0,0,0.6)',
-            cursor: (gameDoc.status === 'playing' && isAlive && (myRole === 'impostor' || myRole === 'sheriff')) ? 'pointer' : 'default',
+            cursor: 'pointer',
             userSelect: 'none',
           }}
         >
@@ -4243,6 +4243,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                           </div>
                         ))}
                     </div>
+                    <div style={{ marginTop: 8, fontSize: 10.5, color: '#ffccbc', fontWeight: 700 }}>
+                      <i className="fas fa-radiation" style={{ marginRight: 5 }} />
+                      วิธีใช้สกิล: แตะที่แถบ TOTAL TASKS COMPLETED ด้านบนเพื่อเปิดเมนูก่อวินาศกรรม (Sabotage)
+                    </div>
                   </div>
                 )}
 
@@ -4272,8 +4276,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         {(me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '1 นัด พร้อมยิง' : 'ใช้สิทธิ์แล้ว'}
                       </span>
                     </div>
-                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.6)' }}>
-                      กดปุ่ม SHOOT ใน Action Hub ด้านล่างเพื่อยิง
+                    <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>
+                      แตะที่แถบ TOTAL TASKS COMPLETED ด้านบนเพื่อสั่งยิง
                     </span>
                   </div>
                 )}
@@ -4353,12 +4357,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               margin: '2px 0',
             }}>
               {isAlive && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: (myRole === 'sheriff' || myRole === 'impostor') ? '1.35fr 1fr' : '1fr',
-                  gap: 10,
-                }}>
-                  {/* Giant 3D Beveled Red REPORT Button */}
+                <div>
+                  {/* Giant 3D Beveled Red REPORT Button (100% Equal UI for all roles) */}
                   <button
                     type="button"
                     onClick={() => {
@@ -4367,6 +4367,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                     }}
                     className="au-btn au-btn-red"
                     style={{
+                      width: '100%',
                       padding: '14px 16px',
                       borderRadius: 16,
                       display: 'flex',
@@ -4394,80 +4395,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>แจ้งพบลูกเรือเสียชีวิต</div>
                     </div>
                   </button>
-
-                  {/* Role-Specific Action: Sheriff SHOOT */}
-                  {myRole === 'sheriff' && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (killCooldownSec > 0) {
-                          showToast(`อยู่ในช่วงเวลาห้ามฆ่า (เหลืออีก ${killCooldownSec} วินาที)`, 'error')
-                          return
-                        }
-                        const shots = me?.sheriffShots !== undefined ? me.sheriffShots : 1
-                        if (shots <= 0) {
-                          showToast('คุณใช้สิทธิ์ยิงของรอบนี้ไปแล้ว (จะได้รับสิทธิ์ใหม่หลังจบการประชุม)', 'error')
-                          return
-                        }
-                        setSelectedSheriffTarget(null)
-                        setShowSheriffKillModal(true)
-                      }}
-                      className="au-btn au-btn-yellow"
-                      style={{
-                        padding: '14px 10px',
-                        borderRadius: 16,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 3,
-                      }}
-                      title="เล็งเป้าหมายยิงคนร้าย (มี 1 นัด)"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 900 }}>
-                        <i className="fas fa-crosshairs" />
-                        <span>SHOOT</span>
-                      </div>
-                      <span style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        background: 'rgba(0,0,0,0.15)',
-                        padding: '1px 7px',
-                        borderRadius: 6,
-                      }}>
-                        {(me?.sheriffShots !== undefined ? me.sheriffShots : 1) > 0 ? '1 นัด พร้อมยิง' : 'ยิงแล้ว'}
-                      </span>
-                    </button>
-                  )}
-
-                  {/* Role-Specific Action: Impostor SABOTAGE */}
-                  {myRole === 'impostor' && (
-                    <button
-                      type="button"
-                      onClick={() => setShowSabotageModal(true)}
-                      className="au-btn au-btn-red"
-                      style={{
-                        padding: '14px 10px',
-                        borderRadius: 16,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: 3,
-                        background: '#8a0a14',
-                        borderBottom: '5px solid #4a0309',
-                      }}
-                      title="ก่อวินาศกรรมระบบ (Sabotage)"
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13.5, fontWeight: 900 }}>
-                        <i className="fas fa-radiation" />
-                        <span>SABOTAGE</span>
-                      </div>
-                      <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.85)', fontWeight: 700 }}>
-                        ก่อวินาศกรรม
-                      </span>
-                    </button>
-                  )}
                 </div>
               )}
 
