@@ -3,8 +3,7 @@ import {
   collection, onSnapshot, addDoc, updateDoc, deleteDoc,
   doc, serverTimestamp, query, orderBy, getDoc
 } from 'firebase/firestore'
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
-import { httpsCallable } from 'firebase/functions'
+import { verifySlipDirect, viewSlipImage } from '../utils/slipVerifier'
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import { db, storage, appFunctions } from '../firebase'
 import { useOpenProfile } from '../UserProfileContext'
@@ -1484,46 +1483,24 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
     if (!slipFile) return
     setUploading(true)
     try {
-      // 1. Upload to Storage
-      const path = `slips/deposits/${booking.id}/${lineUser.uid}_${Date.now()}`
-      const fileRef = storageRef(storage, path)
-      await uploadBytes(fileRef, slipFile)
-      const slipUrl = await getDownloadURL(fileRef)
+      // 1. Direct EasySlip check on client (bypasses Firebase Storage & Cloud Functions)
+      const res = await verifySlipDirect(slipFile, amount, { isDeposit: true })
 
-      // 2. Try EasySlip verification via Cloud Function
-      let verified = false
-      let verifyData = {}
-      let slipCode = null
-      try {
-        const verifySlip = httpsCallable(appFunctions, 'verifySlip')
-        const result = await verifySlip({
-          slipUrl,
-          amount,
-          orderId: `booking_${booking.id}`,
-          uid: lineUser.uid,
-          name: lineUser.name,
-          isDeposit: true,
-        })
-        const json = result.data
-        slipCode = json?.code || null
-        if (json?.success) {
-          verified = true
-          const slip = json.data?.rawSlip || {}
-          verifyData = {
-            slipTransRef: slip.transRef || '',
-            slipBank: slip.sender?.bank?.short || '',
-          }
-        } else if (json?.code === 'WRONG_RECEIVER') {
-          showToast('สลิปโอนไปยังบัญชีอื่น — กรุณาตรวจสอบและโอนใหม่', 'error')
-          return
-        }
-      } catch (e) {
-        console.warn('EasySlip verify failed:', e.message)
+      if (res.code === 'WRONG_RECEIVER') {
+        showToast(res.msg || 'สลิปโอนไปยังบัญชีอื่น — กรุณาตรวจสอบและโอนใหม่', 'error')
+        return
       }
 
-      // 3. Update booking member
-      const ref = doc(db, 'bookings', booking.id)
-      const snap = await getDoc(ref)
+      const verified = !!res.success
+      const slipUrl = res.slipThumbnail || ''
+      const verifyData = res.verifyData ? {
+        slipTransRef: res.verifyData.transRef || '',
+        slipBank: res.verifyData.bank || '',
+      } : {}
+
+      // 2. Update booking member in Firestore
+      const bRef = doc(db, 'bookings', booking.id)
+      const snap = await getDoc(bRef)
       if (!snap.exists()) throw new Error('ไม่พบการจอง')
       const data = snap.data()
       const nowIso = new Date().toISOString()
@@ -1531,7 +1508,8 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
         m.uid === lineUser.uid
           ? {
               ...m,
-              slipUrl, slipSubmittedAt: nowIso,
+              slipUrl,
+              slipSubmittedAt: nowIso,
               ...(verified
                 ? { paidDeposit: true, paidAt: nowIso, slipStatus: 'verified', ...verifyData }
                 : { slipStatus: 'pending_verification' })
@@ -1539,7 +1517,6 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
           : m
       )
       const payload = { members: updatedMembers, updatedAt: serverTimestamp() }
-      // If verified → extend deadline +3 days per payer (capped at 1 day before play) & lock when full
       if (verified) {
         payload.depositDeadline = calculateDepositDeadline({
           ...data,
@@ -1550,12 +1527,10 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
         const isFullAndPaid = paidCount >= maxMembers
         if (isFullAndPaid && data.status === 'confirmed') payload.status = 'locked'
       }
-      await updateDoc(ref, payload)
+      await updateDoc(bRef, payload)
 
-      if (verified) showToast('EasySlip ยืนยันแล้ว ✓')
-      else if (slipCode === 'QR_NOT_FOUND' || slipCode === 'IMAGE_ERROR') showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน (อ่าน QR ไม่สำเร็จ)')
-      else if (slipCode === 'SERVICE_EXPIRED') showToast('EasySlip หมดอายุ — รอแอดมินยืนยัน')
-      else if (slipCode === 'NO_API_KEY') showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน')
+      if (verified) showToast('EasySlip ยืนยันสำเร็จ')
+      else if (res.code === 'QR_NOT_FOUND') showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน (อ่าน QR ไม่สำเร็จ)')
       else showToast('ส่งสลิปสำเร็จ — รอแอดมินตรวจสอบ')
 
       setStep('done')

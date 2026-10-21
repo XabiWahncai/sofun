@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { QRCodeCanvas } from 'qrcode.react'
-import { db, storage, appFunctions } from '../firebase'
-import { httpsCallable } from 'firebase/functions'
+import { db } from '../firebase'
 import { doc, collection, onSnapshot, query, orderBy, updateDoc, arrayUnion, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage'
 import { DEFAULT_RECEIPT_SETTINGS } from '../constants/receipt'
+import { verifySlipDirect } from '../utils/slipVerifier'
 
 const ALL = 'ทั้งหมด'
 
@@ -441,47 +440,32 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
 
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0]; if (!file) return
-    setLoadMsg('กำลังอัปโหลดสลิป...')
+    setLoadMsg('กำลังตรวจสอบสลิป...')
     try {
-      // 1. Upload to Storage (for record keeping)
-      const slipRef = ref(storage, `slips/${orderId}/${lineUser.uid}_${Date.now()}`)
-      await uploadBytes(slipRef, file)
-      const slipUrl = await getDownloadURL(slipRef)
+      // 1. Direct EasySlip check on client (bypasses Firebase Storage & Cloud Functions)
+      const res = await verifySlipDirect(file, amount, { isDeposit: false })
 
-      // 2. Call Cloud Function: server reads QR from image → calls EasySlip
-      setLoadMsg('กำลังตรวจสอบ EasySlip...')
-      let verified = false
-      let verifyData = {}
-      let slipCode = null
-      try {
-        const verifySlip = httpsCallable(appFunctions, 'verifySlip')
-        const result = await verifySlip({ slipUrl, amount, orderId, uid: lineUser.uid, name: lineUser.name })
-        const json = result.data
-        slipCode = json.code || null
-        if (json.success) {
-          verified = true
-          const slip = json.data?.rawSlip || {}
-          verifyData = {
-            transRef: slip.transRef || '',
-            bank: slip.sender?.bank?.short || '',
-            bankName: slip.sender?.bank?.name || '',
-          }
-        } else if (json.code === 'SLIP_PENDING' && !forAll) {
-          // Function already wrote the full pending entry to Firestore — just notify and close
-          setStep('done')
-          showToast('Bangkok Bank กำลังประมวลผล — ระบบจะยืนยันอัตโนมัติ ✓')
-          return
-        } else if (json.code === 'WRONG_RECEIVER') {
-          showToast('สลิปโอนไปยังบัญชีอื่น — กรุณาตรวจสอบและโอนใหม่', 'error')
-          return
-        }
-      } catch {}
+      if (res.code === 'WRONG_RECEIVER') {
+        showToast(res.msg || 'สลิปโอนไปยังบัญชีอื่น — กรุณาตรวจสอบและโอนใหม่', 'error')
+        return
+      }
 
-      // 3. Save result to Firestore
+      const verified = !!res.success
+      const slipUrl = res.slipThumbnail || ''
+      const verifyData = res.verifyData || {}
+      const isBankPending = res.code === 'SLIP_PENDING'
+
+      // 2. Save result to Firestore
       const entry = {
-        paidAt: new Date().toISOString(), amount, slipUrl,
-        verified, pendingAdminReview: !verified,
-        name: lineUser.name, ...verifyData,
+        paidAt: new Date().toISOString(),
+        amount,
+        slipUrl,
+        verified,
+        pendingAdminReview: !verified && !isBankPending,
+        easyslipPending: isBankPending,
+        easyslipPayload: res.payload || null,
+        name: lineUser.name,
+        ...verifyData,
       }
       const updates = {}
       if (forAll) {
@@ -508,15 +492,13 @@ function PaymentSheet({ amount, forAll, forGroup, groupMembers = [], orderId, li
 
       setStep('done')
       if (verified) {
-        showToast('EasySlip ยืนยันแล้ว ✓')
-      } else if (slipCode === 'QR_NOT_FOUND' || slipCode === 'IMAGE_ERROR') {
+        showToast('EasySlip ยืนยันสำเร็จ')
+      } else if (isBankPending) {
+        showToast('ธนาคารกำลังประมวลผล — บันทึกสลิปแล้ว')
+      } else if (res.code === 'QR_NOT_FOUND') {
         showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน (อ่าน QR อัตโนมัติไม่สำเร็จ)')
-      } else if (slipCode === 'SERVICE_EXPIRED') {
-        showToast('EasySlip หมดอายุ — บันทึกสลิปแล้ว รอแอดมินยืนยัน')
-      } else if (slipCode === 'NO_API_KEY') {
-        showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน')
       } else {
-        showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน')
+        showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยันรับเงิน')
       }
     } catch (err) {
       showToast(err?.message || 'อัปโหลดไม่สำเร็จ', 'error')

@@ -1,3 +1,4 @@
+import { viewSlipImage } from '../utils/slipVerifier'
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import {
@@ -7835,9 +7836,9 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
                           </div>
                           {pendingSlips.map(m => (
                             <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                              <a href={m.slipUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
+                              <div onClick={() => viewSlipImage(m.slipUrl)} style={{ flexShrink: 0, cursor: 'pointer' }} title="คลิกดูสลิปเต็มจอ">
                                 <img src={m.slipUrl} alt="slip" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-default)', display: 'block' }} />
-                              </a>
+                              </div>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {m.name || m.uid}
