@@ -656,14 +656,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
 
     // Synchronize party members into gameDoc.players if in waiting state
+    // Use dot-notation per player to avoid overwriting colors/ready flags of existing players
     if (gameDoc.status === 'waiting') {
       const currentPlayers = gameDoc.players || {}
-      let changed = false
-      const updatedPlayers = { ...currentPlayers }
+      const patch = {}
 
       members.forEach(m => {
-        if (!updatedPlayers[m.uid]) {
-          updatedPlayers[m.uid] = {
+        if (m.uid && !currentPlayers[m.uid]) {
+          patch[`players.${m.uid}`] = {
             uid: m.uid,
             name: m.name || 'ผู้เล่น',
             avatar: m.avatar || '',
@@ -672,15 +672,14 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             isAlive: true,
             tasks: [],
             ready: false,
+            emergencyUsed: 0,
+            sabotageUsed: 0,
           }
-          changed = true
         }
       })
 
-      if (changed) {
-        updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-          players: updatedPlayers
-        }).catch(() => {})
+      if (Object.keys(patch).length > 0) {
+        updateDoc(doc(db, 'all_of_us_games', 'active_game'), patch).catch(() => {})
       }
     }
   }, [gameDoc?.status, activeParty, myUid, lineUser?.uid])
