@@ -706,11 +706,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         const elapsedSec = Math.floor((now - (gameDoc.timerUpdatedAt || now)) / 1000)
         const rem = Math.max(0, (gameDoc.gameSecondsRemaining || 0) - elapsedSec)
         setCurrentTimeSec(rem)
-        if (rem === 0 && hasAdminPerm && gameDoc.gameTimerRunning) {
-          // Pause timer when expired; GM declares winner manually via GM controls
+        const isMasterTimerWriter = hasAdminPerm || (allPlayersList.length > 0 && allPlayersList[0].uid === myUid)
+        if (rem === 0 && isMasterTimerWriter && gameDoc.gameTimerRunning) {
           updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+            status: 'ended',
+            winner: 'impostor',
+            winReason: 'หมดเวลาการเล่นหลัก (00:00) แล้ว! ฝ่ายคนดีไม่สามารถทำภารกิจกู้ยานได้ทันเวลา ทำให้ฝ่ายคนร้ายชนะเกมทันที!',
             gameTimerRunning: false,
             gameSecondsRemaining: 0,
+            killCooldownUntil: 0,
             timerUpdatedAt: now,
           }).catch(() => {})
         }
@@ -1391,8 +1395,9 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   // Call Emergency Meeting or Report Body
   const callEmergencyMeeting = async (isReport = false, victim = null) => {
     if (gameDoc.status !== 'playing') return
-    if (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
-      showToast('ไม่สามารถเรียกประชุมหรือ Report ศพได้ขณะมีสัญญาณ Sabotage! ต้องแก้ไขก่อน', 'error')
+    // Standard Among Us Rule: Emergency Meeting button is blocked during Sabotage, but Dead Body Report is allowed
+    if (!isReport && gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
+      showToast('ไม่สามารถกดปุ่มเรียกประชุมฉุกเฉินได้ขณะมีสัญญาณ Sabotage! ต้องแก้ไขก่อน', 'error')
       return
     }
     try {
@@ -1401,7 +1406,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       const elapsedSec = Math.floor((now - (gameDoc.timerUpdatedAt || now)) / 1000)
       const currentRemaining = Math.max(0, (gameDoc.gameSecondsRemaining || 0) - elapsedSec)
 
-      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+      const updateData = {
         status: 'meeting_called',
         gameSecondsRemaining: currentRemaining,
         gameTimerRunning: false,
@@ -1422,9 +1427,17 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           votes: {},
           result: null,
         }
-      })
+      }
+
+      // Standard Among Us Rule: Reporting a dead body immediately cancels any active Sabotage
+      if (isReport && gameDoc.sabotage?.active) {
+        updateData.sabotage = { active: false, id: '', title: '', status: 'idle', countdownSeconds: 90, startedAt: 0 }
+        stopSabotageAlarm()
+      }
+
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), updateData)
       playMeetingBuzzer()
-      showToast(isReport ? `REPORT ศพ ${victim ? victim.name : ''} สำเร็จ! เรียกทุกคนเข้าที่ประชุม` : 'เปิดประชุมฉุกเฉินสำเร็จ')
+      showToast(isReport ? `REPORT ศพ ${victim ? victim.name : ''} สำเร็จ! ยกเลิก Sabotage และเรียกทุกคนเข้าที่ประชุม` : 'เปิดประชุมฉุกเฉินสำเร็จ')
     } catch (e) {
       showToast('เรียกประชุมล้มเหลว: ' + e.message, 'error')
     }
@@ -3791,64 +3804,44 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               {/* Action Buttons: Report Body & Self-Report Death */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
                 {isAlive && (
-                  (() => {
-                    const isSabotageActive = Boolean(gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active')
-                    return (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (isSabotageActive) {
-                            showToast('มีเหตุการณ์ Sabotage อยู่ ต้องแก้ไขก่อนจึงจะรายงานศพได้', 'error')
-                            return
-                          }
-                          setSelectedReportVictim(null)
-                          setShowReportModal(true)
-                        }}
-                        style={{
-                          padding: '10px 16px',
-                          borderRadius: 14,
-                          background: isSabotageActive
-                            ? 'rgba(40, 40, 40, 0.7)'
-                            : 'linear-gradient(135deg, #c62828 0%, #b71c1c 100%)',
-                          border: isSabotageActive
-                            ? '2px solid rgba(255, 255, 255, 0.15)'
-                            : '2.5px solid #ff5252',
-                          boxShadow: isSabotageActive
-                            ? 'none'
-                            : '0 4px 18px rgba(198, 40, 40, 0.45)',
-                          color: '#fff',
-                          cursor: isSabotageActive ? 'not-allowed' : 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 10,
-                          opacity: isSabotageActive ? 0.6 : 1,
-                          transition: 'all 0.15s ease',
-                        }}
-                        title={isSabotageActive ? 'ติดสถานะ Sabotage ไม่สามารถ Report ได้' : 'รายงานการพบศพ'}
-                      >
-                        <div style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: '50%',
-                          background: isSabotageActive ? 'rgba(255,255,255,0.1)' : 'rgba(255, 255, 255, 0.2)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 16,
-                        }}>
-                          {isSabotageActive ? <i className="fas fa-lock" /> : <i className="fas fa-bullhorn" />}
-                        </div>
-                        <div style={{ textAlign: 'left' }}>
-                          <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.04em' }}>
-                            {isSabotageActive ? 'SABOTAGE LOCK' : 'REPORT ศพ'}
-                          </div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>
-                            {isSabotageActive ? 'ต้องแก้ปัญหาไฟ/ออกซิเจนก่อน' : 'แจ้งพบผู้เล่นเสียชีวิต'}
-                          </div>
-                        </div>
-                      </button>
-                    )
-                  })()
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedReportVictim(null)
+                      setShowReportModal(true)
+                    }}
+                    style={{
+                      padding: '10px 16px',
+                      borderRadius: 14,
+                      background: 'linear-gradient(135deg, #c62828 0%, #b71c1c 100%)',
+                      border: '2.5px solid #ff5252',
+                      boxShadow: '0 4px 18px rgba(198, 40, 40, 0.45)',
+                      color: '#fff',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 10,
+                      transition: 'all 0.15s ease',
+                    }}
+                    title="รายงานการพบศพ (Report Dead Body)"
+                  >
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '50%',
+                      background: 'rgba(255, 255, 255, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 16,
+                    }}>
+                      <i className="fas fa-bullhorn" />
+                    </div>
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.04em' }}>REPORT ศพ</div>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.7)' }}>แจ้งพบผู้เล่นเสียชีวิต</div>
+                    </div>
+                  </button>
                 )}
 
                 {/* Self-Report Eliminated Button */}
@@ -4863,11 +4856,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 disabled={!selectedReportVictim}
                 onClick={async () => {
                   if (!selectedReportVictim) return
-                  if (gameDoc.sabotage?.active && gameDoc.sabotage.status === 'active') {
-                    showToast('มีสัญญาณ Sabotage อยู่ ต้องแก้ไขก่อนจึงจะ Report ศพได้', 'error')
-                    setShowReportModal(false)
-                    return
-                  }
                   await callEmergencyMeeting(true, selectedReportVictim)
                   setShowReportModal(false)
                   setSelectedReportVictim(null)
@@ -5392,6 +5380,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   <li>ผู้เล่นที่เสียชีวิตจะขึ้นป้าย DEAD ชัดเจน และถูกล็อคไม่ให้ลงคะแนนโหวต</li>
                   <li>ระหว่างการโหวต คะแนนจะถูกปิดเป็นความลับ เห็นเฉพาะสถานะว่าใครโหวตแล้ว</li>
                   <li>ผลคะแนนจะสรุปเมื่อหมดเวลาหรือทุกคนโหวตเสร็จ โดยแจ้งจำนวนเสียงของแต่ละคน แต่ไม่เปิดเผยว่าใครโหวตใคร</li>
+                  <li>สามารถกด REPORT ศพได้ตลอดเวลา แม้จะเกิดสัญญาณ Sabotage อยู่ (การ Report ศพจะยกเลิก Sabotage ทันทีเพื่อเข้าสู่การประชุม)</li>
+                  <li>หากหมดเวลาการเล่นหลัก (00:00) ก่อนที่ฝ่ายคนดีจะทำภารกิจครบ 100% ฝ่ายคนร้ายจะเป็นผู้ชนะเกมทันที</li>
                 </ul>
               </div>
 
