@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
-import { doc, getDoc, addDoc, updateDoc, collection, serverTimestamp, runTransaction } from 'firebase/firestore'
+import { doc, getDoc, addDoc, updateDoc, collection, serverTimestamp, setDoc } from 'firebase/firestore'
 import SlipPrint from './SlipPrint'
 
 // ── PromptPay QR generator (EMVCo / BOT standard) ──────────────────────────
@@ -208,13 +208,16 @@ export default function PaymentModal({
       const orderSnap = await getDoc(doc(db, 'orders', session.confirmedOrderId))
       const openAt = orderSnap.data()?.createdAt?.toDate() || null
 
-      const counterRef = doc(db, 'settings', 'counter')
       let serial = 1
-      await runTransaction(db, async tx => {
-        const snap = await tx.get(counterRef)
+      try {
+        const counterRef = doc(db, 'settings', 'counter')
+        const snap = await getDoc(counterRef)
         serial = ((snap.exists() ? snap.data().slipSerial : 0) || 0) + 1
-        tx.set(counterRef, { slipSerial: serial }, { merge: true })
-      })
+        setDoc(counterRef, { slipSerial: serial }, { merge: true }).catch(() => {})
+      } catch {
+        const now = new Date()
+        serial = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) % 10000 || 1
+      }
 
       const updates = {
         status: 'paid',

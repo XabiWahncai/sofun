@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, onSnapshot,
-  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, runTransaction
+  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, setDoc
 } from 'firebase/firestore'
 import { Html5Qrcode } from 'html5-qrcode'
 import { viewSlipImage } from '../utils/slipVerifier'
@@ -1496,13 +1496,16 @@ export default function POSPage({
     try {
       const orderSnap = await getDoc(doc(db, 'orders', orderId))
       if (orderSnap.exists() && orderSnap.data().status !== 'paid') {
-        const counterRef = doc(db, 'settings', 'counter')
         let serial = 1
-        await runTransaction(db, async tx => {
-          const snap = await tx.get(counterRef)
+        try {
+          const counterRef = doc(db, 'settings', 'counter')
+          const snap = await getDoc(counterRef)
           serial = ((snap.exists() ? snap.data().slipSerial : 0) || 0) + 1
-          tx.set(counterRef, { slipSerial: serial }, { merge: true })
-        })
+          setDoc(counterRef, { slipSerial: serial }, { merge: true }).catch(() => {})
+        } catch {
+          const now = new Date()
+          serial = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) % 10000 || 1
+        }
 
         const expectedTableTotal = Math.max(0, (gamePrice || 0) + (foodTotal || 0) - (totalDiscount || 0))
 
@@ -1560,7 +1563,7 @@ export default function POSPage({
       } else {
         setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
       }
-      showToast('บันทึก report และปิดตี้แล้ว ✓')
+      showToast('บันทึก report และปิดตี้แล้ว')
     } catch (e) { showToast('ปิดตี้ล้มเหลว: ' + e.message, 'error') }
   }
 
