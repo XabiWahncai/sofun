@@ -4116,119 +4116,115 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               )}
 
               {/* Meeting Phase 4: Outer Space Ejection Reveal Screen */}
-              {gameDoc.status === 'meeting_result' && (
-                <div style={{
-                  flex: 1, display: 'flex', flexDirection: 'column',
-                  alignItems: 'center', justifyContent: 'center', textAlign: 'center',
-                  padding: '24px 0', minHeight: 360,
-                  position: 'relative', overflow: 'hidden',
-                }}>
-                  {/* Floating Ejected Crewmate Sprite tumbling through space */}
+              {gameDoc.status === 'meeting_result' && (() => {
+                const res = gameDoc.meeting?.result || {}
+                const victim = res?.eliminatedUid ? gameDoc.players?.[res.eliminatedUid] : null
+                const remainingImpostorsCount = Object.values(gameDoc.players || {}).filter(p => p.role === 'impostor' && p.isAlive).length
+                const wasImpostor = res?.eliminatedRole === 'impostor'
+
+                return (
                   <div style={{
-                    width: 70, height: 70,
-                    marginBottom: 24,
-                    animation: 'auEjectSpin 4.5s linear infinite',
+                    flex: 1, display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center', textAlign: 'center',
+                    padding: '24px 0', minHeight: 360,
+                    position: 'relative', overflow: 'hidden',
                   }}>
-                    <AmongUsVisor
-                      role={gameDoc.meeting?.result?.eliminatedRole || 'crewmate'}
-                      isAlive={true}
-                      size={60}
-                      color={gameDoc.meeting?.result?.eliminatedUid ? (gameDoc.players?.[gameDoc.meeting.result.eliminatedUid]?.color || null) : null}
-                    />
-                  </div>
-
-                  {/* Classic Reveal Text Banner */}
-                  {(() => {
-                    const res = gameDoc.meeting?.result
-                    const victim = res?.eliminatedUid ? gameDoc.players?.[res.eliminatedUid] : null
-                    const remainingImpostorsCount = Object.values(gameDoc.players || {}).filter(p => p.role === 'impostor' && p.isAlive).length
-
-                    if (victim) {
-                      const wasImpostor = res?.eliminatedRole === 'impostor'
-                      return (
-                        <div style={{ maxWidth: 420, padding: '0 16px' }}>
-                          <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', lineHeight: 1.3, marginBottom: 6 }}>
-                            {victim.name} was {wasImpostor ? 'An Impostor.' : 'not An Impostor.'}
-                          </div>
-                          <div style={{ fontSize: 15, fontWeight: 800, color: '#80d8ff', marginBottom: 12 }}>
-                            {remainingImpostorsCount} Impostor{remainingImpostorsCount === 1 ? '' : 's'} remain{remainingImpostorsCount === 1 ? 's' : ''}.
-                          </div>
-                          <div style={{ fontSize: 14, color: wasImpostor ? '#ff5252' : '#a5d6a7', fontWeight: 800 }}>
-                            {res?.outcomeText}
-                          </div>
-                        </div>
-                      )
-                    } else {
-                      return (
-                        <div style={{ maxWidth: 420, padding: '0 16px' }}>
-                          <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', marginBottom: 8 }}>
-                            No one was ejected. ({res?.isTie ? 'Tie' : 'Skipped'})
-                          </div>
-                          <div style={{ fontSize: 14.5, color: '#ffd54f', fontWeight: 800 }}>
-                            {res?.outcomeText || 'ไม่มีใครถูกขับออกจากยาน'}
-                          </div>
-                        </div>
-                      )
-                    }
-                  })()}
-
-                  {/* Anonymous Vote Tally Result Box (shows count per target, conceals voter identities) */}
-                  {res?.voteCounts && Object.keys(res.voteCounts).length > 0 && (
+                    {/* Floating Ejected Crewmate Sprite tumbling through space */}
                     <div style={{
-                      marginTop: 20,
-                      background: 'rgba(13, 19, 29, 0.85)',
-                      borderRadius: 14,
-                      padding: '12px 16px',
-                      border: '1.5px solid rgba(255,255,255,0.12)',
-                      maxWidth: 380,
-                      width: '100%',
-                      textAlign: 'left',
+                      width: 70, height: 70,
+                      marginBottom: 24,
+                      animation: 'auEjectSpin 4.5s linear infinite',
                     }}>
-                      <div style={{ fontSize: 11.5, fontWeight: 900, color: 'rgba(255,255,255,0.7)', marginBottom: 8, letterSpacing: '0.04em' }}>
-                        <i className="fas fa-poll" style={{ marginRight: 6, color: '#ffd54f' }} />
-                        สรุปผลคะแนนโหวต (ANONYMOUS TALLY)
-                      </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        {Object.entries(res.voteCounts).map(([targetUid, count]) => {
-                          const p = targetUid === 'skip' ? null : gameDoc.players?.[targetUid]
-                          return (
-                            <div key={targetUid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: '#fff' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                {p ? (
-                                  <>
-                                    <AmongUsVisor color={p.color || '#78909c'} size={24} isAlive={true} />
-                                    <span style={{ fontWeight: 700 }}>{p.name}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <i className="fas fa-forward" style={{ color: '#9e9e9e', fontSize: 13 }} />
-                                    <span style={{ fontWeight: 700, color: '#9e9e9e' }}>SKIP VOTE</span>
-                                  </>
-                                )}
-                              </div>
-                              <span style={{ fontWeight: 900, color: '#ff5252', background: 'rgba(255,82,82,0.18)', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(255,82,82,0.3)', fontSize: 11.5 }}>
-                                {count} เสียง
-                              </span>
-                            </div>
-                          )
-                        })}
-                      </div>
+                      <AmongUsVisor
+                        role={res?.eliminatedRole || 'crewmate'}
+                        isAlive={true}
+                        size={60}
+                        color={victim?.color || (res?.eliminatedUid ? gameDoc.players?.[res.eliminatedUid]?.color : null) || null}
+                      />
                     </div>
-                  )}
 
-                  {hasAdminPerm && (
-                    <button
-                      type="button"
-                      onClick={handleResumeGame}
-                      className="au-btn au-btn-green"
-                      style={{ marginTop: 32, padding: '14px 32px', fontSize: 14 }}
-                    >
-                      <i className="fas fa-play" style={{ marginRight: 8 }} />
-                      เล่นเกมต่อ (เวลาเดินต่อ)
-                    </button>
-                  )}
-                </div>
-              )}
+                    {/* Classic Reveal Text Banner */}
+                    {victim ? (
+                      <div style={{ maxWidth: 420, padding: '0 16px' }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', lineHeight: 1.3, marginBottom: 6 }}>
+                          {victim.name} was {wasImpostor ? 'An Impostor.' : 'not An Impostor.'}
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: '#80d8ff', marginBottom: 12 }}>
+                          {remainingImpostorsCount} Impostor{remainingImpostorsCount === 1 ? '' : 's'} remain{remainingImpostorsCount === 1 ? 's' : ''}.
+                        </div>
+                        <div style={{ fontSize: 14, color: wasImpostor ? '#ff5252' : '#a5d6a7', fontWeight: 800 }}>
+                          {res?.outcomeText}
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ maxWidth: 420, padding: '0 16px' }}>
+                        <div style={{ fontSize: 22, fontWeight: 900, color: '#fff', letterSpacing: '0.04em', marginBottom: 8 }}>
+                          No one was ejected. ({res?.isTie ? 'Tie' : 'Skipped'})
+                        </div>
+                        <div style={{ fontSize: 14.5, color: '#ffd54f', fontWeight: 800 }}>
+                          {res?.outcomeText || 'ไม่มีใครถูกขับออกจากยาน'}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Anonymous Vote Tally Result Box (shows count per target, conceals voter identities) */}
+                    {res?.voteCounts && Object.keys(res.voteCounts).length > 0 && (
+                      <div style={{
+                        marginTop: 20,
+                        background: 'rgba(13, 19, 29, 0.85)',
+                        borderRadius: 14,
+                        padding: '12px 16px',
+                        border: '1.5px solid rgba(255,255,255,0.12)',
+                        maxWidth: 380,
+                        width: '100%',
+                        textAlign: 'left',
+                      }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 900, color: 'rgba(255,255,255,0.7)', marginBottom: 8, letterSpacing: '0.04em' }}>
+                          <i className="fas fa-poll" style={{ marginRight: 6, color: '#ffd54f' }} />
+                          สรุปผลคะแนนโหวต (ANONYMOUS TALLY)
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {Object.entries(res.voteCounts).map(([targetUid, count]) => {
+                            const p = targetUid === 'skip' ? null : gameDoc.players?.[targetUid]
+                            return (
+                              <div key={targetUid} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, color: '#fff' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  {p ? (
+                                    <>
+                                      <AmongUsVisor color={p.color || '#78909c'} size={24} isAlive={true} />
+                                      <span style={{ fontWeight: 700 }}>{p.name}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <i className="fas fa-forward" style={{ color: '#9e9e9e', fontSize: 13 }} />
+                                      <span style={{ fontWeight: 700, color: '#9e9e9e' }}>SKIP VOTE</span>
+                                    </>
+                                  )}
+                                </div>
+                                <span style={{ fontWeight: 900, color: '#ff5252', background: 'rgba(255,82,82,0.18)', padding: '2px 8px', borderRadius: 6, border: '1px solid rgba(255,82,82,0.3)', fontSize: 11.5 }}>
+                                  {count} เสียง
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {hasAdminPerm && (
+                      <button
+                        type="button"
+                        onClick={handleResumeGame}
+                        className="au-btn au-btn-green"
+                        style={{ marginTop: 32, padding: '14px 32px', fontSize: 14 }}
+                      >
+                        <i className="fas fa-play" style={{ marginRight: 8 }} />
+                        เล่นเกมต่อ (เวลาเดินต่อ)
+                      </button>
+                    )}
+                  </div>
+                )
+              })()}
 
             </div>
           </div>

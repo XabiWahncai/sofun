@@ -679,13 +679,15 @@ export default function App() {
       {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} />}
       {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} />}
       {currentPage === 'allofuswilldie' && (
-        <AllOfUsWillDiePage
-          lineUser={lineUser}
-          firebaseUser={firebaseUser}
-          isAdmin={isEffectiveAdmin}
-          showToast={showToast}
-          showPage={showPage}
-        />
+        <ErrorBoundary>
+          <AllOfUsWillDiePage
+            lineUser={lineUser}
+            firebaseUser={firebaseUser}
+            isAdmin={isEffectiveAdmin}
+            showToast={showToast}
+            showPage={showPage}
+          />
+        </ErrorBoundary>
       )}
       {currentPage === 'admin' && (
         <AdminPage
