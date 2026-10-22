@@ -391,7 +391,6 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
-  const [selectedRoomFilter, setSelectedRoomFilter] = useState('all')
   const [viewModeOverride, setViewModeOverride] = useState('auto') // 'auto' | 'bars' | 'cards'
   const calendarRef = useRef(null)
   const [containerWidth, setContainerWidth] = useState(700)
@@ -604,55 +603,6 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
         </div>
       </div>
 
-      {/* ── Room Filter Chips ─────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: '6px',
-        overflowX: 'auto', paddingBottom: '4px',
-        scrollbarWidth: 'none',
-      }}>
-        <button
-          onClick={() => setSelectedRoomFilter('all')}
-          style={{
-            flexShrink: 0, padding: '5px 14px', borderRadius: '20px',
-            fontSize: '11px', fontWeight: 800, cursor: 'pointer',
-            border: selectedRoomFilter === 'all' ? '1px solid var(--crimson-500)' : '1px solid rgba(0,0,0,0.08)',
-            background: selectedRoomFilter === 'all' ? 'var(--crimson-500)' : '#fff',
-            color: selectedRoomFilter === 'all' ? '#fff' : 'var(--text-secondary)',
-            boxShadow: selectedRoomFilter === 'all' ? '0 2px 8px rgba(198,36,25,0.25)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
-        >
-          ทั้งหมด
-        </button>
-        {ALL_ROOMS.map(r => {
-          const isSel = selectedRoomFilter === r
-          const rc = ROOM_COLORS[r] || '#64748b'
-          return (
-            <button
-              key={r}
-              onClick={() => setSelectedRoomFilter(curr => curr === r ? 'all' : r)}
-              style={{
-                flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: '6px',
-                padding: '5px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: 800,
-                cursor: 'pointer',
-                border: `1px solid ${isSel ? rc : 'rgba(0,0,0,0.08)'}`,
-                background: isSel ? `${rc}18` : '#fff',
-                color: isSel ? rc : 'var(--text-secondary)',
-                boxShadow: isSel ? `0 2px 8px ${rc}30` : 'none',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <span style={{
-                width: '7px', height: '7px', borderRadius: '50%',
-                background: rc, flexShrink: 0,
-                boxShadow: isSel ? `0 0 6px ${rc}` : 'none',
-              }} />
-              {r}
-            </button>
-          )
-        })}
-      </div>
-
       {/* ── Monthly Grid Card (Locked Cell Dimensions) ───────────────── */}
       <div
         ref={calendarRef}
@@ -713,8 +663,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             }
 
             const dateStr = `${viewYear}-${pad2(viewMonth + 1)}-${pad2(day)}`
-            let dayBookings = bookingsByDate[dateStr] || []
-            if (selectedRoomFilter !== 'all') dayBookings = dayBookings.filter(b => b.room === selectedRoomFilter)
+            const dayBookings = bookingsByDate[dateStr] || []
             const dayBookingsSorted = dayBookings.slice().sort((a, b) => (a.time || '').localeCompare(b.time || ''))
             const isToday = todayStr === dateStr
             const isSel = activeDateStr === dateStr
