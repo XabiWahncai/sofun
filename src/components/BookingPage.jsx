@@ -1176,75 +1176,176 @@ function CreateBookingModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
-      style={{ background: 'rgba(17,24,39,0.5)', backdropFilter: 'blur(8px)' }}
       onClick={e => e.target === e.currentTarget && onClose()}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'clamp(28px, 5vh, 48px) 16px',
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(10px)',
+        boxSizing: 'border-box',
+      }}
     >
       <div
-        className="w-full sm:max-w-2xl flex flex-col overflow-hidden"
         style={{
+          width: '100%',
+          maxWidth: '720px',
+          maxHeight: 'min(84dvh, 780px)',
           background: '#ffffff',
-          borderTopLeftRadius: 28,
-          borderTopRightRadius: 28,
-          borderBottomLeftRadius: window.matchMedia('(min-width:640px)').matches ? 28 : 0,
-          borderBottomRightRadius: window.matchMedia('(min-width:640px)').matches ? 28 : 0,
-          maxHeight: '94dvh',
-          boxShadow: '0 40px 100px rgba(0,0,0,0.22)',
+          borderRadius: '24px',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          fontFamily: 'Sarabun, sans-serif',
         }}
       >
-        <div className="w-11 h-[5px] rounded-full mx-auto mt-3 mb-0 sm:hidden" style={{ background: 'rgba(0,0,0,0.12)' }} />
-
-        {/* Modal Header */}
-        <div className="flex items-start justify-between pt-6 pb-4" style={{ paddingLeft: 28, paddingRight: 28 }}>
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10.5px] font-black uppercase tracking-[0.16em]" style={{ color: C }}>
-                {step === 'game' ? 'ขั้นตอน 1 / 2 — เลือกสคริปต์' : 'ขั้นตอน 2 / 2 — เลือกรอบและเวลา'}
+        {/* ── Modal Header (Spacious, Elegant, No edge-clipping) ──────── */}
+        <div
+          style={{
+            padding: '24px clamp(20px, 3.5vw, 32px) 18px',
+            background: '#ffffff',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'space-between',
+            gap: '16px',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>
+            {/* Step badge + dots */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '3px 10px',
+                  borderRadius: '20px',
+                  background: 'rgba(229, 9, 20, 0.08)',
+                  color: C,
+                  fontSize: '11px',
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                }}
+              >
+                <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: C }} />
+                {step === 'game' ? 'ขั้นตอน 1 / 2 : เลือกสคริปต์' : 'ขั้นตอน 2 / 2 : เลือกรอบและเวลา'}
               </span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(0,0,0,0.08)' }} />
-              <div className="flex items-center gap-1.5">
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <button
                   type="button"
                   onClick={() => setStep('game')}
-                  className="rounded-full cursor-pointer"
-                  style={{ width: step === 'game' ? 22 : 8, height: 8, background: step === 'game' ? C : 'rgba(0,0,0,0.15)', border: 'none', padding: 0, transition: 'all 240ms' }}
-                  title="ขั้นตอน 1"
+                  title="ขั้นตอน 1 : เลือกสคริปต์"
+                  style={{
+                    width: step === 'game' ? '22px' : '7px',
+                    height: '7px',
+                    borderRadius: '10px',
+                    background: step === 'game' ? C : 'rgba(0, 0, 0, 0.15)',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.24s ease',
+                  }}
                 />
                 <button
                   type="button"
                   onClick={() => setStep('datetime')}
-                  className="rounded-full cursor-pointer"
-                  style={{ width: step === 'datetime' ? 22 : 8, height: 8, background: step === 'datetime' ? C : 'rgba(0,0,0,0.15)', border: 'none', padding: 0, transition: 'all 240ms' }}
-                  title="ขั้นตอน 2"
+                  title="ขั้นตอน 2 : เลือกรอบและเวลา"
+                  style={{
+                    width: step === 'datetime' ? '22px' : '7px',
+                    height: '7px',
+                    borderRadius: '10px',
+                    background: step === 'datetime' ? C : 'rgba(0, 0, 0, 0.15)',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    transition: 'all 0.24s ease',
+                  }}
                 />
               </div>
             </div>
-            <h3 className="font-black leading-tight tracking-tight" style={{ color: INK, fontSize: 22 }}>
+
+            <h3
+              style={{
+                fontFamily: "'Bebas Neue', sans-serif",
+                fontSize: 'clamp(22px, 2.5vw, 28px)',
+                fontWeight: 900,
+                color: INK,
+                letterSpacing: '0.02em',
+                lineHeight: 1.1,
+                margin: 0,
+                textTransform: 'uppercase',
+              }}
+            >
               {step === 'game' ? 'เลือกสคริปต์ที่ต้องการเล่น' : 'เลือกรอบและเวลาจัดแสดง'}
             </h3>
+
+            <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#64748b', lineHeight: 1.5 }}>
+              {step === 'game'
+                ? 'เลือกสคริปต์จากแฟ้มคดี หรือกรองตามจำนวนผู้เล่นที่ต้องการ'
+                : 'ระบุวันที่และรอบเวลาที่ต้องการเปิดห้องสืบคดี'}
+            </p>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center transition-all shrink-0 ml-4"
-            style={{ background: '#f3f4f6', color: '#6b7280' }}
+            title="ปิดหน้าต่าง"
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '50%',
+              background: '#f3f4f6',
+              border: '1px solid rgba(0, 0, 0, 0.06)',
+              color: '#64748b',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '13px',
+              flexShrink: 0,
+              transition: 'all 0.15s ease',
+            }}
             onMouseEnter={e => { e.currentTarget.style.background = '#e5e7eb'; e.currentTarget.style.color = INK }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#6b7280' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#64748b' }}
           >
-            <i className="fas fa-times text-sm" />
+            <i className="fas fa-times" />
           </button>
         </div>
 
-        {/* Modal Body */}
+        {/* ── Modal Body ────────────────────────────────────────────── */}
         <div
-          className="overflow-y-auto flex-1 flex flex-col"
-          style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 24, gap: 20 }}
+          style={{
+            padding: '20px clamp(20px, 3.5vw, 32px)',
+            overflowY: 'auto',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '16px',
+          }}
         >
           {selectedDate && finalTime && (
             <div
-              className="flex items-center justify-between px-3.5 py-2.5 rounded-xl"
-              style={{ background: 'rgba(229,9,20,0.05)', border: '1px solid rgba(229,9,20,0.18)' }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 16px',
+                borderRadius: '14px',
+                background: 'rgba(229, 9, 20, 0.05)',
+                border: '1px solid rgba(229, 9, 20, 0.18)',
+              }}
             >
-              <div className="flex items-center gap-2.5 text-[12.5px]">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
                 <i className="fas fa-calendar-check" style={{ color: C }} />
                 <span style={{ color: INK, fontWeight: 700 }}>
                   รอบวันที่ {fmtDate(selectedDate)} เวลา {finalTime} น.
@@ -1254,7 +1355,7 @@ function CreateBookingModal({
               <button
                 type="button"
                 onClick={() => setStep('datetime')}
-                style={{ fontSize: 11.5, fontWeight: 800, color: C, background: 'none', border: 'none', cursor: 'pointer' }}
+                style={{ fontSize: '12px', fontWeight: 800, color: C, background: 'none', border: 'none', cursor: 'pointer' }}
               >
                 เปลี่ยนรอบ
               </button>
@@ -1264,10 +1365,10 @@ function CreateBookingModal({
           {/* STEP 1: Visual Script Selection */}
           {step === 'game' && (
             <>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {/* Search */}
                 <div style={{ position: 'relative' }}>
-                  <i className="fas fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: 13 }} />
+                  <i className="fas fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '13px' }} />
                   <input
                     type="text"
                     placeholder="ค้นหาชื่อสคริปต์สืบคดี..."
@@ -1275,18 +1376,19 @@ function CreateBookingModal({
                     onChange={e => setSearch(e.target.value)}
                     style={{
                       width: '100%',
-                      paddingLeft: 42,
-                      paddingRight: search ? 38 : 16,
-                      height: 44,
+                      paddingLeft: '42px',
+                      paddingRight: search ? '38px' : '16px',
+                      height: '44px',
                       background: '#f8fafc',
-                      border: '1px solid rgba(0,0,0,0.08)',
-                      borderRadius: 12,
+                      border: '1px solid rgba(0, 0, 0, 0.08)',
+                      borderRadius: '12px',
                       color: INK,
-                      fontSize: 13.5,
+                      fontSize: '13.5px',
                       outline: 'none',
+                      boxSizing: 'border-box',
                     }}
                     onFocus={e => { e.target.style.borderColor = C; e.target.style.background = '#ffffff' }}
-                    onBlur={e => { e.target.style.borderColor = 'rgba(0,0,0,0.08)'; e.target.style.background = '#f8fafc' }}
+                    onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.background = '#f8fafc' }}
                   />
                   {search && (
                     <button
@@ -1300,7 +1402,7 @@ function CreateBookingModal({
                 </div>
 
                 {/* Player count filter pills */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', scrollbarWidth: 'none' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', padding: '2px 0' }}>
                   {[
                     { id: 'all', label: 'ทั้งหมด' },
                     { id: '5-6', label: '5-6 คน' },
@@ -1314,12 +1416,12 @@ function CreateBookingModal({
                         type="button"
                         onClick={() => setPlayerFilter(p.id)}
                         style={{
-                          padding: '5px 12px',
-                          borderRadius: 20,
-                          border: `1px solid ${isActive ? C : 'rgba(0,0,0,0.08)'}`,
-                          background: isActive ? 'rgba(229,9,20,0.08)' : '#ffffff',
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          border: `1px solid ${isActive ? C : 'rgba(0, 0, 0, 0.08)'}`,
+                          background: isActive ? 'rgba(229, 9, 20, 0.08)' : '#ffffff',
                           color: isActive ? C : '#4b5563',
-                          fontSize: 11.5,
+                          fontSize: '12px',
                           fontWeight: 700,
                           cursor: 'pointer',
                           whiteSpace: 'nowrap',
@@ -1330,27 +1432,27 @@ function CreateBookingModal({
                       </button>
                     )
                   })}
-                  <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
                     พบ {filteredGames.length} เรื่อง
                   </span>
                 </div>
               </div>
 
-              {/* Visual Posters Grid */}
+              {/* Visual Posters Grid (Clean margins & spacious cards) */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(135px, 1fr))',
-                  gap: 12,
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(136px, 1fr))',
+                  gap: '14px',
                   maxHeight: '44vh',
                   overflowY: 'auto',
-                  padding: '2px 2px 6px',
+                  padding: '6px 4px 16px',
                 }}
               >
                 {filteredGames.length === 0 && (
                   <div style={{ gridColumn: '1 / -1', padding: '40px 16px', textAlign: 'center', color: '#9ca3af' }}>
-                    <i className="fas fa-search" style={{ fontSize: 24, opacity: 0.5, marginBottom: 8, display: 'block' }} />
-                    <span style={{ fontSize: 13 }}>ไม่พบสคริปต์ที่ตรงกับเงื่อนไข</span>
+                    <i className="fas fa-search" style={{ fontSize: '24px', opacity: 0.5, marginBottom: '8px', display: 'block' }} />
+                    <span style={{ fontSize: '13px' }}>ไม่พบสคริปต์ที่ตรงกับเงื่อนไข</span>
                   </div>
                 )}
                 {filteredGames.map(g => {
@@ -1365,20 +1467,34 @@ function CreateBookingModal({
                       onClick={() => !isLocked && setSelectedGame(g)}
                       style={{
                         position: 'relative',
-                        borderRadius: 12,
+                        borderRadius: '14px',
                         overflow: 'hidden',
                         background: '#ffffff',
-                        border: `2px solid ${isSel ? C : 'rgba(0,0,0,0.08)'}`,
-                        boxShadow: isSel ? `0 6px 20px rgba(229,9,20,0.22)` : '0 2px 6px rgba(0,0,0,0.04)',
+                        border: `1.5px solid ${isSel ? C : 'rgba(0, 0, 0, 0.08)'}`,
+                        boxShadow: isSel ? '0 6px 20px rgba(229, 9, 20, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         opacity: isLocked ? 0.5 : 1,
-                        transition: 'transform 0.2s cubic-bezier(0.16,1,0.3,1), border-color 0.2s',
+                        transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s, border-color 0.2s',
                         transform: isSel ? 'translateY(-2px)' : 'none',
                         display: 'flex',
                         flexDirection: 'column',
                       }}
+                      onMouseEnter={e => {
+                        if (!isLocked && !isSel) {
+                          e.currentTarget.style.borderColor = C
+                          e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)'
+                          e.currentTarget.style.transform = 'translateY(-2px)'
+                        }
+                      }}
+                      onMouseLeave={e => {
+                        if (!isLocked && !isSel) {
+                          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'
+                          e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)'
+                          e.currentTarget.style.transform = 'none'
+                        }
+                      }}
                     >
-                      <div style={{ position: 'relative', height: 140, background: '#1e293b', overflow: 'hidden' }}>
+                      <div style={{ position: 'relative', height: '140px', background: '#1e293b', overflow: 'hidden' }}>
                         {gImg ? (
                           <img
                             src={gImg}
@@ -1393,22 +1509,22 @@ function CreateBookingModal({
                         )}
 
                         {isSel && (
-                          <div style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: C, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
+                          <div style={{ position: 'absolute', top: 6, right: 6, width: '22px', height: '22px', borderRadius: '50%', background: C, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
                             <i className="fas fa-check" />
                           </div>
                         )}
 
-                        <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4 }}>
-                          <i className="fas fa-users" style={{ marginRight: 3, fontSize: 8 }} />
+                        <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0, 0, 0, 0.72)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px' }}>
+                          <i className="fas fa-users" style={{ marginRight: '3px', fontSize: '8px' }} />
                           {pCount} คน
                         </div>
                       </div>
 
-                      <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 4, flex: 1, justifyContent: 'space-between' }}>
-                        <h4 style={{ margin: 0, fontSize: 13, fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.25 }}>
+                      <div style={{ padding: '9px 10px', display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, justifyContent: 'space-between' }}>
+                        <h4 style={{ margin: 0, fontSize: '13px', fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.25 }}>
                           {g.title}
                         </h4>
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 10.5, color: '#6b7280', marginTop: 2 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10.5px', color: '#6b7280', marginTop: '2px' }}>
                           <span>{g.difficulty || 'สืบสวน'}</span>
                           {g.deposit > 0 && (
                             <span style={{ fontWeight: 700, color: '#047857' }}>฿{g.deposit}</span>
@@ -1426,29 +1542,29 @@ function CreateBookingModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  gap: 12,
+                  gap: '12px',
                   padding: '12px 16px',
                   background: '#f8fafc',
-                  borderRadius: 14,
-                  border: '1px solid rgba(0,0,0,0.06)',
-                  marginTop: 4,
+                  borderRadius: '14px',
+                  border: '1px solid rgba(0, 0, 0, 0.06)',
+                  marginTop: '4px',
                 }}
               >
                 <div style={{ minWidth: 0, flex: 1 }}>
                   {selectedGame ? (
                     <div>
-                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: C, letterSpacing: '0.08em' }}>
+                      <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: C, letterSpacing: '0.08em' }}>
                         สคริปต์ที่เลือก:
                       </span>
-                      <h4 style={{ margin: 0, fontSize: 14, fontWeight: 900, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 900, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {selectedGame.title}
                       </h4>
-                      <span style={{ fontSize: 11, color: '#6b7280' }}>
+                      <span style={{ fontSize: '11px', color: '#6b7280' }}>
                         มัดจำ ฿{selectedGame.deposit || 0}/คน
                       </span>
                     </div>
                   ) : (
-                    <span style={{ fontSize: 12.5, color: '#9ca3af' }}>
+                    <span style={{ fontSize: '12.5px', color: '#9ca3af' }}>
                       กรุณาคลิกเลือกสคริปต์ที่ต้องการเล่น
                     </span>
                   )}
@@ -1462,16 +1578,16 @@ function CreateBookingModal({
                     className="nfx-btn-primary"
                     style={{
                       padding: '10px 22px',
-                      borderRadius: 10,
+                      borderRadius: '10px',
                       background: selectedGame && !submitting ? C : '#e5e7eb',
                       color: selectedGame && !submitting ? '#ffffff' : '#9ca3af',
                       fontWeight: 800,
-                      fontSize: 13.5,
+                      fontSize: '13.5px',
                       border: 'none',
                       cursor: selectedGame && !submitting ? 'pointer' : 'not-allowed',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
+                      gap: '6px',
                     }}
                   >
                     {submitting ? (
@@ -1494,16 +1610,16 @@ function CreateBookingModal({
                     className="nfx-btn-primary"
                     style={{
                       padding: '10px 20px',
-                      borderRadius: 10,
+                      borderRadius: '10px',
                       background: selectedGame ? C : '#e5e7eb',
                       color: selectedGame ? '#ffffff' : '#9ca3af',
                       fontWeight: 800,
-                      fontSize: 13.5,
+                      fontSize: '13.5px',
                       border: 'none',
                       cursor: selectedGame ? 'pointer' : 'not-allowed',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
+                      gap: '6px',
                     }}
                   >
                     <span>ถัดไป: เลือกรอบ</span>
@@ -1522,14 +1638,14 @@ function CreateBookingModal({
                   style={{
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 12,
-                    padding: '10px 14px',
-                    borderRadius: 14,
+                    gap: '12px',
+                    padding: '12px 16px',
+                    borderRadius: '14px',
                     background: '#f8fafc',
-                    border: '1px solid rgba(0,0,0,0.06)',
+                    border: '1px solid rgba(0, 0, 0, 0.06)',
                   }}
                 >
-                  <div style={{ width: 44, height: 56, borderRadius: 8, overflow: 'hidden', background: '#1e293b', flexShrink: 0 }}>
+                  <div style={{ width: '44px', height: '56px', borderRadius: '8px', overflow: 'hidden', background: '#1e293b', flexShrink: 0 }}>
                     {selectedGame.image ? (
                       <img src={convertImg(selectedGame.image, 160)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
@@ -1539,20 +1655,20 @@ function CreateBookingModal({
                     )}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, color: C, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                    <span style={{ fontSize: '10px', fontWeight: 800, color: C, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
                       สคริปต์ที่เลือก
                     </span>
-                    <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {selectedGame.title}
                     </h4>
-                    <span style={{ fontSize: 11, color: '#6b7280' }}>
+                    <span style={{ fontSize: '11px', color: '#6b7280' }}>
                       {selectedGame.characters?.length || selectedGame.players || 6} คน · มัดจำ ฿{selectedGame.deposit || 0}/คน
                     </span>
                   </div>
                   <button
                     type="button"
                     onClick={() => setStep('game')}
-                    style={{ fontSize: 11.5, fontWeight: 700, color: C, background: 'rgba(229,9,20,0.08)', border: 'none', padding: '6px 12px', borderRadius: 20, cursor: 'pointer' }}
+                    style={{ fontSize: '11.5px', fontWeight: 700, color: C, background: 'rgba(229, 9, 20, 0.08)', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer' }}
                   >
                     เปลี่ยน
                   </button>
@@ -1560,13 +1676,13 @@ function CreateBookingModal({
               )}
 
               {/* Date Input */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                  <label style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6b7280' }}>
+                  <label style={{ fontSize: '11.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6b7280' }}>
                     วันที่ต้องการเล่น
                   </label>
                   {selectedDate && (
-                    <span style={{ fontSize: 11.5, fontWeight: 700, color: C }}>
+                    <span style={{ fontSize: '11.5px', fontWeight: 700, color: C }}>
                       {fmtDate(selectedDate)}
                     </span>
                   )}
@@ -1577,39 +1693,40 @@ function CreateBookingModal({
                   value={selectedDate}
                   onChange={e => { setSelectedDate(e.target.value); setSelectedTime('') }}
                   style={{
-                    height: 50,
+                    height: '48px',
                     padding: '0 16px',
-                    borderRadius: 12,
+                    borderRadius: '12px',
                     background: '#f8fafc',
-                    border: `1.5px solid ${selectedDate ? C : 'rgba(0,0,0,0.08)'}`,
+                    border: `1.5px solid ${selectedDate ? C : 'rgba(0, 0, 0, 0.08)'}`,
                     color: selectedDate ? INK : '#9ca3af',
-                    fontSize: 14,
+                    fontSize: '14px',
                     fontWeight: 600,
                     outline: 'none',
                     colorScheme: 'light',
+                    boxSizing: 'border-box',
                   }}
                   onFocus={e => { e.target.style.borderColor = C; e.target.style.boxShadow = `0 0 0 3px rgba(229,9,20,0.12)` }}
-                  onBlur={e => { e.target.style.borderColor = selectedDate ? C : 'rgba(0,0,0,0.08)'; e.target.style.boxShadow = 'none' }}
+                  onBlur={e => { e.target.style.borderColor = selectedDate ? C : 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none' }}
                 />
-                <div style={{ fontSize: 11, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 5 }}>
+                <div style={{ fontSize: '11px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <i className="fas fa-info-circle" style={{ color: C }} />
                   กำหนดให้จองล่วงหน้าอย่างน้อย 1 วัน
                 </div>
               </div>
 
               {/* Time Slots */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-                  <label style={{ fontSize: 11.5, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6b7280' }}>
+                  <label style={{ fontSize: '11.5px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: '#6b7280' }}>
                     รอบเวลาเล่น (13:00 - 19:00 น.)
                   </label>
                   {selectedRoom && (
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#2563eb' }}>
+                    <span style={{ fontSize: '11px', fontWeight: 700, color: '#2563eb' }}>
                       ห้องที่ระบุ: {selectedRoom}
                     </span>
                   )}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
                   {TIME_SLOTS.map(t => {
                     const isActive = selectedTime === t
                     const count = slotCounts[t] || 0
@@ -1619,12 +1736,12 @@ function CreateBookingModal({
                         type="button"
                         onClick={() => setSelectedTime(t)}
                         style={{
-                          height: 58,
-                          borderRadius: 12,
+                          height: '56px',
+                          borderRadius: '12px',
                           background: isActive ? C : '#f8fafc',
                           color: isActive ? '#ffffff' : INK,
-                          border: `1.5px solid ${isActive ? C : count > 0 ? 'rgba(229,9,20,0.25)' : 'rgba(0,0,0,0.08)'}`,
-                          boxShadow: isActive ? '0 6px 16px rgba(229,9,20,0.3)' : 'none',
+                          border: `1.5px solid ${isActive ? C : count > 0 ? 'rgba(229,9,20,0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
+                          boxShadow: isActive ? '0 6px 16px rgba(229, 9, 20, 0.3)' : 'none',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
@@ -1633,9 +1750,9 @@ function CreateBookingModal({
                           transition: 'all 0.15s ease',
                         }}
                       >
-                        <span style={{ fontSize: 14, fontWeight: 800 }}>{t}</span>
+                        <span style={{ fontSize: '14px', fontWeight: 800 }}>{t}</span>
                         {count > 0 && (
-                          <span style={{ fontSize: 9.5, fontWeight: 700, color: isActive ? 'rgba(255,255,255,0.85)' : C, marginTop: 2 }}>
+                          <span style={{ fontSize: '9.5px', fontWeight: 700, color: isActive ? 'rgba(255,255,255,0.85)' : C, marginTop: '2px' }}>
                             {count} จอง
                           </span>
                         )}
@@ -1646,14 +1763,14 @@ function CreateBookingModal({
               </div>
 
               {/* Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
                 <button
                   type="button"
                   onClick={() => setStep('game')}
                   style={{
-                    width: 50,
-                    height: 50,
-                    borderRadius: 12,
+                    width: '48px',
+                    height: '48px',
+                    borderRadius: '12px',
                     background: '#f3f4f6',
                     color: '#4b5563',
                     border: 'none',
@@ -1673,18 +1790,18 @@ function CreateBookingModal({
                   className="nfx-btn-primary"
                   style={{
                     flex: 1,
-                    height: 50,
-                    borderRadius: 12,
+                    height: '48px',
+                    borderRadius: '12px',
                     background: selectedDate && finalTime && !submitting ? C : '#e5e7eb',
                     color: selectedDate && finalTime && !submitting ? '#ffffff' : '#9ca3af',
                     fontWeight: 800,
-                    fontSize: 14,
+                    fontSize: '14px',
                     border: 'none',
                     cursor: selectedDate && finalTime && !submitting ? 'pointer' : 'not-allowed',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 8,
+                    gap: '8px',
                   }}
                 >
                   {submitting ? (
@@ -1703,7 +1820,6 @@ function CreateBookingModal({
             </>
           )}
         </div>
-        <div style={{ height: 'env(safe-area-inset-bottom, 0px)' }} />
       </div>
     </div>
   )
@@ -1831,17 +1947,27 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   return (
     <div
       onClick={e => e.target === e.currentTarget && onClose()}
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-6"
-      style={{ background: 'rgba(26,26,26,0.5)', backdropFilter: 'blur(10px)' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'clamp(24px, 5vh, 48px) 16px',
+        background: 'rgba(15, 23, 42, 0.65)',
+        backdropFilter: 'blur(10px)',
+        boxSizing: 'border-box',
+      }}
     >
       <div
         className="w-full sm:max-w-md flex flex-col overflow-hidden"
         style={{
           background: '#ffffff',
           color: INK,
-          borderTopLeftRadius: 28, borderTopRightRadius: 28,
-          maxHeight: '94dvh',
-          boxShadow: '0 40px 100px rgba(26,26,26,0.22)',
+          borderRadius: 24,
+          maxHeight: 'min(86dvh, 760px)',
+          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25)',
           fontFamily: "'Sarabun', sans-serif",
         }}
       >
@@ -2398,16 +2524,28 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
   return (
     <>
       <div
-        className="fixed inset-0 z-50 flex items-end sm:items-center justify-center px-0 sm:px-6 pt-10 sm:pt-6 pb-0 sm:pb-6"
-        style={{ background: 'rgba(26,26,26,0.5)', backdropFilter: 'blur(10px)' }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'clamp(24px, 5vh, 48px) 16px',
+          background: 'rgba(15, 23, 42, 0.65)',
+          backdropFilter: 'blur(10px)',
+          boxSizing: 'border-box',
+        }}
         onClick={e => e.target === e.currentTarget && onClose()}
       >
         <div
-          className="w-full sm:max-w-xl overflow-hidden max-h-[94dvh] flex flex-col rounded-t-[28px] sm:rounded-b-[28px]"
+          className="w-full sm:max-w-xl overflow-hidden flex flex-col"
           style={{
             background: '#ffffff',
             color: INK,
-            boxShadow: '0 50px 120px rgba(0,0,0,0.3)',
+            borderRadius: 24,
+            maxHeight: 'min(86dvh, 800px)',
+            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25)',
           }}
         >
 
