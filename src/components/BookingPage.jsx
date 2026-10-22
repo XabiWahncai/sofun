@@ -68,27 +68,28 @@ const ROOM_METADATA = {
 // ── Netflix Booking Design System & Keyframe Styles ───────────────────────────
 const NETFLIX_BOOKING_CSS = `
   /* Keyframe Animations */
-  @keyframes netflixKenBurns {
-    0% { transform: scale(1) translate(0, 0); }
-    50% { transform: scale(1.05) translate(-1%, -0.5%); }
-    100% { transform: scale(1.02) translate(0.5%, 0.5%); }
-  }
-
   @keyframes netflixFadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
   }
 
-  @keyframes netflixMotionSlideUp {
-    from { opacity: 0; transform: translateY(16px); }
+  @keyframes netflixSlideUp {
+    from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
   }
 
-  /* Billboard Elements */
-  .nfx-billboard-backdrop {
-    animation: netflixKenBurns 24s cubic-bezier(0.25, 1, 0.5, 1) infinite alternate, netflixFadeIn 0.8s ease both;
-    transform-origin: 75% 25%;
-    will-change: transform, opacity;
+  /* Two-column calendar responsive grid */
+  .booking-two-col-grid {
+    display: grid;
+    grid-template-columns: minmax(330px, 390px) 1fr;
+    gap: 24px;
+    align-items: start;
+  }
+  @media (max-width: 960px) {
+    .booking-two-col-grid {
+      grid-template-columns: 1fr !important;
+      gap: 20px !important;
+    }
   }
 
   .nfx-btn-primary {
@@ -112,139 +113,6 @@ const NETFLIX_BOOKING_CSS = `
   }
   .nfx-btn-secondary:active {
     transform: scale(0.97) !important;
-  }
-
-  /* Date Ribbon */
-  .nfx-date-ribbon {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    overflow-x: auto;
-    padding: 6px 2px 14px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .nfx-date-ribbon::-webkit-scrollbar {
-    display: none;
-  }
-
-  .nfx-date-pill {
-    flex-shrink: 0;
-    min-width: 82px;
-    padding: 10px 12px;
-    border-radius: 14px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    background: #ffffff;
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
-    user-select: none;
-  }
-  .nfx-date-pill:hover {
-    transform: translateY(-2px);
-    border-color: #e50914;
-    box-shadow: 0 4px 14px rgba(229, 9, 20, 0.15);
-  }
-  .nfx-date-pill-active {
-    background: #e50914 !important;
-    border-color: #e50914 !important;
-    color: #ffffff !important;
-    box-shadow: 0 8px 24px rgba(229, 9, 20, 0.35) !important;
-    transform: translateY(-2px) scale(1.02);
-  }
-
-  /* Carousel */
-  .nfx-carousel {
-    display: flex;
-    gap: 14px;
-    overflow-x: auto;
-    padding: 6px 2px 16px;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-  }
-  .nfx-carousel::-webkit-scrollbar {
-    display: none;
-  }
-
-  .nfx-poster-card {
-    border-radius: 14px;
-    background: #ffffff;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    overflow: hidden;
-    cursor: pointer;
-    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s, border-color 0.24s;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    position: relative;
-  }
-  .nfx-poster-card:hover {
-    transform: translateY(-4px) scale(1.02);
-    border-color: #e50914;
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.1);
-  }
-
-  /* Showtimes Slots */
-  .nfx-slot {
-    height: 48px;
-    border-radius: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 800;
-    cursor: pointer;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
-    position: relative;
-    user-select: none;
-  }
-  .nfx-slot-available {
-    background: #f8fafc;
-    color: #374151;
-  }
-  .nfx-slot-available:hover {
-    background: #fef2f2;
-    border-color: #e50914;
-    color: #e50914;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 14px rgba(229, 9, 20, 0.18);
-  }
-  .nfx-slot-booked {
-    background: rgba(229, 9, 20, 0.06);
-    border-color: rgba(229, 9, 20, 0.25);
-    color: #b80710;
-  }
-  .nfx-slot-booked:hover {
-    background: rgba(229, 9, 20, 0.12);
-    transform: translateY(-1px);
-  }
-  .nfx-slot-locked {
-    background: #f1f5f9;
-    border-color: #e2e8f0;
-    color: #64748b;
-    cursor: default;
-  }
-
-  /* Responsive Rules */
-  @media (max-width: 768px) {
-    .nfx-billboard-content {
-      padding: 24px 16px 20px !important;
-    }
-    .nfx-billboard-title {
-      font-size: clamp(26px, 7vw, 36px) !important;
-    }
-    .nfx-slot {
-      height: 44px !important;
-      font-size: 12px !important;
-    }
-    .nfx-date-pill {
-      min-width: 72px !important;
-      padding: 8px 10px !important;
-    }
   }
 `
 
@@ -1177,725 +1045,6 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
           {pendingRequests} คำขอ
         </div>
       )}
-    </div>
-  )
-}
-
-// ── Netflix Booking Poster Card (for My List horizontal carousel) ─────────────
-function NetflixBookingPosterCard({ booking, lineUser, onOpen, onCloseBooking }) {
-  const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
-  const total = booking.members?.length || 0
-  const max = booking.maxMembers || total || 1
-  const isLeader = booking.leaderId === lineUser?.uid
-  const pendingRequests = booking.joinRequests?.length || 0
-  const isLocked = isRoomLocked(booking)
-  const canView = canViewBookingDetail(booking, lineUser)
-  const publicGameName = getPublicGameName(booking, lineUser)
-  const imgSrc = (!isLocked || canView) && booking.gameImage ? convertImg(booking.gameImage, 500) : null
-  const countdown = booking.status === 'confirmed' && booking.depositDeadline ? formatCountdown(booking.depositDeadline) : null
-  const isUrgent = countdown && new Date(booking.depositDeadline) - new Date() < 24 * 3600000
-  const allPaid = paidCount >= max
-  const paidPct = Math.min(100, Math.round((paidCount / max) * 100))
-  const rc = ROOM_COLORS[booking.room] || '#e50914'
-  const isCollapsed = booking.status === 'collapsed'
-
-  return (
-    <div
-      onClick={() => onOpen(booking)}
-      className="nfx-poster-card"
-      style={{
-        width: 280,
-        minWidth: 280,
-        flexShrink: 0,
-        borderColor: isCollapsed ? 'rgba(239, 68, 68, 0.3)' : 'rgba(0, 0, 0, 0.08)',
-        background: isCollapsed ? '#fff5f5' : '#ffffff',
-      }}
-    >
-      {/* Artwork Header */}
-      <div style={{ position: 'relative', height: 160, overflow: 'hidden', background: '#0f172a' }}>
-        {imgSrc ? (
-          <img
-            src={imgSrc}
-            alt={publicGameName}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease' }}
-          />
-        ) : (
-          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94a3b8', fontSize: 32 }}>
-            <i className={isLocked && !canView ? "fas fa-lock" : "fas fa-theater-masks"} />
-          </div>
-        )}
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)' }} />
-
-        {/* Room badge on top-left */}
-        {booking.room && (
-          <div style={{ position: 'absolute', top: 10, left: 10, display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 8px', borderRadius: 6, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: 11, fontWeight: 700, borderLeft: `3px solid ${rc}` }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: rc }} />
-            <span>{booking.room}</span>
-          </div>
-        )}
-
-        {/* Status badge on top-right */}
-        <div style={{ position: 'absolute', top: 10, right: 10 }}>
-          <StatusBadge status={isLocked ? 'locked' : booking.status} label={isLocked && !canView ? 'ล็อกห้องแล้ว' : (booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined)} />
-        </div>
-
-        {/* Urgent countdown pill */}
-        {(!isLocked || canView) && countdown && (
-          <div style={{ position: 'absolute', bottom: 10, right: 10, padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 4, background: isUrgent ? 'rgba(239,68,68,0.92)' : 'rgba(245,158,11,0.92)', color: '#ffffff', boxShadow: '0 2px 6px rgba(0,0,0,0.25)' }}>
-            <i className="fas fa-clock" style={{ fontSize: 9 }} />
-            <span>{countdown}</span>
-          </div>
-        )}
-
-        {/* Pending requests pill */}
-        {isLeader && pendingRequests > 0 && (
-          <div style={{ position: 'absolute', bottom: 10, left: 10, background: '#f59e0b', color: '#111827', fontSize: 10, fontWeight: 900, padding: '2px 8px', borderRadius: 20 }}>
-            {pendingRequests} คำขอใหม่
-          </div>
-        )}
-      </div>
-
-      {/* Card Body */}
-      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10, flex: 1, justifyContent: 'space-between' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-            <h4 style={{ margin: 0, fontSize: 15, fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-              {publicGameName}
-            </h4>
-            {isLeader && (
-              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#e50914', background: 'rgba(229,9,20,0.08)', padding: '2px 6px', borderRadius: 4 }}>
-                หัวหน้า
-              </span>
-            )}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 12, color: '#4b5563' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="far fa-calendar" style={{ fontSize: 11, color: '#e50914' }} />
-              {fmtDate(booking.date)}
-            </span>
-            {booking.time && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <i className="far fa-clock" style={{ fontSize: 11, color: '#4b5563' }} />
-                {booking.time} น.
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Progress bar */}
-        <div style={{ paddingTop: 8, borderTop: '1px solid rgba(0,0,0,0.06)' }}>
-          {isLocked && !canView ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#047857', fontWeight: 700 }}>
-              <span><i className="fas fa-lock" style={{ marginRight: 4 }} />ห้องนี้ถูกล็อกแล้ว</span>
-              <span>เฉพาะสมาชิกในตี้</span>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#6b7280', fontWeight: 600 }}>
-                <span>สมาชิก {total}/{max} คน</span>
-                <span style={{ color: isLocked || allPaid ? '#047857' : '#e50914', fontWeight: 700 }}>
-                  {isLocked ? 'ล็อกห้องแล้ว' : `มัดจำ ${paidCount}/${max}`}
-                </span>
-              </div>
-              <div style={{ height: 6, borderRadius: 3, background: '#f1f5f9', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${paidPct}%`, background: isLocked || allPaid ? '#10b981' : '#e50914', borderRadius: 3, transition: 'width 0.3s ease' }} />
-              </div>
-            </div>
-          )}
-
-          {isLeader && booking.status === 'collapsed' && onCloseBooking && (
-            <button
-              onClick={e => { e.stopPropagation(); onCloseBooking(booking) }}
-              style={{ width: '100%', marginTop: 8, padding: '6px', borderRadius: 8, background: '#fee2e2', border: '1px solid #fca5a5', color: '#b91c1c', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
-            >
-              <i className="fas fa-times-circle" style={{ marginRight: 4 }} />ปิดตี้ที่ล่ม
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Booking Billboard Spotlight Component ─────────────────────────────────────
-function BookingBillboardSpotlight({ allGames = [], onBookGame, onScrollToShowtimes }) {
-  const [spotlightIdx, setSpotlightIdx] = useState(0)
-
-  // Pick top games with valid image
-  const featuredGames = useMemo(() => {
-    if (!allGames.length) return []
-    const withImages = allGames.filter(g => Boolean(g.image))
-    return withImages.length > 0 ? withImages.slice(0, 5) : allGames.slice(0, 5)
-  }, [allGames])
-
-  const game = featuredGames[spotlightIdx] || allGames[0] || null
-
-  useEffect(() => {
-    if (featuredGames.length <= 1) return
-    const timer = setInterval(() => {
-      setSpotlightIdx(prev => (prev + 1) % featuredGames.length)
-    }, 9000)
-    return () => clearInterval(timer)
-  }, [featuredGames.length])
-
-  if (!game) return null
-
-  const backdropSrc = game.image ? convertImg(game.image, 1400) : ''
-  const playerCount = game.characters?.length || parseInt(game.players) || 6
-  const duration = game.duration || '3-4 ชม.'
-  const difficulty = game.difficulty || 'สืบสวนเข้มข้น'
-  const deposit = game.deposit || 0
-
-  return (
-    <section
-      style={{
-        position: 'relative',
-        minHeight: 'clamp(420px, 48vh, 520px)',
-        overflow: 'hidden',
-        background: '#ffffff',
-        borderBottom: '1px solid rgba(0,0,0,0.08)',
-        display: 'flex',
-        alignItems: 'center',
-      }}
-    >
-      {/* Animated Ken Burns Backdrop */}
-      {backdropSrc && (
-        <div
-          key={game.id}
-          className="nfx-billboard-backdrop"
-          style={{
-            position: 'absolute',
-            inset: 0,
-            backgroundImage: `url(${backdropSrc})`,
-            backgroundSize: 'cover',
-            backgroundPosition: 'center 20%',
-            opacity: 0.82,
-            filter: 'contrast(1.05) saturate(1.1)',
-          }}
-        />
-      )}
-
-      {/* Gradients to Clean White */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(to right, #ffffff 0%, rgba(255,255,255,0.95) 45%, rgba(255,255,255,0.6) 75%, transparent 100%)',
-          pointerEvents: 'none',
-        }}
-      />
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'linear-gradient(to top, #ffffff 0%, rgba(255,255,255,0.85) 25%, transparent 100%)',
-          pointerEvents: 'none',
-        }}
-      />
-
-      {/* Content Container */}
-      <div
-        style={{
-          maxWidth: '1240px',
-          width: '100%',
-          margin: '0 auto',
-          padding: '40px 24px',
-          position: 'relative',
-          zIndex: 2,
-        }}
-      >
-        <div className="nfx-billboard-content" style={{ maxWidth: '640px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {/* Eyebrow Pill */}
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '4px 12px', borderRadius: 20, background: 'rgba(229,9,20,0.08)', border: '1px solid rgba(229,9,20,0.25)', color: '#e50914', fontSize: 11, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', width: 'fit-content' }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e50914' }} />
-            SOFUN SHOWTIMES SPOTLIGHT
-          </div>
-
-          {/* Heading */}
-          <h1
-            className="nfx-billboard-title"
-            style={{
-              fontFamily: "'Bebas Neue', 'Barlow Condensed', sans-serif",
-              fontSize: 'clamp(32px, 4.6vw, 56px)',
-              fontWeight: 900,
-              color: '#111827',
-              letterSpacing: '0.02em',
-              lineHeight: 1.05,
-              margin: 0,
-              textTransform: 'uppercase',
-            }}
-          >
-            {game.title}
-          </h1>
-
-          {/* Metadata Specs */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: '#f8fafc', border: '1px solid rgba(0,0,0,0.08)', fontSize: 12, fontWeight: 700, color: '#111827' }}>
-              <i className="fas fa-users" style={{ color: '#e50914', fontSize: 11 }} />
-              {playerCount} คน
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: '#f8fafc', border: '1px solid rgba(0,0,0,0.08)', fontSize: 12, fontWeight: 700, color: '#111827' }}>
-              <i className="fas fa-clock" style={{ color: '#d97706', fontSize: 11 }} />
-              {duration}
-            </span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: '#f8fafc', border: '1px solid rgba(0,0,0,0.08)', fontSize: 12, fontWeight: 700, color: '#111827' }}>
-              <i className="fas fa-shield-alt" style={{ color: '#2563eb', fontSize: 11 }} />
-              {difficulty}
-            </span>
-            {deposit > 0 && (
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '4px 10px', borderRadius: 8, background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.25)', fontSize: 12, fontWeight: 800, color: '#047857' }}>
-                <i className="fas fa-ticket-alt" style={{ fontSize: 11 }} />
-                มัดจำ ฿{deposit}/คน
-              </span>
-            )}
-          </div>
-
-          {/* Synopsis */}
-          {game.synopsis && (
-            <p
-              style={{
-                fontSize: 14,
-                color: '#4b5563',
-                lineHeight: 1.6,
-                margin: '2px 0 6px',
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical',
-                overflow: 'hidden',
-              }}
-            >
-              {game.synopsis}
-            </p>
-          )}
-
-          {/* Action Buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 4 }}>
-            <button
-              onClick={() => onBookGame(game.id)}
-              className="nfx-btn-primary"
-              style={{
-                padding: '12px 26px',
-                borderRadius: 12,
-                background: '#e50914',
-                color: '#ffffff',
-                border: 'none',
-                fontWeight: 800,
-                fontSize: 14,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                boxShadow: '0 4px 16px rgba(229,9,20,0.28)',
-              }}
-            >
-              <i className="fas fa-calendar-plus" style={{ fontSize: 12 }} />
-              จองรอบเกมนี้ทันที
-            </button>
-            <button
-              onClick={onScrollToShowtimes}
-              className="nfx-btn-secondary"
-              style={{
-                padding: '12px 22px',
-                borderRadius: 12,
-                background: '#ffffff',
-                color: '#111827',
-                border: '1px solid rgba(0,0,0,0.14)',
-                fontWeight: 700,
-                fontSize: 14,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-              }}
-            >
-              <i className="fas fa-clock" style={{ fontSize: 12, color: '#e50914' }} />
-              เช็คตารางห้องว่าง
-            </button>
-          </div>
-
-          {/* Slide Indicator Dots */}
-          {featuredGames.length > 1 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 8 }}>
-              {featuredGames.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSpotlightIdx(i)}
-                  style={{
-                    width: spotlightIdx === i ? 22 : 6,
-                    height: 6,
-                    borderRadius: 3,
-                    background: spotlightIdx === i ? '#e50914' : 'rgba(0,0,0,0.18)',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    transition: 'all 0.24s ease',
-                  }}
-                  title={`สคริปต์แนะนำ ${i + 1}`}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-// ── Netflix Date Ribbon Component ─────────────────────────────────────────────
-function DateRibbon({ selectedDate, onSelectDate, bookingsByDate = {} }) {
-  const ribbonRef = useRef(null)
-
-  const dates = useMemo(() => {
-    const list = []
-    const now = new Date()
-    for (let i = 0; i < 14; i++) {
-      const d = new Date(now)
-      d.setDate(now.getDate() + i)
-      const dateStr = toDateStr(d)
-      let label = ''
-      if (i === 0) label = 'วันนี้'
-      else if (i === 1) label = 'พรุ่งนี้'
-      else label = DAY_NAMES[d.getDay()]
-      list.push({
-        dateStr,
-        label,
-        dayNum: d.getDate(),
-        monthName: MONTH_NAMES[d.getMonth()]?.slice(0, 4) || '',
-        isToday: i === 0,
-        bookingCount: bookingsByDate[dateStr]?.length || 0,
-      })
-    }
-    return list
-  }, [bookingsByDate])
-
-  const scroll = (direction) => {
-    if (!ribbonRef.current) return
-    const offset = direction === 'left' ? -220 : 220
-    ribbonRef.current.scrollBy({ left: offset, behavior: 'smooth' })
-  }
-
-  return (
-    <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-      <button
-        onClick={() => scroll('left')}
-        title="เลื่อนซ้าย"
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: '50%',
-          border: '1px solid rgba(0,0,0,0.08)',
-          background: '#ffffff',
-          color: '#111827',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-          flexShrink: 0,
-          marginRight: 6,
-          zIndex: 2,
-        }}
-      >
-        <i className="fas fa-chevron-left" style={{ fontSize: 10 }} />
-      </button>
-
-      <div ref={ribbonRef} className="nfx-date-ribbon" style={{ flex: 1 }}>
-        {dates.map(d => {
-          const isActive = selectedDate === d.dateStr
-          return (
-            <div
-              key={d.dateStr}
-              onClick={() => onSelectDate(d.dateStr)}
-              className={`nfx-date-pill ${isActive ? 'nfx-date-pill-active' : ''}`}
-            >
-              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '0.04em', textTransform: 'uppercase', opacity: isActive ? 0.9 : 0.6 }}>
-                {d.label}
-              </span>
-              <span style={{ fontSize: 18, fontWeight: 900, lineHeight: 1.1, fontFamily: "'Bebas Neue', sans-serif" }}>
-                {d.dayNum} {d.monthName}
-              </span>
-              {d.bookingCount > 0 ? (
-                <span
-                  style={{
-                    fontSize: 9.5,
-                    fontWeight: 800,
-                    padding: '1px 6px',
-                    borderRadius: 10,
-                    background: isActive ? 'rgba(255,255,255,0.22)' : 'rgba(229,9,20,0.08)',
-                    color: isActive ? '#ffffff' : '#e50914',
-                    marginTop: 2,
-                  }}
-                >
-                  {d.bookingCount} จอง
-                </span>
-              ) : (
-                <span
-                  style={{
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: 10,
-                    background: isActive ? 'rgba(255,255,255,0.18)' : '#f1f5f9',
-                    color: isActive ? '#ffffff' : '#64748b',
-                    marginTop: 2,
-                  }}
-                >
-                  ว่าง
-                </span>
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      <button
-        onClick={() => scroll('right')}
-        title="เลื่อนขวา"
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: '50%',
-          border: '1px solid rgba(0,0,0,0.08)',
-          background: '#ffffff',
-          color: '#111827',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          boxShadow: '0 2px 6px rgba(0,0,0,0.05)',
-          flexShrink: 0,
-          marginLeft: 6,
-          zIndex: 2,
-        }}
-      >
-        <i className="fas fa-chevron-right" style={{ fontSize: 10 }} />
-      </button>
-    </div>
-  )
-}
-
-// ── Cinema Showtimes & Room Grid Component ────────────────────────────────────
-function ShowtimesRoomGrid({
-  selectedDate,
-  bookings = [],
-  lineUser,
-  onOpenDetail,
-  onSelectSlot,
-  selectedCategory,
-  onSelectCategory,
-}) {
-  const filteredRooms = useMemo(() => {
-    if (selectedCategory === 'all') return ALL_ROOMS
-    return ALL_ROOMS.filter(r => ROOM_METADATA[r]?.category === selectedCategory)
-  }, [selectedCategory])
-
-  // Active bookings on this date
-  const dayBookings = useMemo(() => {
-    if (!selectedDate) return []
-    return bookings.filter(b => b.date === selectedDate && !['cancelled', 'collapsed'].includes(b.status))
-  }, [bookings, selectedDate])
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Category Pills */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', scrollbarWidth: 'none', paddingBottom: 4 }}>
-        {ROOM_CATEGORIES.map(cat => {
-          const isActive = selectedCategory === cat.id
-          return (
-            <button
-              key={cat.id}
-              onClick={() => onSelectCategory(cat.id)}
-              style={{
-                padding: '6px 14px',
-                borderRadius: 20,
-                border: `1px solid ${isActive ? '#e50914' : 'rgba(0,0,0,0.08)'}`,
-                background: isActive ? 'rgba(229,9,20,0.08)' : '#ffffff',
-                color: isActive ? '#e50914' : '#4b5563',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              {cat.label}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Rooms List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        {filteredRooms.map(room => {
-          const meta = ROOM_METADATA[room] || { icon: 'fas fa-door-open', desc: '', cap: '6-8 คน' }
-          const rc = ROOM_COLORS[room] || '#64748b'
-
-          // Bookings in this room on this date
-          const roomBookings = dayBookings.filter(b => b.room === room)
-          const bookedTimes = new Set(roomBookings.map(b => b.time))
-          const availableCount = TIME_SLOTS.filter(t => !bookedTimes.has(t)).length
-
-          return (
-            <div
-              key={room}
-              style={{
-                background: '#ffffff',
-                border: '1px solid rgba(0,0,0,0.08)',
-                borderRadius: 16,
-                padding: '16px 18px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: 12,
-                boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
-              }}
-            >
-              {/* Room Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div
-                    style={{
-                      width: 38,
-                      height: 38,
-                      borderRadius: 10,
-                      background: `${rc}18`,
-                      border: `1px solid ${rc}35`,
-                      color: rc,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 16,
-                      flexShrink: 0,
-                    }}
-                  >
-                    <i className={meta.icon} />
-                  </div>
-                  <div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <h4 style={{ margin: 0, fontSize: 15, fontWeight: 900, color: '#111827' }}>
-                        {room}
-                      </h4>
-                      <span style={{ fontSize: 11, fontWeight: 600, color: '#6b7280' }}>
-                        ({meta.cap})
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11.5, color: '#6b7280', marginTop: 1 }}>
-                      {meta.desc}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Status pill */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  {availableCount > 0 ? (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: 'rgba(16,185,129,0.08)', color: '#047857', border: '1px solid rgba(16,185,129,0.25)', fontSize: 11, fontWeight: 700 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981' }} />
-                      ว่าง {availableCount}/{TIME_SLOTS.length} รอบ
-                    </span>
-                  ) : (
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 20, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', fontSize: 11, fontWeight: 700 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#94a3b8' }} />
-                      เต็มทุกรอบ
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {/* Slots Row */}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(88px, 1fr))',
-                  gap: 8,
-                }}
-              >
-                {TIME_SLOTS.map(slot => {
-                  const b = roomBookings.find(item => item.time === slot)
-                  if (!b) {
-                    // Available slot
-                    return (
-                      <button
-                        key={slot}
-                        onClick={() => onSelectSlot(selectedDate, slot, room)}
-                        className="nfx-slot nfx-slot-available"
-                        title={`คลิกเพื่อจองรอบ ${slot} น. (${room})`}
-                      >
-                        <span style={{ fontSize: 13, lineHeight: 1 }}>{slot}</span>
-                        <span style={{ fontSize: 9.5, fontWeight: 600, opacity: 0.7, marginTop: 2 }}>+ ว่าง</span>
-                      </button>
-                    )
-                  }
-
-                  // Booked slot
-                  const locked = isRoomLocked(b)
-                  const canView = canViewBookingDetail(b, lineUser)
-                  const title = getPublicGameName(b, lineUser)
-
-                  if (locked) {
-                    return (
-                      <button
-                        key={slot}
-                        onClick={() => onOpenDetail(b)}
-                        className="nfx-slot nfx-slot-locked"
-                        title={canView ? `ดูรายละเอียด ${title}` : 'ห้องนี้ถูกล็อกแล้ว'}
-                      >
-                        <span style={{ fontSize: 13, lineHeight: 1 }}>{slot}</span>
-                        <span style={{ fontSize: 9.5, fontWeight: 700, marginTop: 2, display: 'flex', alignItems: 'center', gap: 3 }}>
-                          <i className="fas fa-lock" style={{ fontSize: 8 }} />
-                          ล็อกแล้ว
-                        </span>
-                      </button>
-                    )
-                  }
-
-                  return (
-                    <button
-                      key={slot}
-                      onClick={() => onOpenDetail(b)}
-                      className="nfx-slot nfx-slot-booked"
-                      title={`เปิดตี้: ${title} (คลิกเพื่อดูหรือขอร่วมเล่น)`}
-                    >
-                      <span style={{ fontSize: 13, lineHeight: 1 }}>{slot}</span>
-                      <span style={{ fontSize: 9.5, fontWeight: 800, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '80%' }}>
-                        {title.slice(0, 8)}...
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Legend */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 16,
-          flexWrap: 'wrap',
-          padding: '12px 16px',
-          background: '#f8fafc',
-          borderRadius: 12,
-          border: '1px solid rgba(0,0,0,0.06)',
-          fontSize: 11.5,
-          color: '#6b7280',
-        }}
-      >
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#f8fafc', border: '1px solid rgba(0,0,0,0.12)' }} />
-          ว่าง (คลิกเพื่อจองรอบ)
-        </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: 'rgba(229,9,20,0.15)', border: '1px solid rgba(229,9,20,0.3)' }} />
-          มีตี้เปิดรับสมัคร (คลิกเพื่อขอร่วม)
-        </span>
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ width: 10, height: 10, borderRadius: 3, background: '#e2e8f0', border: '1px solid #cbd5e1' }} />
-          ล็อกห้องแล้ว
-        </span>
-      </div>
     </div>
   )
 }
@@ -4007,12 +3156,6 @@ export default function BookingPage({
   const [createBookingRoom, setCreateBookingRoom] = useState('')
   const [detailBooking, setDetailBooking] = useState(null)
   const [calendarDate, setCalendarDate] = useState('')
-
-  // Showtimes Hub State
-  const tomorrowStr = useMemo(() => toDateStr(new Date(Date.now() + 86400000)), [])
-  const [selectedRibbonDate, setSelectedRibbonDate] = useState(() => toDateStr(new Date()))
-  const [selectedRoomCategory, setSelectedRoomCategory] = useState('all')
-  const [showMonthlyCalendar, setShowMonthlyCalendar] = useState(false)
   const [myBookingsTab, setMyBookingsTab] = useState('active')
 
   useEffect(() => {
@@ -4127,6 +3270,8 @@ export default function BookingPage({
     }
   }
 
+  const upcomingCount = bookings.filter(b => b.status === 'locked' || b.status === 'confirmed').length
+
   const handleStartBooking = (date = '', gameId = '', time = '', room = '') => {
     setCreateBookingDate(date || '')
     setCreateBookingGameId(gameId || '')
@@ -4139,19 +3284,9 @@ export default function BookingPage({
     }
   }
 
-  const bookingsByDate = useMemo(() => {
-    const map = {}
-    bookings.forEach(b => {
-      if (!b.date || b.status === 'cancelled' || b.status === 'collapsed') return
-      if (!map[b.date]) map[b.date] = []
-      map[b.date].push(b)
-    })
-    return map
-  }, [bookings])
-
   if (loading) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12, color: '#64748b', fontFamily: 'Sarabun, sans-serif', background: '#ffffff' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12, color: '#64748b', fontFamily: 'Sarabun, sans-serif', background: '#f8fafc' }}>
         <div style={{ width: 36, height: 36, border: '3px solid rgba(0,0,0,0.1)', borderTopColor: '#e50914', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.04em' }}>กำลังโหลดระบบจองรอบเกม...</div>
       </div>
@@ -4159,315 +3294,489 @@ export default function BookingPage({
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#ffffff', color: '#111827', fontFamily: 'Sarabun, sans-serif', paddingTop: 56, paddingBottom: 80 }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: '#f8fafc',
+        color: '#111827',
+        fontFamily: 'Sarabun, sans-serif',
+        paddingTop: 56,
+        paddingBottom: 80,
+        '--crimson-500': '#e50914',
+        '--crimson-400': '#ef4444',
+        '--surface-card': '#ffffff',
+        '--surface-raised': '#ffffff',
+        '--surface-sunken': '#f8fafc',
+        '--border-default': 'rgba(0, 0, 0, 0.08)',
+        '--text-primary': '#111827',
+        '--text-secondary': '#4b5563',
+        '--text-tertiary': '#9ca3af',
+        '--line-green': '#06c755',
+      }}
+    >
       <style>{NETFLIX_BOOKING_CSS}</style>
 
-      {/* ── 1. Netflix Billboard Spotlight Hero ──────────────────────────────── */}
-      <BookingBillboardSpotlight
-        allGames={allGames}
-        onBookGame={(gid) => handleStartBooking(tomorrowStr, gid)}
-        onScrollToShowtimes={() => {
-          const el = document.getElementById('showtimes-hub')
-          if (el) el.scrollIntoView({ behavior: 'smooth' })
+      {/* ── Redesigned Clean White Header ──────────────────────────────────── */}
+      <section
+        style={{
+          position: 'relative',
+          overflow: 'hidden',
+          background: '#ffffff',
+          borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
+          padding: '40px 24px 36px',
         }}
-      />
+      >
+        <div style={{ maxWidth: 1320, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            {/* Tag */}
+            <div>
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '4px 12px',
+                  borderRadius: 20,
+                  background: 'rgba(229, 9, 20, 0.08)',
+                  border: '1px solid rgba(229, 9, 20, 0.2)',
+                  color: '#e50914',
+                  fontSize: 11,
+                  fontWeight: 800,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  marginBottom: 12,
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e50914' }} />
+                SOFUN CLUB THAILAND · SCRIPT MURDER BOOKING
+              </div>
 
-      {/* ── Main Container ─────────────────────────────────────────────────── */}
-      <div style={{ maxWidth: 1240, margin: '0 auto', padding: '24px 20px', display: 'flex', flexDirection: 'column', gap: 36 }}>
-
-        {/* ── 2. My Bookings / VIP Pass Row ─────────────────────────────────── */}
-        <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          {lineUser ? (
-            <div style={{ background: '#ffffff', borderRadius: 20, border: '1px solid rgba(0,0,0,0.08)', padding: '20px 22px', boxShadow: '0 2px 8px rgba(0,0,0,0.02)' }}>
-              {/* Section Header */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 4, height: 18, background: '#e50914', borderRadius: 2 }} />
-                  <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#111827', letterSpacing: '-0.01em' }}>
-                    การจองของฉัน (MY LIST)
-                  </h3>
-                  {activeMyBookings.length > 0 && (
-                    <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 12, background: 'rgba(229,9,20,0.1)', color: '#e50914' }}>
-                      {activeMyBookings.length}
-                    </span>
-                  )}
+              {/* Title + CTA row */}
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
+                <div>
+                  <h1
+                    style={{
+                      fontFamily: "'Bebas Neue', sans-serif",
+                      fontWeight: 900,
+                      fontSize: 'clamp(32px, 4.5vw, 52px)',
+                      color: '#111827',
+                      letterSpacing: '0.02em',
+                      lineHeight: 1.05,
+                      margin: '0 0 10px',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    จองรอบเกม <span style={{ color: '#e50914' }}>& ตารางห้องสืบคดี</span>
+                  </h1>
+                  <p style={{ fontSize: 13.5, color: '#4b5563', lineHeight: 1.7, margin: 0, maxWidth: 680 }}>
+                    จองรอบเล่นเกม Script Murder ที่ Sofun Club Thailand เช็คตารางห้องว่างแบบเรียลไทม์ หรือเปิดปาร์ตี้ใหม่เพื่อชวนเพื่อนร่วมไขปริศนา
+                  </p>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  {/* Tabs */}
-                  <div style={{ display: 'flex', background: '#f8fafc', padding: 3, borderRadius: 10, border: '1px solid rgba(0,0,0,0.06)' }}>
-                    {[
-                      { key: 'active', label: 'รอดำเนินการ', count: activeMyBookings.length },
-                      { key: 'all',    label: 'ทั้งหมด',     count: myBookings.length },
-                      { key: 'closed', label: 'ปิด/ยกเลิก',  count: closedMyBookings.length },
-                    ].map(t => {
-                      const isActive = myBookingsTab === t.key
-                      return (
-                        <button
-                          key={t.key}
-                          type="button"
-                          onClick={() => setMyBookingsTab(t.key)}
-                          style={{
-                            padding: '4px 10px',
-                            borderRadius: 8,
-                            border: 'none',
-                            fontSize: 11.5,
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            background: isActive ? '#ffffff' : 'transparent',
-                            color: isActive ? '#111827' : '#64748b',
-                            boxShadow: isActive ? '0 1px 3px rgba(0,0,0,0.06)' : 'none',
-                          }}
-                        >
-                          <span>{t.label}</span>
-                          {t.count > 0 && (
-                            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '0 4px', borderRadius: 10, background: isActive ? 'rgba(229,9,20,0.1)' : '#e2e8f0', color: isActive ? '#e50914' : '#475569' }}>
-                              {t.count}
-                            </span>
-                          )}
-                        </button>
-                      )
-                    })}
+                <button
+                  type="button"
+                  onClick={() => handleStartBooking(calendarDate || toDateStr(new Date()))}
+                  className="nfx-btn-primary"
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: 12,
+                    background: '#e50914',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: 14,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.28)',
+                    flexShrink: 0,
+                  }}
+                >
+                  <i className="fas fa-plus" style={{ fontSize: 12 }} />
+                  สร้างการจองใหม่
+                </button>
+              </div>
+
+              {/* Stats pills */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
+                {[
+                  { icon: 'fas fa-door-open', label: '4 ห้องมาตรฐานพร้อมระบบเสียง & แสง' },
+                  { icon: 'fas fa-scroll', label: '40+ แฟ้มคดี Script Murder ลิขสิทธิ์แปลไทย' },
+                  { icon: 'fas fa-calendar-check', label: `${upcomingCount} รอบเล่นในระบบ` },
+                ].map((stat, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      padding: '5px 12px',
+                      borderRadius: 10,
+                      background: '#f8fafc',
+                      border: '1px solid rgba(0, 0, 0, 0.06)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      color: '#4b5563',
+                    }}
+                  >
+                    <i className={stat.icon} style={{ color: '#e50914', fontSize: 11 }} />
+                    <span>{stat.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Main Two-Column Calendar Layout ───────────────────────────────── */}
+      <main
+        style={{
+          maxWidth: 1320,
+          margin: '0 auto',
+          padding: '28px 20px 64px',
+        }}
+      >
+        <div className="booking-two-col-grid">
+
+          {/* ── Left Column: My Bookings or Guest VIP Pass ─────────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {lineUser ? (
+              <div
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  borderRadius: 20,
+                  padding: '20px',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 16,
+                }}
+              >
+                {/* Header */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 4, height: 18, borderRadius: 2, background: '#e50914' }} />
+                    <h3 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.01em' }}>
+                      การจองของฉัน (MY LIST)
+                    </h3>
+                    {activeMyBookings.length > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 12, background: 'rgba(229, 9, 20, 0.1)', color: '#e50914' }}>
+                        {activeMyBookings.length}
+                      </span>
+                    )}
                   </div>
 
                   <button
-                    onClick={() => handleStartBooking(tomorrowStr)}
+                    type="button"
+                    onClick={() => handleStartBooking(calendarDate || toDateStr(new Date()))}
                     className="nfx-btn-primary"
                     style={{
-                      padding: '6px 14px',
-                      borderRadius: 10,
+                      padding: '5px 12px',
+                      borderRadius: 8,
                       background: '#e50914',
                       color: '#ffffff',
                       border: 'none',
-                      fontSize: 12,
+                      fontSize: 11.5,
                       fontWeight: 800,
                       cursor: 'pointer',
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
+                      gap: 5,
                     }}
                   >
-                    <i className="fas fa-plus" style={{ fontSize: 10 }} />
-                    สร้างการจองใหม่
+                    <i className="fas fa-plus" style={{ fontSize: 9 }} />
+                    จองเพิ่ม
                   </button>
                 </div>
-              </div>
 
-              {/* Bookings Carousel or Empty */}
-              {displayedMyBookings.length === 0 ? (
-                <div style={{ padding: '32px 16px', borderRadius: 14, border: '1px dashed rgba(0,0,0,0.12)', textAlign: 'center', background: '#f8fafc' }}>
-                  <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(229,9,20,0.08)', color: '#e50914', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontSize: 18 }}>
-                    <i className="fas fa-calendar-plus" />
-                  </div>
-                  <h4 style={{ margin: '0 0 4px', fontSize: 14, fontWeight: 800, color: '#111827' }}>
-                    {myBookingsTab === 'active' ? 'ไม่มีการจองที่กำลังดำเนินอยู่' : myBookingsTab === 'closed' ? 'ไม่มีการจองที่ปิดหรือยกเลิก' : 'ยังไม่มีประวัติการจอง'}
-                  </h4>
-                  <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b' }}>
-                    เลือกรอบจากตารางห้อง หรือเลือกสคริปต์ที่สนใจเพื่อเปิดห้องสืบคดี
-                  </p>
-                  <button
-                    onClick={() => handleStartBooking(tomorrowStr)}
-                    className="nfx-btn-primary"
+                {/* Tabs */}
+                <div style={{ display: 'flex', background: '#f8fafc', padding: 3, borderRadius: 10, border: '1px solid rgba(0, 0, 0, 0.06)' }}>
+                  {[
+                    { key: 'active', label: 'รอดำเนินการ', count: activeMyBookings.length },
+                    { key: 'all', label: 'ทั้งหมด', count: myBookings.length },
+                    { key: 'closed', label: 'ปิด/ยกเลิก', count: closedMyBookings.length },
+                  ].map(t => {
+                    const isActive = myBookingsTab === t.key
+                    return (
+                      <button
+                        key={t.key}
+                        type="button"
+                        onClick={() => setMyBookingsTab(t.key)}
+                        style={{
+                          flex: 1,
+                          padding: '5px 8px',
+                          borderRadius: 8,
+                          border: 'none',
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 5,
+                          background: isActive ? '#ffffff' : 'transparent',
+                          color: isActive ? '#111827' : '#64748b',
+                          boxShadow: isActive ? '0 1px 3px rgba(0, 0, 0, 0.06)' : 'none',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <span>{t.label}</span>
+                        {t.count > 0 && (
+                          <span
+                            style={{
+                              fontSize: 9.5,
+                              fontWeight: 800,
+                              padding: '0 5px',
+                              borderRadius: 10,
+                              background: isActive ? 'rgba(229, 9, 20, 0.1)' : '#e2e8f0',
+                              color: isActive ? '#e50914' : '#475569',
+                            }}
+                          >
+                            {t.count}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Booking List or Empty State */}
+                {displayedMyBookings.length === 0 ? (
+                  <div
                     style={{
-                      padding: '8px 20px',
-                      borderRadius: 10,
-                      background: '#e50914',
-                      color: '#ffffff',
-                      border: 'none',
-                      fontSize: 12,
-                      fontWeight: 800,
-                      cursor: 'pointer',
+                      padding: '36px 16px',
+                      borderRadius: 14,
+                      border: '1px dashed rgba(0, 0, 0, 0.12)',
+                      textAlign: 'center',
+                      background: '#f8fafc',
                     }}
                   >
-                    + สร้างการจองใหม่
-                  </button>
-                </div>
-              ) : (
-                <div className="nfx-carousel">
-                  {displayedMyBookings.map(b => (
-                    <NetflixBookingPosterCard
-                      key={b.id}
-                      booking={b}
-                      lineUser={lineUser}
-                      onOpen={openDetail}
-                      onCloseBooking={handleCloseBookingFromList}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          ) : (
-            /* Guest VIP Pass Banner */
-            <div
-              style={{
-                position: 'relative',
-                overflow: 'hidden',
-                borderRadius: 20,
-                background: '#ffffff',
-                border: '1px solid rgba(0,0,0,0.08)',
-                padding: '24px 28px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 20,
-                boxShadow: '0 2px 10px rgba(0,0,0,0.02)',
-              }}
-            >
-              <div style={{ maxWidth: 640 }}>
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 20, background: 'rgba(6,199,85,0.1)', color: '#06c755', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', marginBottom: 8 }}>
+                    <div
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 12,
+                        background: 'rgba(229, 9, 20, 0.08)',
+                        color: '#e50914',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 10px',
+                        fontSize: 18,
+                      }}
+                    >
+                      <i className="fas fa-calendar-plus" />
+                    </div>
+                    <h4 style={{ margin: '0 0 4px', fontSize: 13.5, fontWeight: 800, color: '#111827' }}>
+                      {myBookingsTab === 'active' ? 'ไม่มีการจองที่รอดำเนินการ' : myBookingsTab === 'closed' ? 'ไม่มีการจองที่ปิดหรือยกเลิก' : 'ยังไม่มีประวัติการจอง'}
+                    </h4>
+                    <p style={{ margin: '0 0 14px', fontSize: 12, color: '#64748b', lineHeight: 1.6 }}>
+                      เลือกรอบจากปฏิทินทางขวา หรือกดสร้างการจองใหม่เพื่อเปิดห้องสืบคดี
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleStartBooking(calendarDate || toDateStr(new Date()))}
+                      className="nfx-btn-primary"
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: 10,
+                        background: '#e50914',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: 12,
+                        fontWeight: 800,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      + สร้างการจองใหม่
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {displayedMyBookings.map(b => (
+                      <BookingCard
+                        key={b.id}
+                        booking={b}
+                        lineUser={lineUser}
+                        onOpen={openDetail}
+                        onCloseBooking={handleCloseBookingFromList}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              /* Guest VIP Pass Card */
+              <div
+                style={{
+                  position: 'relative',
+                  overflow: 'hidden',
+                  borderRadius: 20,
+                  background: '#ffffff',
+                  border: '1px solid rgba(0, 0, 0, 0.08)',
+                  padding: '26px 22px',
+                  boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '4px 12px',
+                    borderRadius: 20,
+                    background: 'rgba(6, 199, 85, 0.1)',
+                    border: '1px solid rgba(6, 199, 85, 0.2)',
+                    color: '#06c755',
+                    fontSize: 11,
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    marginBottom: 14,
+                  }}
+                >
                   <i className="fas fa-crown" style={{ fontSize: 10 }} />
                   SOFUN VIP PASS
                 </div>
-                <h3 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 900, color: '#111827' }}>
-                  เข้าสู่ระบบด้วย LINE เพื่อเริ่มจองห้องและสร้างตี้
+
+                <h3 style={{ fontSize: 17, fontWeight: 900, color: '#111827', margin: '0 0 6px', letterSpacing: '-0.01em' }}>
+                  เข้าสู่ระบบเพื่อเริ่มจอง
                 </h3>
-                <p style={{ margin: 0, fontSize: 13, color: '#64748b', lineHeight: 1.6 }}>
-                  เช็คสถานะการจองเรียลไทม์ ชวนเพื่อนร่วมตี้ผ่าน LINE และรับสิทธิพิเศษสำหรับสมาชิก Sofun Club
+                <p style={{ fontSize: 12.5, color: '#64748b', margin: '0 0 18px', lineHeight: 1.6, maxWidth: 280 }}>
+                  เชื่อมต่อด้วย LINE เพื่อจัดการรอบเล่น ชวนเพื่อน และรับสิทธิพิเศษ Exclusive
                 </p>
-              </div>
-              <button
-                onClick={onLogin}
-                style={{
-                  padding: '12px 26px',
-                  borderRadius: 12,
-                  background: '#06c755',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: 14,
-                  fontWeight: 800,
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  boxShadow: '0 4px 14px rgba(6,199,85,0.25)',
-                }}
-              >
-                <i className="fab fa-line" style={{ fontSize: 18 }} />
-                เข้าสู่ระบบด้วย LINE
-              </button>
-            </div>
-          )}
-        </section>
 
-        {/* ── 3. Netflix Showtimes Hub (Date Ribbon + Room Grid) ─────────────── */}
-        <section id="showtimes-hub" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          {/* Section Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 4, height: 18, background: '#e50914', borderRadius: 2 }} />
-                <h2 style={{ margin: 0, fontSize: 'clamp(18px, 2.4vw, 22px)', fontWeight: 900, color: '#111827', letterSpacing: '-0.01em' }}>
-                  ตารางรอบและห้องจัดแสดง (CINEMA SHOWTIMES)
-                </h2>
-              </div>
-              <p style={{ margin: '4px 0 0', fontSize: 12.5, color: '#64748b' }}>
-                เลือกรอบเวลา 13:00 – 19:00 น. เพื่อจองห้องเล่น หรือคลิกตี้ที่เปิดรับเพื่อขอเข้าร่วม
-              </p>
-            </div>
+                <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8, textAlign: 'left', marginBottom: 20 }}>
+                  {[
+                    { icon: 'fas fa-door-closed', col: '#d97706', text: 'ล็อคห้องส่วนตัว & เลือกรอบเวลาที่ต้องการ' },
+                    { icon: 'fas fa-users', col: '#2563eb', text: 'สร้างปาร์ตี้ ส่งลิงก์ชวนเพื่อนร่วมตี้' },
+                    { icon: 'fab fa-line', col: '#06c755', text: 'แจ้งเตือนสถานะการจองผ่าน LINE ทันที' },
+                    { icon: 'fas fa-gem', col: '#e50914', text: 'สะสมแต้มเล่นเกมเพื่อรับส่วนลดพิเศษ' },
+                  ].map((item, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '10px 12px',
+                        borderRadius: 12,
+                        background: '#f8fafc',
+                        border: '1px solid rgba(0, 0, 0, 0.06)',
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          flexShrink: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: `${item.col}15`,
+                          border: `1px solid ${item.col}30`,
+                          color: item.col,
+                          fontSize: 12,
+                        }}
+                      >
+                        <i className={item.icon} />
+                      </div>
+                      <span style={{ fontSize: 12, fontWeight: 600, color: '#374151' }}>{item.text}</span>
+                    </div>
+                  ))}
+                </div>
 
-            {/* Monthly Calendar View Toggle */}
-            <button
-              type="button"
-              onClick={() => setShowMonthlyCalendar(prev => !prev)}
-              style={{
-                padding: '8px 16px',
-                borderRadius: 10,
-                border: '1px solid rgba(0,0,0,0.08)',
-                background: showMonthlyCalendar ? '#e50914' : '#ffffff',
-                color: showMonthlyCalendar ? '#ffffff' : '#111827',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                transition: 'all 0.15s ease',
-              }}
-            >
-              <i className="far fa-calendar-alt" style={{ fontSize: 11 }} />
-              <span>{showMonthlyCalendar ? 'ซ่อนปฏิทินรายเดือน' : 'ดูปฏิทินรายเดือน (Monthly Grid)'}</span>
-            </button>
+                <button
+                  type="button"
+                  onClick={onLogin}
+                  style={{
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: 12,
+                    background: '#06c755',
+                    border: 'none',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: 13.5,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    boxShadow: '0 4px 14px rgba(6, 199, 85, 0.25)',
+                    transition: 'all 0.15s ease',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = '0.9'}
+                  onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                >
+                  <i className="fab fa-line" style={{ fontSize: 17 }} />
+                  เข้าสู่ระบบด้วย LINE เพื่อจองห้อง
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Date Ribbon */}
-          <DateRibbon
-            selectedDate={selectedRibbonDate}
-            onSelectDate={(d) => {
-              setSelectedRibbonDate(d)
-              setCalendarDate(d)
-            }}
-            bookingsByDate={bookingsByDate}
-          />
-
-          {/* Room Showtimes Grid */}
-          <ShowtimesRoomGrid
-            selectedDate={selectedRibbonDate}
-            bookings={bookings}
-            lineUser={lineUser}
-            onOpenDetail={openDetail}
-            onSelectSlot={(d, t, r) => handleStartBooking(d, '', t, r)}
-            selectedCategory={selectedRoomCategory}
-            onSelectCategory={setSelectedRoomCategory}
-          />
-        </section>
-
-        {/* ── 4. Collapsible Full Monthly Calendar ───────────────────────────── */}
-        {showMonthlyCalendar && (
-          <section
-            style={{
-              background: '#ffffff',
-              border: '1px solid rgba(0,0,0,0.08)',
-              borderRadius: 20,
-              padding: '24px',
-              boxShadow: '0 4px 16px rgba(0,0,0,0.02)',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: 16,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingBottom: 14, borderBottom: '1px solid rgba(0,0,0,0.06)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 4, height: 18, background: '#e50914', borderRadius: 2 }} />
-                <h3 style={{ margin: 0, fontSize: 16, fontWeight: 900, color: '#111827' }}>
-                  ปฏิทินภาพรวมทั้งเดือน (MONTHLY OVERVIEW)
-                </h3>
-              </div>
-              <button
-                onClick={() => setShowMonthlyCalendar(false)}
-                style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}
-              >
-                <i className="fas fa-times" style={{ marginRight: 4 }} />
-                ปิดมุมมองเดือน
-              </button>
-            </div>
-            <BookingCalendar
-              bookings={bookings}
-              lineUser={lineUser}
-              onDayClick={(date) => {
-                setCalendarDate(d => d === date ? '' : date)
-                if (date) setSelectedRibbonDate(date)
+          {/* ── Right Column: Interactive Monthly Calendar ───────────────── */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid rgba(0, 0, 0, 0.08)',
+                borderRadius: 20,
+                padding: '20px 22px',
+                boxShadow: '0 2px 10px rgba(0, 0, 0, 0.02)',
               }}
-              selectedDate={calendarDate || selectedRibbonDate}
-              onEventClick={openDetail}
-              onBookToday={(d) => handleStartBooking(d || tomorrowStr)}
-            />
-          </section>
-        )}
+            >
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 16,
+                  paddingBottom: 14,
+                  borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{ width: 4, height: 18, borderRadius: 2, background: '#e50914' }} />
+                  <h3 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.01em' }}>
+                    ตารางห้อง & ปฏิทินรอบเล่น
+                  </h3>
+                </div>
+                <span style={{ fontSize: 11.5, color: '#64748b', fontWeight: 600 }}>
+                  คลิกวันที่เพื่อดูรายละเอียดรอบเล่น
+                </span>
+              </div>
 
-      </div>
+              <BookingCalendar
+                bookings={bookings}
+                lineUser={lineUser}
+                onDayClick={date => setCalendarDate(d => d === date ? '' : date)}
+                selectedDate={calendarDate}
+                onEventClick={openDetail}
+                onBookToday={date => handleStartBooking(date || calendarDate || toDateStr(new Date()))}
+              />
+            </div>
+          </div>
 
-      {/* ── Modals ─────────────────────────────────────────────────────────── */}
+        </div>
+      </main>
+
+      {/* ── Modals ───────────────────────────────────────────────────────── */}
       {showCreate && (
         <CreateBookingModal
           allGames={allGames}
           bookings={bookings}
           lineUser={lineUser}
-          defaultDate={createBookingDate || selectedRibbonDate || tomorrowStr}
+          defaultDate={createBookingDate || calendarDate || toDateStr(new Date())}
           defaultGameId={createBookingGameId}
           defaultTime={createBookingTime}
           defaultRoom={createBookingRoom}
