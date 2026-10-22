@@ -797,10 +797,47 @@ export default function POSPage({
   const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
   const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
 
+  // Unassigned food items (orderedBy: null) shared across members in split mode
+  const unassignedFoodTotal = orderArr
+    .filter(x => !x.orderedBy?.uid)
+    .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+  const sharedFoodPerMember = sessionMembers.length > 0
+    ? (unassignedFoodTotal / sessionMembers.length)
+    : 0
+
+  const getMemberBill = (m) => {
+    if (!m) return 0
+    const myFood = orderArr
+      .filter(x => x.orderedBy?.uid === m.uid)
+      .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+    const myBaseGame = m.unpaidDeposit ? gameFullPrice : gameUnitPay
+    const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
+    let myDisc = 0
+    if (isMemberDiscounted) {
+      if (discountMode === 'split' && nDiscounted > 0) {
+        const baseDisc = Math.floor((discountRaw / nDiscounted) * 100) / 100
+        const remainder = Math.round((discountRaw - baseDisc * nDiscounted) * 100) / 100
+        myDisc = (m.uid === discountEffectiveIds[0]) ? baseDisc + remainder : baseDisc
+      } else {
+        myDisc = discountRaw
+      }
+    }
+    return Math.round(Math.max(0, myBaseGame + myFood + sharedFoodPerMember - (Number(m.personalDiscount) || 0) - myDisc) * 100) / 100
+  }
+
+  const isMemberFullyPaid = (m) => {
+    if (!m) return false
+    const p = memberPayments[m.uid]
+    if (!p?.verified) return false
+    const paidAmt = Number(p.amount) || 0
+    const bill = getMemberBill(m)
+    return paidAmt >= (bill - 0.05)
+  }
+
   // ── payment status helpers ───────────────────────────────────────
   const allMembersPaid = activeSession?.confirmedOrderId &&
     sessionMembers.length > 0 &&
-    sessionMembers.every(m => memberPayments[m.uid]?.verified)
+    sessionMembers.every(m => isMemberFullyPaid(m))
   const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
   const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
 
@@ -1179,15 +1216,7 @@ export default function POSPage({
     }
   }
 
-  const getMemberBill = (m) => {
-    const myFood = orderArr
-      .filter(x => x.orderedBy?.uid === m.uid)
-      .reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
-    const myBaseGame = m.unpaidDeposit ? gameFullPrice : gameUnitPay
-    const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
-    const myDisc = isMemberDiscounted ? discountPerDiscounted : 0
-    return Math.round(Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc) * 100) / 100
-  }
+  // getMemberBill is defined in outer component scope
 
   const confirmGroupPayment = async () => {
     const orderId = activeSession.confirmedOrderId
@@ -1523,6 +1552,28 @@ export default function POSPage({
 
         const finalGrandTotal = expectedTableTotal > 0 ? expectedTableTotal : totalPaid
 
+        const memberBills = activeSession.members.map(m => {
+          const mFood = orderArr.filter(x => x.orderedBy?.uid === m.uid)
+          const mUnassigned = orderArr.filter(x => !x.orderedBy?.uid)
+          const mSharedFood = mUnassigned.map(x => ({
+            name: `${x.name} (ส่วนกลาง)`,
+            addons: x.addons || [],
+            price: Math.round(((x.totalPrice || x.price || 0) / (activeSession.members.length || 1)) * 100) / 100,
+            qty: x.qty || 1,
+          }))
+          const mBillTotal = getMemberBill(m)
+          return {
+            uid: m.uid,
+            name: m.name,
+            character: m.character || '',
+            avatar: m.avatar || '',
+            gamePrice: m.unpaidDeposit ? gameFullPrice : gameUnitPay,
+            foodItems: [...mFood, ...mSharedFood],
+            total: mBillTotal,
+            personalDiscount: Number(m.personalDiscount) || 0,
+          }
+        })
+
         await addDoc(collection(db, 'payments'), {
           orderId,
           sessionLabel: activeSession.label,
@@ -1536,9 +1587,10 @@ export default function POSPage({
             avatar: m.avatar || '', scanInAt: m.scanInAt || null,
           })),
           memberUids: activeSession.members.map(m => m.uid),
+          memberBills,
           gameUnitPrice: gameUnitPay,
           gameTotal: gamePrice,
-          foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
+          foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
           foodTotal,
           discount: { type: 'amount', value: totalDiscount, applied: totalDiscount },
           grandTotal: finalGrandTotal,
@@ -1660,6 +1712,8 @@ export default function POSPage({
           orderedBy: x.orderedBy,
           note: x.note || '',
         })),
+        customPrice: s.customPrice ?? '',
+        gameUnitPrice: gameUnitPay,
         foodTotal,
         gameTotal: gamePrice,
         discount: discountRaw,  // raw input value (per-person or lump sum)

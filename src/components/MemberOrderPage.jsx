@@ -860,9 +860,13 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const myPendingTotal = pendingItems.reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
 
   const selectedGame = (allGames || []).find(g => g.id === activeOrder?.scriptId)
-  const normalGameFee = selectedGame
-    ? (selectedGame.payPrice ?? selectedGame.price ?? 0)
-    : (activeOrder?.gameUnitPrice || (activeOrder?.gameTotal && activeOrder.members?.length ? Math.round(activeOrder.gameTotal / activeOrder.members.length) : 0))
+  const normalGameFee = (activeOrder?.customPrice !== '' && activeOrder?.customPrice !== undefined && activeOrder?.customPrice !== null)
+    ? Number(activeOrder.customPrice) || 0
+    : (activeOrder?.gameUnitPrice !== undefined && activeOrder?.gameUnitPrice !== null)
+      ? Number(activeOrder.gameUnitPrice) || 0
+      : selectedGame
+        ? (selectedGame.payPrice ?? selectedGame.price ?? 0)
+        : (activeOrder?.gameTotal && activeOrder.members?.length ? Math.round(activeOrder.gameTotal / activeOrder.members.length) : 0)
   const fullGameFee = selectedGame
     ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (normalGameFee + (Number(selectedGame.deposit) || 0)))
     : normalGameFee
@@ -879,18 +883,29 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
     : orderMembers.map(mm => mm.uid)
   const nDisc = effIds.length
 
+  // Unassigned food items shared equally across table members
+  const unassignedFoodTotal = (activeOrder?.foodItems || activeOrder?.memberFoodHistory || [])
+    .filter(f => !f.orderedBy?.uid)
+    .reduce((s, f) => s + (f.totalPrice || f.price || 0) * (f.qty || 1), 0)
+  const sharedFoodPerMember = numMembers > 0 ? (unassignedFoodTotal / numMembers) : 0
+
   const getMemberDiscount = (m) => {
     if (!m) return 0
     const isDisc = effIds.includes(m.uid)
     if (!isDisc) return 0
-    return dMode === 'split' ? (nDisc > 0 ? rawD / nDisc : 0) : rawD
+    if (dMode === 'split' && nDisc > 0) {
+      const baseDisc = Math.floor((rawD / nDisc) * 100) / 100
+      const remainder = Math.round((rawD - baseDisc * nDisc) * 100) / 100
+      return (m.uid === effIds[0]) ? baseDisc + remainder : baseDisc
+    }
+    return rawD
   }
 
   const myDiscount = getMemberDiscount(me)
   const myPersonalDiscount = Number(me?.personalDiscount) || 0
   const myPersonalDiscountNote = me?.personalDiscountNote || ''
   const myGameFee = getMemberGameFee(me)
-  const myTotal = Math.round(Math.max(0, myHistoryTotal + myPendingTotal + myGameFee - myDiscount - myPersonalDiscount) * 100) / 100
+  const myTotal = Math.round(Math.max(0, myHistoryTotal + myPendingTotal + myGameFee + sharedFoodPerMember - myDiscount - myPersonalDiscount) * 100) / 100
 
   const getGroupMemberBill = (m) => {
     const food = (activeOrder.memberFoodHistory || [])
@@ -898,7 +913,7 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
       .reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
     const gameFee = getMemberGameFee(m)
     const disc = getMemberDiscount(m)
-    return Math.round(Math.max(0, food + gameFee - disc - (Number(m.personalDiscount) || 0)) * 100) / 100
+    return Math.round(Math.max(0, food + sharedFoodPerMember + gameFee - disc - (Number(m.personalDiscount) || 0)) * 100) / 100
   }
   const groupPayTotal = Math.round([...groupPayUids].reduce((s, uid) => {
     const m = (activeOrder.members || []).find(x => x.uid === uid)
@@ -1022,6 +1037,40 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
               </div>
             ))}
           </div>
+          {activeOrder.status === 'paid' && (
+            <div style={{
+              margin: '10px 0 0',
+              padding: '10px 14px',
+              borderRadius: 12,
+              background: '#f0fdf4',
+              border: '1.5px solid #86efac',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#166534' }}>
+                  <i className="fas fa-check-circle" style={{ marginRight: 6 }} />
+                  ตี้นี้ชำระเงินและปิดรอบแล้ว
+                </div>
+                <div style={{ fontSize: 11.5, color: '#15803d' }}>
+                  ขอบคุณที่มาเล่นกับเรา สามารถดูใบเสร็จหรือประเมินเกมได้ที่ปุ่มบิล
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowBill(true)}
+                style={{
+                  background: '#16a34a', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700,
+                  cursor: 'pointer', whiteSpace: 'nowrap',
+                }}
+              >
+                ดูใบเสร็จ
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Order status pills */}

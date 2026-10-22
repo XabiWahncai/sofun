@@ -976,11 +976,23 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
 }
 
 // ── Create Booking Modal ───────────────────────────────────────────────────────
-function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showToast, defaultDate = '' }) {
+function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showToast, defaultDate = '', defaultGameId = '' }) {
   const [step, setStep] = useState('datetime') // 'datetime' | 'game'
   const [selectedDate, setSelectedDate] = useState(defaultDate || '')
   const [selectedTime, setSelectedTime] = useState('')
-  const [selectedGame, setSelectedGame] = useState(null)
+  const [selectedGame, setSelectedGame] = useState(() => {
+    if (defaultGameId && allGames.length > 0) {
+      return allGames.find(g => g.id === defaultGameId) || null
+    }
+    return null
+  })
+
+  useEffect(() => {
+    if (defaultGameId && allGames.length > 0 && !selectedGame) {
+      const found = allGames.find(g => g.id === defaultGameId)
+      if (found) setSelectedGame(found)
+    }
+  }, [defaultGameId, allGames, selectedGame])
   const [search, setSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -1122,6 +1134,41 @@ function CreateBookingModal({ allGames, bookings = [], lineUser, onClose, showTo
           {/* ── STEP 1: Date & Time ── */}
           {step === 'datetime' && (
             <>
+              {selectedGame && (
+                <div
+                  className="flex items-center gap-3 p-3.5 rounded-2xl"
+                  style={{ background: '#faf7f5', border: '1.5px solid rgba(26,26,26,0.06)' }}
+                >
+                  <div className="shrink-0 overflow-hidden" style={{ width: 44, height: 56, borderRadius: 10, background: '#f5f1ef' }}>
+                    {selectedGame.image ? (
+                      <img src={convertImg(selectedGame.image, 160)} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <i className="fas fa-theater-masks text-sm" style={{ color: 'rgba(26,26,26,0.3)' }} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-[10px] font-black uppercase tracking-wider block" style={{ color: C }}>
+                      สคริปต์ที่เลือก
+                    </span>
+                    <h4 className="font-bold text-[14px] leading-snug line-clamp-1" style={{ color: INK }}>
+                      {selectedGame.title}
+                    </h4>
+                    <span className="text-[11px]" style={{ color: 'rgba(26,26,26,0.5)' }}>
+                      {selectedGame.characters?.length || selectedGame.players || 6} คน
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStep('game')}
+                    className="font-bold shrink-0 transition-colors"
+                    style={{ color: C, fontSize: 12, padding: '6px 12px', background: `${C}10`, borderRadius: 999 }}
+                  >
+                    เปลี่ยน
+                  </button>
+                </div>
+              )}
               {/* Date picker */}
               <div className="flex flex-col gap-3.5">
                 <div className="flex items-baseline justify-between">
@@ -1459,7 +1506,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
       a.href = canvas.toDataURL('image/png')
       a.download = `promptpay-${amount}-${booking.id}.png`
       a.click()
-      showToast('บันทึก QR แล้ว ✓')
+      showToast('บันทึก QR แล้ว')
     } catch (e) {
       showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error')
     }
@@ -2858,11 +2905,12 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
 }
 
 // ── Main BookingPage Component ────────────────────────────────────────────────
-export default function BookingPage({ lineUser, allGames = [], showToast, onLogin = () => {} }) {
+export default function BookingPage({ lineUser, allGames = [], showToast, onLogin = () => {}, initialGameId = '' }) {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
   const [createBookingDate, setCreateBookingDate] = useState('')
+  const [createBookingGameId, setCreateBookingGameId] = useState(initialGameId || '')
   const [detailBooking, setDetailBooking] = useState(null)
   const [calendarDate, setCalendarDate] = useState('')
   const [myBookingsTab, setMyBookingsTab] = useState('active') // 'active' | 'all' | 'closed'
@@ -2898,6 +2946,16 @@ export default function BookingPage({ lineUser, allGames = [], showToast, onLogi
     }, () => setLoading(false))
     return unsub
   }, [])
+
+  // Handle ?gameId= or initialGameId
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const gid = params.get('gameId') || initialGameId
+    if (gid) {
+      setCreateBookingGameId(gid)
+      setShowCreate(true)
+    }
+  }, [initialGameId])
 
   // Handle ?booking=id URL param
   useEffect(() => {

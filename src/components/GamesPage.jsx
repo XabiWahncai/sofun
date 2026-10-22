@@ -1,251 +1,1655 @@
-import { useState, useMemo, useEffect } from 'react'
-import { collection, onSnapshot, query, where } from 'firebase/firestore'
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import { collection, onSnapshot, query, where, orderBy, limit, doc } from 'firebase/firestore'
 import { db } from '../firebase'
-import { useLang } from '../LangContext'
 
-/* ── Design tokens — resolved via theme.css CSS variables ─ */
-const VOID    = 'var(--void-950)'   // kept for badge/overlay contexts
-const SURFACE = 'var(--void-900)'
-const CARD    = 'var(--void-800)'
-const C       = 'var(--crimson-500)'
-const C_DEEP  = 'var(--crimson-700)'
-const CHALK   = 'var(--chalk)'      // kept for badge text on dark/colored bg
-const CHALK_2 = 'var(--chalk-2)'
-const CHALK_3 = 'var(--chalk-3)'
-const WIRE    = 'var(--border-dark-wire)'
-const WIRE_2  = 'var(--border-dark-wire-2)'
-const AMBER   = 'var(--case-amber)'
+/* ── Light / White Theme Tokens ────────────────────────────────────── */
+const BG_PAGE       = '#fcfcfc'
+const CARD_BG       = '#ffffff'
+const CARD_BG_HOVER = '#f8f8f8'
+const SURFACE_ELEV  = '#f3f4f6'
+const NETFLIX_RED   = '#e50914'
+const CRIMSON_DEEP  = '#b80710'
+const GOLD_AMBER    = '#f59e0b'
+const TEXT_PRIMARY  = '#111827'
+const TEXT_MUTED    = '#4b5563'
+const TEXT_SUBTLE   = '#9ca3af'
+const BORDER_SUBTLE = 'rgba(0,0,0,0.08)'
+const BORDER_FOCUS  = 'rgba(0,0,0,0.2)'
 
-/* ── Light catalog tokens ──────────────────────────────── */
-const INK      = 'var(--text-primary)'
-const INK_2    = 'var(--text-secondary)'
-const INK_3    = 'var(--text-tertiary)'
-const PAPER    = 'var(--surface-page)'
-const PAPER_2  = 'var(--surface-card)'
-const L_BORDER = 'var(--border-default)'
-const L_BORDER_2 = 'var(--border-strong)'
+/* ── Image CDN Helper ──────────────────────────────────────────────── */
+const toWsrv = (id, w = 600) =>
+  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
 
-/* ── Image helpers ───────────────────────────────────── */
-const toWsrv = (id) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=400&output=webp`
-
-const convertImageUrl = (url) => {
-  if (!url) return url
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-  if (lh3) return toWsrv(lh3[1])
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m1) return toWsrv(m1[1])
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return toWsrv(m2[1])
+const getCleanImgUrl = (url, w = 600) => {
+  if (!url) return ''
+  const gdriveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/)
+  if (gdriveMatch && gdriveMatch[1]) {
+    return toWsrv(gdriveMatch[1], w)
+  }
   return url
 }
 
-/* ── Filter constants ────────────────────────────────── */
-const GENRE_OPTIONS  = ['Horror', 'Drama', 'Detective', 'Emotional', 'Comedy']
-const DIFF_OPTIONS   = ['Beginner', 'Normal', 'Hard', 'Expert']
-const PLAYER_COUNTS  = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-const STAR_OPTIONS   = [1, 2, 3, 4, 5]
-
-const PRICE_OPTIONS = [
-  { value: '', label: 'ทุกราคา' },
-  { value: 'free', label: 'เล่นฟรี (฿0)' },
-  { value: 'under700', label: 'ไม่เกิน ฿699' },
-  { value: '700-899', label: '฿700 - ฿899' },
-  { value: 'above900', label: '฿900 ขึ้นไป' },
-]
-
-const TIME_OPTIONS = [
-  { value: '', label: 'ทุกระยะเวลา' },
-  { value: '3-4', label: '3 - 4 ชั่วโมง' },
-  { value: '5-6', label: '5 - 6 ชั่วโมง' },
-  { value: '7+', label: '7 ชั่วโมงขึ้นไป' },
-]
-
-function priceMatches(displayPrice, filter) {
-  if (!filter) return true
-  const p = Number(displayPrice) || 0
-  if (filter === 'free') return p === 0
-  if (filter === 'under700') return p > 0 && p <= 699
-  if (filter === '700-899') return p >= 700 && p <= 899
-  if (filter === 'above900') return p >= 900
-  return true
+/* ── Difficulty Badge Helper ───────────────────────────────────────── */
+function getDifficultyBadge(level) {
+  if (!level) return { bg: '#6b7280', text: '#ffffff', label: '' }
+  const l = (level || '').toLowerCase()
+  if (l === 'beginner' || l === 'ง่าย' || l === 'มือใหม่') return { bg: '#10b981', text: '#ffffff', label: level }
+  if (l === 'normal' || l === 'ปานกลาง')   return { bg: '#3b82f6', text: '#ffffff', label: level }
+  if (l === 'hard' || l === 'ยาก')     return { bg: '#f59e0b', text: '#111827', label: level }
+  if (l === 'expert' || l === 'ยากมาก')   return { bg: NETFLIX_RED, text: '#ffffff', label: level }
+  return { bg: '#6b7280', text: '#ffffff', label: level }
 }
 
-function timeMatches(timeStr, filter) {
-  if (!filter) return true
-  const nums = String(timeStr || '').match(/\d+(\.\d+)?/g)?.map(Number) || []
-  if (nums.length === 0) return true
-  const minH = nums[0]
-  const maxH = nums[1] || nums[0]
-  if (filter === '3-4') return maxH <= 4
-  if (filter === '5-6') return (minH >= 4 && maxH <= 6) || (minH <= 5 && maxH >= 5)
-  if (filter === '7+') return minH >= 6 || maxH >= 7
-  return true
+/* ── Parse Player Range ────────────────────────────────────────────── */
+function parsePlayerCount(str) {
+  if (typeof str === 'number') return str
+  if (!str) return 0
+  const match = String(str).match(/\d+/)
+  return match ? parseInt(match[0], 10) : 0
 }
 
-/* Returns badge bg + accessible text color (WCAG AA verified) */
-function diffConfig(level) {
-  const lv = (level || '').toLowerCase()
-  if (lv.includes('beginner') || lv.includes('easy') || lv.includes('ง่าย'))
-    return { bg: 'var(--feedback-success-icon)', text: CHALK }
-  if (lv.includes('normal') || lv.includes('ปานกลาง'))
-    return { bg: 'var(--feedback-info-icon)', text: CHALK }
-  if (lv.includes('hard') || lv.includes('ยาก'))
-    return { bg: 'var(--feedback-warning-icon)', text: VOID }
-  if (lv.includes('expert') || lv.includes('ยากมาก'))
-    return { bg: C, text: CHALK }
-  return { bg: 'var(--void-500)', text: CHALK }
+function getGamePlayerCount(g) {
+  if (!g) return 0
+  if (Array.isArray(g.characters) && g.characters.length > 0) return g.characters.length
+  return parsePlayerCount(g.players) || 6
 }
 
-function parsePlayerRange(str) {
-  const nums = String(str || '').match(/\d+/g)?.map(Number) || []
-  return { lo: nums[0] || 0, hi: nums[1] || nums[0] || 0 }
-}
+/* ── Comprehensive Responsive CSS ──────────────────────────────────── */
+const RESPONSIVE_CSS = `
+  /* Desktop Wide (> 1024px) */
+  @media (min-width: 1025px) {
+    .netflix-billboard {
+      padding-left: max(40px, calc((100% - 1320px) / 2)) !important;
+      padding-right: 40px !important;
+    }
+  }
 
-function playerMatches(playersStr, count) {
-  if (!count) return true
-  const { lo, hi } = parsePlayerRange(playersStr)
-  if (!lo) return true
-  return count >= lo && count <= (hi || lo)
-}
+  /* Tablet (769px - 1024px) */
+  @media (min-width: 769px) and (max-width: 1024px) {
+    .netflix-billboard {
+      min-height: 500px !important;
+      height: 55vh !important;
+      padding-left: 28px !important;
+      padding-right: 28px !important;
+    }
+    .netflix-subbar {
+      padding: 12px 28px !important;
+    }
+    .netflix-row-header {
+      padding: 0 28px !important;
+    }
+    .netflix-row-scroll {
+      padding: 8px 28px 16px !important;
+      gap: 12px !important;
+    }
+    .netflix-card {
+      width: 165px !important;
+      min-width: 165px !important;
+      height: 248px !important;
+    }
+    .netflix-grid-wrapper {
+      padding: 0 28px !important;
+    }
+    .netflix-grid-cards {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)) !important;
+      gap: 14px !important;
+    }
+  }
 
-/* ── Sub-components ──────────────────────────────────── */
-function StarRow({ label, value, onChange, color }) {
+  /* Mobile Devices (<= 768px) */
+  @media (max-width: 768px) {
+    /* Billboard */
+    .netflix-billboard {
+      min-height: 420px !important;
+      height: auto !important;
+      padding: 24px 16px 20px !important;
+      flex-direction: column !important;
+      justify-content: flex-end !important;
+      align-items: stretch !important;
+    }
+    .netflix-billboard-backdrop {
+      width: 100% !important;
+      height: 65% !important;
+      opacity: 0.82 !important;
+      background-position: center top !important;
+    }
+    .netflix-billboard-grad-left {
+      background: linear-gradient(to right, rgba(255,255,255,0.92) 0%, rgba(255,255,255,0.65) 60%, transparent 100%) !important;
+    }
+    .netflix-billboard-grad-bottom {
+      height: 72% !important;
+      background: linear-gradient(to top, #ffffff 42%, rgba(255,255,255,0.95) 70%, transparent 100%) !important;
+    }
+    .netflix-billboard-content {
+      max-width: 100% !important;
+      padding-top: 100px !important;
+      gap: 10px !important;
+    }
+    .netflix-billboard-title {
+      font-size: clamp(22px, 6vw, 30px) !important;
+      line-height: 1.15 !important;
+    }
+    .netflix-billboard-synopsis {
+      -webkit-line-clamp: 2 !important;
+      font-size: 12.5px !important;
+      line-height: 1.5 !important;
+    }
+    .netflix-billboard-actions {
+      display: flex !important;
+      flex-direction: row !important;
+      gap: 8px !important;
+      width: 100% !important;
+      margin-top: 4px !important;
+    }
+    .netflix-billboard-actions button {
+      flex: 1 !important;
+      height: 44px !important;
+      padding: 0 8px !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
+      justify-content: center !important;
+      border-radius: 8px !important;
+    }
+    .netflix-billboard-dots {
+      position: static !important;
+      display: flex !important;
+      justify-content: center !important;
+      margin-top: 10px !important;
+      z-index: 3 !important;
+    }
+
+    /* Subbar */
+    .netflix-subbar {
+      padding: 8px 12px !important;
+      top: 56px !important;
+      flex-direction: column !important;
+      align-items: stretch !important;
+      gap: 8px !important;
+    }
+    .netflix-subbar-categories {
+      width: 100% !important;
+      overflow-x: auto !important;
+      -webkit-overflow-scrolling: touch !important;
+      padding-bottom: 2px !important;
+      gap: 6px !important;
+    }
+    .netflix-subbar-categories::-webkit-scrollbar {
+      display: none !important;
+    }
+    .netflix-subbar-controls {
+      width: 100% !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 6px !important;
+    }
+    .netflix-search-box {
+      flex: 1 !important;
+      min-width: 0 !important;
+    }
+    .netflix-search-box input {
+      width: 100% !important;
+      height: 34px !important;
+      font-size: 12px !important;
+    }
+    .netflix-filter-btn {
+      height: 34px !important;
+      padding: 0 10px !important;
+      font-size: 11.5px !important;
+      white-space: nowrap !important;
+    }
+    .netflix-view-toggle button {
+      height: 30px !important;
+      padding: 0 8px !important;
+      font-size: 11px !important;
+    }
+
+    /* Swimlanes & Rows */
+    .netflix-row-header {
+      padding: 0 16px !important;
+      margin-bottom: 8px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      text-align: left !important;
+    }
+    .netflix-row-title-wrap {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: flex-start !important;
+      gap: 10px !important;
+      text-align: left !important;
+      flex: 1 !important;
+      min-width: 0 !important;
+    }
+    .netflix-row-header h3 {
+      font-size: 16px !important;
+      text-align: left !important;
+    }
+    .netflix-row-scroll {
+      padding: 4px 16px 14px !important;
+      gap: 10px !important;
+      -webkit-overflow-scrolling: touch !important;
+    }
+    .netflix-scroll-arrow {
+      display: none !important;
+    }
+    .netflix-card {
+      width: 145px !important;
+      min-width: 145px !important;
+      height: 220px !important;
+      border-radius: 10px !important;
+    }
+    .netflix-card h4 {
+      font-size: 12px !important;
+      -webkit-line-clamp: 1 !important;
+    }
+    .netflix-card-actions {
+      opacity: 1 !important;
+      max-height: 36px !important;
+      transform: none !important;
+      margin-top: 4px !important;
+    }
+
+    /* Grid View */
+    .netflix-grid-wrapper {
+      padding: 0 12px !important;
+    }
+    .netflix-grid-cards {
+      grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      gap: 10px !important;
+    }
+    .netflix-grid-cards .netflix-card {
+      width: 100% !important;
+      min-width: 0 !important;
+      height: 235px !important;
+    }
+
+    /* Active filter chips */
+    .netflix-active-chips {
+      padding: 10px 16px 0 !important;
+    }
+
+    /* Bottom Sheet Filter on Mobile */
+    .netflix-filter-backdrop {
+      position: fixed !important;
+      inset: 0 !important;
+      background: rgba(0,0,0,0.55) !important;
+      backdrop-filter: blur(4px) !important;
+      z-index: 99 !important;
+    }
+    .netflix-filter-drawer-container {
+      position: fixed !important;
+      bottom: 0 !important;
+      left: 0 !important;
+      right: 0 !important;
+      max-height: 84vh !important;
+      overflow-y: auto !important;
+      background: #ffffff !important;
+      border-radius: 20px 20px 0 0 !important;
+      box-shadow: 0 -8px 32px rgba(0,0,0,0.2) !important;
+      z-index: 100 !important;
+      padding: 16px 16px 24px !important;
+      animation: netflixSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    }
+    .netflix-filter-drag-handle {
+      display: block !important;
+      width: 40px !important;
+      height: 4px !important;
+      border-radius: 2px !important;
+      background: #d1d5db !important;
+      margin: 0 auto 12px !important;
+    }
+  }
+
+  /* Extra Small Devices (<= 360px) */
+  @media (max-width: 360px) {
+    .netflix-card {
+      width: 130px !important;
+      min-width: 130px !important;
+      height: 195px !important;
+    }
+    .netflix-grid-cards .netflix-card {
+      height: 205px !important;
+    }
+  }
+
+  @keyframes netflixSlideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+
+  /* Disable hover transform on touch devices to avoid stuck states */
+  @media (hover: none) {
+    .netflix-card:hover {
+      transform: none !important;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    }
+    .netflix-card-actions {
+      opacity: 1 !important;
+      max-height: 36px !important;
+      transform: none !important;
+    }
+  }
+`
+
+/* ── Netflix Poster Card Component (White Theme) ───────────────────── */
+function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
+  const [hovered, setHovered] = useState(false)
+  const posterImg = getCleanImgUrl(game.image, 400)
+  const diff = getDifficultyBadge(game.difficulty)
+  const players = getGamePlayerCount(game)
+
+  const handleBook = (e) => {
+    e.stopPropagation()
+    if (typeof showPage === 'function') {
+      showPage('booking', { gameId: game.id })
+    } else {
+      window.location.href = `/booking?gameId=${game.id}`
+    }
+  }
+
+  const handleDetail = (e) => {
+    e.stopPropagation()
+    showDetail(game.id)
+  }
+
   return (
-    <div style={{ marginBottom: 0 }}>
-      <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 8 }}>{label}</p>
-      <div style={{ display: 'flex', gap: 4 }}>
-        {STAR_OPTIONS.map(n => {
-          const active = value === n
-          return (
-            <button key={n} onClick={() => onChange(v => v === n ? null : n)} style={{
-              background: active ? `${color}22` : 'transparent',
-              border: `1px solid ${active ? color : L_BORDER}`,
-              color: active ? color : INK_3,
-              borderRadius: 4, cursor: 'pointer',
-              fontSize: 10, padding: '4px 6px', lineHeight: 1,
-              transition: 'all 0.18s',
-            }}>{'★'.repeat(n)}</button>
-          )
-        })}
+    <div
+      onClick={handleDetail}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="netflix-card"
+      style={{
+        position: 'relative',
+        width: 190,
+        minWidth: 190,
+        height: 285,
+        borderRadius: 12,
+        overflow: 'hidden',
+        background: CARD_BG,
+        cursor: 'pointer',
+        border: `1.5px solid ${hovered ? 'rgba(229,9,20,0.35)' : BORDER_SUBTLE}`,
+        boxShadow: hovered
+          ? '0 16px 36px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.06)'
+          : '0 2px 8px rgba(0,0,0,0.06)',
+        transform: hovered ? 'translateY(-6px) scale(1.03)' : 'translateY(0) scale(1)',
+        transition: 'transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.24s ease',
+        userSelect: 'none',
+        flexShrink: 0,
+      }}
+    >
+      {/* Poster Image */}
+      {posterImg ? (
+        <img
+          src={posterImg}
+          alt={game.title}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            filter: hovered ? 'brightness(0.95)' : 'brightness(0.9)',
+            transition: 'filter 0.24s ease',
+          }}
+        />
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6' }}>
+          <i className="fas fa-theater-masks" style={{ fontSize: 32, color: 'rgba(0,0,0,0.2)' }} />
+        </div>
+      )}
+
+      {/* Top Badges */}
+      <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pointerEvents: 'none', zIndex: 2 }}>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 800,
+            color: diff.text,
+            background: diff.bg,
+            padding: '3px 7px',
+            borderRadius: 6,
+            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+          }}
+        >
+          {diff.label}
+        </span>
+
+        {isPlayed && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#ffffff',
+              background: 'rgba(59,130,246,0.92)',
+              padding: '3px 7px',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          >
+            <i className="fas fa-check" style={{ fontSize: 9 }} /> เล่นแล้ว
+          </span>
+        )}
+      </div>
+
+      {/* Bottom Gradient Overlay on Poster */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '40px 10px 10px',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.72) 55%, transparent 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          zIndex: 2,
+        }}
+      >
+        <h4
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 800,
+            color: '#ffffff',
+            lineHeight: 1.25,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+          }}
+        >
+          {game.title}
+        </h4>
+
+        {/* Quick Specs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.78)' }}>
+          <span><i className="fas fa-users" style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }} /> {players} คน</span>
+          <span>•</span>
+          <span>{game.time || '4 ชม.'}</span>
+        </div>
+
+        {/* Hover Action Bar */}
+        <div
+          className="netflix-card-actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 4,
+            opacity: hovered ? 1 : 0,
+            maxHeight: hovered ? 36 : 0,
+            transform: hovered ? 'translateY(0)' : 'translateY(6px)',
+            transition: 'opacity 0.2s ease, max-height 0.2s ease, transform 0.2s ease',
+            overflow: 'hidden',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleBook}
+            style={{
+              flex: 1,
+              height: 28,
+              borderRadius: 6,
+              background: NETFLIX_RED,
+              color: '#ffffff',
+              border: 'none',
+              fontSize: 11,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+              transition: 'background 0.16s ease',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = '#f6121d'}
+            onMouseLeave={e => e.currentTarget.style.background = NETFLIX_RED}
+          >
+            <i className="fas fa-play" style={{ fontSize: 9 }} /> จองรอบ
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDetail}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.22)',
+              color: '#ffffff',
+              border: '1px solid rgba(255,255,255,0.3)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+              transition: 'background 0.16s ease',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.38)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.22)'}
+            aria-label="ดูรายละเอียด"
+          >
+            <i className="fas fa-info" style={{ fontSize: 10 }} />
+          </button>
+        </div>
       </div>
     </div>
   )
 }
 
-function ScriptCard({ game, showDetail, played }) {
-  const imgSrc = game.image ? convertImageUrl(game.image) : null
-  const displayPrice = game.fullPrice ?? game.price
-  const isFree = displayPrice === 0
-  const stars  = Math.min(5, Math.max(0, parseInt(game.detective) || 4))
-  const diff   = diffConfig(game.difficulty)
+/* ── Netflix Horizontal Swimlane Row (White Theme) ─────────────────── */
+function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll }) {
+  const scrollRef = useRef(null)
+  const [canScrollLeft, setCanScrollLeft] = useState(false)
+  const [canScrollRight, setCanScrollRight] = useState(true)
+
+  const checkScroll = () => {
+    if (!scrollRef.current) return
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current
+    setCanScrollLeft(scrollLeft > 10)
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10)
+  }
+
+  useEffect(() => {
+    checkScroll()
+    const el = scrollRef.current
+    if (el) el.addEventListener('scroll', checkScroll, { passive: true })
+    return () => el && el.removeEventListener('scroll', checkScroll)
+  }, [games])
+
+  const scroll = (direction) => {
+    if (!scrollRef.current) return
+    const step = scrollRef.current.clientWidth * 0.75
+    scrollRef.current.scrollBy({
+      left: direction === 'left' ? -step : step,
+      behavior: 'smooth'
+    })
+  }
+
+  if (games.length === 0) return null
 
   return (
-    <div className="gp-card" onClick={() => showDetail(game.id)} style={{
-      borderRadius: 10, overflow: 'hidden', background: PAPER_2,
-      border: `1px solid ${L_BORDER}`, position: 'relative',
-      display: 'flex', flexDirection: 'column', cursor: 'pointer',
-    }}>
-      {/* Cover art */}
-      <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', flexShrink: 0 }}>
-        {imgSrc ? (
-          <img src={imgSrc} alt={game.title} loading="lazy" decoding="async" className="gp-card-img" style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            objectFit: 'cover', filter: 'brightness(0.86) contrast(1.06)',
-          }} />
-        ) : (
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg, var(--void-100) 0%, var(--void-200) 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <i className="fas fa-theater-masks" style={{ fontSize: 36, color: INK_3 }} />
-          </div>
-        )}
-        {/* Gradient */}
-        <div className="gp-card-overlay" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.05) 50%, transparent 100%)', opacity: 0.65 }} />
-        {/* Difficulty badge */}
-        {game.difficulty && (
-          <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, color: diff.text, background: diff.bg }}>
-            {game.difficulty}
-          </span>
-        )}
-        {/* Free badge */}
-        {isFree && (
-          <span style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, fontSize: 9, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: AMBER, color: VOID }}>ฟรี</span>
-        )}
-        {/* Played badge */}
-        {played && (
-          <span style={{
-            position: 'absolute', zIndex: 2,
-            top: isFree ? 32 : 8, right: 8,
-            display: 'inline-flex', alignItems: 'center', gap: 4,
-            padding: '3px 8px', borderRadius: 999,
-            fontSize: 9, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase',
-            background: 'rgba(0,0,0,0.72)', color: '#fff',
-            backdropFilter: 'blur(6px)',
-            border: '1px solid rgba(255,255,255,0.18)',
-          }}>
-            <i className="fas fa-check-circle" style={{ fontSize: 9, color: '#06c755' }} />เล่นแล้ว
-          </span>
-        )}
-        {/* Synopsis hover overlay */}
-        {(game.synopsis || game.description) && (
-          <div className="gp-synopsis" style={{
-            position: 'absolute', inset: 0, zIndex: 3,
-            background: 'rgba(9,9,15,0.92)',
-            padding: '16px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-            opacity: 0, transition: 'opacity 0.28s ease',
-          }}>
-            <p style={{ fontSize: 11, color: CHALK_2, lineHeight: 1.75, display: '-webkit-box', WebkitLineClamp: 7, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-              {game.synopsis || game.description}
-            </p>
-            <p style={{ fontSize: 10, fontWeight: 700, color: C, marginTop: 10, letterSpacing: '0.08em', textTransform: 'uppercase' }}>อ่านเพิ่ม →</p>
-          </div>
+    <div style={{ position: 'relative', marginBottom: 38 }}>
+      {/* Row Header */}
+      <div className="netflix-row-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', marginBottom: 14 }}>
+        <div className="netflix-row-title-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
+          <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '-0.01em', textAlign: 'left' }}>
+            {title}
+          </h3>
+        </div>
+
+        {onSeeAll && (
+          <button
+            type="button"
+            onClick={onSeeAll}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: TEXT_MUTED,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 8px',
+              borderRadius: 6,
+              transition: 'color 0.16s ease',
+            }}
+            onMouseEnter={e => e.currentTarget.style.color = TEXT_PRIMARY}
+            onMouseLeave={e => e.currentTarget.style.color = TEXT_MUTED}
+          >
+            <span>ดูทั้งหมด ({games.length})</span>
+            <i className="fas fa-chevron-right" style={{ fontSize: 10 }} />
+          </button>
         )}
       </div>
 
-      {/* Info */}
-      <div className="gp-card-info" style={{ padding: '12px 12px 14px', display: 'flex', flexDirection: 'column', gap: 7, flex: 1 }}>
-        {game.tags?.length > 0 && (
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
-            {game.tags.slice(0, 2).map(tag => (
-              <span key={tag} style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 7px', borderRadius: 3, background: `${C}14`, color: C, border: `1px solid ${C}28` }}>
-                {tag}
-              </span>
-            ))}
-          </div>
+      {/* Row Body with Navigation Buttons */}
+      <div style={{ position: 'relative' }}>
+        {/* Left Arrow */}
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scroll('left')}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 52,
+              zIndex: 10,
+              background: 'linear-gradient(to right, rgba(252,252,252,0.95) 0%, rgba(252,252,252,0.5) 60%, transparent 100%)',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'opacity 0.2s ease',
+            }}
+            className="netflix-scroll-arrow netflix-scroll-left" aria-label="เลื่อนซ้าย"
+          >
+            <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#ffffff', color: TEXT_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_SUBTLE}` }}>
+              <i className="fas fa-chevron-left text-sm" />
+            </div>
+          </button>
         )}
 
-        <p style={{ fontSize: 12.5, fontWeight: 700, color: INK, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
-          {game.title || 'ไม่มีชื่อ'}
-        </p>
-
-        {/* Stars */}
-        <div style={{ display: 'flex', gap: 2 }}>
-          {[1,2,3,4,5].map(s => (
-            <span key={s} style={{ fontSize: 10, color: s <= stars ? AMBER : L_BORDER_2, lineHeight: 1 }}>★</span>
+        {/* Horizontal Scroll Area */}
+        <div
+          ref={scrollRef}
+          className="netflix-row-scroll"
+          style={{
+            display: 'flex',
+            gap: 14,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            padding: '10px 40px 16px',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            scrollSnapType: 'x proximity',
+          }}
+        >
+          {games.map(game => (
+            <NetflixPosterCard
+              key={game.id}
+              game={game}
+              showDetail={showDetail}
+              showPage={showPage}
+              isPlayed={playedIds.has(game.id)}
+            />
           ))}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 10, color: INK_3, flexWrap: 'wrap' }}>
-          {!!game.players && <span><i className="fas fa-users" style={{ marginRight: 4, fontSize: 9 }} />{game.players} คน</span>}
-          {game.time    && <span><i className="fas fa-clock" style={{ marginRight: 4, fontSize: 9 }} />{game.time}</span>}
+        {/* Right Arrow */}
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scroll('right')}
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 52,
+              zIndex: 10,
+              background: 'linear-gradient(to left, rgba(252,252,252,0.95) 0%, rgba(252,252,252,0.5) 60%, transparent 100%)',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'opacity 0.2s ease',
+            }}
+            className="netflix-scroll-arrow netflix-scroll-right" aria-label="เลื่อนขวา"
+          >
+            <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#ffffff', color: TEXT_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_SUBTLE}` }}>
+              <i className="fas fa-chevron-right text-sm" />
+            </div>
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* ── Hero Billboard Spotlight Component (White Theme) ──────────────── */
+function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings }) {
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isPaused, setIsPaused] = useState(false)
+
+  // Spotlight games (strictly ONLY new games)
+  const spotlightGames = useMemo(() => {
+    if (!games || games.length === 0) return []
+
+    const list = []
+    const seen = new Set()
+
+    // 1. Admin-curated new games from settings/promotion
+    if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds)) {
+      promoSettings.newGameIds.forEach(id => {
+        const found = games.find(g => g.id === id)
+        if (found && !seen.has(found.id)) {
+          seen.add(found.id)
+          list.push(found)
+        }
+      })
+    }
+
+    // 2. Games explicitly marked as isNew or tagged New or เกมใหม่
+    games.forEach(g => {
+      const isMarkedNew = g.isNew || (g.tags || []).some(t => {
+        const s = String(t).toLowerCase()
+        return s === 'new' || s === 'เกมใหม่'
+      })
+      if (isMarkedNew && !seen.has(g.id)) {
+        seen.add(g.id)
+        list.push(g)
+      }
+    })
+
+    // 3. Newest releases sorted by createdAt descending
+    const sorted = [...games].sort((a, b) => {
+      const getTimestamp = (g) => {
+        if (!g) return 0
+        if (g.createdAt?.toMillis) return g.createdAt.toMillis()
+        if (g.createdAt?.seconds) return g.createdAt.seconds * 1000
+        if (g.createdAt) return new Date(g.createdAt).getTime()
+        return 0
+      }
+      return getTimestamp(b) - getTimestamp(a)
+    })
+
+    sorted.forEach(g => {
+      if (list.length < 5 && !seen.has(g.id)) {
+        seen.add(g.id)
+        list.push(g)
+      }
+    })
+
+    return list.slice(0, 5)
+  }, [games, promoSettings?.newGameIds])
+
+  const currentGame = spotlightGames[currentIndex] || games[0]
+
+  // Auto rotation
+  useEffect(() => {
+    if (spotlightGames.length <= 1 || isPaused) return
+    const timer = setInterval(() => {
+      setCurrentIndex(prev => (prev + 1) % spotlightGames.length)
+    }, 8000)
+    return () => clearInterval(timer)
+  }, [spotlightGames.length, isPaused])
+
+  if (!currentGame) return null
+
+  const customCover = promoSettings?.customCovers?.[currentGame.id]
+  const backdropImg = getCleanImgUrl(customCover || currentGame.image, 1400)
+  const diff = getDifficultyBadge(currentGame.difficulty)
+  const players = getGamePlayerCount(currentGame)
+
+  const handleBook = () => {
+    if (typeof showPage === 'function') {
+      showPage('booking', { gameId: currentGame.id })
+    } else {
+      window.location.href = `/booking?gameId=${currentGame.id}`
+    }
+  }
+
+  return (
+    <div
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      className="netflix-billboard"
+      style={{
+        position: 'relative',
+        width: '100%',
+        minHeight: 520,
+        height: '68vh',
+        maxHeight: 640,
+        background: '#ffffff',
+        overflow: 'hidden',
+        display: 'flex',
+        alignItems: 'center',
+        paddingLeft: 'max(40px, calc((100% - 1320px) / 2))',
+        paddingRight: 40,
+        borderBottom: `1px solid ${BORDER_SUBTLE}`,
+      }}
+    >
+      {/* Background Image with Light Vignette */}
+      <div
+        className="netflix-billboard-backdrop"
+        style={{
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          width: '74%',
+          height: '100%',
+          backgroundImage: backdropImg ? `url('${backdropImg}')` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 22%',
+          opacity: 0.82,
+          filter: 'contrast(1.04) brightness(0.98)',
+          transition: 'background-image 0.6s ease-in-out',
+        }}
+      />
+
+      {/* Left to right white gradient */}
+      <div
+        className="netflix-billboard-grad-left"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(to right, #ffffff 32%, rgba(255,255,255,0.94) 52%, rgba(255,255,255,0.35) 80%, transparent 100%)',
+          zIndex: 1,
+        }}
+      />
+
+      {/* Bottom to top white gradient */}
+      <div
+        className="netflix-billboard-grad-bottom"
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '45%',
+          background: 'linear-gradient(to top, #ffffff 10%, rgba(255,255,255,0.75) 50%, transparent 100%)',
+          zIndex: 1,
+        }}
+      />
+
+      {/* Content Container */}
+      <div
+        className="netflix-billboard-content"
+        style={{
+          position: 'relative',
+          zIndex: 2,
+          maxWidth: 620,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          paddingTop: 40,
+        }}
+      >
+        {/* Spotlight Tag */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span
+            style={{
+              background: NETFLIX_RED,
+              color: '#ffffff',
+              fontSize: 10,
+              fontWeight: 900,
+              letterSpacing: '0.14em',
+              textTransform: 'uppercase',
+              padding: '3px 8px',
+              borderRadius: 4,
+            }}
+          >
+            SOFUN NEW GAME
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 700, color: TEXT_MUTED }}>
+            เกมใหม่ล่าสุดจากร้าน
+          </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-          {displayPrice !== undefined && (
-            <span style={{ fontSize: 14, fontWeight: 800, color: isFree ? AMBER : C }}>
-              {isFree ? 'ฟรี' : `฿${displayPrice}`}
-              {!isFree && <span style={{ fontSize: 10, fontWeight: 500, color: INK_3, marginLeft: 3 }}>/คน</span>}
+        {/* Title */}
+        <h1
+          className="netflix-billboard-title"
+          style={{
+            margin: 0,
+            fontSize: 'clamp(28px, 4.2vw, 48px)',
+            fontWeight: 950,
+            color: TEXT_PRIMARY,
+            lineHeight: 1.12,
+            letterSpacing: '-0.02em',
+          }}
+        >
+          {currentGame.title}
+        </h1>
+
+        {/* Quick Specs Row */}
+        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, fontSize: 13 }}>
+          <span
+            style={{
+              padding: '2px 8px',
+              borderRadius: 4,
+              fontSize: 11,
+              fontWeight: 800,
+              color: diff.text,
+              background: diff.bg,
+            }}
+          >
+            {diff.label}
+          </span>
+          <span style={{ color: TEXT_MUTED }}>
+            <i className="fas fa-users" style={{ marginRight: 5, color: TEXT_SUBTLE }} />
+            {players} คน
+          </span>
+          <span style={{ color: TEXT_MUTED }}>
+            <i className="fas fa-clock" style={{ marginRight: 5, color: TEXT_SUBTLE }} />
+            {currentGame.time || '4-5 ชั่วโมง'}
+          </span>
+          {currentGame.mainRoom && (
+            <span style={{ color: TEXT_MUTED }}>
+              <i className="fas fa-door-open" style={{ marginRight: 5, color: TEXT_SUBTLE }} />
+              {currentGame.mainRoom}
             </span>
           )}
-          <span style={{ fontSize: 10, color: INK_3, marginLeft: 'auto' }}>→</span>
+        </div>
+
+        {/* Synopsis Teaser */}
+        <p
+          className="netflix-billboard-synopsis"
+          style={{
+            margin: 0,
+            fontSize: 14,
+            color: '#374151',
+            lineHeight: 1.6,
+            display: '-webkit-box',
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+          }}
+        >
+          {currentGame.synopsis || 'สัมผัสประสบการณ์สวมบทบาทสืบสวนคดีฆาตกรรมสุดเข้มข้น ดำดิ่งสู่เรื่องราวที่เต็มไปด้วยความลับ หักมุม และการชิงไหวชิงพริบในโลกเสมือนจริงที่ร้าน SOFUN'}
+        </p>
+
+        {/* Primary CTA Buttons */}
+        <div className="netflix-billboard-actions" style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
+          <button
+            type="button"
+            onClick={handleBook}
+            style={{
+              height: 44,
+              padding: '0 26px',
+              borderRadius: 8,
+              background: NETFLIX_RED,
+              color: '#ffffff',
+              border: 'none',
+              fontSize: 14,
+              fontWeight: 900,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              boxShadow: '0 4px 16px rgba(229,9,20,0.3)',
+              transition: 'background 0.16s ease, transform 0.16s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f6121d'; e.currentTarget.style.transform = 'scale(1.02)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = NETFLIX_RED; e.currentTarget.style.transform = 'scale(1)' }}
+          >
+            <i className="fas fa-play" style={{ fontSize: 13 }} /> จองรอบเล่นเกมนี้
+          </button>
+
+          <button
+            type="button"
+            onClick={() => showDetail(currentGame.id)}
+            style={{
+              height: 44,
+              padding: '0 22px',
+              borderRadius: 8,
+              background: '#ffffff',
+              color: TEXT_PRIMARY,
+              border: `1.5px solid ${BORDER_SUBTLE}`,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.06)',
+              fontSize: 14,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              transition: 'background 0.16s ease, transform 0.16s ease',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.transform = 'scale(1.02)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.transform = 'scale(1)' }}
+          >
+            <i className="fas fa-info-circle" style={{ fontSize: 14 }} /> ข้อมูลเพิ่มเติม
+          </button>
+        </div>
+      </div>
+
+      {/* Rotation Indicator Dots (Bottom Right) */}
+      {spotlightGames.length > 1 && (
+        <div
+          className="netflix-billboard-dots"
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            right: 40,
+            zIndex: 3,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          {spotlightGames.map((g, idx) => (
+            <button
+              key={g.id}
+              type="button"
+              onClick={() => setCurrentIndex(idx)}
+              style={{
+                width: idx === currentIndex ? 22 : 6,
+                height: 6,
+                borderRadius: 3,
+                background: idx === currentIndex ? NETFLIX_RED : 'rgba(0,0,0,0.2)',
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'width 0.24s ease, background 0.24s ease',
+                padding: 0,
+              }}
+              aria-label={`ไฮไลต์ที่ ${idx + 1}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Netflix SubBar Component (White Theme) ────────────────────────── */
+function NetflixSubBar({
+  activeCategory,
+  onSelectCategory,
+  search,
+  onSearchChange,
+  viewMode,
+  onToggleViewMode,
+  isFilterOpen,
+  onToggleFilter,
+  activeFilterCount,
+}) {
+  const CATEGORIES = [
+    { id: 'all',       label: 'ทั้งหมด' },
+    { id: 'Detective', label: 'สืบสวน' },
+    { id: 'Horror',    label: 'สยองขวัญ' },
+    { id: 'Drama',     label: 'ดราม่า' },
+    { id: 'Fantasy',   label: 'แฟนตาซี' },
+    { id: 'Comedy',    label: 'คอมเมดี้' },
+    { id: 'Beginner',  label: 'มือใหม่' },
+  ]
+
+  return (
+    <div
+      className="netflix-subbar"
+      style={{
+        position: 'sticky',
+        top: 60,
+        zIndex: 20,
+        background: 'rgba(255,255,255,0.94)',
+        backdropFilter: 'blur(16px)',
+        borderBottom: `1px solid ${BORDER_SUBTLE}`,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+        padding: '12px 40px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 14,
+      }}
+    >
+      {/* Category Pills (Left) */}
+      <div className="netflix-subbar-categories" style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', maxWidth: '100%', scrollbarWidth: 'none' }}>
+        {CATEGORIES.map(cat => {
+          const isAct = activeCategory === cat.id
+          return (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => onSelectCategory(cat.id)}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 20,
+                fontSize: 12,
+                fontWeight: isAct ? 800 : 600,
+                color: isAct ? '#ffffff' : TEXT_MUTED,
+                background: isAct ? NETFLIX_RED : '#f3f4f6',
+                border: `1px solid ${isAct ? NETFLIX_RED : 'transparent'}`,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+                transition: 'all 0.16s ease',
+              }}
+              onMouseEnter={e => {
+                if (!isAct) e.currentTarget.style.background = '#e5e7eb'
+              }}
+              onMouseLeave={e => {
+                if (!isAct) e.currentTarget.style.background = '#f3f4f6'
+              }}
+            >
+              {cat.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* Right Controls: Search, Deep Filter, and View Mode Toggle */}
+      <div className="netflix-subbar-controls" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* Search input */}
+        <div className="netflix-search-box" style={{ position: 'relative' }}>
+          <i
+            className="fas fa-search"
+            style={{
+              position: 'absolute',
+              left: 12,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              fontSize: 11,
+              color: TEXT_SUBTLE,
+              pointerEvents: 'none',
+            }}
+          />
+          <input
+            type="text"
+            placeholder="ค้นหาชื่อสคริปต์, คีย์เวิร์ด..."
+            value={search}
+            onChange={e => onSearchChange(e.target.value)}
+            style={{
+              width: 200,
+              height: 34,
+              paddingLeft: 32,
+              paddingRight: search ? 30 : 12,
+              borderRadius: 18,
+              background: '#f3f4f6',
+              border: `1px solid ${search ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.06)'}`,
+              color: TEXT_PRIMARY,
+              fontSize: 12,
+              outline: 'none',
+              transition: 'all 0.2s ease',
+            }}
+            onFocus={e => { e.target.style.width = '240px'; e.target.style.background = '#ffffff'; e.target.style.borderColor = NETFLIX_RED }}
+            onBlur={e => { if (!search) { e.target.style.width = '200px'; e.target.style.background = '#f3f4f6'; e.target.style.borderColor = 'rgba(0,0,0,0.06)' } }}
+          />
+          {search && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              style={{
+                position: 'absolute',
+                right: 8,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                color: TEXT_SUBTLE,
+                cursor: 'pointer',
+                fontSize: 11,
+                padding: 4,
+              }}
+              aria-label="ล้างการค้นหา"
+            >
+              <i className="fas fa-times" />
+            </button>
+          )}
+        </div>
+
+        {/* Deep Filter Toggle Button */}
+        <button
+          type="button"
+          onClick={onToggleFilter}
+          className="netflix-filter-btn"
+          style={{
+            height: 34,
+            padding: '0 12px',
+            borderRadius: 18,
+            background: isFilterOpen || activeFilterCount > 0 ? 'rgba(229,9,20,0.08)' : '#f3f4f6',
+            border: `1px solid ${isFilterOpen || activeFilterCount > 0 ? NETFLIX_RED : 'transparent'}`,
+            color: isFilterOpen || activeFilterCount > 0 ? NETFLIX_RED : TEXT_MUTED,
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            transition: 'all 0.16s ease',
+          }}
+        >
+          <i className="fas fa-sliders-h" style={{ fontSize: 11 }} />
+          <span>ตัวกรอง</span>
+          {activeFilterCount > 0 && (
+            <span
+              style={{
+                background: NETFLIX_RED,
+                color: '#ffffff',
+                fontSize: 10,
+                fontWeight: 900,
+                width: 16,
+                height: 16,
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
+
+        {/* View Mode Toggle Button */}
+        <div
+          className="netflix-view-toggle"
+          style={{
+            display: 'flex',
+            background: '#f3f4f6',
+            borderRadius: 18,
+            padding: 2,
+            border: `1px solid ${BORDER_SUBTLE}`,
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => onToggleViewMode('swimlanes')}
+            title="มุมมองหมวดหมู่ (Swimlanes)"
+            style={{
+              height: 30,
+              padding: '0 10px',
+              borderRadius: 16,
+              background: viewMode === 'swimlanes' ? '#ffffff' : 'transparent',
+              color: viewMode === 'swimlanes' ? TEXT_PRIMARY : TEXT_SUBTLE,
+              boxShadow: viewMode === 'swimlanes' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              transition: 'all 0.14s ease',
+            }}
+          >
+            <i className="fas fa-stream" />
+            <span style={{ fontSize: 11, fontWeight: 700 }}>หมวดหมู่</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onToggleViewMode('grid')}
+            title="มุมมองตารางทั้งหมด (Grid)"
+            style={{
+              height: 30,
+              padding: '0 10px',
+              borderRadius: 16,
+              background: viewMode === 'grid' ? '#ffffff' : 'transparent',
+              color: viewMode === 'grid' ? TEXT_PRIMARY : TEXT_SUBTLE,
+              boxShadow: viewMode === 'grid' ? '0 1px 4px rgba(0,0,0,0.1)' : 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontSize: 12,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              transition: 'all 0.14s ease',
+            }}
+          >
+            <i className="fas fa-th-large" />
+            <span style={{ fontSize: 11, fontWeight: 700 }}>ตาราง</span>
+          </button>
         </div>
       </div>
     </div>
   )
 }
 
-/* ── Main component ──────────────────────────────────── */
-export default function GamesPage({ allGames, showDetail, lineUser }) {
+/* ── Deep Filter Drawer Component (White Theme) ────────────────────── */
+function NetflixFilterDrawer({
+  isOpen,
+  onClose,
+  selectedPlayerCount,
+  onSelectPlayerCount,
+  selectedDiffs,
+  onToggleDiff,
+  selectedPriceRange,
+  onSelectPriceRange,
+  selectedTimeRange,
+  onSelectTimeRange,
+  selectedDetective,
+  onSelectDetective,
+  selectedRoleplay,
+  onSelectRoleplay,
+  selectedTags,
+  onToggleTag,
+  onResetFilters,
+  activeFilterCount,
+  resultCount = 0,
+}) {
+  if (!isOpen) return null
+
+  const PLAYER_OPTIONS = [
+    { val: null, label: 'ทั้งหมด' },
+    { val: 4,    label: '4 คนหรือน้อยกว่า' },
+    { val: 5,    label: '5 คน' },
+    { val: 6,    label: '6 คน' },
+    { val: 7,    label: '7 คน' },
+    { val: 8,    label: '8 คนขึ้นไป' },
+  ]
+
+  const DIFF_OPTIONS = [
+    { id: 'Beginner', label: 'Beginner' },
+    { id: 'Normal',   label: 'Normal' },
+    { id: 'Hard',     label: 'Hard' },
+    { id: 'Expert',   label: 'Expert' },
+  ]
+
+  const PRICE_OPTIONS = [
+    { val: '',         label: 'ทั้งหมด' },
+    { val: 'under600', label: 'ต่ำกว่า 600 บาท' },
+    { val: '600-799',  label: '600 - 799 บาท' },
+    { val: 'above800', label: '800 บาทขึ้นไป' },
+  ]
+
+  const TIME_OPTIONS = [
+    { val: '',    label: 'ทั้งหมด' },
+    { val: '3-4', label: '3 - 4 ชั่วโมง' },
+    { val: '4-6', label: '4 - 6 ชั่วโมง' },
+    { val: '6+',  label: '6 ชั่วโมงขึ้นไป' },
+  ]
+
+  const ALL_TAGS = ['Detective', 'Horror', 'Drama', 'Comedy', 'Fantasy', 'Romance', 'Sci-Fi', 'Action', 'Thriller', 'History']
+
+  return (
+    <>
+      {/* Mobile Backdrop */}
+      <div className="netflix-filter-backdrop" onClick={onClose} aria-hidden="true" />
+
+      {/* Drawer Container */}
+      <div
+        className="netflix-filter-drawer-container"
+        style={{
+          background: '#ffffff',
+          borderBottom: `1.5px solid ${BORDER_SUBTLE}`,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.04)',
+          padding: '24px 40px',
+        }}
+      >
+        <div style={{ maxWidth: 1240, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+          {/* Mobile Drag Indicator */}
+          <div className="netflix-filter-drag-handle" aria-hidden="true" style={{ display: 'none' }} />
+
+          {/* Drawer Header */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <i className="fas fa-filter" style={{ color: NETFLIX_RED, fontSize: 14 }} />
+              <span style={{ fontSize: 14, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '0.04em', textTransform: 'uppercase' }}>
+                ตัวกรองละเอียด (Advanced Filters)
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={onResetFilters}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: NETFLIX_RED,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    padding: '4px 8px',
+                  }}
+                >
+                  ล้างฟิลเตอร์ทั้งหมด
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  background: '#f3f4f6',
+                  border: 'none',
+                  color: TEXT_PRIMARY,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                aria-label="ปิดตัวกรอง"
+              >
+                <i className="fas fa-times text-xs" />
+              </button>
+            </div>
+          </div>
+
+          {/* Filter Rows */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 20 }}>
+            {/* 1. Players */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: TEXT_MUTED, textTransform: 'uppercase', marginBottom: 8 }}>
+                จำนวนผู้เล่น
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {PLAYER_OPTIONS.map(opt => {
+                  const isAct = selectedPlayerCount === opt.val
+                  return (
+                    <button
+                      key={String(opt.val)}
+                      type="button"
+                      onClick={() => onSelectPlayerCount(opt.val)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: isAct ? 800 : 500,
+                        color: isAct ? '#ffffff' : TEXT_MUTED,
+                        background: isAct ? NETFLIX_RED : '#f3f4f6',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.14s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 2. Difficulty */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: TEXT_MUTED, textTransform: 'uppercase', marginBottom: 8 }}>
+                ระดับความยาก
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {DIFF_OPTIONS.map(opt => {
+                  const isAct = selectedDiffs.includes(opt.id)
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => onToggleDiff(opt.id)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: isAct ? 800 : 500,
+                        color: isAct ? '#ffffff' : TEXT_MUTED,
+                        background: isAct ? NETFLIX_RED : '#f3f4f6',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.14s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 3. Duration */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: TEXT_MUTED, textTransform: 'uppercase', marginBottom: 8 }}>
+                ระยะเวลาเล่น
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {TIME_OPTIONS.map(opt => {
+                  const isAct = selectedTimeRange === opt.val
+                  return (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => onSelectTimeRange(opt.val)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: isAct ? 800 : 500,
+                        color: isAct ? '#ffffff' : TEXT_MUTED,
+                        background: isAct ? NETFLIX_RED : '#f3f4f6',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.14s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* 4. Price */}
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: TEXT_MUTED, textTransform: 'uppercase', marginBottom: 8 }}>
+                ช่วงราคา
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {PRICE_OPTIONS.map(opt => {
+                  const isAct = selectedPriceRange === opt.val
+                  return (
+                    <button
+                      key={opt.val}
+                      type="button"
+                      onClick={() => onSelectPriceRange(opt.val)}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        fontWeight: isAct ? 800 : 500,
+                        color: isAct ? '#ffffff' : TEXT_MUTED,
+                        background: isAct ? NETFLIX_RED : '#f3f4f6',
+                        border: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.14s ease',
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Tags Row */}
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 800, color: TEXT_MUTED, textTransform: 'uppercase', marginBottom: 8 }}>
+              แท็กแนวเรื่อง (Genre Tags)
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {ALL_TAGS.map(tg => {
+                const isAct = selectedTags.includes(tg)
+                return (
+                  <button
+                    key={tg}
+                    type="button"
+                    onClick={() => onToggleTag(tg)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 16,
+                      fontSize: 11.5,
+                      fontWeight: isAct ? 800 : 500,
+                      color: isAct ? '#ffffff' : TEXT_MUTED,
+                      background: isAct ? NETFLIX_RED : '#f3f4f6',
+                      border: 'none',
+                      cursor: 'pointer',
+                      transition: 'all 0.14s ease',
+                    }}
+                  >
+                    #{tg}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Bottom Action Bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, paddingTop: 14, borderTop: `1px solid ${BORDER_SUBTLE}` }}>
+            {activeFilterCount > 0 && (
+              <button
+                type="button"
+                onClick={onResetFilters}
+                style={{
+                  height: 42,
+                  padding: '0 16px',
+                  borderRadius: 8,
+                  background: '#f3f4f6',
+                  color: TEXT_MUTED,
+                  border: 'none',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                รีเซ็ต
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                flex: 1,
+                height: 42,
+                borderRadius: 8,
+                background: NETFLIX_RED,
+                color: '#ffffff',
+                border: 'none',
+                fontSize: 13,
+                fontWeight: 900,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+                boxShadow: '0 4px 14px rgba(229,9,20,0.3)',
+              }}
+            >
+              <span>ดูผลลัพธ์ ({resultCount} เรื่อง)</span>
+              <i className="fas fa-chevron-right" style={{ fontSize: 11 }} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* ── Main GamesPage Component (White Theme) ────────────────────────── */
+export default function GamesPage({ allGames = [], showDetail, showPage, lineUser }) {
+  // 1. Played IDs from playHistory
   const [playedIds, setPlayedIds] = useState(() => new Set())
+  const [recentPlayedIds, setRecentPlayedIds] = useState([])
+  const [promoSettings, setPromoSettings] = useState(null)
+
+  // Load Promotion & Spotlight Settings
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'promotion'), snap => {
+      if (snap.exists()) {
+        setPromoSettings(snap.data())
+      }
+    })
+    return () => unsub()
+  }, [])
+
+  // Load recently played script IDs from orders
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100))
+    const unsub = onSnapshot(q, snap => {
+      const seen = new Set()
+      const list = []
+      snap.docs.forEach(d => {
+        const sid = d.data().scriptId
+        if (sid && !seen.has(sid)) {
+          seen.add(sid)
+          list.push(sid)
+        }
+      })
+      setRecentPlayedIds(list)
+    }, () => {})
+    return unsub
+  }, [])
 
   useEffect(() => {
     if (!lineUser?.uid) { setPlayedIds(new Set()); return }
@@ -257,440 +1661,459 @@ export default function GamesPage({ allGames, showDetail, lineUser }) {
     }, () => {})
   }, [lineUser?.uid])
 
-  const { t } = useLang()
+  // 2. View Mode & Search States
+  const [viewMode,            setViewMode]            = useState('swimlanes') // 'swimlanes' | 'grid'
   const [search,              setSearch]              = useState('')
-  const [selectedTags,        setSelectedTags]        = useState([])
-  const [selectedDiffs,       setSelectedDiffs]       = useState([])
+  const [activeCategory,      setActiveCategory]      = useState('all')
+  const [filterDrawerOpen,    setFilterDrawerOpen]    = useState(false)
+
+  // 3. Deep Filters
   const [selectedPlayerCount, setSelectedPlayerCount] = useState(null)
+  const [selectedDiffs,       setSelectedDiffs]       = useState([])
   const [selectedPriceRange,  setSelectedPriceRange]  = useState('')
   const [selectedTimeRange,   setSelectedTimeRange]   = useState('')
   const [selectedDetective,   setSelectedDetective]   = useState(null)
   const [selectedRoleplay,    setSelectedRoleplay]    = useState(null)
-  const [mobileFilterOpen,    setMobileFilterOpen]    = useState(false)
-  const [sidebarVisible,      setSidebarVisible]      = useState(false)
+  const [selectedTags,        setSelectedTags]        = useState([])
 
-  useEffect(() => { setTimeout(() => setSidebarVisible(true), 80) }, [])
+  // Count active deep filters
+  const activeFilterCount = useMemo(() => {
+    let count = 0
+    if (selectedPlayerCount !== null) count++
+    if (selectedDiffs.length > 0) count += selectedDiffs.length
+    if (selectedPriceRange) count++
+    if (selectedTimeRange) count++
+    if (selectedDetective !== null) count++
+    if (selectedRoleplay !== null) count++
+    if (selectedTags.length > 0) count += selectedTags.length
+    return count
+  }, [selectedPlayerCount, selectedDiffs, selectedPriceRange, selectedTimeRange, selectedDetective, selectedRoleplay, selectedTags])
 
-  const filtered = useMemo(() => {
-    const q = search.toLowerCase()
-    return allGames.filter(g => {
-      const matchName    = (g.title || '').toLowerCase().includes(q)
-      const matchDiff    = selectedDiffs.length === 0 || selectedDiffs.some(d => (g.difficulty || '').toLowerCase() === d.toLowerCase())
-      const matchTags    = selectedTags.length  === 0 || selectedTags.some(tg => g.tags?.includes(tg))
-      const matchPlayers = playerMatches(g.players, selectedPlayerCount)
-      const displayPrice = g.fullPrice ?? g.price
-      const matchPrice   = priceMatches(displayPrice, selectedPriceRange)
-      const matchTime    = timeMatches(g.time, selectedTimeRange)
-      const matchDet     = selectedDetective === null || (parseInt(g.detective) || 0) === selectedDetective
-      const matchRole    = selectedRoleplay === null  || (parseInt(g.roleplay)  || 0) === selectedRoleplay
-      return matchName && matchDiff && matchTags && matchPlayers && matchPrice && matchTime && matchDet && matchRole
-    })
-  }, [allGames, search, selectedTags, selectedDiffs, selectedPlayerCount, selectedPriceRange, selectedTimeRange, selectedDetective, selectedRoleplay])
-
-  useEffect(() => {
-    const obs = new IntersectionObserver(
-      entries => entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('gp-in'); obs.unobserve(e.target) } }),
-      { threshold: 0.06, rootMargin: '0px 0px -40px 0px' }
-    )
-    const t = setTimeout(() => {
-      document.querySelectorAll('.gp-reveal:not(.gp-in)').forEach(el => obs.observe(el))
-    }, 0)
-    return () => { clearTimeout(t); obs.disconnect() }
-  }, [filtered])
-
-  const toggleTag  = tg => setSelectedTags(p  => p.includes(tg) ? p.filter(x => x !== tg) : [...p, tg])
-  const toggleDiff = d  => setSelectedDiffs(p => p.includes(d)  ? p.filter(x => x !== d)  : [...p, d])
-  const resetAll   = () => {
-    setSelectedTags([])
-    setSelectedDiffs([])
+  const resetAllFilters = () => {
     setSelectedPlayerCount(null)
+    setSelectedDiffs([])
     setSelectedPriceRange('')
     setSelectedTimeRange('')
     setSelectedDetective(null)
     setSelectedRoleplay(null)
+    setSelectedTags([])
+    setActiveCategory('all')
     setSearch('')
   }
 
-  const hasFilters = selectedTags.length > 0 || selectedDiffs.length > 0 ||
-    selectedPlayerCount !== null || !!selectedPriceRange || !!selectedTimeRange ||
-    selectedDetective !== null || selectedRoleplay !== null
+  // Toggle filter helpers
+  const toggleTag = (tg) => {
+    setSelectedTags(prev => prev.includes(tg) ? prev.filter(x => x !== tg) : [...prev, tg])
+  }
+  const toggleDiff = (d) => {
+    setSelectedDiffs(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d])
+  }
+
+  // Auto switch to grid if user enters search query or applies deep filters
+  useEffect(() => {
+    if (search.trim().length > 0 || activeFilterCount > 0) {
+      setViewMode('grid')
+    }
+  }, [search, activeFilterCount])
+
+  // 4. Filtering Logic
+  const filteredGames = useMemo(() => {
+    const q = search.trim().toLowerCase()
+
+    return allGames.filter(g => {
+      // Search
+      if (q) {
+        const titleMatch = (g.title || '').toLowerCase().includes(q)
+        const synMatch = (g.synopsis || '').toLowerCase().includes(q)
+        const tagMatch = (g.tags || []).some(t => t.toLowerCase().includes(q))
+        if (!titleMatch && !synMatch && !tagMatch) return false
+      }
+
+      // Quick Category Pill
+      if (activeCategory !== 'all') {
+        if (activeCategory === 'Beginner') {
+          if ((g.difficulty || '').toLowerCase() !== 'beginner') return false
+        } else {
+          if (!(g.tags || []).includes(activeCategory)) return false
+        }
+      }
+
+      // Player Count
+      if (selectedPlayerCount !== null) {
+        const pCount = g.characters?.length || parsePlayerCount(g.players)
+        if (selectedPlayerCount === 4 && pCount > 4) return false
+        if (selectedPlayerCount === 5 && pCount !== 5) return false
+        if (selectedPlayerCount === 6 && pCount !== 6) return false
+        if (selectedPlayerCount === 7 && pCount !== 7) return false
+        if (selectedPlayerCount === 8 && pCount < 8) return false
+      }
+
+      // Difficulty
+      if (selectedDiffs.length > 0) {
+        if (!selectedDiffs.includes(g.difficulty)) return false
+      }
+
+      // Price Range
+      if (selectedPriceRange) {
+        const p = g.price || g.fullPrice || 599
+        if (selectedPriceRange === 'under600' && p >= 600) return false
+        if (selectedPriceRange === '600-799' && (p < 600 || p >= 800)) return false
+        if (selectedPriceRange === 'above800' && p < 800) return false
+      }
+
+      // Time Range
+      if (selectedTimeRange) {
+        const tStr = g.time || ''
+        const m = tStr.match(/\d+/g)
+        const hrs = m ? parseInt(m[m.length - 1], 10) : 4
+        if (selectedTimeRange === '3-4' && hrs > 4) return false
+        if (selectedTimeRange === '4-6' && (hrs < 4 || hrs > 6)) return false
+        if (selectedTimeRange === '6+' && hrs < 6) return false
+      }
+
+      // Detective / Roleplay
+      if (selectedDetective !== null && (g.detective || 0) < selectedDetective) return false
+      if (selectedRoleplay !== null && (g.roleplay || 0) < selectedRoleplay) return false
+
+      // Tags
+      if (selectedTags.length > 0) {
+        const hasAllTags = selectedTags.every(tg => (g.tags || []).includes(tg))
+        if (!hasAllTags) return false
+      }
+
+      return true
+    })
+  }, [
+    allGames, search, activeCategory, selectedPlayerCount, selectedDiffs,
+    selectedPriceRange, selectedTimeRange, selectedDetective, selectedRoleplay, selectedTags
+  ])
+
+  // 5. Swimlane Categories Curation
+  const swimlaneRows = useMemo(() => {
+    if (viewMode !== 'swimlanes') return []
+
+    // 1. Trending Now — โชว์เกมที่ถูกเล่นล่าสุดตามลำดับ
+    const recentMap = new Map()
+    recentPlayedIds.forEach((id, idx) => {
+      recentMap.set(id, idx)
+    })
+    const trending = [...allGames].sort((a, b) => {
+      const idxA = recentMap.has(a.id) ? recentMap.get(a.id) : 9999
+      const idxB = recentMap.has(b.id) ? recentMap.get(b.id) : 9999
+      return idxA - idxB
+    })
+
+    // 2. Beginner Friendly — เน้นสืบและสวมบทดาวน้อย (คะแนนรวมสืบสวนและสวมบทบาทน้อยสุดขึ้นก่อน)
+    const beginner = allGames
+      .filter(g => {
+        const det = Number(g.detective) || 0
+        const rp = Number(g.roleplay) || 0
+        const diff = (g.difficulty || '').toLowerCase()
+        if (diff === 'expert' || diff === 'hard' || diff === 'ยาก' || diff === 'ยากมาก') return false
+        if (det >= 4 || rp >= 4) return false
+        return diff === 'beginner' || diff === 'ง่าย' || diff === 'มือใหม่' || (det + rp <= 5)
+      })
+      .sort((a, b) => {
+        const detA = Number(a.detective) || 0
+        const rpA  = Number(a.roleplay) || 0
+        const detB = Number(b.detective) || 0
+        const rpB  = Number(b.roleplay) || 0
+        const sumA = detA + rpA
+        const sumB = detB + rpB
+        if (sumA !== sumB) return sumA - sumB
+        const maxA = Math.max(detA, rpA)
+        const maxB = Math.max(detB, rpB)
+        if (maxA !== maxB) return maxA - maxB
+        return detA - detB
+      })
+
+    // 3. Hardcore Mystery / Detective — เกมระดับสืบหลายดาว
+    const detective = allGames
+      .filter(g => (g.tags || []).includes('Detective') || (g.detective || 0) >= 3)
+      .sort((a, b) => (b.detective || 0) - (a.detective || 0))
+
+    // 4. Heavy Roleplay & Drama — เน้นเฉพาะเกมประเภทดราม่า (Drama Tag) เรียงตามจำนวนคนเยอะก่อน
+    const roleplay = allGames
+      .filter(g => (g.tags || []).includes('Drama'))
+      .sort((a, b) => {
+        const pA = getGamePlayerCount(a)
+        const pB = getGamePlayerCount(b)
+        if (pB !== pA) return pB - pA
+        return (b.roleplay || 0) - (a.roleplay || 0)
+      })
+
+    // 5. Horror & Thriller
+    const horror = allGames.filter(g => (g.tags || []).includes('Horror') || (g.tags || []).includes('Thriller'))
+
+    // 6. Fantasy & Mystery
+    const fantasy = allGames.filter(g => (g.tags || []).includes('Fantasy') || (g.tags || []).includes('Sci-Fi'))
+
+    // 7. Large Group Parties (7+ Players)
+    const largeGroups = allGames.filter(g => (g.characters?.length || parsePlayerCount(g.players)) >= 7)
+
+    return [
+      {
+        id: 'trending',
+        title: 'กำลังมาแรงติดเทรนด์',
+        games: trending,
+        onSeeAll: () => { setViewMode('grid') }
+      },
+      {
+        id: 'beginner',
+        title: 'เหมาะสำหรับมือใหม่',
+        games: beginner,
+        onSeeAll: () => { setActiveCategory('Beginner'); setViewMode('grid') }
+      },
+      {
+        id: 'detective',
+        title: 'สืบสวนเข้มข้น หักมุม',
+        games: detective,
+        onSeeAll: () => { setActiveCategory('Detective'); setViewMode('grid') }
+      },
+      {
+        id: 'roleplay',
+        title: 'เน้นสวมบทบาท ดราม่าอารมณ์',
+        games: roleplay,
+        onSeeAll: () => { setActiveCategory('Drama'); setViewMode('grid') }
+      },
+      {
+        id: 'horror',
+        title: 'สยองขวัญ ระทึกขวัญ',
+        games: horror,
+        onSeeAll: () => { setActiveCategory('Horror'); setViewMode('grid') }
+      },
+      {
+        id: 'fantasy',
+        title: 'แฟนตาซี & เหนือธรรมชาติ',
+        games: fantasy,
+        onSeeAll: () => { setActiveCategory('Fantasy'); setViewMode('grid') }
+      },
+      {
+        id: 'large_party',
+        title: 'ปาร์ตี้กลุ่มใหญ่ 7 คนขึ้นไป',
+        games: largeGroups,
+        onSeeAll: () => { setSelectedPlayerCount(7); setViewMode('grid') }
+      },
+    ]
+  }, [allGames, viewMode, recentPlayedIds])
 
   return (
-    <div style={{ fontFamily: "'Sarabun', sans-serif", background: PAPER, color: INK, minHeight: '100vh', paddingTop: 60 }}>
+    <div style={{ background: BG_PAGE, color: TEXT_PRIMARY, minHeight: '100vh', paddingBottom: 80 }}>
+      <style>{RESPONSIVE_CSS}</style>
 
-      <style>{`
-        @keyframes gpFadeUp { from{opacity:0;transform:translateY(24px)} to{opacity:1;transform:none} }
-        @keyframes gpFadeIn { from{opacity:0} to{opacity:1} }
-        .gp-reveal { opacity:0; transform:translateY(24px); transition: opacity 0.65s cubic-bezier(0.22,1,0.36,1), transform 0.65s cubic-bezier(0.22,1,0.36,1); }
-        .gp-reveal.gp-in { opacity:1; transform:none; }
-        .gp-d1{transition-delay:0.06s!important} .gp-d2{transition-delay:0.12s!important} .gp-d3{transition-delay:0.18s!important} .gp-d4{transition-delay:0.24s!important}
+      {/* 1. Hero Billboard (Spotlight - strictly ONLY new games) */}
+      <NetflixHeroBillboard
+        games={allGames}
+        showDetail={showDetail}
+        showPage={showPage}
+        promoSettings={promoSettings}
+      />
 
-        /* Card */
-        .gp-card { transition: transform 0.32s cubic-bezier(0.22,1,0.36,1), box-shadow 0.32s, border-color 0.22s !important; }
-        .gp-card:hover { transform: translateY(-6px) !important; box-shadow: 0 16px 40px rgba(0,0,0,0.12), 0 0 0 1px rgba(198,36,25,0.25) !important; }
-        .gp-card:focus-visible { outline: 2px solid ${C}; outline-offset: 2px; }
-        .gp-card:hover .gp-card-img { transform: scale(1.06) !important; }
-        .gp-card:hover .gp-card-overlay { opacity: 0.8 !important; }
-        .gp-card:hover .gp-synopsis { opacity: 1 !important; }
-        .gp-card-img { transition: transform 0.5s cubic-bezier(0.22,1,0.36,1) !important; }
+      {/* 2. Sticky SubBar for Search, Categories, and Mode Toggle */}
+      <NetflixSubBar
+        activeCategory={activeCategory}
+        onSelectCategory={(cat) => {
+          setActiveCategory(cat)
+          if (cat !== 'all') setViewMode('grid')
+        }}
+        search={search}
+        onSearchChange={setSearch}
+        viewMode={viewMode}
+        onToggleViewMode={setViewMode}
+        isFilterOpen={filterDrawerOpen}
+        onToggleFilter={() => setFilterDrawerOpen(prev => !prev)}
+        activeFilterCount={activeFilterCount}
+        resultCount={filteredGames.length}
+      />
 
-        /* Search */
-        .gp-search:focus { outline: none; border-color: ${C} !important; background: rgba(198,36,25,0.06) !important; }
-        .gp-search::placeholder { color: ${INK_3}; }
+      {/* 3. Deep Filter Drawer */}
+      <NetflixFilterDrawer
+        isOpen={filterDrawerOpen}
+        onClose={() => setFilterDrawerOpen(false)}
+        selectedPlayerCount={selectedPlayerCount}
+        onSelectPlayerCount={setSelectedPlayerCount}
+        selectedDiffs={selectedDiffs}
+        onToggleDiff={toggleDiff}
+        selectedPriceRange={selectedPriceRange}
+        onSelectPriceRange={setSelectedPriceRange}
+        selectedTimeRange={selectedTimeRange}
+        onSelectTimeRange={setSelectedTimeRange}
+        selectedDetective={selectedDetective}
+        onSelectDetective={setSelectedDetective}
+        selectedRoleplay={selectedRoleplay}
+        onSelectRoleplay={setSelectedRoleplay}
+        selectedTags={selectedTags}
+        onToggleTag={toggleTag}
+        onResetFilters={resetAllFilters}
+        activeFilterCount={activeFilterCount}
+      />
 
-        /* Sidebar check */
-        .gp-check:hover { background: rgba(0,0,0,0.04) !important; }
-        .gp-check input { accent-color: ${C}; }
-
-        /* Filter chip */
-        .gp-chip { transition: all 0.18s !important; }
-        .gp-chip:hover { border-color: ${C} !important; color: ${INK} !important; }
-        .gp-chip:focus-visible { outline: 2px solid ${C}; outline-offset: 2px; }
-
-        /* Active filter tag */
-        .gp-active-tag { transition: background 0.18s !important; }
-        .gp-active-tag:hover { background: rgba(198,36,25,0.22) !important; }
-        .gp-active-tag:focus-visible { outline: 2px solid ${C}; outline-offset: 2px; }
-
-        /* Sidebar slide in */
-        .gp-sidebar { opacity: 0; transform: translateX(-16px); transition: opacity 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s, transform 0.55s cubic-bezier(0.22,1,0.36,1) 0.1s; }
-        .gp-sidebar.gp-sidebar-in { opacity: 1; transform: none; }
-
-        @media(prefers-reduced-motion:reduce){ .gp-reveal,.gp-card,.gp-sidebar{transition:none;opacity:1;transform:none} }
-        @media(max-width:767px){ .gp-layout-sidebar{display:none!important} }
-        @media(max-width:420px){ .gp-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important} }
-      `}</style>
-
-      {/* ── Page header ── */}
-      <header style={{ background: PAPER_2, borderBottom: `1px solid ${L_BORDER}`, padding: 'clamp(36px,5vw,60px) clamp(20px,4vw,40px)' }}>
-        <div style={{ maxWidth: 1380, margin: '0 auto' }}>
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
-            <div>
-              <h1 style={{ fontFamily: "'Sarabun', 'Bebas Neue', sans-serif", fontWeight: 900, fontSize: 'clamp(42px,6vw,80px)', lineHeight: 0.88, textTransform: 'uppercase', color: INK, margin: 0 }}>
-                แฟ้มคดี<span style={{ color: C }}>ทั้งหมด</span>
-              </h1>
-              <p style={{ margin: '8px 0 0', fontSize: 13, color: INK_2 }}>
-                คลังสคริปต์เกม Script Murder จาก Sofun Club Thailand ครบทุกแนวและทุกระดับความยาก
-              </p>
-            </div>
-            <span style={{ fontSize: 13, color: INK_3, flexShrink: 0, paddingBottom: 6 }}>
-              {allGames.length} สคริปต์
+      {/* 4. Active Filter Chips Bar (If filters are active) */}
+      {activeFilterCount > 0 && (
+        <div className="netflix-active-chips" style={{ padding: '12px 40px 0', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+          <span style={{ fontSize: 11, color: TEXT_MUTED, fontWeight: 700, textTransform: 'uppercase' }}>ฟิลเตอร์ที่ใช้งาน:</span>
+          {selectedPlayerCount !== null && (
+            <span style={{ fontSize: 11, background: '#f3f4f6', border: `1px solid ${BORDER_SUBTLE}`, color: TEXT_PRIMARY, padding: '3px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              ผู้เล่น: {selectedPlayerCount} คน
+              <button type="button" onClick={() => setSelectedPlayerCount(null)} style={{ background: 'none', border: 'none', color: TEXT_MUTED, cursor: 'pointer', padding: 0 }}><i className="fas fa-times text-[9px]" /></button>
             </span>
-          </div>
+          )}
+          {selectedDiffs.map(d => (
+            <span key={d} style={{ fontSize: 11, background: '#f3f4f6', border: `1px solid ${BORDER_SUBTLE}`, color: TEXT_PRIMARY, padding: '3px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              ความยาก: {d}
+              <button type="button" onClick={() => toggleDiff(d)} style={{ background: 'none', border: 'none', color: TEXT_MUTED, cursor: 'pointer', padding: 0 }}><i className="fas fa-times text-[9px]" /></button>
+            </span>
+          ))}
+          {selectedPriceRange && (
+            <span key="price" style={{ fontSize: 11, background: '#f3f4f6', border: `1px solid ${BORDER_SUBTLE}`, color: TEXT_PRIMARY, padding: '3px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              ราคา: {selectedPriceRange}
+              <button type="button" onClick={() => setSelectedPriceRange('')} style={{ background: 'none', border: 'none', color: TEXT_MUTED, cursor: 'pointer', padding: 0 }}><i className="fas fa-times text-[9px]" /></button>
+            </span>
+          )}
+          {selectedTimeRange && (
+            <span key="time" style={{ fontSize: 11, background: '#f3f4f6', border: `1px solid ${BORDER_SUBTLE}`, color: TEXT_PRIMARY, padding: '3px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              เวลา: {selectedTimeRange} ชม.
+              <button type="button" onClick={() => setSelectedTimeRange('')} style={{ background: 'none', border: 'none', color: TEXT_MUTED, cursor: 'pointer', padding: 0 }}><i className="fas fa-times text-[9px]" /></button>
+            </span>
+          )}
+          {selectedTags.map(tg => (
+            <span key={tg} style={{ fontSize: 11, background: '#f3f4f6', border: `1px solid ${BORDER_SUBTLE}`, color: TEXT_PRIMARY, padding: '3px 8px', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 5 }}>
+              #{tg}
+              <button type="button" onClick={() => toggleTag(tg)} style={{ background: 'none', border: 'none', color: TEXT_MUTED, cursor: 'pointer', padding: 0 }}><i className="fas fa-times text-[9px]" /></button>
+            </span>
+          ))}
+          <button
+            type="button"
+            onClick={resetAllFilters}
+            style={{ fontSize: 11, color: NETFLIX_RED, background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700, marginLeft: 4 }}
+          >
+            ล้างทั้งหมด
+          </button>
         </div>
-      </header>
+      )}
 
-      {/* ── Layout: sidebar + main ── */}
-      <div style={{ maxWidth: 1380, margin: '0 auto', display: 'flex', gap: 0, padding: '0 clamp(20px,4vw,40px)', alignItems: 'flex-start' }}>
-
-        {/* ── Sidebar ── */}
-        <aside className={`gp-layout-sidebar gp-sidebar${sidebarVisible ? ' gp-sidebar-in' : ''}`} style={{
-          width: 220, flexShrink: 0, paddingTop: 36, paddingRight: 28, paddingBottom: 48,
-          position: 'sticky', top: 60, maxHeight: 'calc(100vh - 60px)', overflowY: 'auto',
-        }}>
-          {/* Sidebar header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28, paddingBottom: 16, borderBottom: `1px solid ${L_BORDER}` }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color: INK_3 }}>คัดกรอง</span>
-            {hasFilters && (
-              <button onClick={resetAll} style={{ fontSize: 11, fontWeight: 700, color: C, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>ล้างทั้งหมด</button>
-            )}
-          </div>
-
-          <SidebarSection label="แนว / Genre">
-            {GENRE_OPTIONS.map(g => (
-              <CheckRow key={g} checked={selectedTags.includes(g)} onChange={() => toggleTag(g)} label={g} />
-            ))}
-          </SidebarSection>
-
-          <SidebarSection label="ระดับความยาก">
-            {DIFF_OPTIONS.map(d => (
-              <CheckRow key={d} checked={selectedDiffs.includes(d)} onChange={() => toggleDiff(d)} label={d} accent={diffConfig(d).bg} active={selectedDiffs.includes(d)} />
-            ))}
-          </SidebarSection>
-
-          <SidebarSection label="จำนวนผู้เล่น">
-            <select
-              value={selectedPlayerCount ?? ''}
-              onChange={e => setSelectedPlayerCount(e.target.value ? Number(e.target.value) : null)}
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                background: PAPER_2, border: `1px solid ${selectedPlayerCount ? C : L_BORDER}`,
-                borderRadius: 6, color: selectedPlayerCount ? C : INK_2,
-                fontSize: 13, padding: '8px 10px',
-                fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                outline: 'none', fontWeight: selectedPlayerCount ? 700 : 400,
-                transition: 'border-color 0.18s, color 0.18s',
-              }}
-            >
-              <option value="">ทุกจำนวน</option>
-              {PLAYER_COUNTS.map(n => (
-                <option key={n} value={n}>{n} คน</option>
-              ))}
-            </select>
-          </SidebarSection>
-
-          <SidebarSection label="ราคา">
-            <select
-              value={selectedPriceRange}
-              onChange={e => setSelectedPriceRange(e.target.value)}
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                background: PAPER_2, border: `1px solid ${selectedPriceRange ? C : L_BORDER}`,
-                borderRadius: 6, color: selectedPriceRange ? C : INK_2,
-                fontSize: 13, padding: '8px 10px',
-                fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                outline: 'none', fontWeight: selectedPriceRange ? 700 : 400,
-                transition: 'border-color 0.18s, color 0.18s',
-              }}
-            >
-              {PRICE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </SidebarSection>
-
-          <SidebarSection label="เวลา / ระยะเวลา">
-            <select
-              value={selectedTimeRange}
-              onChange={e => setSelectedTimeRange(e.target.value)}
-              style={{
-                width: '100%', boxSizing: 'border-box',
-                background: PAPER_2, border: `1px solid ${selectedTimeRange ? C : L_BORDER}`,
-                borderRadius: 6, color: selectedTimeRange ? C : INK_2,
-                fontSize: 13, padding: '8px 10px',
-                fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                outline: 'none', fontWeight: selectedTimeRange ? 700 : 400,
-                transition: 'border-color 0.18s, color 0.18s',
-              }}
-            >
-              {TIME_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
-              ))}
-            </select>
-          </SidebarSection>
-
-          <SidebarSection label="ความเข้มข้น">
-            <StarRow label={t('games','detectiveLevel')} value={selectedDetective} onChange={setSelectedDetective} color={AMBER} />
-            <div style={{ marginTop: 12 }}>
-              <StarRow label={t('games','roleplayLevel')} value={selectedRoleplay} onChange={setSelectedRoleplay} color="#a78bfa" />
-            </div>
-          </SidebarSection>
-        </aside>
-
-        {/* ── Main content ── */}
-        <main style={{ flex: 1, minWidth: 0, paddingTop: 28, paddingBottom: 80 }}>
-
-          {/* Topbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
-            {/* Search */}
-            <div style={{ flex: 1, position: 'relative' }}>
-              <i className="fas fa-search" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: INK_3, pointerEvents: 'none' }} />
-              <input
-                className="gp-search"
-                placeholder="ค้นหาชื่อสคริปต์..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  background: PAPER_2, border: `1px solid ${L_BORDER}`,
-                  borderRadius: 8, color: INK,
-                  fontSize: 13, padding: '11px 14px 11px 38px',
-                  fontFamily: "'Sarabun', sans-serif",
-                  transition: 'border-color 0.2s, background 0.2s',
-                }}
+      {/* 5. Main Body: Mode Swimlanes OR Mode Grid */}
+      <div style={{ marginTop: 28 }}>
+        {viewMode === 'swimlanes' && !search && activeCategory === 'all' && activeFilterCount === 0 ? (
+          /* Netflix Swimlanes Rows */
+          <div>
+            {swimlaneRows.map(row => (
+              <NetflixSwimlaneRow
+                key={row.id}
+                title={row.title}
+                subtitle={row.subtitle}
+                games={row.games}
+                showDetail={showDetail}
+                showPage={showPage}
+                playedIds={playedIds}
+                onSeeAll={row.onSeeAll}
               />
-            </div>
-
-            {/* Count */}
-            <span style={{ fontSize: 12, color: INK_3, flexShrink: 0, whiteSpace: 'nowrap' }}>
-              {filtered.length} เรื่อง
-            </span>
-
-            {/* Mobile filter toggle */}
-            <button
-              onClick={() => setMobileFilterOpen(o => !o)}
-              style={{
-                display: 'none',
-                background: mobileFilterOpen || hasFilters ? `${C}1a` : PAPER_2,
-                border: `1px solid ${mobileFilterOpen || hasFilters ? C : L_BORDER}`,
-                color: mobileFilterOpen || hasFilters ? C : INK_2,
-                borderRadius: 8, padding: '10px 14px',
-                fontSize: 13, cursor: 'pointer', flexShrink: 0,
-                fontFamily: "'Sarabun', sans-serif", fontWeight: 700,
-              }}
-              className="gp-mobile-filter-btn"
-            >
-              <i className="fas fa-sliders-h" style={{ marginRight: 6 }} />
-              ตัวกรอง{hasFilters ? ` (${selectedTags.length + selectedDiffs.length + (selectedPlayerCount ? 1 : 0) + (selectedPriceRange ? 1 : 0) + (selectedTimeRange ? 1 : 0) + (selectedDetective ? 1 : 0) + (selectedRoleplay ? 1 : 0)})` : ''}
-            </button>
-            <style>{`@media(max-width:767px){.gp-mobile-filter-btn{display:flex!important}}`}</style>
+            ))}
           </div>
+        ) : (
+          /* Full Grid View */
+          <div className="netflix-grid-wrapper" style={{ padding: '0 40px' }}>
+            {/* Header info */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
+                <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, textAlign: 'left' }}>
+                  {search ? `ผลการค้นหาสำหรับ "${search}"` : activeCategory !== 'all' ? `หมวดหมู่: ${activeCategory}` : 'สคริปต์ทั้งหมด'}
+                </h3>
+                <span style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: 600 }}>
+                  ({filteredGames.length} เรื่อง)
+                </span>
+              </div>
 
-          {/* Mobile filter drawer */}
-          {mobileFilterOpen && (
-            <div style={{ background: PAPER_2, borderRadius: 10, border: `1px solid ${L_BORDER}`, padding: '20px 16px', marginBottom: 16 }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 16 }}>
-                <FilterGroup label="แนว" options={GENRE_OPTIONS} selected={selectedTags} onToggle={toggleTag} />
-                <FilterGroup label="ความยาก" options={DIFF_OPTIONS} selected={selectedDiffs} onToggle={toggleDiff} />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10, marginBottom: 16 }}>
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 6 }}>จำนวนผู้เล่น</p>
-                  <select
-                    value={selectedPlayerCount ?? ''}
-                    onChange={e => setSelectedPlayerCount(e.target.value ? Number(e.target.value) : null)}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      background: PAPER_2, border: `1px solid ${selectedPlayerCount ? C : L_BORDER}`,
-                      borderRadius: 6, color: selectedPlayerCount ? C : INK_2,
-                      fontSize: 13, padding: '8px 10px',
-                      fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                      outline: 'none', fontWeight: selectedPlayerCount ? 700 : 400,
-                    }}
-                  >
-                    <option value="">ทุกจำนวน</option>
-                    {PLAYER_COUNTS.map(n => <option key={n} value={n}>{n} คน</option>)}
-                  </select>
-                </div>
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 6 }}>ราคา</p>
-                  <select
-                    value={selectedPriceRange}
-                    onChange={e => setSelectedPriceRange(e.target.value)}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      background: PAPER_2, border: `1px solid ${selectedPriceRange ? C : L_BORDER}`,
-                      borderRadius: 6, color: selectedPriceRange ? C : INK_2,
-                      fontSize: 13, padding: '8px 10px',
-                      fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                      outline: 'none', fontWeight: selectedPriceRange ? 700 : 400,
-                    }}
-                  >
-                    {PRICE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 6 }}>ระยะเวลา</p>
-                  <select
-                    value={selectedTimeRange}
-                    onChange={e => setSelectedTimeRange(e.target.value)}
-                    style={{
-                      width: '100%', boxSizing: 'border-box',
-                      background: PAPER_2, border: `1px solid ${selectedTimeRange ? C : L_BORDER}`,
-                      borderRadius: 6, color: selectedTimeRange ? C : INK_2,
-                      fontSize: 13, padding: '8px 10px',
-                      fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
-                      outline: 'none', fontWeight: selectedTimeRange ? 700 : 400,
-                    }}
-                  >
-                    {TIME_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 16 }}>
-                <StarRow label={t('games','detectiveLevel')} value={selectedDetective} onChange={setSelectedDetective} color={AMBER} />
-                <StarRow label={t('games','roleplayLevel')} value={selectedRoleplay} onChange={setSelectedRoleplay} color="#a78bfa" />
-              </div>
-              {hasFilters && (
-                <button onClick={resetAll} style={{ fontSize: 11, fontWeight: 700, padding: '8px 18px', borderRadius: 6, background: `${C}18`, color: C, border: `1px solid ${C}44`, cursor: 'pointer', textTransform: 'uppercase', letterSpacing: '0.12em', fontFamily: "'Sarabun', sans-serif" }}>
-                  ล้างทั้งหมด
+              {viewMode === 'grid' && !search && activeFilterCount === 0 && activeCategory === 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setViewMode('swimlanes')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: TEXT_MUTED,
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <i className="fas fa-stream text-xs" /> กลับสู่มุมมองหมวดหมู่
                 </button>
               )}
             </div>
-          )}
 
-          {/* Active filter chips */}
-          {hasFilters && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 20 }}>
-              {[
-                ...selectedTags.map(v => ({ label: v, rm: () => toggleTag(v), color: C })),
-                ...selectedDiffs.map(v => ({ label: v, rm: () => toggleDiff(v), color: diffConfig(v).bg })),
-                ...(selectedPlayerCount ? [{ label: `${selectedPlayerCount} คน`, rm: () => setSelectedPlayerCount(null), color: C }] : []),
-                ...(selectedPriceRange ? [{ label: PRICE_OPTIONS.find(o => o.value === selectedPriceRange)?.label || selectedPriceRange, rm: () => setSelectedPriceRange(''), color: C }] : []),
-                ...(selectedTimeRange ? [{ label: TIME_OPTIONS.find(o => o.value === selectedTimeRange)?.label || selectedTimeRange, rm: () => setSelectedTimeRange(''), color: C }] : []),
-                ...(selectedDetective ? [{ label: `สืบ ${'★'.repeat(selectedDetective)}`, rm: () => setSelectedDetective(null), color: AMBER }] : []),
-                ...(selectedRoleplay  ? [{ label: `บท ${'★'.repeat(selectedRoleplay)}`,  rm: () => setSelectedRoleplay(null),  color: '#a78bfa' }] : []),
-              ].map(({ label, rm, color }) => (
-                <button key={label} className="gp-active-tag" onClick={rm} style={{
-                  fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 20,
-                  background: `${color}14`, border: `1px solid ${color}38`, color,
-                  cursor: 'pointer', fontFamily: "'Sarabun', sans-serif",
-                  display: 'flex', alignItems: 'center', gap: 5,
-                }}>
-                  {label} <i className="fas fa-times" style={{ fontSize: 9, opacity: 0.7 }} />
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Grid / states */}
-          {allGames.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-              <div style={{ width: 40, height: 40, border: `3px solid ${L_BORDER}`, borderTopColor: C, borderRadius: '50%', margin: '0 auto 20px', animation: 'spin 0.9s linear infinite' }} />
-              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-              <p style={{ color: INK_3, fontSize: 14 }}>กำลังโหลดแฟ้มคดี...</p>
-            </div>
-          ) : filtered.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-              <i className="fas fa-search" style={{ fontSize: 42, color: INK_3, marginBottom: 16, display: 'block' }} />
-              <p style={{ color: INK_3, fontSize: 15, fontWeight: 600 }}>ไม่พบสคริปต์ที่ค้นหา</p>
-              <p style={{ color: INK_3, fontSize: 13, marginTop: 8 }}>ลองปรับตัวกรองหรือคำค้นหา</p>
-            </div>
-          ) : (
-            <div className="gp-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(168px, 1fr))', gap: 14 }}>
-              {filtered.map((game, i) => (
-                <div key={game.id} className={`gp-reveal gp-d${(i % 4) + 1}`}>
-                  <ScriptCard game={game} showDetail={showDetail} played={playedIds.has(game.id)} />
+            {/* Empty state */}
+            {filteredGames.length === 0 ? (
+              <div
+                style={{
+                  textAlign: 'center',
+                  padding: '70px 20px',
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  border: `1px solid ${BORDER_SUBTLE}`,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f3f4f6', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className="fas fa-search" style={{ fontSize: 22, color: TEXT_SUBTLE }} />
                 </div>
-              ))}
-            </div>
-          )}
-        </main>
+                <h4 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: TEXT_PRIMARY }}>
+                  ไม่พบสคริปต์ที่ตรงกับเงื่อนไข
+                </h4>
+                <p style={{ margin: 0, fontSize: 13, color: TEXT_MUTED, maxWidth: 360 }}>
+                  ลองเปลี่ยนคำค้นหา หรือรีเซ็ตตัวกรองเพื่อค้นหาเรื่องราวอื่นๆ
+                </p>
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 20px',
+                    borderRadius: 8,
+                    background: NETFLIX_RED,
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: 12,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                  }}
+                >
+                  ล้างตัวกรองทั้งหมด
+                </button>
+              </div>
+            ) : (
+              /* Grid of Cards */
+              <div
+                className="netflix-grid-cards"
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
+                  gap: 18,
+                  justifyItems: 'center',
+                }}
+              >
+                {filteredGames.map(game => (
+                  <NetflixPosterCard
+                    key={game.id}
+                    game={game}
+                    showDetail={showDetail}
+                    showPage={showPage}
+                    isPlayed={playedIds.has(game.id)}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
-  )
-}
-
-/* ── Sidebar helpers ─────────────────────────────────── */
-function SidebarSection({ label, children }) {
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <p style={{ fontSize: 11, fontWeight: 700, color: INK_3, marginBottom: 12 }}>{label}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {children}
-      </div>
-    </div>
-  )
-}
-
-function CheckRow({ checked, onChange, label, accent, active }) {
-  return (
-    <label className="gp-check" style={{
-      display: 'flex', alignItems: 'center', gap: 9, padding: '7px 8px',
-      borderRadius: 6, cursor: 'pointer',
-      background: checked ? 'rgba(198,36,25,0.07)' : 'transparent',
-      transition: 'background 0.18s',
-    }}>
-      <input type="checkbox" checked={checked} onChange={onChange} style={{ accentColor: C, width: 13, height: 13, flexShrink: 0 }} />
-      <span style={{ fontSize: 13, color: active && accent ? accent : checked ? INK : INK_2, fontWeight: checked ? 700 : 400, transition: 'color 0.18s' }}>
-        {label}
-      </span>
-    </label>
-  )
-}
-
-function FilterGroup({ label: _label, options, selected, onToggle }) {
-  return (
-    <>
-      {options.map(opt => (
-        <button key={opt} className="gp-chip" onClick={() => onToggle(opt)} style={{
-          fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 20,
-          background: selected.includes(opt) ? `${C}18` : 'rgba(0,0,0,0.04)',
-          border: `1px solid ${selected.includes(opt) ? C : L_BORDER}`,
-          color: selected.includes(opt) ? C : INK_2,
-          cursor: 'pointer', fontFamily: "'Sarabun', sans-serif",
-        }}>{opt}</button>
-      ))}
-    </>
   )
 }

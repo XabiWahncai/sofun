@@ -58,6 +58,7 @@ export default function App() {
   const [detailId, setDetailId] = useState(() => parseUrl(window.location.pathname).detailId)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
+  const [bookingGameId, setBookingGameId] = useState("")
   const [toast, setToast] = useState({ msg: '', type: 'success', visible: false })
   const [lineUser, setLineUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sofun_line_user')) } catch { return null }
@@ -147,10 +148,16 @@ export default function App() {
     const pid = params.get('party')
     const sid = params.get('scan')
     const bid = params.get('booking')
+    const gid = params.get('gameId')
     if (pid) {
       setHighlightPartyId(pid)
       setCurrentPage('party')
       window.history.replaceState({ page: 'party' }, '', '/party')
+    }
+    if (gid) {
+      setBookingGameId(gid)
+      setCurrentPage('booking')
+      window.history.replaceState({ page: 'booking' }, '', `/booking?gameId=${gid}`)
     }
     if (bid) {
       setCurrentPage('booking')
@@ -341,12 +348,18 @@ export default function App() {
     if (!uid) { setActiveMemberOrder(null); return }
 
     const maxAgeMs = 24 * 60 * 60 * 1000 // Only consider active orders from the last 24 hours
+    const maxPaidAgeMs = 2 * 60 * 60 * 1000 // Keep paid order available for 2 hours for receipt & review
     const now = Date.now()
     const isOrderFresh = (o) => {
-      if (!o || o.status !== 'active') return false
-      const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime()
+      if (!o) return false
+      if (o.status !== 'active' && o.status !== 'paid') return false
+      const orderTime = o.paidAt?.toDate ? o.paidAt.toDate().getTime()
+        : (o.createdAt?.toDate ? o.createdAt.toDate().getTime()
         : (o.updatedAt?.toDate ? o.updatedAt.toDate().getTime()
-        : (o.createdAt ? new Date(o.createdAt).getTime() : 0))
+        : (o.createdAt ? new Date(o.createdAt).getTime() : 0)))
+      if (o.status === 'paid') {
+        return !orderTime || (now - orderTime) < maxPaidAgeMs
+      }
       return !orderTime || (now - orderTime) < maxAgeMs
     }
 
@@ -356,9 +369,11 @@ export default function App() {
     const q = query(collection(db, 'orders'), where('memberUids', 'array-contains', uid))
     const unsub = onSnapshot(q, snap => {
       if (!isMounted) return
-      const active = snap.docs
+      const matchingOrders = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
-        .find(isOrderFresh)
+        .filter(isOrderFresh)
+      // Prioritize active order first; if none, take the most recent paid order
+      const active = matchingOrders.find(o => o.status === 'active') || matchingOrders.find(o => o.status === 'paid')
 
       if (active) {
         setActiveMemberOrder(active)
@@ -543,7 +558,10 @@ export default function App() {
     }
   }, [isEffectiveAdmin, globalPendingOrdersCount, posSoundMuted])
 
-  const showPage = useCallback((page) => {
+  const showPage = useCallback((page, extra) => {
+    if (page === 'booking' && extra?.gameId) {
+      setBookingGameId(extra.gameId)
+    }
     setPrevPage(p => p)
     setCurrentPage(page)
     window.history.pushState({ page }, '', buildUrl(page))
@@ -576,7 +594,7 @@ export default function App() {
       )}
 
       {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} />}
-      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} lineUser={lineUser} />}
+      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} />}
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}
@@ -676,7 +694,7 @@ export default function App() {
           )}
         </ErrorBoundary>
       )}
-      {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} />}
+      {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} initialGameId={bookingGameId} />}
       {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} />}
       {currentPage === 'allofuswilldie' && (
         <ErrorBoundary>

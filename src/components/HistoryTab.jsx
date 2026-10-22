@@ -132,8 +132,16 @@ export function ThermalSlipModal({ payment, receiptSettings, onClose, showToast 
       } else {
         displayGrandTotal = rawAmt || (cleanTableTotal / (members.length || 1))
       }
+      const memberSpecificFood = (payment.foodItems || []).filter(f => f.orderedBy?.uid === selectedMemberUid)
+      if (memberSpecificFood.length > 0) {
+        displayFoodItems = memberSpecificFood
+      }
     } else {
       displayGrandTotal = cleanTableTotal / (members.length || 1)
+      const memberSpecificFood = (payment.foodItems || []).filter(f => f.orderedBy?.uid === selectedMemberUid)
+      if (memberSpecificFood.length > 0) {
+        displayFoodItems = memberSpecificFood
+      }
     }
   }
 

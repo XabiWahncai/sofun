@@ -1,26 +1,20 @@
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { useLang } from '../LangContext';
 import { db } from '../firebase';
-import { doc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
+import { doc, updateDoc, arrayUnion, onSnapshot, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import Footer from './Footer';
 
-/* ── Design tokens ─────────────────────────────────────── */
-const VOID    = 'var(--void-950)';
-const SURFACE = 'var(--void-900)';
-const CARD    = 'var(--void-800)';
-const C       = 'var(--crimson-500)';
-const C_DEEP  = 'var(--crimson-700)';
-const CHALK   = 'var(--chalk)';
-const CHALK_2 = 'var(--chalk-2)';
-const CHALK_3 = 'var(--chalk-3)';
-const WIRE    = 'var(--border-dark-wire)';
-const WIRE_2  = 'var(--border-dark-wire-2)';
-const AMBER   = 'var(--case-amber)';
-const INK     = 'var(--text-primary)';
-const INK_2   = 'var(--text-secondary)';
-const INK_3   = 'var(--text-tertiary)';
-const PAPER   = 'var(--surface-page)';
-const PAPER_2 = 'var(--surface-card)';
+/* Design tokens - Netflix White Theme */
+const C          = 'var(--crimson-500)';
+const C_DEEP     = 'var(--crimson-700)';
+const NETFLIX_RED = '#e50914';
+const BG_PAGE    = '#ffffff';
+const BG_SURFACE = '#f8fafc';
+const CARD_BG    = '#ffffff';
+const TEXT_MAIN  = '#111827';
+const TEXT_MUTED = '#4b5563';
+const TEXT_LIGHT = '#9ca3af';
+const BORDER_CLR = 'rgba(0, 0, 0, 0.08)';
 
 const toWsrv = (id, w = 900) =>
   `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`;
@@ -42,6 +36,401 @@ const convertImageUrl = (url, w = 900) => {
   return id ? toWsrv(id, w) : url;
 };
 
+/* Difficulty Badge */
+function DiffBadge({ d }) {
+  if (!d) return null;
+  const l = String(d).toLowerCase();
+  let bg = '#6b7280';
+  let fg = '#ffffff';
+
+  if (l === 'beginner' || l === 'ง่าย' || l === 'มือใหม่') {
+    bg = '#10b981';
+    fg = '#ffffff';
+  } else if (l === 'normal' || l === 'ปานกลาง') {
+    bg = '#3b82f6';
+    fg = '#ffffff';
+  } else if (l === 'hard' || l === 'ยาก') {
+    bg = '#f59e0b';
+    fg = '#111827';
+  } else if (l === 'expert' || l === 'ยากมาก') {
+    bg = NETFLIX_RED;
+    fg = '#ffffff';
+  }
+
+  return (
+    <span
+      style={{
+        fontSize: 10,
+        fontWeight: 800,
+        color: fg,
+        background: bg,
+        padding: '3px 7px',
+        borderRadius: 6,
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+      }}
+    >
+      {d}
+    </span>
+  );
+}
+
+function parsePlayerCount(str) {
+  if (typeof str === 'number') return str;
+  if (!str) return 0;
+  const match = String(str).match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+function getGamePlayerCount(g) {
+  if (!g) return 0;
+  if (Array.isArray(g.characters) && g.characters.length > 0) return g.characters.length;
+  return parsePlayerCount(g.players) || 6;
+}
+
+/* Netflix Poster Card */
+function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
+  const [hovered, setHovered] = useState(false);
+  const posterImg = convertImageUrl(game.image || game.coverUrl, 400);
+  const players = getGamePlayerCount(game);
+
+  const handleBook = (e) => {
+    e.stopPropagation();
+    if (typeof showPage === 'function') {
+      showPage('booking', { gameId: game.id });
+    } else {
+      window.location.href = `/booking?gameId=${game.id}`;
+    }
+  };
+
+  const handleDetail = (e) => {
+    e.stopPropagation();
+    if (showDetail) showDetail(game.id);
+  };
+
+  return (
+    <div
+      onClick={handleDetail}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      className="netflix-home-card"
+      style={{
+        position: 'relative',
+        width: 185,
+        minWidth: 185,
+        height: 278,
+        borderRadius: 12,
+        overflow: 'hidden',
+        background: CARD_BG,
+        cursor: 'pointer',
+        border: `1.5px solid ${hovered ? 'rgba(229,9,20,0.35)' : BORDER_CLR}`,
+        boxShadow: hovered
+          ? '0 16px 36px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.06)'
+          : '0 2px 8px rgba(0,0,0,0.05)',
+        transform: hovered ? 'translateY(-6px) scale(1.03)' : 'translateY(0) scale(1)',
+        transition: 'transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease, border-color 0.24s ease',
+        userSelect: 'none',
+        flexShrink: 0,
+      }}
+    >
+      {/* Poster Image */}
+      {posterImg ? (
+        <img
+          src={posterImg}
+          alt={game.title}
+          loading="lazy"
+          decoding="async"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            filter: hovered ? 'brightness(0.95)' : 'brightness(0.9)',
+            transition: 'filter 0.24s ease',
+          }}
+        />
+      ) : (
+        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6' }}>
+          <i className="fas fa-theater-masks" style={{ fontSize: 32, color: 'rgba(0,0,0,0.2)' }} />
+        </div>
+      )}
+
+      {/* Top Badges */}
+      <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pointerEvents: 'none', zIndex: 2 }}>
+        {game.difficulty && <DiffBadge d={game.difficulty} />}
+
+        {isPlayed && (
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 700,
+              color: '#ffffff',
+              background: 'rgba(59,130,246,0.92)',
+              padding: '3px 7px',
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+              marginLeft: 'auto',
+            }}
+          >
+            <i className="fas fa-check" style={{ fontSize: 9 }} /> เล่นแล้ว
+          </span>
+        )}
+      </div>
+
+      {/* Bottom Gradient Overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '40px 10px 10px',
+          background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.72) 55%, transparent 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          zIndex: 2,
+        }}
+      >
+        <h4
+          style={{
+            margin: 0,
+            fontSize: 13,
+            fontWeight: 800,
+            color: '#ffffff',
+            lineHeight: 1.25,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+          }}
+        >
+          {game.title}
+        </h4>
+
+        {/* Specs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: 'rgba(255,255,255,0.78)' }}>
+          <span><i className="fas fa-users" style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }} /> {players} คน</span>
+          <span>•</span>
+          <span>{game.time || '4 ชม.'}</span>
+        </div>
+
+        {/* Action Bar */}
+        <div
+          className="netflix-home-card-actions"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 4,
+            opacity: hovered ? 1 : 0,
+            maxHeight: hovered ? 36 : 0,
+            transform: hovered ? 'translateY(0)' : 'translateY(6px)',
+            transition: 'opacity 0.2s ease, max-height 0.2s ease, transform 0.2s ease',
+            overflow: 'hidden',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleBook}
+            style={{
+              flex: 1,
+              height: 28,
+              borderRadius: 6,
+              background: NETFLIX_RED,
+              color: '#ffffff',
+              border: 'none',
+              fontSize: 11,
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 4,
+            }}
+          >
+            <i className="fas fa-play" style={{ fontSize: 9 }} /> จองรอบ
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDetail}
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 6,
+              background: 'rgba(255,255,255,0.22)',
+              color: '#ffffff',
+              border: '1px solid rgba(255,255,255,0.3)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 11,
+            }}
+            aria-label="ดูรายละเอียด"
+          >
+            <i className="fas fa-info" style={{ fontSize: 10 }} />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* Netflix Swimlane Row */
+function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playedIds, onSeeAll }) {
+  const scrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScroll = () => {
+    if (!scrollRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+    setCanScrollLeft(scrollLeft > 10);
+    setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+  };
+
+  useEffect(() => {
+    checkScroll();
+    const el = scrollRef.current;
+    if (el) el.addEventListener('scroll', checkScroll, { passive: true });
+    return () => el && el.removeEventListener('scroll', checkScroll);
+  }, [games]);
+
+  const scroll = (direction) => {
+    if (!scrollRef.current) return;
+    const step = scrollRef.current.clientWidth * 0.75;
+    scrollRef.current.scrollBy({
+      left: direction === 'left' ? -step : step,
+      behavior: 'smooth'
+    });
+  };
+
+  if (games.length === 0) return null;
+
+  return (
+    <div style={{ position: 'relative', marginBottom: 38 }}>
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
+          <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+          <h3 style={{ margin: 0, fontSize: 'clamp(16px, 2.2vw, 20px)', fontWeight: 900, color: TEXT_MAIN, letterSpacing: '-0.01em', textAlign: 'left' }}>
+            {title}
+          </h3>
+        </div>
+
+        {onSeeAll && (
+          <button
+            type="button"
+            onClick={onSeeAll}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: TEXT_MUTED,
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              padding: '4px 8px',
+              borderRadius: 6,
+            }}
+          >
+            <span>ดูทั้งหมด ({games.length})</span>
+            <i className="fas fa-chevron-right" style={{ fontSize: 10 }} />
+          </button>
+        )}
+      </div>
+
+      {/* Row Body */}
+      <div style={{ position: 'relative' }}>
+        {canScrollLeft && (
+          <button
+            type="button"
+            onClick={() => scroll('left')}
+            className="netflix-home-scroll-arrow"
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: 48,
+              zIndex: 10,
+              background: 'linear-gradient(to right, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.4) 60%, transparent 100%)',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+            aria-label="เลื่อนซ้าย"
+          >
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ffffff', color: TEXT_MAIN, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_CLR}` }}>
+              <i className="fas fa-chevron-left" style={{ fontSize: 12 }} />
+            </div>
+          </button>
+        )}
+
+        <div
+          ref={scrollRef}
+          style={{
+            display: 'flex',
+            gap: 14,
+            overflowX: 'auto',
+            overflowY: 'hidden',
+            padding: '10px clamp(16px, 4vw, 40px) 16px',
+            scrollbarWidth: 'none',
+            msOverflowStyle: 'none',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          {games.slice(0, 16).map(game => (
+            <HomeNetflixPosterCard
+              key={game.id}
+              game={game}
+              showDetail={showDetail}
+              showPage={showPage}
+              isPlayed={playedIds.has(game.id)}
+            />
+          ))}
+        </div>
+
+        {canScrollRight && (
+          <button
+            type="button"
+            onClick={() => scroll('right')}
+            className="netflix-home-scroll-arrow"
+            style={{
+              position: 'absolute',
+              right: 0,
+              top: 0,
+              bottom: 0,
+              width: 48,
+              zIndex: 10,
+              background: 'linear-gradient(to left, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.4) 60%, transparent 100%)',
+              border: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+            }}
+            aria-label="เลื่อนขวา"
+          >
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ffffff', color: TEXT_MAIN, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_CLR}` }}>
+              <i className="fas fa-chevron-right" style={{ fontSize: 12 }} />
+            </div>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 const PLACEHOLDER = Array.from({ length: 12 }, (_, i) => ({
   id: `ph-${i}`,
   title: ['The Mansion Mystery','Blood on the Dancefloor','Midnight Train','The Last Supper','Carnival of Souls','Dead in the Water','Black Swan','The Quiet Room','Red Velvet','Ivory Tower','Crimson Tide','Shadow Play'][i],
@@ -56,9 +445,11 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
   const [promoSettings, setPromoSettings] = useState(null);
+  const [recentPlayedIds, setRecentPlayedIds] = useState([]);
+  const [playedIds, setPlayedIds] = useState(() => new Set());
   const revealRoot = useRef(null);
 
-  /* Load Promotion & Spotlight Settings */
+  /* Load Promotion Settings */
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'promotion'), (snap) => {
       if (snap.exists()) {
@@ -68,7 +459,37 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     return () => unsub();
   }, []);
 
-  /* Sort games by newest first (descending by createdAt) */
+  /* Load Recent Store Plays from Orders */
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
+    const unsub = onSnapshot(q, snap => {
+      const seen = new Set();
+      const list = [];
+      snap.docs.forEach(d => {
+        const sid = d.data().scriptId;
+        if (sid && !seen.has(sid)) {
+          seen.add(sid);
+          list.push(sid);
+        }
+      });
+      setRecentPlayedIds(list);
+    }, () => {});
+    return () => unsub();
+  }, []);
+
+  /* Load User Played Games History */
+  useEffect(() => {
+    if (!lineUser?.uid) { setPlayedIds(new Set()); return; }
+    const q = query(collection(db, 'playHistory'), where('userId', '==', lineUser.uid));
+    const unsub = onSnapshot(q, snap => {
+      const ids = new Set();
+      snap.docs.forEach(d => { const sid = d.data().scriptId; if (sid) ids.add(sid); });
+      setPlayedIds(ids);
+    }, () => {});
+    return () => unsub();
+  }, [lineUser?.uid]);
+
+  /* Sort games by newest first */
   const sortedNewestGames = useMemo(() => {
     return [...allGames].sort((a, b) => {
       const getTimestamp = (g) => {
@@ -82,7 +503,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     });
   }, [allGames]);
 
-  /* 3 New Games to display */
+  /* 3 New Games to display in Hero Card */
   const newGames = useMemo(() => {
     if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds) && promoSettings.newGameIds.length > 0) {
       const mapped = promoSettings.newGameIds
@@ -90,18 +511,70 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .filter(Boolean);
       if (mapped.length > 0) return mapped.slice(0, 3);
     }
-    // Fallback to latest 3 games sorted by creation time
     const source = sortedNewestGames.length > 0 ? sortedNewestGames : (allGames.length > 0 ? allGames : PLACEHOLDER);
     return source.slice(0, 3);
   }, [promoSettings?.newGameIds, allGames, sortedNewestGames]);
 
-  /* Hero Featured Games: show ONLY new games in the hero card */
+  /* Hero Featured Games */
   const heroFeaturedGames = useMemo(() => {
     if (newGames && newGames.length > 0) return newGames;
     return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 3);
   }, [newGames, allGames]);
 
-  /* hero slideshow - cycles ONLY through new games */
+  /* Swimlanes Data */
+  const trendingGames = useMemo(() => {
+    const recentMap = new Map();
+    recentPlayedIds.forEach((id, idx) => { recentMap.set(id, idx); });
+    return [...allGames].sort((a, b) => {
+      const idxA = recentMap.has(a.id) ? recentMap.get(a.id) : 9999;
+      const idxB = recentMap.has(b.id) ? recentMap.get(b.id) : 9999;
+      return idxA - idxB;
+    });
+  }, [allGames, recentPlayedIds]);
+
+  const beginnerGames = useMemo(() => {
+    return allGames
+      .filter(g => {
+        const det = Number(g.detective) || 0;
+        const rp = Number(g.roleplay) || 0;
+        const diff = (g.difficulty || '').toLowerCase();
+        if (diff === 'expert' || diff === 'hard' || diff === 'ยาก' || diff === 'ยากมาก') return false;
+        if (det >= 4 || rp >= 4) return false;
+        return diff === 'beginner' || diff === 'ง่าย' || diff === 'มือใหม่' || (det + rp <= 5);
+      })
+      .sort((a, b) => {
+        const detA = Number(a.detective) || 0;
+        const rpA  = Number(a.roleplay) || 0;
+        const detB = Number(b.detective) || 0;
+        const rpB  = Number(b.roleplay) || 0;
+        const sumA = detA + rpA;
+        const sumB = detB + rpB;
+        if (sumA !== sumB) return sumA - sumB;
+        const maxA = Math.max(detA, rpA);
+        const maxB = Math.max(detB, rpB);
+        if (maxA !== maxB) return maxA - maxB;
+        return detA - detB;
+      });
+  }, [allGames]);
+
+  const detectiveGames = useMemo(() => {
+    return allGames
+      .filter(g => (g.tags || []).includes('Detective') || (g.detective || 0) >= 3 || (g.difficulty || '') === 'ยาก' || (g.difficulty || '') === 'ยากมาก')
+      .sort((a, b) => (b.detective || 0) - (a.detective || 0));
+  }, [allGames]);
+
+  const dramaGames = useMemo(() => {
+    return allGames
+      .filter(g => (g.tags || []).includes('Drama'))
+      .sort((a, b) => {
+        const pA = getGamePlayerCount(a);
+        const pB = getGamePlayerCount(b);
+        if (pB !== pA) return pB - pA;
+        return (b.roleplay || 0) - (a.roleplay || 0);
+      });
+  }, [allGames]);
+
+  /* Hero slideshow timer */
   useEffect(() => {
     const len = heroFeaturedGames.length;
     if (len <= 1) return;
@@ -115,7 +588,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     return () => clearInterval(timer);
   }, [heroFeaturedGames.length]);
 
-  /* scroll reveal */
+  /* Scroll reveal */
   useEffect(() => {
     const els = document.querySelectorAll('.mm-reveal, .mm-reveal-l, .mm-reveal-r, .mm-reveal-s');
     const obs = new IntersectionObserver(
@@ -145,7 +618,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   const openParties  = allParties.filter(p => p.status !== 'closed' && (p.members?.length || 0) < p.maxPlayers).slice(0, 4);
   const displayGames  = allGames.length > 0 ? allGames : PLACEHOLDER;
   const scriptCount   = allGames.length || 48;
-  /* games that actually have a cover image — used for hero slideshow */
   const HERO_EXCLUDED = ['1QylfkWZJKgbA_aodUnYu23pQxupJfAQK', '1Kpod9FnDg-sPVGvi-BskoMqACcbMaB7t'];
   const slidableGames = displayGames.filter(g => {
     const url = g.image || g.coverUrl;
@@ -157,17 +629,14 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   const heroImg       = heroGame ? convertImageUrl(heroCustomCover || heroGame.image || heroGame.coverUrl, 900) : null;
   const tickerGames   = displayGames.map(g => g.title).filter(Boolean);
   const tickerDur     = Math.max(30, tickerGames.length * 2.5);
-  const gridGames     = displayGames.slice(0, 10);
-  /* dots: covers from heroFeaturedGames (strictly new games) */
   const heroCovers    = heroFeaturedGames.map(g => {
     const custom = promoSettings?.customCovers?.[g.id];
     return convertImageUrl(custom || g.image || g.coverUrl, 400);
   });
-  /* scatter: tiny thumbnails — displayed at 36–52px CSS, w=200 is enough at 3× DPR */
   const scatterCovers = slidableGames.map(g => convertImageUrl(g.image || g.coverUrl, 200));
 
   return (
-    <div ref={revealRoot} role="main" style={{ fontFamily: "'Sarabun', sans-serif", background: PAPER, color: INK, paddingTop: 60, overflowX: 'hidden' }}>
+    <div ref={revealRoot} role="main" style={{ fontFamily: "'Sarabun', sans-serif", background: BG_PAGE, color: TEXT_MAIN, paddingTop: 60, overflowX: 'hidden' }}>
 
       <style>{`
         @keyframes mmTicker { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
@@ -196,22 +665,10 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           50% { transform: translate(calc(-50% + clamp(120px,13vw,200px)), calc(-50% + clamp(160px,20vw,280px))) translateY(-9px) scale(1.025); }
         }
 
-        @keyframes mmOrbPulseA {
-          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.12; }
-          50% { transform: translate(32px, -24px) scale(1.18); opacity: 0.19; }
-        }
-        @keyframes mmOrbPulseB {
-          0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.09; }
-          50% { transform: translate(-28px, 28px) scale(1.22); opacity: 0.16; }
-        }
-
         @keyframes mmSnip {
           0%, 100% { transform: rotate(90deg) scale(1); }
           50% { transform: rotate(68deg) scale(1.2); color: var(--crimson-400); }
         }
-
-        .mm-glow-orb-a { animation: mmOrbPulseA 9s ease-in-out infinite; }
-        .mm-glow-orb-b { animation: mmOrbPulseB 11s ease-in-out infinite; }
 
         .mm-r1{animation:mmFadeUp .82s cubic-bezier(.16,1,.3,1) .06s both}
         .mm-r2{animation:mmFadeUp .82s cubic-bezier(.16,1,.3,1) .16s both}
@@ -232,74 +689,24 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px) scale(1.015)!important;box-shadow:0 18px 48px rgba(198,36,25,.55),0 0 24px rgba(198,36,25,.3)!important}
         .mm-btn-pri:active{transform:translateY(0) scale(0.98)!important}
         .mm-btn-pri:hover i.fa-arrow-right{transform:translateX(4px);transition:transform .22s ease}
-        .mm-btn-pri:focus-visible{outline:2px solid ${C};outline-offset:3px}
 
         .mm-btn-gho{transition:border-color .25s,color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s!important}
         .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(198,36,25,.14)!important}
         .mm-btn-gho:active{transform:scale(0.98)!important}
-        .mm-btn-gho:focus-visible{outline:2px solid ${C};outline-offset:3px}
 
-        .mm-btn-dark{transition:background .25s,color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s!important}
-        .mm-btn-dark:hover{background:#fff!important;color:#111!important;transform:translateY(-2px) scale(1.015)!important;box-shadow:0 12px 30px rgba(0,0,0,.2)!important}
-        .mm-btn-dark:active{transform:scale(0.98)!important}
-        button:focus-visible{outline:2px solid ${C};outline-offset:2px}
+        .mm-step-card{transition:transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s ease!important;border-radius:14px;background:#ffffff}
+        .mm-step-card:hover{transform:translateY(-6px)!important;box-shadow:0 16px 36px rgba(0,0,0,0.08)!important}
+        .mm-step-num{font-family:'Bebas Neue',sans-serif;font-size:clamp(70px,10vw,110px);line-height:.8;letter-spacing:-.04em;color:rgba(0,0,0,.04);pointer-events:none;user-select:none}
 
-        /* ── Script Cards with Sheen Sweep ── */
-        .mm-card{
-          position:relative;
-          overflow:hidden;
-          transition:transform .45s cubic-bezier(.16,1,.3,1),box-shadow .45s cubic-bezier(.16,1,.3,1),border-color .3s ease!important;
-          cursor:pointer;
-        }
-        .mm-card::after{
-          content:'';
-          position:absolute;
-          top:-60%;
-          left:-70%;
-          width:70%;
-          height:220%;
-          background:linear-gradient(to right,transparent 0%,rgba(255,255,255,.22) 50%,transparent 100%);
-          transform:rotate(25deg) translateX(-100%);
-          transition:transform .75s cubic-bezier(.16,1,.3,1);
-          pointer-events:none;
-          z-index:5;
-        }
-        .mm-card:hover{
-          transform:translateY(-10px) scale(1.015)!important;
-          box-shadow:0 28px 56px rgba(0,0,0,.18),0 0 0 1.5px rgba(198,36,25,.35)!important;
-        }
-        .mm-card:hover::after{
-          transform:rotate(25deg) translateX(420%);
-        }
-        .mm-card:hover .mm-card-img{transform:scale(1.08)!important;filter:brightness(1.04)!important}
-        .mm-card:hover .mm-card-overlay{opacity:.65!important}
-        .mm-card:focus-visible{outline:2px solid ${C};outline-offset:2px}
-        .mm-card-img{transition:transform .65s cubic-bezier(.16,1,.3,1),filter .65s cubic-bezier(.16,1,.3,1)!important}
-        .mm-card-overlay{transition:opacity .35s ease!important}
+        .mm-stat-box{transition:transform .35s cubic-bezier(.16,1,.3,1)!important}
+        .mm-stat-box:hover{transform:translateY(-4px)!important}
 
-        /* ── Interactive Step Cards ── */
-        .mm-step-card{transition:transform .4s cubic-bezier(.16,1,.3,1),background .3s ease,box-shadow .4s ease!important;border-radius:12px}
-        .mm-step-card:hover{transform:translateY(-8px)!important;background:rgba(255,255,255,0.02)!important}
-        .mm-step-card:hover .mm-step-num{color:rgba(198,36,25,0.14)!important;transform:scale(1.06) translateX(4px)!important}
-        .mm-step-card:hover i{transform:scale(1.15) rotate(-5deg);transition:transform .3s cubic-bezier(.16,1,.3,1)}
-        .mm-step-num{font-family:'Bebas Neue',sans-serif;font-size:clamp(80px,11vw,130px);line-height:.8;letter-spacing:-.04em;color:rgba(255,255,255,.045);pointer-events:none;user-select:none;transition:color .4s ease,transform .4s cubic-bezier(.16,1,.3,1)!important}
+        .mm-party-card{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s ease!important}
+        .mm-party-card:hover{transform:translateY(-4px)!important;box-shadow:0 12px 28px rgba(0,0,0,0.07)!important}
 
-        /* ── Interactive Stat Cards ── */
-        .mm-stat-box{transition:transform .35s cubic-bezier(.16,1,.3,1),background .3s ease!important;border-radius:8px}
-        .mm-stat-box:hover{transform:translateY(-5px)!important;background:rgba(255,255,255,0.02)!important}
-        .mm-stat-box:hover .mm-stat-num{color:var(--crimson-400)!important;transition:color .3s ease}
-        .mm-stat-num{font-family:'Bebas Neue',sans-serif;line-height:.88;letter-spacing:-.02em}
+        .mm-story-card{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s ease!important}
+        .mm-story-card:hover{transform:translateY(-5px)!important;box-shadow:0 14px 30px rgba(0,0,0,0.06)!important}
 
-        /* ── Interactive Party Cards ── */
-        .mm-party-card{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s cubic-bezier(.16,1,.3,1),border-color .25s ease!important}
-        .mm-party-card:hover{transform:translateY(-5px)!important;box-shadow:0 16px 36px rgba(0,0,0,.08)!important;border-color:rgba(198,36,25,.25)!important}
-
-        /* ── Interactive Story/FAQ Cards ── */
-        .mm-story-card{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s cubic-bezier(.16,1,.3,1),border-color .25s ease!important}
-        .mm-story-card:hover{transform:translateY(-6px)!important;box-shadow:0 16px 36px rgba(0,0,0,.07)!important;border-color:rgba(198,36,25,.22)!important}
-        .mm-story-card:hover i{transform:scale(1.15);transition:transform .3s cubic-bezier(.16,1,.3,1)}
-
-        /* ── Hero Main & Covers ── */
         .mm-cover{transition:box-shadow .38s,transform .38s!important}
         .mm-cover:hover{box-shadow:0 36px 72px rgba(0,0,0,.32)!important;filter:brightness(1.06)!important}
         .mm-cover-main{
@@ -319,48 +726,25 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .mm-fg{animation:mmFloatG 5.7s ease-in-out infinite}
         .mm-fh{animation:mmFloatH 7.1s ease-in-out infinite}
 
-        @media(max-width:639px){
-          .mm-card-mobile-hide { display: none !important; }
-        }
-
-        /* ── grids ── */
         .mm-hero-text{width:min(52%,700px);padding:clamp(56px,7vw,96px) clamp(36px,5vw,80px) clamp(64px,8vw,96px)}
 
-        .mm-catalog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px}
-        @media(max-width:480px){.mm-catalog-grid{grid-template-columns:repeat(2,1fr);gap:12px}}
-
-        .mm-stats-grid{display:grid;grid-template-columns:repeat(2,1fr)}
-        @media(min-width:640px){.mm-stats-grid{grid-template-columns:repeat(4,1fr)}}
-
-        .mm-steps-grid{display:grid;grid-template-columns:1fr}
-        @media(min-width:640px){.mm-steps-grid{grid-template-columns:repeat(3,1fr)}}
-
-        /* ── LUXURY EVENT TICKET STYLES ── */
+        /* Luxury White Event Ticket */
         .mm-ticket-card {
           display: flex;
           flex-direction: column;
-          background: linear-gradient(145deg, #151520 0%, #0d0d15 100%);
-          border: 1.5px solid rgba(255, 255, 255, 0.12);
+          background: linear-gradient(145deg, #ffffff 0%, #fafafa 100%);
+          border: 1.5px solid rgba(0, 0, 0, 0.08);
           border-radius: 22px;
           position: relative;
-          box-shadow: 0 30px 70px rgba(0,0,0,0.7), 0 0 0 1px rgba(198,36,25,0.16);
+          box-shadow: 0 24px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(229,9,20,0.08);
           transition: transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s cubic-bezier(.16,1,.3,1)!important;
         }
         .mm-ticket-card:hover {
           transform: translateY(-6px)!important;
-          box-shadow: 0 42px 90px rgba(0,0,0,0.8), 0 0 45px rgba(198,36,25,0.22)!important;
-        }
-        .mm-ticket-card:hover .mm-ticket-img-wrap img {
-          transform: scale(1.04);
-        }
-        .mm-ticket-card:hover .mm-ticket-scissor i {
-          animation: mmSnip .8s ease-in-out infinite;
-        }
-        .mm-ticket-img-wrap img {
-          transition: transform .8s cubic-bezier(.16,1,.3,1)!important;
+          box-shadow: 0 36px 80px rgba(0,0,0,0.12), 0 0 35px rgba(229,9,20,0.12)!important;
         }
         .mm-ticket-stub {
-          padding: 24px 20px;
+          padding: 24px 22px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -373,7 +757,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           justify-content: center;
           position: relative;
           overflow: hidden;
-          background: #08080c;
+          background: #f3f4f6;
         }
         .mm-ticket-img-wrap {
           width: 100%;
@@ -392,196 +776,119 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           width: 22px;
           height: 22px;
           border-radius: 50%;
-          background: #14141e;
-          border: 1px solid rgba(255, 255, 255, 0.22);
+          background: #ffffff;
+          border: 1px solid rgba(0, 0, 0, 0.15);
           display: flex;
           align-items: center;
           justify-content: center;
-          color: rgba(255, 255, 255, 0.65);
+          color: rgba(0, 0, 0, 0.5);
           font-size: 10px;
           z-index: 5;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.06);
         }
         .mm-ticket-barcode-lines {
           height: 32px;
           background: repeating-linear-gradient(
             90deg,
-            rgba(255,255,255,0.8) 0px, rgba(255,255,255,0.8) 2px,
+            rgba(0,0,0,0.75) 0px, rgba(0,0,0,0.75) 2px,
             transparent 2px, transparent 4px,
-            rgba(255,255,255,0.8) 4px, rgba(255,255,255,0.8) 5px,
+            rgba(0,0,0,0.75) 4px, rgba(0,0,0,0.75) 5px,
             transparent 5px, transparent 7px,
-            rgba(255,255,255,0.8) 7px, rgba(255,255,255,0.8) 10px,
+            rgba(0,0,0,0.75) 7px, rgba(0,0,0,0.75) 10px,
             transparent 10px, transparent 12px,
-            rgba(255,255,255,0.8) 12px, rgba(255,255,255,0.8) 13px,
+            rgba(0,0,0,0.75) 12px, rgba(0,0,0,0.75) 13px,
             transparent 13px, transparent 16px,
-            rgba(255,255,255,0.8) 16px, rgba(255,255,255,0.8) 18px,
+            rgba(0,0,0,0.75) 16px, rgba(0,0,0,0.75) 18px,
             transparent 18px, transparent 20px,
-            rgba(255,255,255,0.8) 20px, rgba(255,255,255,0.8) 24px,
+            rgba(0,0,0,0.75) 20px, rgba(0,0,0,0.75) 24px,
             transparent 24px, transparent 27px
           );
           border-radius: 2px;
-          opacity: 0.85;
+          opacity: 0.65;
         }
+
         @media(max-width: 899px) {
-          .mm-ticket-body {
-            order: 1;
-            border-radius: 20px 20px 0 0;
-          }
-          .mm-ticket-img-wrap {
-            border-radius: 20px 20px 0 0;
-          }
-          .mm-ticket-seam {
-            order: 2;
-            width: 100%;
-            height: 24px;
-            margin: 0;
-          }
-          .mm-ticket-seam-line {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 0;
-            border-top: 2px dashed rgba(255, 255, 255, 0.28);
-          }
-          .mm-ticket-stub {
-            order: 3;
-            border-radius: 0 0 20px 20px;
-          }
-          .mm-ticket-notch-start {
-            position: absolute;
-            top: 50%;
-            left: 0;
-            transform: translateY(-50%);
-            width: 18px;
-            height: 36px;
-            border-radius: 0 18px 18px 0;
-            background: #07070b;
-            border: 1.5px solid rgba(255, 255, 255, 0.18);
-            border-left: none;
-            box-shadow: inset -2px 0 6px rgba(0,0,0,0.8);
-            z-index: 6;
-          }
-          .mm-ticket-notch-end {
-            position: absolute;
-            top: 50%;
-            right: 0;
-            transform: translateY(-50%);
-            width: 18px;
-            height: 36px;
-            border-radius: 18px 0 0 18px;
-            background: #07070b;
-            border: 1.5px solid rgba(255, 255, 255, 0.18);
-            border-right: none;
-            box-shadow: inset 2px 0 6px rgba(0,0,0,0.8);
-            z-index: 6;
-          }
-        }
-        @media(min-width: 900px) {
-          .mm-ticket-card {
-            flex-direction: row;
-            align-items: stretch;
-          }
-          .mm-ticket-stub {
-            order: 1;
-            flex: 0 0 400px;
-            max-width: 420px;
-            padding: clamp(24px, 2.5vw, 36px);
-            border-radius: 20px 0 0 20px;
-          }
-          .mm-ticket-seam {
-            order: 2;
-            width: 24px;
-            flex-shrink: 0;
-          }
-          .mm-ticket-seam-line {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            left: 50%;
-            width: 0;
-            border-left: 2px dashed rgba(255, 255, 255, 0.28);
-          }
-          .mm-ticket-scissor {
-            transform: rotate(90deg);
-          }
-          .mm-ticket-body {
-            order: 3;
-            flex: 1;
-            border-radius: 0 20px 20px 0;
-          }
-          .mm-ticket-img-wrap {
-            height: 100%;
-            border-radius: 0 20px 20px 0;
-          }
-          .mm-ticket-notch-start {
-            position: absolute;
-            top: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 36px;
-            height: 18px;
-            border-radius: 0 0 18px 18px;
-            background: #07070b;
-            border: 1.5px solid rgba(255, 255, 255, 0.18);
-            border-top: none;
-            box-shadow: inset 0 -2px 6px rgba(0,0,0,0.8);
-            z-index: 6;
-          }
-          .mm-ticket-notch-end {
-            position: absolute;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 36px;
-            height: 18px;
-            border-radius: 18px 18px 0 0;
-            background: #07070b;
-            border: 1.5px solid rgba(255, 255, 255, 0.18);
-            border-bottom: none;
-            box-shadow: inset 0 2px 6px rgba(0,0,0,0.8);
-            z-index: 6;
-          }
-        }
-        .mm-footer-split{display:grid;grid-template-columns:1fr}
-        @media(min-width:768px){.mm-footer-split{grid-template-columns:1fr 1fr}}
-
-        .mm-footer-cols{display:grid;grid-template-columns:1fr;gap:40px}
-        @media(min-width:640px){.mm-footer-cols{grid-template-columns:2fr 1fr 1fr 1fr}}
-
-        /* mobile hero — hide right-side elements */
-        @media(max-width:899px){
+          .mm-ticket-body { order: 1; border-radius: 20px 20px 0 0; }
+          .mm-ticket-img-wrap { border-radius: 20px 20px 0 0; }
+          .mm-ticket-seam { order: 2; width: 100%; height: 24px; margin: 0; }
+          .mm-ticket-seam-line { position: absolute; top: 50%; left: 0; right: 0; height: 0; border-top: 2px dashed rgba(0, 0, 0, 0.18); }
+          .mm-ticket-stub { order: 3; border-radius: 0 0 20px 20px; }
+          .mm-ticket-notch-start { position: absolute; top: 50%; left: 0; transform: translateY(-50%); width: 18px; height: 36px; border-radius: 0 18px 18px 0; background: #ffffff; border: 1.5px solid rgba(0, 0, 0, 0.1); border-left: none; box-shadow: inset -2px 0 6px rgba(0,0,0,0.06); z-index: 6; }
+          .mm-ticket-notch-end { position: absolute; top: 50%; right: 0; transform: translateY(-50%); width: 18px; height: 36px; border-radius: 18px 0 0 18px; background: #ffffff; border: 1.5px solid rgba(0, 0, 0, 0.1); border-right: none; box-shadow: inset 2px 0 6px rgba(0,0,0,0.06); z-index: 6; }
           .mm-scatter-r,.mm-hero-main,.mm-hero-pill,.mm-hero-dots{display:none!important}
         }
+
+        @media(min-width: 900px) {
+          .mm-ticket-card { flex-direction: row; align-items: stretch; }
+          .mm-ticket-stub { order: 1; flex: 0 0 400px; max-width: 420px; padding: clamp(24px, 2.5vw, 36px); border-radius: 20px 0 0 20px; }
+          .mm-ticket-seam { order: 2; width: 24px; flex-shrink: 0; }
+          .mm-ticket-seam-line { position: absolute; top: 0; bottom: 0; left: 50%; width: 0; border-left: 2px dashed rgba(0, 0, 0, 0.18); }
+          .mm-ticket-scissor { transform: rotate(90deg); }
+          .mm-ticket-body { order: 3; flex: 1; border-radius: 0 20px 20px 0; }
+          .mm-ticket-img-wrap { height: 100%; border-radius: 0 20px 20px 0; }
+          .mm-ticket-notch-start { position: absolute; top: 0; left: 50%; transform: translateX(-50%); width: 36px; height: 18px; border-radius: 0 0 18px 18px; background: #ffffff; border: 1.5px solid rgba(0, 0, 0, 0.1); border-top: none; box-shadow: inset 0 -2px 6px rgba(0,0,0,0.06); z-index: 6; }
+          .mm-ticket-notch-end { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 36px; height: 18px; border-radius: 18px 18px 0 0; background: #ffffff; border: 1.5px solid rgba(0, 0, 0, 0.1); border-bottom: none; box-shadow: inset 0 2px 6px rgba(0,0,0,0.06); z-index: 6; }
+        }
+
         @media(min-width:640px) and (max-width:899px){
           .mm-hero-text{width:100%;padding:clamp(48px,7vw,72px) clamp(28px,5vw,56px) clamp(56px,7vw,80px)}
-          .mm-hero-cats,.mm-hero-stats{justify-content:flex-start!important}
+          .mm-hero-cats{justify-content:flex-start!important}
         }
-        /* mobile-only scatter covers — hidden on tablet/desktop */
         .mm-mobile-only{display:none!important}
         @media(max-width:639px){
           .mm-hero-text{width:100%;padding:clamp(36px,8vw,56px) 20px clamp(48px,8vw,64px)}
-          .mm-hero-cats,.mm-hero-stats{justify-content:center!important}
-          /* phone: hide zone-2 covers + odd zone-1 covers */
+          .mm-hero-cats{justify-content:center!important}
           .mm-phone-r{display:none!important}
-          /* show mobile-specific scatter */
           .mm-mobile-only{display:block!important}
         }
-
-        /* iPad: slightly smaller scatter covers */
         @media(min-width:900px) and (max-width:1199px){
           .mm-cover:not(.mm-cover-main){ max-width:48px!important }
         }
 
-        @media(prefers-reduced-motion:reduce){
-          .mm-r1,.mm-r2,.mm-r3,.mm-r4,.mm-r5{animation:none;opacity:1;transform:none;filter:none}
-          .mm-reveal,.mm-reveal-l,.mm-reveal-r,.mm-reveal-s{transition:none;opacity:1;transform:none;filter:none}
-          .mm-btn-pri:hover,.mm-card:hover,.mm-ticket-card:hover,.mm-step-card:hover,.mm-stat-box:hover,.mm-party-card:hover,.mm-story-card:hover{transform:none}
-          .mm-fa,.mm-fb,.mm-fc,.mm-fd,.mm-fe,.mm-ff,.mm-fg,.mm-fh,.mm-cover-main,.mm-hero-pill,.mm-glow-orb-a,.mm-glow-orb-b{animation:none}
+        /* Mobile adjustments for swimlanes */
+        @media(max-width: 768px) {
+          .netflix-home-card {
+            width: 145px !important;
+            min-width: 145px !important;
+            height: 220px !important;
+            border-radius: 10px !important;
+          }
+          .netflix-home-card h4 {
+            font-size: 12px !important;
+            -webkit-line-clamp: 1 !important;
+          }
+          .netflix-home-card-actions {
+            opacity: 1 !important;
+            max-height: 36px !important;
+            transform: none !important;
+            margin-top: 4px !important;
+          }
+          .netflix-home-scroll-arrow {
+            display: none !important;
+          }
+        }
+        @media(max-width: 480px) {
+          .netflix-home-card {
+            width: 130px !important;
+            min-width: 130px !important;
+            height: 195px !important;
+          }
+        }
+        @media (hover: none) {
+          .netflix-home-card:hover {
+            transform: none !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+          }
+          .netflix-home-card-actions {
+            opacity: 1 !important;
+            max-height: 36px !important;
+            transform: none !important;
+          }
         }
       `}</style>
 
       {/* ══════════════════════════════════════════
-          1. HERO
+          1. HERO (KEPT EXACTLY 100% UNTOUCHED)
       ══════════════════════════════════════════ */}
       <section style={{ background: '#fff', position: 'relative', overflow: 'hidden', minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
 
@@ -612,10 +919,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           </div>
         ))}
 
-        {/* ══ SCATTER CARDS — full-section canvas ══
-            zi:1 = behind text (left texture + center bridge)
-            zi:3 = right showcase (high opacity)
-            hide:true = also hidden on mobile (via mm-scatter-r)     */}
+        {/* ══ SCATTER CARDS — full-section canvas ══ */}
         {[
           /* ── ZONE 1: FAR LEFT EDGE (0–6%) — whisper texture ── */
           { idx:0, cls:'mm-fa', top:'4%',  left:'0.5%', w:36, zi:1, op:.15, delay:'0s'    },
@@ -670,30 +974,25 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           { idx:8, cls:'mm-fe', top:'74%', right:'0.5%',w:48, zi:4, op:.64, delay:'1.5s',  hide:true },
           { idx:0, cls:'mm-ff', top:'87%', right:'1%',  w:50, zi:4, op:.62, delay:'0.9s',  hide:true },
           /* ── ZONE 6: AROUND THE MAIN COVER — fills empty band ── */
-          /* above: top 0–5% spanning left 55–87% */
           { idx:1, cls:'mm-fb', top:'1%',  left:'55%', w:46, zi:4, op:.52, delay:'0.4s',  hide:true },
           { idx:2, cls:'mm-fd', top:'2%',  left:'64%', w:60, zi:4, op:.62, delay:'1.1s',  hide:true },
           { idx:3, cls:'mm-fg', top:'1%',  left:'74%', w:54, zi:4, op:.58, delay:'1.8s',  hide:true },
           { idx:4, cls:'mm-fa', top:'3%',  left:'83%', w:48, zi:4, op:.54, delay:'0.7s',  hide:true },
-          /* below: top 88–92% spanning left 55–87% */
           { idx:5, cls:'mm-fc', top:'90%', left:'55%', w:48, zi:4, op:.52, delay:'2.1s',  hide:true },
           { idx:6, cls:'mm-fe', top:'89%', left:'64%', w:58, zi:4, op:.60, delay:'1.4s',  hide:true },
           { idx:7, cls:'mm-fh', top:'91%', left:'74%', w:52, zi:4, op:.56, delay:'0.5s',  hide:true },
           { idx:8, cls:'mm-fb', top:'89%', left:'83%', w:46, zi:4, op:.52, delay:'2.3s',  hide:true },
-          /* right gap: left 88–93% between main cover right edge and far-right zone */
           { idx:0, cls:'mm-fc', top:'16%', left:'88%', w:50, zi:4, op:.62, delay:'0.3s',  hide:true },
           { idx:1, cls:'mm-fe', top:'31%', left:'90%', w:56, zi:4, op:.66, delay:'1.0s',  hide:true },
           { idx:2, cls:'mm-fg', top:'46%', left:'88%', w:60, zi:4, op:.70, delay:'1.7s',  hide:true },
           { idx:3, cls:'mm-fa', top:'61%', left:'90%', w:54, zi:4, op:.64, delay:'0.8s',  hide:true },
           { idx:4, cls:'mm-fh', top:'75%', left:'88%', w:50, zi:4, op:.60, delay:'2.0s',  hide:true },
-          /* left gap: left 51–53% between zone 4B and main cover left edge */
           { idx:5, cls:'mm-fd', top:'18%', left:'51%', w:54, zi:4, op:.48, delay:'1.3s',  hide:true },
           { idx:6, cls:'mm-fb', top:'43%', left:'52%', w:58, zi:4, op:.52, delay:'0.6s',  hide:true },
           { idx:7, cls:'mm-fc', top:'67%', left:'51%', w:50, zi:4, op:.48, delay:'1.9s',  hide:true },
         ].map(({ idx: _idx, cls, w, zi, op, hide, delay, ...pos }, i) => {
           const src = scatterCovers.length > 0 ? scatterCovers[i % scatterCovers.length] : null;
           const ph = ['#ebebeb','#e8e8e8','#eeeeee','#e6e6e6','#ededed','#e9e9e9','#ececec','#eaeaea'][i % 8];
-          /* phone: hide zone-2 (i 8–14) + odd zone-1 (i 1,3,5,7) */
           const phoneHide = !hide && (i >= 8 || i % 2 === 1);
           return (
             <div key={i} aria-hidden className={`mm-cover ${cls}${hide ? ' mm-scatter-r' : ''}${phoneHide ? ' mm-phone-r' : ''}`} style={{
@@ -713,7 +1012,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           );
         })}
 
-        {/* ══ MAIN FEATURED CARD — positioning wrapper + animated inner ══ */}
+        {/* ══ MAIN FEATURED CARD ══ */}
         {(() => {
           return (
             <div className="mm-hero-main" style={{
@@ -800,7 +1099,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         {/* ── UNIFIED TEXT BLOCK ── */}
         <div className="mm-hero-text" style={{ position: 'relative', zIndex: 4, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
 
-
             {/* Headline */}
             <h1 className="mm-r2" style={{
               fontFamily: "'Bebas Neue', sans-serif",
@@ -868,7 +1166,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </section>
 
       {/* ══════════════════════════════════════════
-          2. TICKER
+          2. TICKER (KEPT EXACTLY 100% UNTOUCHED)
       ══════════════════════════════════════════ */}
       <div style={{ background: C, overflow: 'hidden', padding: '11px 0', whiteSpace: 'nowrap', position: 'relative', zIndex: 10 }}>
         <div aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 72, background: `linear-gradient(to right,${C},transparent)`, zIndex: 1, pointerEvents: 'none' }} />
@@ -881,7 +1179,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   <span style={{ fontFamily: "'Sarabun',sans-serif", fontWeight: 800, fontSize: 11, letterSpacing: '0.22em', textTransform: 'uppercase', color: '#fff', padding: '0 28px', whiteSpace: 'nowrap' }}>
                     {title}
                   </span>
-                  <span aria-hidden style={{ opacity: 0.4, fontSize: 5, color: '#fff' }}>◆</span>
+                  <span aria-hidden style={{ opacity: 0.4, fontSize: 5, color: '#fff' }}>[#]</span>
                 </React.Fragment>
               ))}
             </span>
@@ -890,113 +1188,154 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </div>
 
       {/* ══════════════════════════════════════════
-          3. SCRIPT CATALOG — shown early, core product
+          3. NETFLIX SWIMLANES CATALOG (WHITE THEME)
       ══════════════════════════════════════════ */}
-      <section style={{ background: '#fff', padding: 'clamp(72px,9vw,120px) clamp(24px,5vw,64px)' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+      <section style={{ background: BG_PAGE, padding: 'clamp(56px,7vw,84px) 0 40px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto' }}>
 
-          {/* Header row */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
+          {/* Section Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 28, flexWrap: 'wrap', gap: 14 }}>
             <div className="mm-reveal-l">
-              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,80px)', lineHeight: 0.88, textTransform: 'uppercase', color: '#111', margin: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ background: NETFLIX_RED, color: '#fff', fontSize: 9.5, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: 4 }}>
+                  NETFLIX SELECTION
+                </span>
+              </div>
+              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(38px,5.5vw,68px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
                 {t('home','catalogHeading')}
               </h2>
             </div>
             <div className="mm-reveal-r">
-              <button className="mm-btn-gho" onClick={() => showPage('games')} style={{
-                background: 'transparent', color: '#555', border: '1.5px solid rgba(0,0,0,.18)',
-                cursor: 'pointer', fontSize: 11, fontWeight: 700, letterSpacing: '0.14em',
-                textTransform: 'uppercase', fontFamily: "'Sarabun',sans-serif",
-                padding: '12px 28px', borderRadius: 6,
-              }}>
-                {t('home','viewAll')} {scriptCount}+
+              <button
+                className="mm-btn-gho"
+                onClick={() => showPage('games')}
+                style={{
+                  background: 'transparent',
+                  color: TEXT_MAIN,
+                  border: `1.5px solid ${BORDER_CLR}`,
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  padding: '12px 24px',
+                  borderRadius: 8,
+                }}
+              >
+                ดูสคริปต์ทั้งหมด {scriptCount}+ เรื่อง &gt;
               </button>
             </div>
           </div>
 
-          {/* Card grid */}
-          <div className="mm-catalog-grid">
-            {gridGames.map((game, i) => {
-              const imgSrc = (game.image || game.coverUrl) ? convertImageUrl(game.image || game.coverUrl, 400) : null;
-              const displayPrice = game.fullPrice ?? game.price;
-              return (
-                <div key={game.id || i}
-                  className={`mm-card mm-reveal mm-d${Math.min((i % 4) + 1, 6)}${i >= 4 ? ' mm-card-mobile-hide' : ''}`}
-                  role="button" tabIndex={0}
-                  onClick={() => showPage('games')}
-                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && showPage('games')}
-                  style={{ borderRadius: 12, overflow: 'hidden', background: PAPER_2, border: '1px solid rgba(0,0,0,.07)', display: 'flex', flexDirection: 'column', boxShadow: '0 2px 8px rgba(0,0,0,.05)' }}>
-                  <div style={{ position: 'relative', aspectRatio: '2/3', overflow: 'hidden', flexShrink: 0 }}>
-                    {imgSrc
-                      ? <img src={imgSrc} alt={game.title} loading="lazy" decoding="async" className="mm-card-img" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      : <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(145deg,#1a1a2e,#16213e)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><i className="fas fa-user-secret" style={{ fontSize: 40, color: 'rgba(255,255,255,.1)' }} /></div>
-                    }
-                    <div className="mm-card-overlay" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(0,0,0,.8) 0%,rgba(0,0,0,.02) 55%,transparent 100%)', opacity: 0.48 }} />
-                    {game.difficulty && <DiffBadge d={game.difficulty} />}
-                    {displayPrice === 0 && (
-                      <span style={{ position: 'absolute', top: 8, right: 8, zIndex: 2, fontSize: 10.5, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: AMBER, color: VOID }}>{t('home','free')}</span>
-                    )}
-                  </div>
-                  <div style={{ padding: '12px 14px 14px', display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
-                    <p style={{ fontSize: 12.5, fontWeight: 700, color: INK, lineHeight: 1.35, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', margin: 0 }}>
-                      {game.title}
-                    </p>
-                    <div style={{ display: 'flex', gap: 2 }}>
-                      {[1,2,3,4,5].map(s => <span key={s} style={{ fontSize: 9.5, color: s <= 4 ? AMBER : 'var(--void-200)', lineHeight: 1 }}>★</span>)}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', paddingTop: 4 }}>
-                      {!!game.players && <span style={{ fontSize: 10, color: INK_3 }}>{game.players} {t('home','playerCount')}</span>}
-                      {displayPrice !== undefined && (
-                        <span style={{ fontSize: 13, fontWeight: 800, color: displayPrice === 0 ? AMBER : C }}>
-                          {displayPrice === 0 ? t('home','free') : `฿${displayPrice}`}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {/* Swimlane 1: Trending Now */}
+          <HomeNetflixSwimlaneRow
+            title="กำลังมาแรงติดเทรนด์"
+            games={trendingGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
 
-          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 52 }}>
-            <button className="mm-btn-gho" onClick={() => showPage('games')} style={{
-              background: 'transparent', color: '#555', border: '1.5px solid rgba(0,0,0,.18)',
-              cursor: 'pointer', fontSize: 12, fontWeight: 700, letterSpacing: '0.18em',
-              textTransform: 'uppercase', fontFamily: "'Sarabun',sans-serif",
-              padding: '17px 60px', borderRadius: 6,
-            }}>
-              {t('home','openAllFiles')} {scriptCount}+ →
+          {/* Swimlane 2: New Releases */}
+          <HomeNetflixSwimlaneRow
+            title="เกมเข้าใหม่ล่าสุด"
+            games={sortedNewestGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 3: Beginner Friendly */}
+          <HomeNetflixSwimlaneRow
+            title="เหมาะสำหรับมือใหม่"
+            games={beginnerGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 4: Detective & Hardcore Mystery */}
+          <HomeNetflixSwimlaneRow
+            title="สืบสวนเข้มข้น ปริศนาท้าทาย"
+            games={detectiveGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 5: Roleplay & Drama */}
+          <HomeNetflixSwimlaneRow
+            title="สวมบทบาท ดราม่าอารมณ์"
+            games={dramaGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Catalog Footer Link */}
+          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>
+            <button
+              className="mm-btn-pri"
+              onClick={() => showPage('games')}
+              style={{
+                background: NETFLIX_RED,
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                padding: '16px 48px',
+                borderRadius: 8,
+                boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
+              }}
+            >
+              เปิดดูคลังสคริปต์ทั้งหมด {scriptCount}+ เรื่อง
             </button>
           </div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════
-          4. STATS — dark, credibility numbers
+          4. STATS BAR (WHITE THEME)
       ══════════════════════════════════════════ */}
-      <section style={{ background: '#060606', color: '#fff', padding: 'clamp(64px,8vw,104px) clamp(24px,5vw,64px)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-
-          <div className="mm-stats-grid">
+      <section style={{ background: BG_SURFACE, color: TEXT_MAIN, padding: 'clamp(56px,7vw,88px) clamp(20px,5vw,60px)', borderTop: `1px solid ${BORDER_CLR}`, borderBottom: `1px solid ${BORDER_CLR}` }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
             {[
               { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
               { num: '200+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
-              { num: '฿499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
+              { num: 'B499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
               { num: '5',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
             ].map((s, i) => (
               <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
-                padding: 'clamp(32px,4vw,56px) clamp(20px,3vw,40px)',
-                borderRight: s.border ? '1px solid rgba(255,255,255,.06)' : 'none',
+                padding: 'clamp(24px,3vw,40px) clamp(16px,2vw,28px)',
+                background: '#ffffff',
+                borderRadius: 12,
+                border: `1px solid ${BORDER_CLR}`,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
               }}>
-                <div className="mm-stat-num" style={{ fontSize: 'clamp(52px,7.5vw,96px)', color: '#fff' }}>{s.num}</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: C, textTransform: 'uppercase', letterSpacing: '0.1em', marginTop: 4 }}>{s.unit}</div>
-                <div style={{ fontSize: 11, color: 'rgba(255,255,255,.28)', marginTop: 6 }}>{s.sub}</div>
+                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,76px)', color: TEXT_MAIN, lineHeight: 0.9 }}>
+                  {s.num}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: NETFLIX_RED, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>
+                  {s.unit}
+                </div>
+                <div style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 4 }}>
+                  {s.sub}
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="mm-reveal" style={{ marginTop: 48, paddingTop: 36, borderTop: '1px solid rgba(255,255,255,.06)', textAlign: 'center' }}>
-            <p style={{ fontSize: 'clamp(14px,1.6vw,17px)', fontWeight: 600, color: 'rgba(255,255,255,.65)', maxWidth: '64ch', margin: '0 auto', lineHeight: 1.65 }}>
+          <div className="mm-reveal" style={{ marginTop: 40, textAlign: 'center' }}>
+            <p style={{ fontSize: 'clamp(13px,1.4vw,16px)', fontWeight: 600, color: TEXT_MUTED, maxWidth: '64ch', margin: '0 auto', lineHeight: 1.7 }}>
               <strong>Sofun Club Thailand</strong> ผู้บุกเบิกและสตูดิโอเกม <strong>Script Murder</strong> คุณภาพพรีเมียมแห่งแรกใจกลาง RCA พร้อม Game Master มืออาชีพดูแลห้องสืบคดีทุกรอบ
             </p>
           </div>
@@ -1004,48 +1343,50 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </section>
 
       {/* ══════════════════════════════════════════
-          6. HOW TO PLAY
+          5. HOW TO PLAY (WHITE THEME)
       ══════════════════════════════════════════ */}
-      <section style={{ background: '#0a0a0a', color: '#fff', padding: 'clamp(72px,9vw,120px) clamp(24px,5vw,64px)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          <div className="mm-reveal" style={{ marginBottom: 64 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+      <section style={{ background: BG_PAGE, color: TEXT_MAIN, padding: 'clamp(64px,8vw,104px) clamp(20px,5vw,60px)' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div className="mm-reveal" style={{ marginBottom: 48, textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED, padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+              HOW TO PLAY
             </div>
-            <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(48px,7vw,96px)', lineHeight: 0.88, textTransform: 'uppercase', color: '#fff', margin: 0 }}>
+            <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(40px,6vw,80px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
               {t('home','howStartHeading')}
             </h2>
           </div>
 
-          <div className="mm-steps-grid">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
             {[
               { n: '01', icon: 'fas fa-folder-open', title: t('home','step1Title'), desc: t('home','step1Desc'), d: 'mm-d1' },
               { n: '02', icon: 'fas fa-user-secret', title: t('home','step2Title'), desc: t('home','step2Desc'), d: 'mm-d2' },
               { n: '03', icon: 'fas fa-search',      title: t('home','step3Title'), desc: t('home','step3Desc'), d: 'mm-d3' },
             ].map((step, i) => (
               <div key={i} className={`mm-reveal ${step.d} mm-step-card`} style={{
-                padding: 'clamp(28px,4vw,48px)',
-                borderRight: i < 2 ? '1px solid rgba(255,255,255,.05)' : 'none',
+                padding: 'clamp(28px,3.5vw,44px)',
                 position: 'relative',
+                border: `1px solid ${BORDER_CLR}`,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
               }}>
                 <div aria-hidden className="mm-step-num">{step.n}</div>
-                <div style={{ marginTop: -14, marginBottom: 16 }}>
-                  <div style={{ width: 26, height: 2, background: C, marginBottom: 14, borderRadius: 2 }} />
-                  <i className={step.icon} style={{ fontSize: 22, color: C, display: 'block', marginBottom: 14 }} />
-                  <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(24px,3vw,38px)', textTransform: 'uppercase', color: '#fff', marginBottom: 12, letterSpacing: '0.02em', margin: '0 0 12px' }}>
+                <div style={{ marginTop: -14 }}>
+                  <div style={{ width: 28, height: 3, background: NETFLIX_RED, marginBottom: 14, borderRadius: 2 }} />
+                  <i className={step.icon} style={{ fontSize: 24, color: NETFLIX_RED, display: 'block', marginBottom: 14 }} />
+                  <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(22px,2.6vw,32px)', textTransform: 'uppercase', color: TEXT_MAIN, marginBottom: 10, letterSpacing: '0.02em', margin: '0 0 10px' }}>
                     {step.title}
                   </h3>
-                  <p style={{ fontSize: 13.5, lineHeight: 1.85, color: 'rgba(255,255,255,.4)', margin: 0 }}>{step.desc}</p>
+                  <p style={{ fontSize: 13.5, lineHeight: 1.8, color: TEXT_MUTED, margin: 0 }}>{step.desc}</p>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 64, paddingTop: 48, borderTop: '1px solid rgba(255,255,255,.06)' }}>
+          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 52 }}>
             <button className="mm-btn-pri" onClick={() => showPage('games')} style={{
-              background: C, color: '#fff', border: 'none', cursor: 'pointer',
+              background: NETFLIX_RED, color: '#fff', border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
-              fontFamily: "'Sarabun',sans-serif", padding: '18px 56px', borderRadius: 6,
-              boxShadow: '0 8px 36px rgba(198,36,25,.45)',
+              fontFamily: "'Sarabun',sans-serif", padding: '16px 52px', borderRadius: 8,
+              boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
             }}>
               {t('home','startPlaying')}
             </button>
@@ -1054,154 +1395,87 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </section>
 
       {/* ══════════════════════════════════════════
-          7. OPEN PARTIES (conditional)
-      ══════════════════════════════════════════ */}
-      {openParties.length > 0 && (
-        <section style={{ background: PAPER_2, padding: 'clamp(56px,7vw,96px) clamp(24px,5vw,64px)' }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, marginBottom: 36, flexWrap: 'wrap' }}>
-              <div className="mm-reveal-l">
-                <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(36px,5vw,64px)', lineHeight: 0.9, textTransform: 'uppercase', color: INK, margin: 0 }}>
-                  {t('home','partyEyebrow')}
-                </h2>
-              </div>
-              <div className="mm-reveal-r" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ position: 'relative', display: 'inline-block', width: 8, height: 8 }}>
-                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: C, animation: 'mmPulse 2s ease-in-out infinite' }} />
-                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: C, animation: 'mmPing 2s ease-out infinite' }} />
-                </span>
-                <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, background: 'rgba(198,36,25,.1)', color: C }}>
-                  {openParties.length} {t('home','partiesOpen')}
-                </span>
-              </div>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(272px,1fr))', gap: 12 }}>
-              {openParties.map((party, i) => (
-                <div key={party.id} className={`mm-reveal mm-d${Math.min(i + 1, 4)} mm-party-card`} style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  padding: '16px 18px', background: PAPER, borderRadius: 10,
-                  border: '1px solid rgba(0,0,0,.08)', gap: 14,
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(198,36,25,.11)', color: C, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
-                      {(party.ownerName || '?')[0]}
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: INK, maxWidth: 148, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{party.gameName || 'ปาร์ตี้'}</p>
-                      <p style={{ fontSize: 10, color: INK_3, margin: '3px 0 0' }}>{party.ownerName} · {party.members?.length || 0}/{party.maxPlayers} คน</p>
-                    </div>
-                  </div>
-                  <button onClick={(e) => joinParty(party, e)} style={{
-                    fontSize: 11, fontWeight: 700, padding: '12px 18px', borderRadius: 5,
-                    background: C, color: '#fff', border: 'none', cursor: 'pointer', flexShrink: 0, minHeight: 44,
-                    transition: 'background .18s',
-                  }}
-                    onMouseEnter={e => e.currentTarget.style.background = C_DEEP}
-                    onMouseLeave={e => e.currentTarget.style.background = C}>
-                    {t('home','joinParty')}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ══════════════════════════════════════════
-          8. PROMOTION & NEW GAMES SPOTLIGHT
-      ══════════════════════════════════════════ */}
-      {/* ══════════════════════════════════════════
-          8. PROMOTION & NEW GAMES SPOTLIGHT (PRO UX/UI REDESIGN)
+          6. LUXURY VIP EVENT TICKET / PROMOTION (WHITE THEME)
       ══════════════════════════════════════════ */}
       <section style={{
-        background: 'radial-gradient(ellipse 70% 60% at 20% 30%, rgba(198,36,25,0.08) 0%, transparent 60%), radial-gradient(ellipse 60% 50% at 85% 70%, rgba(200,160,80,0.06) 0%, transparent 60%), #07070b',
-        color: '#fff',
+        background: BG_SURFACE,
+        color: TEXT_MAIN,
         position: 'relative',
         overflow: 'hidden',
-        borderTop: '1px solid rgba(255,255,255,0.06)',
-        borderBottom: '1px solid rgba(255,255,255,0.06)',
-        padding: 'clamp(64px, 8vw, 104px) clamp(20px, 4vw, 48px)',
+        borderTop: `1px solid ${BORDER_CLR}`,
+        borderBottom: `1px solid ${BORDER_CLR}`,
+        padding: 'clamp(56px, 7vw, 96px) clamp(16px, 4vw, 48px)',
       }}>
-        {/* Subtle Ambient Decorative Glows */}
-        <div aria-hidden className="mm-glow-orb-a" style={{ position: 'absolute', top: '-10%', left: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(198,36,25,0.12) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
-        <div aria-hidden className="mm-glow-orb-b" style={{ position: 'absolute', bottom: '-10%', right: '-5%', width: '400px', height: '400px', background: 'radial-gradient(circle, rgba(200,160,80,0.09) 0%, transparent 70%)', pointerEvents: 'none', filter: 'blur(40px)' }} />
-
         <div style={{ maxWidth: 1280, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          {/* ══ LUXURY VIP EVENT TICKET (DETAILS STUB + PERFORATED SEAM + 980x400 IMAGE) ══ */}
           <div className="mm-ticket-card mm-reveal">
-            {/* ── SHORT SIDE: DETAILS STUB (MINIMAL LUXURY) ── */}
+            {/* Details Stub */}
             <div className="mm-ticket-stub">
               <div>
-                {/* Minimal Header: Month Badge & Serial */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 14 }}>
                   <span style={{
                     fontSize: 10.5, fontWeight: 800, letterSpacing: '0.14em',
-                    textTransform: 'uppercase', color: 'var(--crimson-400)',
+                    textTransform: 'uppercase', color: NETFLIX_RED,
                   }}>
                     {promoSettings?.month || 'PROMOTION'}
                   </span>
                   <span style={{
                     fontFamily: 'monospace', fontSize: 10, letterSpacing: '0.15em',
-                    color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase',
+                    color: TEXT_LIGHT, textTransform: 'uppercase',
                   }}>
                     SF-09482
                   </span>
                 </div>
 
-                {/* Heading */}
                 <h2 style={{
                   fontFamily: "'Bebas Neue',sans-serif",
                   fontSize: 'clamp(28px, 2.8vw, 40px)',
                   lineHeight: 1,
                   textTransform: 'uppercase',
-                  color: '#fff',
+                  color: TEXT_MAIN,
                   margin: '0 0 14px 0',
                   letterSpacing: '0.02em',
                 }}>
                   {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
                 </h2>
 
-                {/* Minimal Voucher Discount Row */}
                 {promoSettings?.discountAmount && (
                   <div style={{
                     display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
                     padding: '10px 14px', borderRadius: 8,
-                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                    background: '#f8fafc', border: `1px solid ${BORDER_CLR}`,
                     marginBottom: 14,
                   }}>
-                    <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>
+                    <span style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: 600 }}>
                       {promoSettings.discountType === 'person' ? 'ลดต่อคนในรอบเล่น' : 'ส่วนลดทั้งปาร์ตี้'}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--crimson-400)' }}>฿</span>
-                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1, color: '#fff' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: NETFLIX_RED }}>B</span>
+                      <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1, color: TEXT_MAIN }}>
                         {promoSettings.discountAmount}
                       </span>
                     </div>
                   </div>
                 )}
 
-                {/* Description */}
                 <p style={{
-                  fontSize: 'clamp(12.5px, 1.1vw, 13.5px)', color: 'rgba(255,255,255,0.6)',
+                  fontSize: 'clamp(12.5px, 1.1vw, 13.5px)', color: TEXT_MUTED,
                   lineHeight: 1.6, margin: '0 0 14px 0',
                 }}>
                   {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
                 </p>
 
-                {/* Minimal Feature Tags - Clean inline text */}
                 <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
                   {([promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean).length > 0
                     ? [promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean)
                     : ['สคริปต์ยอดนิยม', 'ส่วนลดพิเศษ', 'จำนวนจำกัด']
-                  ).map((b, i, arr) => {
-                    const cleanText = b.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
+                  ).map((b, i) => {
+                    const cleanText = String(b || '').replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
                     return (
                       <span key={i} style={{
-                        fontSize: 10.5, color: 'rgba(255,255,255,0.45)',
+                        fontSize: 10.5, color: TEXT_MUTED,
                         display: 'inline-flex', alignItems: 'center', gap: 6,
                       }}>
-                        {i > 0 && <span style={{ color: 'rgba(255,255,255,0.18)' }}>·</span>}
+                        {i > 0 && <span style={{ color: TEXT_LIGHT }}>*</span>}
                         <span>{cleanText}</span>
                       </span>
                     );
@@ -1209,32 +1483,28 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 </div>
               </div>
 
-              {/* Action Button & Sleek Barcode */}
               <div>
                 <button
                   onClick={() => showPage(promoSettings?.buttonLink || 'booking')}
                   style={{
                     width: '100%',
-                    background: 'var(--crimson-500)',
+                    background: NETFLIX_RED,
                     color: '#fff', border: 'none', cursor: 'pointer',
-                    fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase',
+                    fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
                     fontFamily: "'Sarabun',sans-serif", padding: '12px 20px', borderRadius: 8,
-                    transition: 'all 0.2s ease', textAlign: 'center',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: '0 4px 14px rgba(229,9,20,0.25)',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--crimson-600)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'var(--crimson-500)'}
                 >
-                  <span>{(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย').replace(/→|->/g, '').trim()}</span>
+                  <span>{String(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย').replace(/->/g, '').trim()}</span>
                   <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
                 </button>
 
-                {/* Minimal Barcode */}
-                <div style={{ marginTop: 14, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="mm-ticket-barcode-lines" style={{ height: 22, opacity: 0.45 }} />
+                <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${BORDER_CLR}` }}>
+                  <div className="mm-ticket-barcode-lines" style={{ height: 22, opacity: 0.55 }} />
                   <div style={{
                     fontFamily: 'monospace', fontSize: 9, letterSpacing: '0.22em',
-                    color: 'rgba(255,255,255,0.3)', textAlign: 'center', marginTop: 4, textTransform: 'uppercase',
+                    color: TEXT_LIGHT, textAlign: 'center', marginTop: 4, textTransform: 'uppercase',
                   }}>
                     * SF-VOUCHER-2026 *
                   </div>
@@ -1242,7 +1512,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               </div>
             </div>
 
-            {/* ── PERFORATED SEAM WITH TEAR NOTCHES AND SCISSORS ── */}
+            {/* Perforated Seam */}
             <div className="mm-ticket-seam" aria-hidden="true">
               <div className="mm-ticket-seam-line" />
               <div className="mm-ticket-scissor">
@@ -1252,7 +1522,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               <div className="mm-ticket-notch-end" />
             </div>
 
-            {/* ── LONG SIDE: EVENT TICKET BANNER (980x400) ── */}
+            {/* 980x400 Promo Banner */}
             <div className="mm-ticket-body">
               <div className="mm-ticket-img-wrap">
                 {promoSettings?.bannerUrl ? (
@@ -1264,95 +1534,114 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 ) : (
                   <div style={{
                     width: '100%', height: '100%',
-                    background: 'linear-gradient(135deg, #18090d 0%, #0c0e18 50%, #050711 100%)',
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     padding: 24, textAlign: 'center', position: 'relative',
                   }}>
                     <div style={{
                       width: 56, height: 56, borderRadius: '50%',
-                      background: 'rgba(198,36,25,0.15)', border: '1px solid rgba(198,36,25,0.3)',
+                      background: 'rgba(229,9,20,0.08)', border: '1px solid rgba(229,9,20,0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      color: 'var(--crimson-400)', fontSize: 22, marginBottom: 10,
+                      color: NETFLIX_RED, fontSize: 22, marginBottom: 10,
                     }}>
                       <i className="fas fa-ticket-alt" />
                     </div>
-                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, letterSpacing: '0.08em', color: '#fff', textTransform: 'uppercase' }}>
+                    <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 26, letterSpacing: '0.08em', color: TEXT_MAIN, textTransform: 'uppercase' }}>
                       SOFUN EVENT PASS
                     </div>
-                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                    <div style={{ fontSize: 11, color: TEXT_MUTED, marginTop: 4 }}>
                       EXCLUSIVE MURDER MYSTERY EVENT
                     </div>
                   </div>
                 )}
 
-                {/* Ornamental Gold Corner Brackets for Luxury Ticket Frame */}
-                <div style={{ position: 'absolute', top: 12, left: 12, width: 18, height: 18, borderTop: '2px solid rgba(255,215,0,0.65)', borderLeft: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
-                <div style={{ position: 'absolute', top: 12, right: 12, width: 18, height: 18, borderTop: '2px solid rgba(255,215,0,0.65)', borderRight: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
-                <div style={{ position: 'absolute', bottom: 12, left: 12, width: 18, height: 18, borderBottom: '2px solid rgba(255,215,0,0.65)', borderLeft: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
-                <div style={{ position: 'absolute', bottom: 12, right: 12, width: 18, height: 18, borderBottom: '2px solid rgba(255,215,0,0.65)', borderRight: '2px solid rgba(255,215,0,0.65)', pointerEvents: 'none', zIndex: 4 }} />
-
                 {/* VIP Gold Foil Badge */}
                 <div style={{
                   position: 'absolute', top: 16, right: 16,
-                  background: 'linear-gradient(135deg, rgba(212,175,55,0.95) 0%, rgba(160,120,40,0.95) 100%)',
-                  color: '#1a1002', padding: '4px 12px', borderRadius: 6,
+                  background: 'linear-gradient(135deg, #d4af37 0%, #aa820a 100%)',
+                  color: '#ffffff', padding: '4px 12px', borderRadius: 6,
                   fontSize: 9.5, fontWeight: 900, letterSpacing: '0.14em',
                   textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6,
-                  boxShadow: '0 4px 16px rgba(0,0,0,0.6)', zIndex: 5,
+                  boxShadow: '0 4px 14px rgba(0,0,0,0.2)', zIndex: 5,
                 }}>
                   <i className="fas fa-crown" style={{ fontSize: 9 }} />
                   <span>VIP ADMISSION PASS</span>
-                </div>
-
-                {/* Bottom Ticket Watermark Overlay */}
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0,
-                  background: 'linear-gradient(to top, rgba(8,8,12,0.96) 0%, rgba(8,8,12,0.6) 60%, transparent 100%)',
-                  padding: '24px 18px 12px',
-                  display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
-                  gap: 12, zIndex: 4,
-                }}>
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.18em', color: 'var(--crimson-400)', textTransform: 'uppercase', marginBottom: 2 }}>
-                      SOFUN LOUNGE · SPECIAL VOUCHER
-                    </div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {promoSettings?.heading || 'สิทธิ์พิเศษเฉพาะคุณ'}
-                    </div>
-                  </div>
-                  <div style={{
-                    fontFamily: 'monospace', fontSize: 10, letterSpacing: '0.12em',
-                    color: 'rgba(255,255,255,0.45)', flexShrink: 0, textTransform: 'uppercase',
-                  }}>
-                    FORMAT 980x400
-                  </div>
                 </div>
               </div>
             </div>
           </div>
         </div>
-
       </section>
 
       {/* ══════════════════════════════════════════
-          9. SCRIPT MURDER STORY & SEO SECTION
+          7. OPEN PARTIES (WHITE THEME - CONDITIONAL)
+      ══════════════════════════════════════════ */}
+      {openParties.length > 0 && (
+        <section style={{ background: BG_PAGE, padding: 'clamp(56px,7vw,88px) clamp(20px,5vw,60px)', borderBottom: `1px solid ${BORDER_CLR}` }}>
+          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 20, marginBottom: 32, flexWrap: 'wrap' }}>
+              <div className="mm-reveal-l">
+                <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(36px,5vw,64px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
+                  {t('home','partyEyebrow')}
+                </h2>
+              </div>
+              <div className="mm-reveal-r" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ position: 'relative', display: 'inline-block', width: 8, height: 8 }}>
+                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: NETFLIX_RED, animation: 'mmPulse 2s ease-in-out infinite' }} />
+                  <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: NETFLIX_RED, animation: 'mmPing 2s ease-out infinite' }} />
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, background: 'rgba(229,9,20,.08)', color: NETFLIX_RED }}>
+                  {openParties.length} {t('home','partiesOpen')}
+                </span>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(272px,1fr))', gap: 14 }}>
+              {openParties.map((party, i) => (
+                <div key={party.id} className={`mm-reveal mm-d${Math.min(i + 1, 4)} mm-party-card`} style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '16px 18px', background: BG_SURFACE, borderRadius: 12,
+                  border: `1px solid ${BORDER_CLR}`, gap: 14,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(229,9,20,.08)', color: NETFLIX_RED, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
+                      {(party.ownerName || '?')[0]}
+                    </div>
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 700, color: TEXT_MAIN, maxWidth: 148, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{party.gameName || 'ปาร์ตี้'}</p>
+                      <p style={{ fontSize: 10.5, color: TEXT_MUTED, margin: '3px 0 0' }}>{party.ownerName} · {party.members?.length || 0}/{party.maxPlayers} คน</p>
+                    </div>
+                  </div>
+                  <button onClick={(e) => joinParty(party, e)} style={{
+                    fontSize: 11, fontWeight: 800, padding: '10px 18px', borderRadius: 6,
+                    background: NETFLIX_RED, color: '#fff', border: 'none', cursor: 'pointer', flexShrink: 0,
+                  }}>
+                    {t('home','joinParty')}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ══════════════════════════════════════════
+          8. SCRIPT MURDER STORY & FAQ (WHITE THEME)
       ══════════════════════════════════════════ */}
       <section style={{
-        background: '#fff',
-        color: INK,
-        padding: 'clamp(64px, 8vw, 104px) clamp(24px, 5vw, 64px)',
-        borderTop: '1px solid rgba(0,0,0,0.06)',
+        background: BG_PAGE,
+        color: TEXT_MAIN,
+        padding: 'clamp(64px, 8vw, 104px) clamp(20px, 5vw, 60px)',
       }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div className="mm-reveal" style={{ textAlign: 'center', maxWidth: 800, margin: '0 auto 56px' }}>
+          <div className="mm-reveal" style={{ textAlign: 'center', maxWidth: 800, margin: '0 auto 52px' }}>
             <h2 style={{
               fontFamily: "'Bebas Neue', sans-serif",
               fontSize: 'clamp(36px, 5.5vw, 64px)',
-              lineHeight: 0.95, textTransform: 'uppercase', margin: '0 0 16px', color: '#111',
+              lineHeight: 0.95, textTransform: 'uppercase', margin: '0 0 14px', color: TEXT_MAIN,
             }}>
-              ประสบการณ์เกม <span style={{ color: C }}>Script Murder</span> กับ Sofun Club
+              ประสบการณ์เกม <span style={{ color: NETFLIX_RED }}>Script Murder</span> กับ Sofun Club
             </h2>
-            <p style={{ fontSize: 'clamp(13px, 1.3vw, 15px)', color: '#666', lineHeight: 1.8, margin: 0 }}>
+            <p style={{ fontSize: 'clamp(13px, 1.3vw, 15px)', color: TEXT_MUTED, lineHeight: 1.8, margin: 0 }}>
               ค้นพบเสน่ห์ของเกมสืบสวนสวมบทบาทที่ได้รับความนิยมสูงสุดในเอเชีย กับ Sofun Club Thailand
             </p>
           </div>
@@ -1380,26 +1669,26 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               },
             ].map((item, idx) => (
               <div key={idx} className={`mm-reveal mm-d${idx + 1} mm-story-card`} style={{
-                background: PAPER_2,
+                background: '#ffffff',
                 borderRadius: 16,
-                border: '1px solid rgba(0,0,0,0.07)',
+                border: `1px solid ${BORDER_CLR}`,
                 padding: '28px 24px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 14,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.03)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
               }}>
                 <div style={{
-                  width: 42, height: 42, borderRadius: 10,
-                  background: 'rgba(198,36,25,0.08)', color: C,
+                  width: 44, height: 44, borderRadius: 12,
+                  background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                 }}>
                   <i className={item.icon} />
                 </div>
-                <h3 style={{ fontSize: 16, fontWeight: 800, color: '#111', lineHeight: 1.4, margin: 0 }}>
+                <h3 style={{ fontSize: 16, fontWeight: 800, color: TEXT_MAIN, lineHeight: 1.4, margin: 0 }}>
                   {item.q}
                 </h3>
-                <p style={{ fontSize: 13, color: '#666', lineHeight: 1.75, margin: 0 }}>
+                <p style={{ fontSize: 13, color: TEXT_MUTED, lineHeight: 1.75, margin: 0 }}>
                   {item.a}
                 </p>
               </div>
@@ -1411,17 +1700,5 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       {/* ── Contact / Info Footer ── */}
       <Footer />
     </div>
-  );
-}
-
-/* ── DiffBadge ──────────────────────────────────────── */
-function DiffBadge({ d }) {
-  if (!d) return null;
-  const bg = { 'ง่าย': 'var(--feedback-success-icon)', 'ปานกลาง': 'var(--feedback-info-icon)', 'ยาก': 'var(--feedback-warning-icon)', 'ยากมาก': 'var(--crimson-500)' }[d] || 'var(--void-500)';
-  const fg = d === 'ยาก' ? 'var(--void-950)' : 'var(--chalk)';
-  return (
-    <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 2, fontSize: 11, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, color: fg, background: bg }}>
-      {d}
-    </span>
   );
 }

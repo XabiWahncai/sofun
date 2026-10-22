@@ -101,20 +101,45 @@ export default function PaymentModal({
     ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (gameUnit + (Number(selectedGame.deposit) || 0)))
     : gameUnit
 
+  const unassignedFoodTotal = orderArr
+    .filter(x => !x.orderedBy?.uid)
+    .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+  const sharedFoodPerMember = sessionMembers.length > 0
+    ? (unassignedFoodTotal / sessionMembers.length)
+    : 0
+
   const getMemberBill = (m) => {
     let bill = 0
     if (propGetMemberBill) {
       bill = propGetMemberBill(m)
     } else {
       const myFood = orderArr
-        .filter(x => x.orderedBy?.uid === m.uid)
+        .filter(x => x.orderedBy?.uid === m?.uid)
         .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
-      const myBaseGame = m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)
-      const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m.uid)
+      const myBaseGame = m?.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)
+      const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m?.uid)
       const myDisc = isMemberDiscounted ? (propDiscountPerDiscounted || 0) : 0
-      bill = Math.max(0, myBaseGame + myFood - (Number(m.personalDiscount) || 0) - myDisc)
+      bill = Math.max(0, myBaseGame + myFood + sharedFoodPerMember - (Number(m?.personalDiscount) || 0) - myDisc)
     }
     return Math.round(bill * 100) / 100
+  }
+
+  const getMemberPaid = (m) => {
+    const p = currentPayments[m?.uid]
+    return p?.verified ? (Number(p.amount) || 0) : 0
+  }
+  const getMemberRemaining = (m) => {
+    if (!m) return 0
+    const bill = getMemberBill(m)
+    const paid = getMemberPaid(m)
+    return Math.max(0, Math.round((bill - paid) * 100) / 100)
+  }
+  const isMemberFullyPaid = (m) => {
+    if (!m) return false
+    const p = currentPayments[m.uid]
+    if (!p?.verified) return false
+    const paid = Number(p.amount) || 0
+    return paid >= (getMemberBill(m) - 0.05)
   }
 
   const rawFoodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
@@ -130,13 +155,13 @@ export default function PaymentModal({
   const calcGrandTotal = propGrandTotal ?? Math.max(0, rawTotal - effectiveTotalDiscount - propTotalPersonalDiscounts)
   const tableRemaining = propRemainingAmount ?? Math.max(0, Math.round((calcGrandTotal - alreadyPaid) * 100) / 100)
 
-  const isAllMembersPaid = sessionMembers.length > 0 && sessionMembers.every(m => currentPayments[m.uid]?.verified)
+  const isAllMembersPaid = sessionMembers.length > 0 && sessionMembers.every(m => isMemberFullyPaid(m))
 
   // Initialize or maintain active member in split mode
   useEffect(() => {
     if (splitMode && sessionMembers.length > 0) {
       if (!activeMember || !sessionMembers.some(m => m.uid === activeMember)) {
-        const firstUnpaid = sessionMembers.find(m => !currentPayments[m.uid]?.verified)
+        const firstUnpaid = sessionMembers.find(m => !isMemberFullyPaid(m))
         setActiveMember((firstUnpaid || sessionMembers[0]).uid)
       }
     }
@@ -144,9 +169,9 @@ export default function PaymentModal({
 
   const activeMemberObj = sessionMembers.find(m => m.uid === activeMember) || sessionMembers[0] || null
   const activeAmt = splitMode && activeMemberObj
-    ? getMemberBill(activeMemberObj)
+    ? getMemberRemaining(activeMemberObj)
     : tableRemaining
-  const isSelectedMemberPaid = activeMemberObj ? Boolean(currentPayments[activeMemberObj.uid]?.verified) : false
+  const isSelectedMemberPaid = activeMemberObj ? isMemberFullyPaid(activeMemberObj) : false
 
   // ── Confirm single member payment (DOES NOT close party/session) ───────────
   const handleConfirmSingleMember = async () => {
@@ -155,7 +180,8 @@ export default function PaymentModal({
     }
     if (!activeMemberObj) return
     const targetUid = activeMemberObj.uid
-    const amt = Math.round(activeAmt * 100) / 100
+    const prevPaid = getMemberPaid(activeMemberObj)
+    const amt = Math.round((prevPaid + activeAmt) * 100) / 100
 
     setSaving(true)
     try {
@@ -186,7 +212,7 @@ export default function PaymentModal({
 
       // Auto-advance to next unpaid member
       const nextUnpaid = sessionMembers.find(
-        m => m.uid !== targetUid && !currentPayments[m.uid]?.verified
+        m => m.uid !== targetUid && !isMemberFullyPaid(m)
       )
       if (nextUnpaid) {
         setActiveMember(nextUnpaid.uid)
@@ -252,9 +278,30 @@ export default function PaymentModal({
           scanInAt: m.scanInAt || null,
         })),
         memberUids: sessionMembers.map(m => m.uid),
+        memberBills: sessionMembers.map(m => {
+          const mFood = orderArr.filter(x => x.orderedBy?.uid === m.uid)
+          const mUnassigned = orderArr.filter(x => !x.orderedBy?.uid)
+          const mSharedFood = mUnassigned.map(x => ({
+            name: `${x.name} (ส่วนกลาง)`,
+            addons: x.addons || [],
+            price: Math.round(((x.totalPrice || x.price || 0) / (sessionMembers.length || 1)) * 100) / 100,
+            qty: x.qty || 1,
+          }))
+          const mBillTotal = getMemberBill(m)
+          return {
+            uid: m.uid,
+            name: m.name,
+            character: m.character || '',
+            avatar: m.avatar || '',
+            gamePrice: m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit),
+            foodItems: [...mFood, ...mSharedFood],
+            total: mBillTotal,
+            personalDiscount: Number(m.personalDiscount) || 0,
+          }
+        }),
         gameUnitPrice: propGameUnitPay ?? gameUnit,
         gameTotal: rawGameTotal,
-        foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty })),
+        foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
         foodTotal: rawFoodTotal,
         discount: { applied: propTotalDiscount || 0 },
         alreadyPaid,
@@ -390,8 +437,8 @@ export default function PaymentModal({
               {/* Member Tabs */}
               <div className="pay-member-tabs">
                 {sessionMembers.map(m => {
-                  const isPaid = Boolean(currentPayments[m.uid]?.verified)
-                  const mBill = getMemberBill(m)
+                  const isPaid = isMemberFullyPaid(m)
+                  const mRemaining = getMemberRemaining(m)
                   const isActive = activeMember === m.uid
                   return (
                     <button
@@ -409,7 +456,7 @@ export default function PaymentModal({
                         {m.name.split(' ')[0]}
                       </span>
                       <span className="pay-member-tab-amt" style={{ color: isPaid ? '#16a34a' : 'var(--red)' }}>
-                        {isPaid ? 'จ่ายแล้ว' : `฿${fmtCurrency(mBill)}`}
+                        {isPaid ? 'จ่ายแล้ว' : `฿${fmtCurrency(mRemaining)}`}
                       </span>
                     </button>
                   )
@@ -569,7 +616,7 @@ export default function PaymentModal({
                 onClick={() => {
                   if (isAllMembersPaid) onClose()
                   else {
-                    const nextUnpaid = sessionMembers.find(m => !currentPayments[m.uid]?.verified)
+                    const nextUnpaid = sessionMembers.find(m => !isMemberFullyPaid(m))
                     if (nextUnpaid) setActiveMember(nextUnpaid.uid)
                   }
                 }}
