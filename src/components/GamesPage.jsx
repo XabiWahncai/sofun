@@ -319,6 +319,228 @@ const RESPONSIVE_CSS = `
     to { transform: translateY(0); }
   }
 
+  /* ── Netflix Signature Motion Engine ─────────────────────────────────── */
+
+  /* Billboard Cinematic Ken Burns Effect */
+  .netflix-billboard-backdrop {
+    animation: netflixKenBurns 22s cubic-bezier(0.25, 1, 0.5, 1) infinite alternate, netflixFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+    transform-origin: 75% 25%;
+    will-change: transform, opacity;
+  }
+  @keyframes netflixKenBurns {
+    0% { transform: scale(1) translate(0, 0); }
+    50% { transform: scale(1.05) translate(-1%, -0.5%); }
+    100% { transform: scale(1.02) translate(0.5%, 0.5%); }
+  }
+  @keyframes netflixFadeIn {
+    from { opacity: 0; }
+    to { opacity: 0.82; }
+  }
+
+  /* Billboard Staggered Entrance */
+  .netflix-billboard-tag {
+    animation: netflixMotionSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .netflix-billboard-title {
+    animation: netflixMotionSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+  }
+  .netflix-billboard-specs {
+    animation: netflixMotionSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+  }
+  .netflix-billboard-synopsis {
+    animation: netflixMotionSlideUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+  }
+  .netflix-billboard-actions {
+    animation: netflixMotionSlideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+  }
+  @keyframes netflixMotionSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  /* Billboard Buttons Micro-Interactions */
+  .netflix-billboard-btn-book {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, background 0.16s ease !important;
+  }
+  .netflix-billboard-btn-book:hover {
+    transform: scale(1.03) translateY(-1px) !important;
+    box-shadow: 0 8px 24px rgba(229,9,20,0.38) !important;
+  }
+  .netflix-billboard-btn-book:active {
+    transform: scale(0.97) !important;
+  }
+  .netflix-billboard-btn-detail {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.16s ease, border-color 0.16s ease !important;
+  }
+  .netflix-billboard-btn-detail:hover {
+    transform: scale(1.03) translateY(-1px) !important;
+    border-color: rgba(0,0,0,0.2) !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+  }
+  .netflix-billboard-btn-detail:active {
+    transform: scale(0.97) !important;
+  }
+
+  /* Poster Cards - The Iconic Netflix Elevation & Flare */
+  .netflix-card {
+    will-change: transform, box-shadow;
+    transition: transform 0.28s cubic-bezier(0.2, 0, 0, 1), box-shadow 0.28s ease, border-color 0.24s ease !important;
+  }
+  @media (hover: hover) and (min-width: 769px) {
+    .netflix-card:hover {
+      transform: translateY(-8px) scale(1.05) !important;
+      box-shadow: 0 20px 42px rgba(0,0,0,0.18), 0 0 0 1.5px rgba(229,9,20,0.35) !important;
+      z-index: 10 !important;
+    }
+    .netflix-card:hover .netflix-card-img {
+      transform: scale(1.06) !important;
+      filter: brightness(0.98) !important;
+    }
+  }
+
+  /* Specular Shimmer Streak across Cards */
+  .netflix-card::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0.62) 62%, transparent 100%);
+    transform: translateX(-120%);
+    transition: transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+    pointer-events: none;
+    z-index: 3;
+  }
+  @media (hover: hover) {
+    .netflix-card:hover::after {
+      transform: translateX(120%);
+    }
+  }
+
+  /* Mobile Touch Haptic Tactile Response */
+  .netflix-card:active {
+    transform: scale(0.96) !important;
+    transition: transform 0.12s ease !important;
+  }
+
+  /* Card Action Buttons Spring Animations */
+  .netflix-card-btn-play {
+    transition: transform 0.16s ease, background 0.16s ease, box-shadow 0.16s ease !important;
+  }
+  .netflix-card-btn-play:hover {
+    transform: scale(1.03);
+    box-shadow: 0 4px 12px rgba(229,9,20,0.35);
+  }
+  .netflix-card-btn-play:active {
+    transform: scale(0.96);
+  }
+  .netflix-card-btn-info {
+    transition: transform 0.16s ease, background 0.16s ease !important;
+  }
+  .netflix-card-btn-info:hover {
+    transform: scale(1.08);
+  }
+  .netflix-card-btn-info:active {
+    transform: scale(0.92);
+  }
+
+  /* Swimlane Row Reveal & Interactive Indicators */
+  .netflix-row-wrapper {
+    animation: netflixRowSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  @keyframes netflixRowSlideUp {
+    from {
+      opacity: 0;
+      transform: translateY(18px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .netflix-row-indicator {
+    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.24s ease !important;
+  }
+  .netflix-row-header:hover .netflix-row-indicator {
+    transform: scaleY(1.22);
+    box-shadow: 0 0 10px rgba(229,9,20,0.55);
+  }
+
+  /* Carousel Navigation Arrows Micro-Animations */
+  .netflix-scroll-arrow {
+    transition: opacity 0.25s ease !important;
+  }
+  .netflix-scroll-arrow-circle {
+    transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease, color 0.16s ease, background 0.22s ease !important;
+  }
+  .netflix-scroll-arrow:hover .netflix-scroll-arrow-circle {
+    transform: scale(1.15) !important;
+    border-color: rgba(229,9,20,0.4) !important;
+    color: #e50914 !important;
+    box-shadow: 0 6px 20px rgba(229,9,20,0.22), 0 2px 8px rgba(0,0,0,0.1) !important;
+  }
+  .netflix-scroll-arrow:active .netflix-scroll-arrow-circle {
+    transform: scale(0.95) !important;
+  }
+  .netflix-scroll-left:hover i {
+    animation: netflixArrowNudgeLeft 0.75s ease-in-out infinite alternate;
+  }
+  .netflix-scroll-right:hover i {
+    animation: netflixArrowNudgeRight 0.75s ease-in-out infinite alternate;
+  }
+  @keyframes netflixArrowNudgeLeft {
+    from { transform: translateX(0); }
+    to { transform: translateX(-3px); }
+  }
+  @keyframes netflixArrowNudgeRight {
+    from { transform: translateX(0); }
+    to { transform: translateX(3px); }
+  }
+
+  /* Subbar Controls Motion */
+  .netflix-cat-pill {
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease !important;
+  }
+  .netflix-cat-pill:hover {
+    transform: translateY(-1px);
+  }
+  .netflix-cat-pill:active {
+    transform: scale(0.95) !important;
+  }
+  .netflix-cat-pill.active {
+    box-shadow: 0 4px 14px rgba(229,9,20,0.3) !important;
+  }
+
+  .netflix-filter-btn {
+    transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), background 0.18s ease, color 0.18s ease, border-color 0.18s ease !important;
+  }
+  .netflix-filter-btn:hover {
+    transform: translateY(-1px);
+  }
+  .netflix-filter-btn:active {
+    transform: scale(0.95) !important;
+  }
+
+  .netflix-search-box input {
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .netflix-search-box input:focus {
+    border-color: rgba(229,9,20,0.6) !important;
+    box-shadow: 0 0 0 3px rgba(229,9,20,0.12) !important;
+  }
+
+  .netflix-view-toggle button {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+  .netflix-view-toggle button:active {
+    transform: scale(0.93) !important;
+  }
+
   /* Disable hover transform on touch devices to avoid stuck states */
   @media (hover: none) {
     .netflix-card:hover {
@@ -386,12 +608,14 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
           alt={game.title}
           loading="lazy"
           decoding="async"
+          className="netflix-card-img"
           style={{
             width: '100%',
             height: '100%',
             objectFit: 'cover',
-            filter: hovered ? 'brightness(0.95)' : 'brightness(0.9)',
-            transition: 'filter 0.24s ease',
+            filter: hovered ? 'brightness(0.96)' : 'brightness(0.9)',
+            transform: hovered ? 'scale(1.06)' : 'scale(1)',
+            transition: 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), filter 0.24s ease',
           }}
         />
       ) : (
@@ -494,6 +718,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
           <button
             type="button"
             onClick={handleBook}
+            className="netflix-card-btn-play"
             style={{
               flex: 1,
               height: 28,
@@ -508,7 +733,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 4,
-              transition: 'background 0.16s ease',
+              transition: 'background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease',
             }}
             onMouseEnter={e => e.currentTarget.style.background = '#f6121d'}
             onMouseLeave={e => e.currentTarget.style.background = NETFLIX_RED}
@@ -519,6 +744,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
           <button
             type="button"
             onClick={handleDetail}
+            className="netflix-card-btn-info"
             style={{
               width: 28,
               height: 28,
@@ -531,7 +757,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 11,
-              transition: 'background 0.16s ease',
+              transition: 'background 0.16s ease, transform 0.16s ease',
             }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.38)'}
             onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.22)'}
@@ -577,11 +803,11 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
   if (games.length === 0) return null
 
   return (
-    <div style={{ position: 'relative', marginBottom: 38 }}>
+    <div className="netflix-row-wrapper" style={{ position: 'relative', marginBottom: 38 }}>
       {/* Row Header */}
       <div className="netflix-row-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', marginBottom: 14 }}>
         <div className="netflix-row-title-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
-          <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+          <div className="netflix-row-indicator" style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
           <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '-0.01em', textAlign: 'left' }}>
             {title}
           </h3>
@@ -638,7 +864,7 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
             }}
             className="netflix-scroll-arrow netflix-scroll-left" aria-label="เลื่อนซ้าย"
           >
-            <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#ffffff', color: TEXT_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_SUBTLE}` }}>
+            <div className="netflix-scroll-arrow-circle" style={{ width: 38, height: 38, borderRadius: '50%', background: '#ffffff', color: TEXT_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_SUBTLE}` }}>
               <i className="fas fa-chevron-left text-sm" />
             </div>
           </button>
@@ -692,7 +918,7 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
             }}
             className="netflix-scroll-arrow netflix-scroll-right" aria-label="เลื่อนขวา"
           >
-            <div style={{ width: 38, height: 38, borderRadius: '50%', background: '#ffffff', color: TEXT_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_SUBTLE}` }}>
+            <div className="netflix-scroll-arrow-circle" style={{ width: 38, height: 38, borderRadius: '50%', background: '#ffffff', color: TEXT_PRIMARY, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(0,0,0,0.12)', border: `1px solid ${BORDER_SUBTLE}` }}>
               <i className="fas fa-chevron-right text-sm" />
             </div>
           </button>
@@ -807,6 +1033,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
     >
       {/* Background Image with Light Vignette */}
       <div
+        key={`billboard-bg-${currentGame.id}`}
         className="netflix-billboard-backdrop"
         style={{
           position: 'absolute',
@@ -819,7 +1046,6 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
           backgroundPosition: 'center 22%',
           opacity: 0.82,
           filter: 'contrast(1.04) brightness(0.98)',
-          transition: 'background-image 0.6s ease-in-out',
         }}
       />
 
@@ -850,6 +1076,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
 
       {/* Content Container */}
       <div
+        key={`billboard-content-${currentGame.id}`}
         className="netflix-billboard-content"
         style={{
           position: 'relative',
@@ -862,7 +1089,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
         }}
       >
         {/* Spotlight Tag */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div className="netflix-billboard-tag" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span
             style={{
               background: NETFLIX_RED,
@@ -898,7 +1125,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
         </h1>
 
         {/* Quick Specs Row */}
-        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, fontSize: 13 }}>
+        <div className="netflix-billboard-specs" style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10, fontSize: 13 }}>
           <span
             style={{
               padding: '2px 8px',
@@ -949,6 +1176,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
           <button
             type="button"
             onClick={handleBook}
+            className="netflix-billboard-btn-book"
             style={{
               height: 44,
               padding: '0 26px',
@@ -963,10 +1191,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
               alignItems: 'center',
               gap: 8,
               boxShadow: '0 4px 16px rgba(229,9,20,0.3)',
-              transition: 'background 0.16s ease, transform 0.16s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f6121d'; e.currentTarget.style.transform = 'scale(1.02)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = NETFLIX_RED; e.currentTarget.style.transform = 'scale(1)' }}
           >
             <i className="fas fa-play" style={{ fontSize: 13 }} /> จองรอบเล่นเกมนี้
           </button>
@@ -974,6 +1199,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
           <button
             type="button"
             onClick={() => showDetail(currentGame.id)}
+            className="netflix-billboard-btn-detail"
             style={{
               height: 44,
               padding: '0 22px',
@@ -988,10 +1214,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              transition: 'background 0.16s ease, transform 0.16s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#f9fafb'; e.currentTarget.style.transform = 'scale(1.02)' }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.transform = 'scale(1)' }}
           >
             <i className="fas fa-info-circle" style={{ fontSize: 14 }} /> ข้อมูลเพิ่มเติม
           </button>
@@ -1086,6 +1309,7 @@ function NetflixSubBar({
               key={cat.id}
               type="button"
               onClick={() => onSelectCategory(cat.id)}
+              className={`netflix-cat-pill ${isAct ? 'active' : ''}`}
               style={{
                 padding: '6px 14px',
                 borderRadius: 20,
@@ -1096,7 +1320,6 @@ function NetflixSubBar({
                 border: `1px solid ${isAct ? NETFLIX_RED : 'transparent'}`,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                transition: 'all 0.16s ease',
               }}
               onMouseEnter={e => {
                 if (!isAct) e.currentTarget.style.background = '#e5e7eb'
