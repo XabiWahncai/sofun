@@ -1104,6 +1104,7 @@ function CreateBookingModal({
     return allGames.filter(g => {
       if (search && !g.title?.toLowerCase().includes(search.toLowerCase())) return false
       const count = g.characters?.length || parseInt(g.players) || 6
+      if (playerFilter === '2-4' && !(count <= 4)) return false
       if (playerFilter === '5-6' && !(count >= 5 && count <= 6)) return false
       if (playerFilter === '7-8' && !(count >= 7 && count <= 8)) return false
       if (playerFilter === '9+' && !(count >= 9)) return false
@@ -1405,6 +1406,7 @@ function CreateBookingModal({
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', padding: '2px 0' }}>
                   {[
                     { id: 'all', label: 'ทั้งหมด' },
+                    { id: '2-4', label: '2-4 คน' },
                     { id: '5-6', label: '5-6 คน' },
                     { id: '7-8', label: '7-8 คน' },
                     { id: '9+',  label: '9+ คน' },
