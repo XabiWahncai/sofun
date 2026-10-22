@@ -114,6 +114,24 @@ const NETFLIX_BOOKING_CSS = `
   .nfx-btn-secondary:active {
     transform: scale(0.97) !important;
   }
+
+  .nfx-script-card {
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  @media (hover: hover) {
+    .nfx-script-card:not(.selected):not(.locked):hover {
+      border-color: #e50914 !important;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
+      transform: translateY(-2px) !important;
+    }
+  }
+  .nfx-script-card.selected {
+    border-color: #e50914 !important;
+    box-shadow: 0 8px 24px rgba(229, 9, 20, 0.25) !important;
+    transform: translateY(-2px) !important;
+  }
 `
 
 // ── PromptPay QR Generation (EMVCo standard) ──────────────────────────────────
@@ -1049,11 +1067,24 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   )
 }
 
+// ── Helper to calculate player range ──────────────────────────────────────────
+function getGamePlayerRange(g) {
+  if (Array.isArray(g.characters) && g.characters.length > 0) {
+    return { min: g.characters.length, max: g.characters.length }
+  }
+  const s = String(g.players || '').trim()
+  const nums = s.match(/\d+/g)?.map(Number) || []
+  if (nums.length === 0) return { min: 6, max: 6 }
+  if (nums.length === 1) return { min: nums[0], max: nums[0] }
+  return { min: Math.min(...nums), max: Math.max(...nums) }
+}
+
 // ── Create Booking Modal ───────────────────────────────────────────────────────
 function CreateBookingModal({
   allGames = [],
   bookings = [],
   lineUser,
+  onLogin,
   onClose,
   showToast,
   defaultDate = '',
@@ -1061,10 +1092,14 @@ function CreateBookingModal({
   defaultTime = '',
   defaultRoom = '',
 }) {
-  const [selectedDate, setSelectedDate] = useState(defaultDate || '')
+  const tomorrowStr = toDateStr(new Date(Date.now() + 86400000))
+  const [selectedDate, setSelectedDate] = useState(() => {
+    if (defaultDate && defaultDate >= tomorrowStr) return defaultDate
+    return tomorrowStr
+  })
   const [selectedTime, setSelectedTime] = useState(defaultTime || '')
   const [selectedRoom, setSelectedRoom] = useState(defaultRoom || '')
-  const [step, setStep] = useState(defaultDate && defaultTime ? 'game' : 'game')
+  const [step, setStep] = useState(defaultGameId ? 'datetime' : 'game')
   const [selectedGame, setSelectedGame] = useState(() => {
     if (defaultGameId && allGames.length > 0) {
       return allGames.find(g => g.id === defaultGameId) || null
@@ -1083,7 +1118,6 @@ function CreateBookingModal({
   const [playerFilter, setPlayerFilter] = useState('all')
   const [submitting, setSubmitting] = useState(false)
 
-  const tomorrowStr = toDateStr(new Date(Date.now() + 86400000))
   const finalTime = selectedTime
 
   const activeDateBookings = selectedDate
@@ -1103,17 +1137,23 @@ function CreateBookingModal({
   const filteredGames = useMemo(() => {
     return allGames.filter(g => {
       if (search && !g.title?.toLowerCase().includes(search.toLowerCase())) return false
-      const count = g.characters?.length || parseInt(g.players) || 6
-      if (playerFilter === '2-4' && !(count <= 4)) return false
-      if (playerFilter === '5-6' && !(count >= 5 && count <= 6)) return false
-      if (playerFilter === '7-8' && !(count >= 7 && count <= 8)) return false
-      if (playerFilter === '9+' && !(count >= 9)) return false
+      const range = getGamePlayerRange(g)
+      if (playerFilter === '2-4' && !(range.min <= 4)) return false
+      if (playerFilter === '5-6' && !(range.min <= 6 && range.max >= 5)) return false
+      if (playerFilter === '7-8' && !(range.min <= 8 && range.max >= 7)) return false
+      if (playerFilter === '9+' && !(range.max >= 9)) return false
       return true
     })
   }, [allGames, search, playerFilter])
 
   const handleSubmit = async () => {
+    if (!lineUser || !lineUser.uid) {
+      showToast('กรุณาเข้าสู่ระบบ LINE ก่อนทำการจอง', 'warning')
+      onLogin?.()
+      return
+    }
     if (!selectedGame) {
+      setStep('game')
       showToast('กรุณาเลือกสคริปต์ที่ต้องการเล่น', 'error')
       return
     }
@@ -1145,11 +1185,11 @@ function CreateBookingModal({
         isMock: false,
         mockNote: '',
         leaderId: lineUser.uid,
-        leaderName: lineUser.name,
+        leaderName: lineUser.name || 'ไม่ระบุชื่อ',
         leaderAvatar: lineUser.avatar || '',
         members: [{
           uid: lineUser.uid,
-          name: lineUser.name,
+          name: lineUser.name || 'ไม่ระบุชื่อ',
           avatar: lineUser.avatar || '',
           paidDeposit: false,
           paidAt: ''
@@ -1185,7 +1225,7 @@ function CreateBookingModal({
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 'clamp(28px, 5vh, 48px) 16px',
+        padding: 'clamp(20px, 4vh, 40px) 16px',
         background: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(10px)',
         boxSizing: 'border-box',
@@ -1194,8 +1234,8 @@ function CreateBookingModal({
       <div
         style={{
           width: '100%',
-          maxWidth: '720px',
-          maxHeight: 'min(84dvh, 780px)',
+          maxWidth: '740px',
+          maxHeight: 'min(88dvh, 780px)',
           background: '#ffffff',
           borderRadius: '24px',
           border: '1px solid rgba(0, 0, 0, 0.08)',
@@ -1206,10 +1246,10 @@ function CreateBookingModal({
           fontFamily: 'Sarabun, sans-serif',
         }}
       >
-        {/* ── Modal Header (Spacious, Elegant, No edge-clipping) ──────── */}
+        {/* ── Modal Header (Pinned Top) ──────────────────────────────── */}
         <div
           style={{
-            padding: '24px clamp(20px, 3.5vw, 32px) 18px',
+            padding: '20px clamp(18px, 3vw, 28px) 16px',
             background: '#ffffff',
             borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
             display: 'flex',
@@ -1220,7 +1260,6 @@ function CreateBookingModal({
           }}
         >
           <div style={{ minWidth: 0, flex: 1 }}>
-            {/* Step badge + dots */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               <span
                 style={{
@@ -1259,7 +1298,7 @@ function CreateBookingModal({
                 />
                 <button
                   type="button"
-                  onClick={() => setStep('datetime')}
+                  onClick={() => selectedGame && setStep('datetime')}
                   title="ขั้นตอน 2 : เลือกรอบและเวลา"
                   style={{
                     width: step === 'datetime' ? '22px' : '7px',
@@ -1268,7 +1307,7 @@ function CreateBookingModal({
                     background: step === 'datetime' ? C : 'rgba(0, 0, 0, 0.15)',
                     border: 'none',
                     padding: 0,
-                    cursor: 'pointer',
+                    cursor: selectedGame ? 'pointer' : 'not-allowed',
                     transition: 'all 0.24s ease',
                   }}
                 />
@@ -1292,7 +1331,7 @@ function CreateBookingModal({
 
             <p style={{ margin: '4px 0 0', fontSize: '12.5px', color: '#64748b', lineHeight: 1.5 }}>
               {step === 'game'
-                ? 'เลือกสคริปต์จากแฟ้มคดี หรือกรองตามจำนวนผู้เล่นที่ต้องการ'
+                ? 'คลิกเลือกสคริปต์คดีที่ต้องการเล่น หรือกรองตามจำนวนผู้เล่น'
                 : 'ระบุวันที่และรอบเวลาที่ต้องการเปิดห้องสืบคดี'}
             </p>
           </div>
@@ -1316,58 +1355,28 @@ function CreateBookingModal({
               flexShrink: 0,
               transition: 'all 0.15s ease',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#e5e7eb'; e.currentTarget.style.color = INK }}
-            onMouseLeave={e => { e.currentTarget.style.background = '#f3f4f6'; e.currentTarget.style.color = '#64748b' }}
           >
             <i className="fas fa-times" />
           </button>
         </div>
 
-        {/* ── Modal Body ────────────────────────────────────────────── */}
+        {/* ── Modal Body (Scrollable Middle) ─────────────────────────── */}
         <div
           style={{
-            padding: '20px clamp(20px, 3.5vw, 32px)',
+            padding: '18px clamp(18px, 3vw, 28px)',
             overflowY: 'auto',
             flex: 1,
+            minHeight: 0,
             display: 'flex',
             flexDirection: 'column',
             gap: '16px',
           }}
         >
-          {selectedDate && finalTime && (
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                borderRadius: '14px',
-                background: 'rgba(229, 9, 20, 0.05)',
-                border: '1px solid rgba(229, 9, 20, 0.18)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px' }}>
-                <i className="fas fa-calendar-check" style={{ color: C }} />
-                <span style={{ color: INK, fontWeight: 700 }}>
-                  รอบวันที่ {fmtDate(selectedDate)} เวลา {finalTime} น.
-                  {selectedRoom ? ` (${selectedRoom})` : ''}
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStep('datetime')}
-                style={{ fontSize: '12px', fontWeight: 800, color: C, background: 'none', border: 'none', cursor: 'pointer' }}
-              >
-                เปลี่ยนรอบ
-              </button>
-            </div>
-          )}
-
-          {/* STEP 1: Visual Script Selection */}
+          {/* STEP 1: Script Selection */}
           {step === 'game' && (
             <>
+              {/* Search + Filter */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                {/* Search */}
                 <div style={{ position: 'relative' }}>
                   <i className="fas fa-search" style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#9ca3af', fontSize: '13px' }} />
                   <input
@@ -1379,7 +1388,7 @@ function CreateBookingModal({
                       width: '100%',
                       paddingLeft: '42px',
                       paddingRight: search ? '38px' : '16px',
-                      height: '44px',
+                      height: '42px',
                       background: '#f8fafc',
                       border: '1px solid rgba(0, 0, 0, 0.08)',
                       borderRadius: '12px',
@@ -1388,8 +1397,6 @@ function CreateBookingModal({
                       outline: 'none',
                       boxSizing: 'border-box',
                     }}
-                    onFocus={e => { e.target.style.borderColor = C; e.target.style.background = '#ffffff' }}
-                    onBlur={e => { e.target.style.borderColor = 'rgba(0, 0, 0, 0.08)'; e.target.style.background = '#f8fafc' }}
                   />
                   {search && (
                     <button
@@ -1402,7 +1409,7 @@ function CreateBookingModal({
                   )}
                 </div>
 
-                {/* Player count filter pills */}
+                {/* Filter Pills */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none', padding: '2px 0' }}>
                   {[
                     { id: 'all', label: 'ทั้งหมด' },
@@ -1420,7 +1427,7 @@ function CreateBookingModal({
                         style={{
                           padding: '6px 14px',
                           borderRadius: '20px',
-                          border: `1px solid ${isActive ? C : 'rgba(0, 0, 0, 0.08)'}`,
+                          border: `1.5px solid ${isActive ? C : 'rgba(0, 0, 0, 0.08)'}`,
                           background: isActive ? 'rgba(229, 9, 20, 0.08)' : '#ffffff',
                           color: isActive ? C : '#4b5563',
                           fontSize: '12px',
@@ -1440,15 +1447,13 @@ function CreateBookingModal({
                 </div>
               </div>
 
-              {/* Visual Posters Grid (Clean margins & spacious cards) */}
+              {/* Posters Grid */}
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(136px, 1fr))',
-                  gap: '14px',
-                  maxHeight: '44vh',
-                  overflowY: 'auto',
-                  padding: '6px 4px 16px',
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(132px, 1fr))',
+                  gap: '12px',
+                  padding: '4px 2px 12px',
                 }}
               >
                 {filteredGames.length === 0 && (
@@ -1461,39 +1466,40 @@ function CreateBookingModal({
                   const isSel = selectedGame?.id === g.id
                   const isLocked = lockedSlotIds.has(g.id)
                   const gImg = g.image ? convertImg(g.image, 320) : null
-                  const pCount = g.characters?.length || parseInt(g.players) || 6
+                  const pRange = getGamePlayerRange(g)
+                  const pLabel = pRange.min === pRange.max ? `${pRange.min} คน` : `${pRange.min}-${pRange.max} คน`
 
                   return (
                     <div
                       key={g.id}
-                      onClick={() => !isLocked && setSelectedGame(g)}
+                      role="button"
+                      tabIndex={0}
+                      aria-pressed={isSel}
+                      onClick={() => {
+                        if (!isLocked) {
+                          setSelectedGame(g)
+                        }
+                      }}
+                      onKeyDown={e => {
+                        if ((e.key === 'Enter' || e.key === ' ') && !isLocked) {
+                          e.preventDefault()
+                          setSelectedGame(g)
+                        }
+                      }}
+                      className={`nfx-script-card ${isSel ? 'selected' : ''} ${isLocked ? 'locked' : ''}`}
                       style={{
                         position: 'relative',
                         borderRadius: '14px',
                         overflow: 'hidden',
                         background: '#ffffff',
-                        border: `1.5px solid ${isSel ? C : 'rgba(0, 0, 0, 0.08)'}`,
-                        boxShadow: isSel ? '0 6px 20px rgba(229, 9, 20, 0.22)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                        border: isSel ? `2px solid ${C}` : '1.5px solid rgba(0, 0, 0, 0.08)',
+                        boxShadow: isSel ? '0 8px 24px rgba(229, 9, 20, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         opacity: isLocked ? 0.5 : 1,
-                        transition: 'transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s, border-color 0.2s',
                         transform: isSel ? 'translateY(-2px)' : 'none',
                         display: 'flex',
                         flexDirection: 'column',
-                      }}
-                      onMouseEnter={e => {
-                        if (!isLocked && !isSel) {
-                          e.currentTarget.style.borderColor = C
-                          e.currentTarget.style.boxShadow = '0 6px 18px rgba(0, 0, 0, 0.08)'
-                          e.currentTarget.style.transform = 'translateY(-2px)'
-                        }
-                      }}
-                      onMouseLeave={e => {
-                        if (!isLocked && !isSel) {
-                          e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'
-                          e.currentTarget.style.boxShadow = '0 2px 6px rgba(0, 0, 0, 0.03)'
-                          e.currentTarget.style.transform = 'none'
-                        }
+                        outline: 'none',
                       }}
                     >
                       <div style={{ position: 'relative', height: '140px', background: '#1e293b', overflow: 'hidden' }}>
@@ -1502,7 +1508,8 @@ function CreateBookingModal({
                             src={gImg}
                             alt={g.title}
                             loading="lazy"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            draggable={false}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' }}
                           />
                         ) : (
                           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
@@ -1511,14 +1518,14 @@ function CreateBookingModal({
                         )}
 
                         {isSel && (
-                          <div style={{ position: 'absolute', top: 6, right: 6, width: '22px', height: '22px', borderRadius: '50%', background: C, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', boxShadow: '0 2px 6px rgba(0,0,0,0.3)' }}>
+                          <div style={{ position: 'absolute', top: 6, right: 6, width: '24px', height: '24px', borderRadius: '50%', background: C, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', boxShadow: '0 2px 8px rgba(229,9,20,0.5)' }}>
                             <i className="fas fa-check" />
                           </div>
                         )}
 
-                        <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0, 0, 0, 0.72)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px' }}>
+                        <div style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0, 0, 0, 0.75)', backdropFilter: 'blur(4px)', color: '#ffffff', fontSize: '10px', fontWeight: 700, padding: '2px 7px', borderRadius: '6px' }}>
                           <i className="fas fa-users" style={{ marginRight: '3px', fontSize: '8px' }} />
-                          {pCount} คน
+                          {pLabel}
                         </div>
                       </div>
 
@@ -1536,98 +1543,6 @@ function CreateBookingModal({
                     </div>
                   )
                 })}
-              </div>
-
-              {/* Bottom Sticky Action Bar */}
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '12px',
-                  padding: '12px 16px',
-                  background: '#f8fafc',
-                  borderRadius: '14px',
-                  border: '1px solid rgba(0, 0, 0, 0.06)',
-                  marginTop: '4px',
-                }}
-              >
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  {selectedGame ? (
-                    <div>
-                      <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: C, letterSpacing: '0.08em' }}>
-                        สคริปต์ที่เลือก:
-                      </span>
-                      <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 900, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {selectedGame.title}
-                      </h4>
-                      <span style={{ fontSize: '11px', color: '#6b7280' }}>
-                        มัดจำ ฿{selectedGame.deposit || 0}/คน
-                      </span>
-                    </div>
-                  ) : (
-                    <span style={{ fontSize: '12.5px', color: '#9ca3af' }}>
-                      กรุณาคลิกเลือกสคริปต์ที่ต้องการเล่น
-                    </span>
-                  )}
-                </div>
-
-                {selectedDate && finalTime ? (
-                  <button
-                    type="button"
-                    disabled={!selectedGame || submitting}
-                    onClick={handleSubmit}
-                    className="nfx-btn-primary"
-                    style={{
-                      padding: '10px 22px',
-                      borderRadius: '10px',
-                      background: selectedGame && !submitting ? C : '#e5e7eb',
-                      color: selectedGame && !submitting ? '#ffffff' : '#9ca3af',
-                      fontWeight: 800,
-                      fontSize: '13.5px',
-                      border: 'none',
-                      cursor: selectedGame && !submitting ? 'pointer' : 'not-allowed',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    {submitting ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
-                        <span>กำลังส่ง...</span>
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-paper-plane text-xs" />
-                        <span>ยืนยันการจอง</span>
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    disabled={!selectedGame}
-                    onClick={() => setStep('datetime')}
-                    className="nfx-btn-primary"
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: '10px',
-                      background: selectedGame ? C : '#e5e7eb',
-                      color: selectedGame ? '#ffffff' : '#9ca3af',
-                      fontWeight: 800,
-                      fontSize: '13.5px',
-                      border: 'none',
-                      cursor: selectedGame ? 'pointer' : 'not-allowed',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <span>ถัดไป: เลือกรอบ</span>
-                    <i className="fas fa-arrow-right text-xs" />
-                  </button>
-                )}
               </div>
             </>
           )}
@@ -1672,7 +1587,7 @@ function CreateBookingModal({
                     onClick={() => setStep('game')}
                     style={{ fontSize: '11.5px', fontWeight: 700, color: C, background: 'rgba(229, 9, 20, 0.08)', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer' }}
                   >
-                    เปลี่ยน
+                    เปลี่ยนสคริปต์
                   </button>
                 </div>
               )}
@@ -1695,7 +1610,7 @@ function CreateBookingModal({
                   value={selectedDate}
                   onChange={e => { setSelectedDate(e.target.value); setSelectedTime('') }}
                   style={{
-                    height: '48px',
+                    height: '46px',
                     padding: '0 16px',
                     borderRadius: '12px',
                     background: '#f8fafc',
@@ -1707,8 +1622,6 @@ function CreateBookingModal({
                     colorScheme: 'light',
                     boxSizing: 'border-box',
                   }}
-                  onFocus={e => { e.target.style.borderColor = C; e.target.style.boxShadow = `0 0 0 3px rgba(229,9,20,0.12)` }}
-                  onBlur={e => { e.target.style.borderColor = selectedDate ? C : 'rgba(0, 0, 0, 0.08)'; e.target.style.boxShadow = 'none' }}
                 />
                 <div style={{ fontSize: '11px', color: '#6b7280', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   <i className="fas fa-info-circle" style={{ color: C }} />
@@ -1738,7 +1651,7 @@ function CreateBookingModal({
                         type="button"
                         onClick={() => setSelectedTime(t)}
                         style={{
-                          height: '56px',
+                          height: '54px',
                           borderRadius: '12px',
                           background: isActive ? C : '#f8fafc',
                           color: isActive ? '#ffffff' : INK,
@@ -1763,62 +1676,131 @@ function CreateBookingModal({
                   })}
                 </div>
               </div>
+            </>
+          )}
+        </div>
 
-              {/* Actions */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                <button
-                  type="button"
-                  onClick={() => setStep('game')}
-                  style={{
-                    width: '48px',
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: '#f3f4f6',
-                    color: '#4b5563',
-                    border: 'none',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                  title="ย้อนกลับไปเลือกสคริปต์"
-                >
-                  <i className="fas fa-arrow-left" />
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedDate || !finalTime || submitting}
-                  onClick={handleSubmit}
-                  className="nfx-btn-primary"
-                  style={{
-                    flex: 1,
-                    height: '48px',
-                    borderRadius: '12px',
-                    background: selectedDate && finalTime && !submitting ? C : '#e5e7eb',
-                    color: selectedDate && finalTime && !submitting ? '#ffffff' : '#9ca3af',
-                    fontWeight: 800,
-                    fontSize: '14px',
-                    border: 'none',
-                    cursor: selectedDate && finalTime && !submitting ? 'pointer' : 'not-allowed',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                  }}
-                >
-                  {submitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
-                      <span>กำลังส่งคำขอ...</span>
-                    </>
-                  ) : (
-                    <>
-                      <i className="fas fa-paper-plane text-xs" />
-                      <span>ยืนยันการจอง</span>
-                    </>
-                  )}
-                </button>
+        {/* ── Modal Footer (Pinned Bottom Action Bar) ────────────────── */}
+        <div
+          style={{
+            padding: '14px clamp(18px, 3vw, 28px)',
+            background: '#ffffff',
+            borderTop: '1px solid rgba(0, 0, 0, 0.06)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            flexShrink: 0,
+          }}
+        >
+          {step === 'game' ? (
+            <>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                {selectedGame ? (
+                  <div>
+                    <span style={{ fontSize: '10px', fontWeight: 800, textTransform: 'uppercase', color: C, letterSpacing: '0.08em' }}>
+                      สคริปต์ที่เลือก:
+                    </span>
+                    <h4 style={{ margin: 0, fontSize: '14px', fontWeight: 900, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {selectedGame.title}
+                    </h4>
+                    <span style={{ fontSize: '11px', color: '#6b7280' }}>
+                      มัดจำ ฿{selectedGame.deposit || 0}/คน
+                    </span>
+                  </div>
+                ) : (
+                  <span style={{ fontSize: '12.5px', color: '#9ca3af' }}>
+                    กรุณาคลิกเลือกสคริปต์ที่ต้องการเล่น
+                  </span>
+                )}
               </div>
+
+              <button
+                type="button"
+                disabled={!selectedGame}
+                onClick={() => setStep('datetime')}
+                className="nfx-btn-primary"
+                style={{
+                  padding: '10px 22px',
+                  borderRadius: '12px',
+                  background: selectedGame ? C : '#e5e7eb',
+                  color: selectedGame ? '#ffffff' : '#9ca3af',
+                  fontWeight: 800,
+                  fontSize: '13.5px',
+                  border: 'none',
+                  cursor: selectedGame ? 'pointer' : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: selectedGame ? '0 4px 14px rgba(229,9,20,0.3)' : 'none',
+                  flexShrink: 0,
+                }}
+              >
+                <span>ถัดไป: เลือกรอบ</span>
+                <i className="fas fa-arrow-right text-xs" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => setStep('game')}
+                style={{
+                  height: '46px',
+                  padding: '0 16px',
+                  borderRadius: '12px',
+                  background: '#f3f4f6',
+                  color: '#4b5563',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  fontWeight: 700,
+                  fontSize: '13px',
+                  flexShrink: 0,
+                }}
+              >
+                <i className="fas fa-arrow-left text-xs" />
+                <span>ย้อนกลับ</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={!selectedDate || !finalTime || submitting}
+                onClick={handleSubmit}
+                className="nfx-btn-primary"
+                style={{
+                  flex: 1,
+                  maxWidth: '240px',
+                  height: '46px',
+                  borderRadius: '12px',
+                  background: selectedDate && finalTime && !submitting ? C : '#e5e7eb',
+                  color: selectedDate && finalTime && !submitting ? '#ffffff' : '#9ca3af',
+                  fontWeight: 800,
+                  fontSize: '13.5px',
+                  border: 'none',
+                  cursor: selectedDate && finalTime && !submitting ? 'pointer' : 'not-allowed',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  boxShadow: selectedDate && finalTime && !submitting ? '0 4px 14px rgba(229,9,20,0.3)' : 'none',
+                  flexShrink: 0,
+                }}
+              >
+                {submitting ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(255,255,255,0.3)', borderTopColor: '#fff' }} />
+                    <span>กำลังส่งคำขอ...</span>
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-paper-plane text-xs" />
+                    <span>ยืนยันการจอง</span>
+                  </>
+                )}
+              </button>
             </>
           )}
         </div>
@@ -1826,6 +1808,7 @@ function CreateBookingModal({
     </div>
   )
 }
+
 
 // ── Deposit Payment & Slip Modal ──────────────────────────────────────────────
 function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated }) {
@@ -3916,6 +3899,7 @@ export default function BookingPage({
           allGames={allGames}
           bookings={bookings}
           lineUser={lineUser}
+          onLogin={onLogin}
           defaultDate={createBookingDate || calendarDate || toDateStr(new Date())}
           defaultGameId={createBookingGameId}
           defaultTime={createBookingTime}
