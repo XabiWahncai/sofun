@@ -21,7 +21,7 @@ const ROOM_COLORS = {
   'Chinese Room': '#ea580c', 'Europe Room': '#2563eb',
   'Ghost Room': '#7c3aed', 'Projector Room': '#0891b2',
   '5 Floor': '#16a34a', 'Yang': '#db2777',
-  'Chinese DM': '#c62419', 'Thai DM': '#b45309',
+  'Chinese DM': '#e50914', 'Thai DM': '#b45309',
 }
 
 const STATUS_LABELS = {
@@ -33,11 +33,11 @@ const STATUS_LABELS = {
 }
 
 const STATUS_COLORS = {
-  pending:   { bg: 'rgba(0,0,0,0.05)',       color: '#555555', border: 'rgba(0,0,0,0.14)'     },
-  confirmed: { bg: 'rgba(200,160,80,0.12)',   color: '#1a1a1a', border: 'rgba(200,160,80,0.35)'},
-  locked:    { bg: 'rgba(200,160,80,0.18)',   color: '#1a1a1a', border: 'rgba(200,160,80,0.45)'},
-  collapsed: { bg: 'rgba(198,36,25,0.07)',    color: '#c62419', border: 'rgba(198,36,25,0.2)' },
-  cancelled: { bg: 'rgba(0,0,0,0.05)',        color: '#555555', border: 'rgba(0,0,0,0.14)'    },
+  pending:   { bg: 'rgba(245, 158, 11, 0.08)', color: '#b45309', border: 'rgba(245, 158, 11, 0.25)' },
+  confirmed: { bg: 'rgba(229, 9, 20, 0.08)',   color: '#e50914', border: 'rgba(229, 9, 20, 0.25)' },
+  locked:    { bg: 'rgba(16, 185, 129, 0.08)', color: '#15803d', border: 'rgba(16, 185, 129, 0.25)' },
+  collapsed: { bg: 'rgba(239, 68, 68, 0.08)',  color: '#dc2626', border: 'rgba(239, 68, 68, 0.25)' },
+  cancelled: { bg: 'rgba(100, 116, 139, 0.08)',color: '#64748b', border: 'rgba(100, 116, 139, 0.2)' },
 }
 
 const TIME_SLOTS = ['13:00', '14:00', '15:00', '16:00', '17:00', '18:00', '19:00']
@@ -316,8 +316,8 @@ function MemberAvatar({
         <div
           className="w-full h-full rounded-full flex items-center justify-center font-black"
           style={{
-            background: '#f5f1ef',
-            color: 'rgba(26,26,26,0.6)',
+            background: '#f1f5f9',
+            color: '#64748b',
             fontSize: Math.max(10, Math.round(size * 0.36)),
             ...imgStyle,
           }}
@@ -391,7 +391,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
   const today = new Date()
   const [viewYear, setViewYear] = useState(today.getFullYear())
   const [viewMonth, setViewMonth] = useState(today.getMonth())
-  const [viewModeOverride, setViewModeOverride] = useState('auto') // 'auto' | 'bars' | 'cards'
+  const [viewModeOverride, setViewModeOverride] = useState('auto')
   const calendarRef = useRef(null)
   const [containerWidth, setContainerWidth] = useState(700)
 
@@ -452,7 +452,6 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
   for (let d = 1; d <= daysInMonth; d++) cells.push(d)
   while (cells.length % 7 !== 0) cells.push(null)
 
-  // Total bookings in this month for stats
   const totalMonthBookings = Object.entries(bookingsByDate).reduce((acc, [d, list]) => {
     if (d.startsWith(`${viewYear}-${pad2(viewMonth + 1)}`)) return acc + list.length
     return acc
@@ -460,53 +459,79 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontFamily: 'Sarabun, sans-serif' }}>
-
-      {/* ── Header: Month + Navigation ─────────────────────────────────── */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        flexWrap: 'wrap',
-        gap: '12px',
-        background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
-        padding: '14px 18px',
-        borderRadius: '16px',
-        border: '1px solid rgba(0,0,0,0.06)',
-        boxShadow: '0 2px 8px -2px rgba(0,0,0,0.03)',
-      }}>
+      {/* ── Header: Month + Navigation Controls ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '12px',
+          background: '#ffffff',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div style={{
-            width: '40px', height: '40px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, rgba(198,36,25,0.12), rgba(198,36,25,0.04))',
-            border: '1px solid rgba(198,36,25,0.2)',
-            color: 'var(--crimson-500)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '17px', flexShrink: 0,
-          }}>
+          <div
+            style={{
+              width: '42px',
+              height: '42px',
+              borderRadius: '12px',
+              background: 'rgba(229, 9, 20, 0.08)',
+              border: '1px solid rgba(229, 9, 20, 0.2)',
+              color: '#e50914',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '17px',
+              flexShrink: 0,
+            }}
+          >
             <i className="far fa-calendar-alt" />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
-              <h2 style={{
-                fontSize: '20px', fontWeight: 900, color: 'var(--text-primary)',
-                letterSpacing: '-0.01em', margin: 0,
-              }}>
+              <h2
+                style={{
+                  fontSize: '22px',
+                  fontWeight: 900,
+                  color: '#111827',
+                  letterSpacing: '-0.01em',
+                  margin: 0,
+                  lineHeight: 1.1,
+                }}
+              >
                 {MONTH_NAMES[viewMonth]}
               </h2>
-              <span style={{
-                fontSize: '15px', fontWeight: 800, color: 'var(--crimson-500)',
-                background: 'rgba(198,36,25,0.08)', padding: '1px 8px', borderRadius: '6px',
-              }}>
+              <span
+                style={{
+                  fontSize: '14px',
+                  fontWeight: 800,
+                  color: '#e50914',
+                  background: 'rgba(229, 9, 20, 0.08)',
+                  padding: '2px 8px',
+                  borderRadius: '6px',
+                }}
+              >
                 {viewYear + 543}
               </span>
             </div>
-            <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <span>ตารางจองเดือนนี้</span>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>ตารางจองรอบเล่นเดือนนี้</span>
               {totalMonthBookings > 0 && (
-                <span style={{
-                  background: 'rgba(34,197,94,0.1)', color: '#16a34a',
-                  padding: '0 6px', borderRadius: '10px', fontWeight: 700, fontSize: '10px',
-                }}>
+                <span
+                  style={{
+                    background: '#dcfce7',
+                    color: '#15803d',
+                    padding: '1px 7px',
+                    borderRadius: '10px',
+                    fontWeight: 700,
+                    fontSize: '11px',
+                  }}
+                >
                   {totalMonthBookings} รอบ
                 </span>
               )}
@@ -516,7 +541,6 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
 
         {/* Navigation Controls + View Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          {/* Toggle View Mode: Bars vs Detail Cards */}
           <button
             type="button"
             onClick={() => setViewModeOverride(m => {
@@ -525,76 +549,105 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             })}
             title={useBarMode ? 'สลับเป็นมุมมองแสดงการ์ดข้อความ' : 'สลับเป็นมุมมองแท่งสีห้อง'}
             style={{
-              padding: '7px 12px', borderRadius: '10px',
-              border: '1px solid rgba(0,0,0,0.08)',
-              background: useBarMode ? 'rgba(198,36,25,0.08)' : '#fff',
-              color: useBarMode ? 'var(--crimson-500)' : 'var(--text-secondary)',
-              fontSize: '12px', fontWeight: 800, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 12px',
+              borderRadius: '10px',
+              border: `1px solid ${useBarMode ? 'rgba(229, 9, 20, 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
+              background: useBarMode ? 'rgba(229, 9, 20, 0.08)' : '#ffffff',
+              color: useBarMode ? '#e50914' : '#4b5563',
+              fontSize: '12px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
               transition: 'all 0.15s ease',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
             }}
           >
-            <i className={useBarMode ? "fas fa-bars" : "fas fa-th-large"} style={{ fontSize: '11px' }} />
+            <i className={useBarMode ? 'fas fa-bars' : 'fas fa-th-large'} style={{ fontSize: '11px' }} />
             <span>{useBarMode ? 'แท่งสีห้อง' : 'การ์ดข้อความ'}</span>
           </button>
 
           <button
+            type="button"
             onClick={goToday}
             style={{
-              padding: '7px 14px', borderRadius: '10px',
-              border: '1px solid rgba(0,0,0,0.08)',
-              background: '#fff', color: 'var(--text-secondary)',
-              fontSize: '12px', fontWeight: 800, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: '6px',
+              padding: '7px 14px',
+              borderRadius: '10px',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              background: '#ffffff',
+              color: '#4b5563',
+              fontSize: '12px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
               transition: 'all 0.15s ease',
-              boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = 'var(--crimson-500)'
-              e.currentTarget.style.color = 'var(--crimson-500)'
-              e.currentTarget.style.background = 'rgba(198,36,25,0.04)'
+              e.currentTarget.style.borderColor = '#e50914'
+              e.currentTarget.style.color = '#e50914'
+              e.currentTarget.style.background = 'rgba(229, 9, 20, 0.04)'
             }}
             onMouseLeave={e => {
-              e.currentTarget.style.borderColor = 'rgba(0,0,0,0.08)'
-              e.currentTarget.style.color = 'var(--text-secondary)'
-              e.currentTarget.style.background = '#fff'
+              e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'
+              e.currentTarget.style.color = '#4b5563'
+              e.currentTarget.style.background = '#ffffff'
             }}
           >
-            <i className="fas fa-bullseye" style={{ fontSize: '11px', color: 'var(--crimson-500)' }} />
+            <i className="fas fa-bullseye" style={{ fontSize: '11px', color: '#e50914' }} />
             วันนี้
           </button>
-          <div style={{
-            display: 'flex', alignItems: 'center',
-            background: '#fff', border: '1px solid rgba(0,0,0,0.08)',
-            borderRadius: '10px', overflow: 'hidden',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-          }}>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: '#ffffff',
+              border: '1px solid rgba(0, 0, 0, 0.08)',
+              borderRadius: '10px',
+              overflow: 'hidden',
+            }}
+          >
             <button
+              type="button"
               onClick={prevMonth}
               title="เดือนก่อนหน้า"
               style={{
-                width: '34px', height: '34px', border: 'none', background: 'transparent',
-                color: 'var(--text-secondary)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                border: 'none',
+                background: 'transparent',
+                color: '#4b5563',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <i className="fas fa-chevron-left" style={{ fontSize: '11px' }} />
             </button>
-            <div style={{ width: '1px', height: '18px', background: 'rgba(0,0,0,0.08)' }} />
+            <div style={{ width: '1px', height: '18px', background: 'rgba(0, 0, 0, 0.08)' }} />
             <button
+              type="button"
               onClick={nextMonth}
               title="เดือนถัดไป"
               style={{
-                width: '34px', height: '34px', border: 'none', background: 'transparent',
-                color: 'var(--text-secondary)', cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: '34px',
+                height: '34px',
+                border: 'none',
+                background: 'transparent',
+                color: '#4b5563',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0,0,0,0.05)'}
+              onMouseEnter={e => e.currentTarget.style.background = 'rgba(0, 0, 0, 0.05)'}
               onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
               <i className="fas fa-chevron-right" style={{ fontSize: '11px' }} />
@@ -603,36 +656,44 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
         </div>
       </div>
 
-      {/* ── Monthly Grid Card (Locked Cell Dimensions) ───────────────── */}
+      {/* ── Monthly Grid Card ── */}
       <div
         ref={calendarRef}
         style={{
           borderRadius: '18px',
-          border: '1px solid rgba(0,0,0,0.08)',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
           overflow: 'hidden',
-          background: '#fff',
-          boxShadow: '0 4px 20px -2px rgba(0,0,0,0.05), 0 2px 6px -1px rgba(0,0,0,0.02)',
+          background: '#ffffff',
+          boxShadow: '0 4px 20px -2px rgba(0, 0, 0, 0.04)',
         }}
       >
         {/* Day-of-week header */}
-        <div style={{
-          display: 'grid', gridTemplateColumns: 'repeat(7,1fr)',
-          background: 'linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%)',
-          borderBottom: '1px solid rgba(0,0,0,0.07)',
-        }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, 1fr)',
+            background: '#f8fafc',
+            borderBottom: '1px solid rgba(0, 0, 0, 0.06)',
+          }}
+        >
           {DAY_NAMES_FULL.map((d, i) => {
             const isSun = i === 0
             const isSat = i === 6
-            const headerColor = isSun ? 'var(--crimson-500)' : isSat ? '#2563eb' : '#475569'
+            const headerColor = isSun ? '#e50914' : isSat ? '#2563eb' : '#475569'
             return (
               <div
                 key={d}
                 style={{
-                  padding: '10px 2px', textAlign: 'center',
-                  fontSize: '11px', fontWeight: 800,
+                  padding: '10px 2px',
+                  textAlign: 'center',
+                  fontSize: '11px',
+                  fontWeight: 800,
                   color: headerColor,
                   letterSpacing: '0.02em',
-                  display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '1px',
                 }}
               >
                 <span>{d}</span>
@@ -644,8 +705,8 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
           })}
         </div>
 
-        {/* Calendar cells: STRICTLY LOCKED 92px HEIGHT */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)' }}>
+        {/* Calendar cells: locked 108px height */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {cells.map((day, idx) => {
             const col = idx % 7
             const isSun = col === 0
@@ -653,12 +714,12 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             const isLastCol = col === 6
             const isLastRow = idx >= cells.length - 7
 
-            const borderRight = isLastCol ? 'none' : '1px solid rgba(0,0,0,0.05)'
-            const borderBottom = isLastRow ? 'none' : '1px solid rgba(0,0,0,0.05)'
+            const borderRight = isLastCol ? 'none' : '1px solid #f1f5f9'
+            const borderBottom = isLastRow ? 'none' : '1px solid #f1f5f9'
 
             if (!day) {
               return (
-                <div key={`e-${idx}`} style={{ height: '110px', background: 'rgba(0,0,0,0.018)', borderRight, borderBottom }} />
+                <div key={`e-${idx}`} style={{ height: '108px', background: '#f8fafc', borderRight, borderBottom }} />
               )
             }
 
@@ -670,72 +731,106 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             const isPast = dateStr < todayStr
 
             const cellBg = isSel
-              ? 'rgba(198,36,25,0.04)'
+              ? 'rgba(229, 9, 20, 0.03)'
               : isToday
-              ? 'rgba(245,158,11,0.03)'
-              : isPast
-              ? '#fcfcfd'
-              : '#ffffff'
+                ? 'rgba(245, 158, 11, 0.02)'
+                : isPast
+                  ? '#fcfcfd'
+                  : '#ffffff'
 
             return (
               <div
                 key={day}
                 onClick={() => onDayClick(dateStr)}
-                style={{ height: '110px', overflow: 'hidden', padding: '8px 6px 6px', display: 'flex', flexDirection: 'column', gap: '3px', cursor: 'pointer', background: cellBg, borderRight, borderBottom, transition: 'background 0.12s', position: 'relative', boxShadow: isSel ? 'inset 0 0 0 2px var(--crimson-500)' : 'none' }}
-                onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0,0,0,0.025)' }}
+                style={{
+                  height: '108px',
+                  overflow: 'hidden',
+                  padding: '8px 6px 6px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '3px',
+                  cursor: 'pointer',
+                  background: cellBg,
+                  borderRight,
+                  borderBottom,
+                  transition: 'background 0.12s',
+                  position: 'relative',
+                  boxShadow: isSel ? 'inset 0 0 0 2px #e50914' : 'none',
+                }}
+                onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0, 0, 0, 0.025)' }}
                 onMouseLeave={e => e.currentTarget.style.background = cellBg}
               >
                 {/* Cell Header: Date Number & Indicator */}
-                <div style={{
-                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  marginBottom: '2px', flexShrink: 0,
-                }}>
-                  {/* Left tag if today */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '2px',
+                    flexShrink: 0,
+                  }}
+                >
                   {isToday ? (
-                    <span style={{
-                      fontSize: '8.5px', fontWeight: 900,
-                      color: 'var(--crimson-500)',
-                      letterSpacing: '0.02em',
-                      textTransform: 'uppercase',
-                    }}>
+                    <span
+                      style={{
+                        fontSize: '8.5px',
+                        fontWeight: 900,
+                        color: '#e50914',
+                        letterSpacing: '0.02em',
+                        textTransform: 'uppercase',
+                      }}
+                    >
                       วันนี้
                     </span>
                   ) : dayBookingsSorted.length > 0 ? (
-                    <span style={{
-                      width: '5px', height: '5px', borderRadius: '50%',
-                      background: 'var(--crimson-500)', opacity: 0.8,
-                    }} />
+                    <span
+                      style={{
+                        width: '5px',
+                        height: '5px',
+                        borderRadius: '50%',
+                        background: '#e50914',
+                        opacity: 0.85,
+                      }}
+                    />
                   ) : <span />}
 
                   {/* Day Number badge */}
-                  <span style={{
-                    width: '21px', height: '21px', borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '11.5px', fontWeight: 800, flexShrink: 0,
-                    color: isToday
-                      ? '#fff'
-                      : isSel
-                      ? 'var(--crimson-500)'
-                      : isSun
-                      ? 'var(--crimson-500)'
-                      : isSat
-                      ? '#2563eb'
-                      : isPast
-                      ? '#94a3b8'
-                      : '#1e293b',
-                    background: isToday
-                      ? 'linear-gradient(135deg, var(--crimson-500), #e11d48)'
-                      : isSel
-                      ? 'rgba(198,36,25,0.14)'
-                      : 'transparent',
-                    boxShadow: isToday ? '0 2px 5px rgba(198,36,25,0.35)' : 'none',
-                  }}>
+                  <span
+                    style={{
+                      width: '21px',
+                      height: '21px',
+                      borderRadius: '50%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      flexShrink: 0,
+                      color: isToday
+                        ? '#ffffff'
+                        : isSel
+                          ? '#e50914'
+                          : isSun
+                            ? '#e50914'
+                            : isSat
+                              ? '#2563eb'
+                              : isPast
+                                ? '#94a3b8'
+                                : '#1e293b',
+                      background: isToday
+                        ? '#e50914'
+                        : isSel
+                          ? 'rgba(229, 9, 20, 0.12)'
+                          : 'transparent',
+                      boxShadow: isToday ? '0 2px 6px rgba(229, 9, 20, 0.35)' : 'none',
+                    }}
+                  >
                     {day}
                   </span>
                 </div>
 
-                {/* Event bars */}
-                {dayBookingsSorted.length > 2 ? (
+                {/* Event items */}
+                {useBarMode ? (
                   dayBookingsSorted.map(b => {
                     const rc = ROOM_COLORS[b.room] || '#64748b'
                     return (
@@ -743,9 +838,17 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                         key={b.id}
                         onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
                         title={getEventTitle(b, lineUser)}
-                        style={{ height: '7px', borderRadius: '99px', background: rc, cursor: 'pointer', flexShrink: 0, opacity: 0.85, transition: 'opacity 0.12s' }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '1'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '0.85'}
+                        style={{
+                          height: '7px',
+                          borderRadius: '99px',
+                          background: rc,
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                          opacity: 0.88,
+                          transition: 'opacity 0.12s, transform 0.12s',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scaleY(1.3)' }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'scaleY(1)' }}
                       />
                     )
                   })
@@ -756,20 +859,32 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                     return (
                       <button
                         key={b.id}
+                        type="button"
                         onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
                         title={getEventTitle(b, lineUser)}
-                        style={{ width: '100%', textAlign: 'left', padding: '4px 7px', borderRadius: '6px', border: 'none', background: `${rc}18`, borderLeft: `3px solid ${rc}`, cursor: 'pointer', transition: 'opacity 0.12s', minWidth: 0 }}
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          padding: '3px 6px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: `${rc}18`,
+                          borderLeft: `3px solid ${rc}`,
+                          cursor: 'pointer',
+                          transition: 'opacity 0.12s',
+                          minWidth: 0,
+                        }}
                         onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
                         onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#111827', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '3px' }}>
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.room || 'ห้อง'}</span>
                           {locked && (
-                            <i className="fas fa-lock" style={{ fontSize: '8px', opacity: 0.65, flexShrink: 0 }} />
+                            <i className="fas fa-lock" style={{ fontSize: '8px', opacity: 0.7, flexShrink: 0 }} />
                           )}
                         </div>
                         {b.time && (
-                          <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', lineHeight: 1.2 }}>{b.time}</div>
+                          <div style={{ fontSize: '9.5px', color: '#64748b', lineHeight: 1.2 }}>{b.time} น.</div>
                         )}
                       </button>
                     )
@@ -781,33 +896,64 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
         </div>
       </div>
 
-      {/* ── Selected Day Action Bar (Clicking any day shows full details) ─ */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        flexWrap: 'wrap', gap: '14px',
-        padding: '14px 18px', borderRadius: '16px',
-        background: 'linear-gradient(135deg, #ffffff 0%, #fbfbfd 100%)',
-        border: '1px solid rgba(0,0,0,0.08)',
-        boxShadow: '0 4px 16px -2px rgba(0,0,0,0.04)',
-      }}>
+      {/* ── Selected Day Action Bar ── */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '14px',
+          padding: '16px 20px',
+          borderRadius: '16px',
+          background: '#ffffff',
+          border: '1px solid rgba(0, 0, 0, 0.08)',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0, flex: 1 }}>
-          <div style={{
-            width: '38px', height: '38px', borderRadius: '10px',
-            background: activeDateStr === todayStr ? 'rgba(198,36,25,0.1)' : 'rgba(0,0,0,0.04)',
-            color: activeDateStr === todayStr ? 'var(--crimson-500)' : 'var(--text-secondary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '15px', flexShrink: 0, marginTop: '2px',
-          }}>
+          <div
+            style={{
+              width: '40px',
+              height: '40px',
+              borderRadius: '12px',
+              background: activeDateStr === todayStr ? 'rgba(229, 9, 20, 0.08)' : '#f1f5f9',
+              color: activeDateStr === todayStr ? '#e50914' : '#4b5563',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '16px',
+              flexShrink: 0,
+              marginTop: '1px',
+            }}
+          >
             <i className={activeDateStr === todayStr ? 'fas fa-star' : 'far fa-calendar-check'} />
           </div>
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{
-              fontSize: '14px', fontWeight: 900, color: 'var(--text-primary)',
-              display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
-            }}>
-              <span>{activeDateStr === todayStr ? 'วันนี้ · ' + fmtDate(activeDateStr) : fmtDate(activeDateStr)}</span>
+            <div
+              style={{
+                fontSize: '14.5px',
+                fontWeight: 900,
+                color: '#111827',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span>{activeDateStr === todayStr ? `วันนี้ · ${fmtDate(activeDateStr)}` : fmtDate(activeDateStr)}</span>
               {selectedDayBookings.length > 0 && (
-                <span style={{ fontSize: '11px', fontWeight: 800, padding: '1px 8px', borderRadius: '20px', background: 'rgba(198,36,25,0.08)', color: 'var(--crimson-500)' }}>
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 800,
+                    padding: '2px 8px',
+                    borderRadius: '20px',
+                    background: 'rgba(229, 9, 20, 0.08)',
+                    color: '#e50914',
+                    border: '1px solid rgba(229, 9, 20, 0.2)',
+                  }}
+                >
                   {selectedDayBookings.length} รอบเล่น
                 </span>
               )}
@@ -823,41 +969,47 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                   return (
                     <button
                       key={b.id}
+                      type="button"
                       onClick={() => onEventClick?.(b)}
                       title={getEventTitle(b, lineUser)}
                       style={{
-                        display: 'inline-flex', alignItems: 'center', gap: '6px',
-                        padding: '4px 10px', borderRadius: '8px',
-                        background: `${rc}12`, border: `1px solid ${rc}35`,
-                        cursor: 'pointer', transition: 'all 0.15s ease',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        padding: '4px 10px',
+                        borderRadius: '8px',
+                        background: `${rc}14`,
+                        border: `1px solid ${rc}40`,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
                         fontFamily: 'Sarabun, sans-serif',
                       }}
                       onMouseEnter={e => {
-                        e.currentTarget.style.background = `${rc}24`
+                        e.currentTarget.style.background = `${rc}26`
                         e.currentTarget.style.borderColor = rc
                         e.currentTarget.style.transform = 'translateY(-1px)'
                       }}
                       onMouseLeave={e => {
-                        e.currentTarget.style.background = `${rc}12`
-                        e.currentTarget.style.borderColor = `${rc}35`
+                        e.currentTarget.style.background = `${rc}14`
+                        e.currentTarget.style.borderColor = `${rc}40`
                         e.currentTarget.style.transform = 'translateY(0)'
                       }}
                     >
                       <span style={{ width: 7, height: 7, borderRadius: '50%', background: rc, flexShrink: 0 }} />
-                      <span style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a' }}>{b.room || 'ห้องเล่น'}</span>
+                      <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#111827' }}>{b.room || 'ห้องเล่น'}</span>
                       {locked && (
                         <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
                           <i className="fas fa-lock" style={{ fontSize: '8px' }} />ล็อก
                         </span>
                       )}
-                      {b.time && <span style={{ fontSize: '10.5px', color: rc, fontWeight: 800 }}>{b.time}</span>}
-                      {canView && publicName && <span style={{ fontSize: '10px', color: '#64748b' }}>({publicName})</span>}
+                      {b.time && <span style={{ fontSize: '11px', color: rc, fontWeight: 800 }}>{b.time} น.</span>}
+                      {canView && publicName && <span style={{ fontSize: '10.5px', color: '#64748b' }}>({publicName})</span>}
                     </button>
                   )
                 })}
               </div>
             ) : (
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>
                 ยังไม่มีรอบเล่นในวันนี้ — สามารถเปิดตี้แรกได้เลย
               </div>
             )}
@@ -865,22 +1017,24 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
         </div>
 
         <button
+          type="button"
           onClick={() => onBookToday?.(activeDateStr)}
+          className="nfx-btn-primary"
           style={{
-            flexShrink: 0, padding: '10px 22px', borderRadius: '12px',
-            background: 'linear-gradient(135deg, var(--crimson-500), #e11d48)',
-            border: 'none', color: '#fff', fontSize: '13px', fontWeight: 800,
-            cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px',
-            boxShadow: '0 4px 14px rgba(198,36,25,0.3)',
-            transition: 'all 0.15s ease', whiteSpace: 'nowrap',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.transform = 'translateY(-1px)'
-            e.currentTarget.style.boxShadow = '0 6px 18px rgba(198,36,25,0.4)'
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.transform = 'translateY(0)'
-            e.currentTarget.style.boxShadow = '0 4px 14px rgba(198,36,25,0.3)'
+            flexShrink: 0,
+            padding: '10px 22px',
+            borderRadius: '12px',
+            background: '#e50914',
+            border: 'none',
+            color: '#ffffff',
+            fontSize: '13px',
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            boxShadow: '0 4px 14px rgba(229, 9, 20, 0.28)',
+            whiteSpace: 'nowrap',
           }}
         >
           <i className="fas fa-plus" style={{ fontSize: '11px' }} />
@@ -891,7 +1045,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
   )
 }
 
-// ── Booking Card Component ────────────────────────────────────────────────────
+// ── Netflix Clean White Booking Card Component ────────────────────────────────
 function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
   const total = booking.members?.length || 0
@@ -905,7 +1059,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   const countdown = booking.status === 'confirmed' && booking.depositDeadline ? formatCountdown(booking.depositDeadline) : null
   const isUrgent = countdown && new Date(booking.depositDeadline) - new Date() < 24 * 3600000
   const allPaid = paidCount >= max
-  const paidPct = (paidCount / max) * 100
+  const paidPct = Math.min(100, Math.round((paidCount / max) * 100))
   const rc = ROOM_COLORS[booking.room] || '#64748b'
   const isCollapsed = booking.status === 'collapsed'
 
@@ -913,109 +1067,241 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
     <div
       onClick={() => onOpen(booking)}
       style={{
-        position: 'relative', borderRadius: '14px',
-        border: `1px solid ${isCollapsed ? 'rgba(185,28,28,0.2)' : 'var(--border-default)'}`,
-        background: isCollapsed ? 'rgba(185,28,28,0.04)' : 'var(--surface-card)',
-        cursor: 'pointer', overflow: 'hidden', display: 'flex',
-        transition: 'box-shadow 0.2s, border-color 0.2s',
+        position: 'relative',
+        borderRadius: '16px',
+        border: `1px solid ${isCollapsed ? '#fecaca' : 'rgba(0, 0, 0, 0.08)'}`,
+        background: isCollapsed ? '#fef2f2' : '#ffffff',
+        cursor: 'pointer',
+        overflow: 'hidden',
+        display: 'flex',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
+        transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
       }}
-      onMouseEnter={e => { if (!isCollapsed) e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.1)' }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor=isCollapsed?'rgba(185,28,28,0.25)':'var(--border-default)'; e.currentTarget.style.boxShadow='none' }}
-    >
-      {/* Left: Image Strip */}
-      <div style={{ width: '72px', flexShrink: 0, position: 'relative', overflow: 'hidden', background: 'var(--surface-sunken)' }}>
-        {imgSrc
-          ? <img src={imgSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: 'brightness(0.75) contrast(1.1)', display: 'block' }} />
-          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)', fontSize: '22px' }}><i className={isLocked && !canView ? "fas fa-lock" : "fas fa-scroll"} /></div>
+      onMouseEnter={e => {
+        if (!isCollapsed) {
+          e.currentTarget.style.borderColor = '#e50914'
+          e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.08)'
+          e.currentTarget.style.transform = 'translateY(-2px)'
         }
-        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '3px', background: rc }} />
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.borderColor = isCollapsed ? '#fecaca' : 'rgba(0, 0, 0, 0.08)'
+        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.02)'
+        e.currentTarget.style.transform = 'translateY(0)'
+      }}
+    >
+      {/* Left: 3D Poster Thumbnail */}
+      <div
+        style={{
+          width: '84px',
+          flexShrink: 0,
+          position: 'relative',
+          overflow: 'hidden',
+          background: '#111827',
+        }}
+      >
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt=""
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              display: 'block',
+            }}
+          />
+        ) : (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: 'rgba(255, 255, 255, 0.4)',
+              fontSize: '22px',
+            }}
+          >
+            <i className={isLocked && !canView ? 'fas fa-lock' : 'fas fa-scroll'} />
+          </div>
+        )}
+        <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '4px', background: rc }} />
       </div>
 
       {/* Right: Content */}
-      <div style={{ flex: '1 1 0%', minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: '8px' }}>
+      <div
+        style={{
+          flex: '1 1 0%',
+          minWidth: 0,
+          padding: '12px 14px',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+          gap: '8px',
+        }}
+      >
         {/* Title + Status */}
-        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px', marginBottom: '5px' }}>
-          <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text-primary)', lineHeight: 1.3, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8px' }}>
+          <div
+            style={{
+              fontSize: '14.5px',
+              fontWeight: 800,
+              color: '#111827',
+              lineHeight: 1.3,
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 1,
+              WebkitBoxOrient: 'vertical',
+            }}
+          >
             {publicGameName}
           </div>
-          <StatusBadge status={isLocked ? 'locked' : booking.status} label={isLocked && !canView ? 'ล็อกห้องแล้ว' : (booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined)} />
+          <StatusBadge
+            status={isLocked ? 'locked' : booking.status}
+            label={isLocked && !canView ? 'ล็อกห้องแล้ว' : (booking.status === 'cancelled' && booking.closedBy ? 'ปิดตี้แล้ว' : undefined)}
+          />
         </div>
 
         {/* Meta chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <i className="fas fa-calendar" style={{ fontSize: '10px', opacity: 0.55 }} />{fmtDate(booking.date)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: '11.5px', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <i className="fas fa-calendar text-[10px]" style={{ color: '#e50914' }} />
+            {fmtDate(booking.date)}
           </span>
           {booking.time && (
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <i className="fas fa-clock" style={{ fontSize: '10px', opacity: 0.55 }} />{booking.time}
+            <span style={{ fontSize: '11.5px', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <i className="fas fa-clock text-[10px]" style={{ color: '#f59e0b' }} />
+              {booking.time} น.
             </span>
           )}
           {booking.room && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: rc, fontWeight: 700 }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: rc, flexShrink: 0 }} />{booking.room}
+              <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: rc, flexShrink: 0 }} />
+              {booking.room}
             </span>
           )}
           {isLeader && (
-            <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.12)', padding: '2px 8px', borderRadius: '10px' }}>หัวหน้า</span>
+            <span
+              style={{
+                fontSize: '9.5px',
+                fontWeight: 800,
+                color: '#e50914',
+                background: 'rgba(229, 9, 20, 0.08)',
+                padding: '1px 6px',
+                borderRadius: '6px',
+                border: '1px solid rgba(229, 9, 20, 0.2)',
+              }}
+            >
+              หัวหน้า
+            </span>
           )}
         </div>
 
-        {/* Progress footer */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-default)' }}>
+        {/* Progress bar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', paddingTop: '4px', borderTop: '1px solid rgba(0, 0, 0, 0.06)' }}>
           {isLocked && !canView ? (
-            <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#047857', fontWeight: 700 }}>
-                <span><i className="fas fa-lock" style={{ marginRight: '4px' }} />ห้องนี้ถูกล็อกแล้ว</span>
-                <span>เฉพาะสมาชิกในตี้</span>
-              </div>
-              <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: '100%', background: '#10b981', borderRadius: '6px' }} />
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#15803d', fontWeight: 700 }}>
+              <span><i className="fas fa-lock mr-1" />ห้องนี้ถูกล็อกแล้ว</span>
+              <span>เฉพาะสมาชิกในตี้</span>
             </div>
           ) : (
-            <div style={{ flex: '1 1 0%', display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'var(--text-tertiary)', fontWeight: 600 }}>
-                <span>สมาชิก {total}/{max}</span>
-                <span style={{ color: isLocked || allPaid ? '#047857' : 'var(--text-tertiary)' }}>
-                  {isLocked ? 'ล็อกห้องแล้ว' : `มัดจำ ${paidCount}/${max}`}
-                </span>
-              </div>
-              <div style={{ height: '6px', borderRadius: '6px', background: 'var(--border-default)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${Math.min(100, Math.max(0, paidPct))}%`, background: isLocked || allPaid ? '#10b981' : 'var(--crimson-500)', borderRadius: '6px', transition: 'width 0.3s ease-out' }} />
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#64748b', fontWeight: 600 }}>
+              <span>สมาชิก {total}/{max} คน</span>
+              <span style={{ color: isLocked || allPaid ? '#15803d' : '#e50914', fontWeight: 700 }}>
+                {isLocked ? 'ล็อกห้องแล้ว 100%' : `มัดจำ ${paidCount}/${max} คน`}
+              </span>
             </div>
           )}
 
-          {(!isLocked || canView) && countdown && (
-            <div style={{ flexShrink: 0, padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '5px', background: isUrgent ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.12)', color: isUrgent ? '#ef4444' : '#d97706', border: `1px solid ${isUrgent ? 'rgba(239,68,68,0.3)' : 'rgba(245,158,11,0.25)'}` }}>
-              <i className="fas fa-clock" style={{ fontSize: '9px' }} />{countdown}
-            </div>
-          )}
+          <div style={{ height: '5px', borderRadius: '5px', background: '#f1f5f9', overflow: 'hidden' }}>
+            <div
+              style={{
+                height: '100%',
+                width: isLocked && !canView ? '100%' : `${paidPct}%`,
+                background: isLocked || allPaid ? '#16a34a' : '#e50914',
+                borderRadius: '5px',
+                transition: 'width 0.3s ease-out',
+              }}
+            />
+          </div>
+        </div>
 
-          {isLeader && booking.status === 'collapsed' && onCloseBooking && (
+        {/* Bottom row: Countdown / Actions */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          {(!isLocked || canView) && countdown ? (
+            <div
+              style={{
+                padding: '2px 8px',
+                borderRadius: '6px',
+                fontSize: '10px',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                background: isUrgent ? '#fee2e2' : '#fef3c7',
+                color: isUrgent ? '#dc2626' : '#b45309',
+                border: `1px solid ${isUrgent ? '#fecaca' : '#fde68a'}`,
+              }}
+            >
+              <i className="fas fa-clock text-[9px]" />
+              {countdown}
+            </div>
+          ) : <span />}
+
+          {isLeader && booking.status === 'collapsed' && onCloseBooking ? (
             <button
+              type="button"
               onClick={e => { e.stopPropagation(); onCloseBooking(booking) }}
               title="ปิดตี้ที่ล่ม"
-              style={{ flexShrink: 0, padding: '6px 12px', borderRadius: '8px', background: 'rgba(198,36,25,0.15)', border: '1px solid rgba(198,36,25,0.35)', color: 'var(--crimson-500)', fontSize: '11px', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px', transition: 'background 0.15s, color 0.15s' }}
-              onMouseEnter={e => { e.currentTarget.style.background='var(--crimson-500)'; e.currentTarget.style.color='#fff' }}
-              onMouseLeave={e => { e.currentTarget.style.background='rgba(198,36,25,0.15)'; e.currentTarget.style.color='var(--crimson-500)' }}
+              style={{
+                padding: '4px 10px',
+                borderRadius: '6px',
+                background: '#fee2e2',
+                border: '1px solid #fecaca',
+                color: '#dc2626',
+                fontSize: '11px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
             >
-              <i className="fas fa-times-circle" />ปิดตี้
+              <i className="fas fa-times-circle" />
+              ปิดตี้
             </button>
+          ) : (
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#e50914', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+              ดูรายละเอียด <i className="fas fa-chevron-right text-[9px]" />
+            </span>
           )}
         </div>
       </div>
 
+      {/* Floating requests pill */}
       {isLeader && pendingRequests > 0 && (
-        <div style={{ position: 'absolute', top: '8px', right: '8px', background: '#f59e0b', color: '#000', fontSize: '10px', fontWeight: 900, padding: '2px 8px', borderRadius: '20px', pointerEvents: 'none' }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            background: '#e50914',
+            color: '#ffffff',
+            fontSize: '10px',
+            fontWeight: 900,
+            padding: '2px 8px',
+            borderRadius: '20px',
+            boxShadow: '0 2px 8px rgba(229, 9, 20, 0.4)',
+            pointerEvents: 'none',
+          }}
+        >
           {pendingRequests} คำขอ
         </div>
       )}
     </div>
   )
 }
-
 // ── Helper to calculate player range ──────────────────────────────────────────
 function getGamePlayerRange(g) {
   if (Array.isArray(g.characters) && g.characters.length > 0) {
@@ -1906,7 +2192,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
         }}
       >
         {/* Drag handle */}
-        <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden shrink-0" style={{ background: 'rgba(26,26,26,0.12)' }} />
+        <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden shrink-0" style={{ background: '#cbd5e1' }} />
 
         {/* Header */}
         <div className="flex items-start justify-between pt-7 pb-5 shrink-0" style={{ paddingLeft: 28, paddingRight: 28 }}>
@@ -1916,13 +2202,13 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
               <span className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: C }}>
                 ขั้นตอน {stepIndex + 1} / 3
               </span>
-              <div className="flex-1 h-px" style={{ background: 'rgba(26,26,26,0.08)' }} />
+              <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
               <div className="flex items-center gap-1.5">
                 {[0, 1, 2].map(i => (
                   <div key={i} className="rounded-full"
                     style={{
                       width: i === stepIndex ? 20 : 6, height: 6,
-                      background: i <= stepIndex ? C : 'rgba(26,26,26,0.14)',
+                      background: i <= stepIndex ? C : '#cbd5e1',
                       transition: 'width 220ms',
                     }}
                   />
@@ -1932,7 +2218,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
             <h3 className="font-black leading-[1.15] tracking-tight" style={{ color: INK, fontSize: 24 }}>
               {step === 'qr' ? 'ชำระมัดจำ' : step === 'upload' ? 'ตรวจสอบสลิป' : 'ส่งสลิปสำเร็จ'}
             </h3>
-            <p className="text-[13px] mt-1.5 leading-snug truncate" style={{ color: 'rgba(26,26,26,0.55)' }}>
+            <p className="text-[13px] mt-1.5 leading-snug truncate" style={{ color: '#64748b' }}>
               {step === 'qr' ? `สแกน QR แล้วโอน · ${booking.gameName}` : step === 'upload' ? 'ตรวจความถูกต้องก่อนส่ง' : 'รอแอดมินยืนยัน'}
             </p>
           </div>
@@ -1940,9 +2226,9 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
             <button
               onClick={onClose}
               className="w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 ml-4"
-              style={{ background: '#f5f1ef', color: 'rgba(26,26,26,0.5)', marginTop: 2 }}
+              style={{ background: '#f5f1ef', color: '#64748b', marginTop: 2 }}
               onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.color = 'rgba(26,26,26,0.5)' }}
+              onMouseLeave={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.color = '#64748b' }}
             >
               <i className="fas fa-times text-sm" />
             </button>
@@ -1957,11 +2243,11 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                 {/* Amount hero */}
                 <div className="flex items-end justify-between" style={{ padding: '18px 20px', borderRadius: 16, background: `${C}0a`, border: `1px solid ${C}22` }}>
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: 'rgba(26,26,26,0.5)', marginBottom: 4 }}>ยอดต่อคน</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: '#64748b', marginBottom: 4 }}>ยอดต่อคน</p>
                     <p className="font-black leading-none" style={{ color: C, fontSize: 36, letterSpacing: '-0.02em' }}>฿{amount.toLocaleString()}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[11px]" style={{ color: 'rgba(26,26,26,0.5)', lineHeight: 1.4 }}>
+                    <p className="text-[11px]" style={{ color: '#64748b', lineHeight: 1.4 }}>
                       {booking.date ? fmtDate(booking.date) : ''}
                     </p>
                     {booking.time && (
@@ -1975,8 +2261,8 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                   <div style={{
                     padding: 20, borderRadius: 20,
                     background: '#ffffff',
-                    border: '1px solid rgba(26,26,26,0.08)',
-                    boxShadow: '0 12px 32px rgba(26,26,26,0.08)',
+                    border: '1px solid #e2e8f0',
+                    boxShadow: '0 12px 32px #e2e8f0',
                   }}>
                     <QRCodeCanvas id="dp-deposit-qr-canvas" value={qrPayload} size={200} bgColor="#ffffff" fgColor={INK} level="M" includeMargin={true} />
                   </div>
@@ -1988,7 +2274,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                       {promptPayPhone}
                     </p>
                     {(accountName || bankName) && (
-                      <p className="text-[12px] mt-1 font-medium" style={{ color: 'rgba(26,26,26,0.65)' }}>
+                      <p className="text-[12px] mt-1 font-medium" style={{ color: '#4b5563' }}>
                         {accountName}{bankName ? ` (${bankName})` : ''}
                       </p>
                     )}
@@ -2000,11 +2286,11 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                     style={{
                       gap: 8, height: 40, padding: '0 18px', borderRadius: 999,
                       background: '#ffffff', color: INK,
-                      border: '1px solid rgba(26,26,26,0.12)',
+                      border: '1px solid #cbd5e1',
                       fontSize: 12.5, fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.borderColor = 'rgba(26,26,26,0.2)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = 'rgba(26,26,26,0.12)' }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.borderColor = '#94a3b8' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1' }}
                   >
                     <i className="fas fa-download" style={{ fontSize: 11 }} />
                     <span>บันทึกรูป QR</span>
@@ -2018,12 +2304,12 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                     `โอน ฿${amount.toLocaleString()} แล้วบันทึกสลิป`,
                     'กดปุ่มด้านล่างเพื่อแนบสลิป',
                   ].map((txt, i) => (
-                    <li key={i} className="flex items-center" style={{ gap: 12, padding: '10px 14px', borderRadius: 12, background: '#ffffff', border: '1px solid rgba(26,26,26,0.06)' }}>
+                    <li key={i} className="flex items-center" style={{ gap: 12, padding: '10px 14px', borderRadius: 12, background: '#ffffff', border: '1px solid #f1f5f9' }}>
                       <span className="flex items-center justify-center font-black shrink-0"
                         style={{ width: 24, height: 24, borderRadius: 999, background: `${C}10`, color: C, fontSize: 11 }}>
                         {i + 1}
                       </span>
-                      <span className="text-[13px]" style={{ color: 'rgba(26,26,26,0.75)', lineHeight: 1.5 }}>{txt}</span>
+                      <span className="text-[13px]" style={{ color: '#374151', lineHeight: 1.5 }}>{txt}</span>
                     </li>
                   ))}
                 </ol>
@@ -2046,11 +2332,11 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
             ) : (
               <div className="flex flex-col items-center gap-4 py-12 text-center">
                 <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#f5f1ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <i className="fas fa-qrcode" style={{ fontSize: 30, color: 'rgba(26,26,26,0.35)' }} />
+                  <i className="fas fa-qrcode" style={{ fontSize: 30, color: '#94a3b8' }} />
                 </div>
                 <div>
                   <p className="font-black text-[15px]" style={{ color: INK }}>ยังไม่ได้ตั้งค่าบัญชี</p>
-                  <p className="text-[13px] mt-1" style={{ color: 'rgba(26,26,26,0.55)', maxWidth: 260 }}>ติดต่อแอดมินเพื่อรับข้อมูลการโอนเงิน</p>
+                  <p className="text-[13px] mt-1" style={{ color: '#64748b', maxWidth: 260 }}>ติดต่อแอดมินเพื่อรับข้อมูลการโอนเงิน</p>
                 </div>
                 <button onClick={onClose} className="font-bold" style={{ marginTop: 6, height: 44, padding: '0 24px', borderRadius: 12, background: '#f5f1ef', color: INK, border: 'none', cursor: 'pointer', fontSize: 13.5, fontFamily: "'Sarabun', sans-serif" }}>
                   ปิด
@@ -2069,7 +2355,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                 <i className="fas fa-receipt" style={{ color: C, fontSize: 14 }} />
               </div>
               <div>
-                <div className="text-[11px] font-bold" style={{ color: 'rgba(26,26,26,0.5)' }}>ยอดที่ต้องชำระ</div>
+                <div className="text-[11px] font-bold" style={{ color: '#64748b' }}>ยอดที่ต้องชำระ</div>
                 <div className="font-black" style={{ fontSize: 18, color: C, lineHeight: 1.1 }}>฿{amount.toLocaleString()}</div>
               </div>
             </div>
@@ -2077,12 +2363,12 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
             {/* Slip preview */}
             {slipPreview && (
               <div className="overflow-hidden flex items-center justify-center"
-                style={{ borderRadius: 16, border: '1px solid rgba(26,26,26,0.08)', background: '#f5f1ef', maxHeight: 320 }}>
+                style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f5f1ef', maxHeight: 320 }}>
                 <img src={slipPreview} alt="slip" className="w-full object-contain" style={{ maxHeight: 320 }} />
               </div>
             )}
 
-            <p className="text-center text-[12px]" style={{ color: 'rgba(26,26,26,0.5)' }}>
+            <p className="text-center text-[12px]" style={{ color: '#64748b' }}>
               ตรวจสอบความถูกต้องของสลิปก่อนกดยืนยัน
             </p>
 
@@ -2110,7 +2396,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
                 style={{
                   gap: 10, height: 56, borderRadius: 14,
                   background: uploading ? '#f0ebe9' : C,
-                  color: uploading ? 'rgba(26,26,26,0.3)' : '#fff',
+                  color: uploading ? '#94a3b8' : '#fff',
                   border: 'none', cursor: uploading ? 'wait' : 'pointer',
                   fontSize: 15, letterSpacing: '0.01em',
                   boxShadow: uploading ? 'none' : `0 10px 28px ${C}3f`,
@@ -2118,7 +2404,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
               >
                 {uploading ? (
                   <>
-                    <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: 'rgba(26,26,26,0.2)', borderTopColor: INK }} />
+                    <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: '#94a3b8', borderTopColor: INK }} />
                     <span>กำลังส่ง...</span>
                   </>
                 ) : (
@@ -2153,13 +2439,13 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
 
             {/* Booking recap */}
             <div className="w-full flex items-center text-left"
-              style={{ gap: 14, padding: '14px 18px', borderRadius: 16, background: '#ffffff', border: '1px solid rgba(26,26,26,0.08)' }}>
+              style={{ gap: 14, padding: '14px 18px', borderRadius: 16, background: '#ffffff', border: '1px solid #e2e8f0' }}>
               <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                 <i className="fas fa-calendar-check" style={{ color: C, fontSize: 15 }} />
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-black truncate" style={{ fontSize: 14, color: INK }}>{booking.gameName}</p>
-                <p className="mt-0.5 text-[12px]" style={{ color: 'rgba(26,26,26,0.55)' }}>
+                <p className="mt-0.5 text-[12px]" style={{ color: '#64748b' }}>
                   {booking.date ? fmtDate(booking.date) : ''}{booking.time ? ` · ${booking.time} น.` : ''}
                 </p>
               </div>
