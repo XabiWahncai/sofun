@@ -1188,214 +1188,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </div>
 
       {/* ══════════════════════════════════════════
-          3. NETFLIX SWIMLANES CATALOG (WHITE THEME)
-      ══════════════════════════════════════════ */}
-      <section style={{ background: BG_PAGE, padding: 'clamp(56px,7vw,84px) 0 40px' }}>
-        <div style={{ maxWidth: 1320, margin: '0 auto' }}>
-
-          {/* Section Header */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 28, flexWrap: 'wrap', gap: 14 }}>
-            <div className="mm-reveal-l">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <span style={{ background: NETFLIX_RED, color: '#fff', fontSize: 9.5, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: 4 }}>
-                  NETFLIX SELECTION
-                </span>
-              </div>
-              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(38px,5.5vw,68px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
-                {t('home','catalogHeading')}
-              </h2>
-            </div>
-            <div className="mm-reveal-r">
-              <button
-                className="mm-btn-gho"
-                onClick={() => showPage('games')}
-                style={{
-                  background: 'transparent',
-                  color: TEXT_MAIN,
-                  border: `1.5px solid ${BORDER_CLR}`,
-                  cursor: 'pointer',
-                  fontSize: 11.5,
-                  fontWeight: 800,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  padding: '12px 24px',
-                  borderRadius: 8,
-                }}
-              >
-                ดูสคริปต์ทั้งหมด {scriptCount}+ เรื่อง &gt;
-              </button>
-            </div>
-          </div>
-
-          {/* Swimlane 1: Trending Now */}
-          <HomeNetflixSwimlaneRow
-            title="กำลังมาแรงติดเทรนด์"
-            games={trendingGames}
-            showDetail={showDetail}
-            showPage={showPage}
-            playedIds={playedIds}
-            onSeeAll={() => showPage('games')}
-          />
-
-          {/* Swimlane 2: New Releases */}
-          <HomeNetflixSwimlaneRow
-            title="เกมเข้าใหม่ล่าสุด"
-            games={sortedNewestGames}
-            showDetail={showDetail}
-            showPage={showPage}
-            playedIds={playedIds}
-            onSeeAll={() => showPage('games')}
-          />
-
-          {/* Swimlane 3: Beginner Friendly */}
-          <HomeNetflixSwimlaneRow
-            title="เหมาะสำหรับมือใหม่"
-            games={beginnerGames}
-            showDetail={showDetail}
-            showPage={showPage}
-            playedIds={playedIds}
-            onSeeAll={() => showPage('games')}
-          />
-
-          {/* Swimlane 4: Detective & Hardcore Mystery */}
-          <HomeNetflixSwimlaneRow
-            title="สืบสวนเข้มข้น ปริศนาท้าทาย"
-            games={detectiveGames}
-            showDetail={showDetail}
-            showPage={showPage}
-            playedIds={playedIds}
-            onSeeAll={() => showPage('games')}
-          />
-
-          {/* Swimlane 5: Roleplay & Drama */}
-          <HomeNetflixSwimlaneRow
-            title="สวมบทบาท ดราม่าอารมณ์"
-            games={dramaGames}
-            showDetail={showDetail}
-            showPage={showPage}
-            playedIds={playedIds}
-            onSeeAll={() => showPage('games')}
-          />
-
-          {/* Catalog Footer Link */}
-          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>
-            <button
-              className="mm-btn-pri"
-              onClick={() => showPage('games')}
-              style={{
-                background: NETFLIX_RED,
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                padding: '16px 48px',
-                borderRadius: 8,
-                boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
-              }}
-            >
-              เปิดดูคลังสคริปต์ทั้งหมด {scriptCount}+ เรื่อง
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          4. STATS BAR (WHITE THEME)
-      ══════════════════════════════════════════ */}
-      <section style={{ background: BG_SURFACE, color: TEXT_MAIN, padding: 'clamp(56px,7vw,88px) clamp(20px,5vw,60px)', borderTop: `1px solid ${BORDER_CLR}`, borderBottom: `1px solid ${BORDER_CLR}` }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
-            {[
-              { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
-              { num: '200+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
-              { num: 'B499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
-              { num: '5',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
-            ].map((s, i) => (
-              <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
-                padding: 'clamp(24px,3vw,40px) clamp(16px,2vw,28px)',
-                background: '#ffffff',
-                borderRadius: 12,
-                border: `1px solid ${BORDER_CLR}`,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-              }}>
-                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,76px)', color: TEXT_MAIN, lineHeight: 0.9 }}>
-                  {s.num}
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: NETFLIX_RED, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>
-                  {s.unit}
-                </div>
-                <div style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 4 }}>
-                  {s.sub}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mm-reveal" style={{ marginTop: 40, textAlign: 'center' }}>
-            <p style={{ fontSize: 'clamp(13px,1.4vw,16px)', fontWeight: 600, color: TEXT_MUTED, maxWidth: '64ch', margin: '0 auto', lineHeight: 1.7 }}>
-              <strong>Sofun Club Thailand</strong> ผู้บุกเบิกและสตูดิโอเกม <strong>Script Murder</strong> คุณภาพพรีเมียมแห่งแรกใจกลาง RCA พร้อม Game Master มืออาชีพดูแลห้องสืบคดีทุกรอบ
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          5. HOW TO PLAY (WHITE THEME)
-      ══════════════════════════════════════════ */}
-      <section style={{ background: BG_PAGE, color: TEXT_MAIN, padding: 'clamp(64px,8vw,104px) clamp(20px,5vw,60px)' }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div className="mm-reveal" style={{ marginBottom: 48, textAlign: 'center' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED, padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
-              HOW TO PLAY
-            </div>
-            <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(40px,6vw,80px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
-              {t('home','howStartHeading')}
-            </h2>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
-            {[
-              { n: '01', icon: 'fas fa-folder-open', title: t('home','step1Title'), desc: t('home','step1Desc'), d: 'mm-d1' },
-              { n: '02', icon: 'fas fa-user-secret', title: t('home','step2Title'), desc: t('home','step2Desc'), d: 'mm-d2' },
-              { n: '03', icon: 'fas fa-search',      title: t('home','step3Title'), desc: t('home','step3Desc'), d: 'mm-d3' },
-            ].map((step, i) => (
-              <div key={i} className={`mm-reveal ${step.d} mm-step-card`} style={{
-                padding: 'clamp(28px,3.5vw,44px)',
-                position: 'relative',
-                border: `1px solid ${BORDER_CLR}`,
-                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
-              }}>
-                <div aria-hidden className="mm-step-num">{step.n}</div>
-                <div style={{ marginTop: -14 }}>
-                  <div style={{ width: 28, height: 3, background: NETFLIX_RED, marginBottom: 14, borderRadius: 2 }} />
-                  <i className={step.icon} style={{ fontSize: 24, color: NETFLIX_RED, display: 'block', marginBottom: 14 }} />
-                  <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(22px,2.6vw,32px)', textTransform: 'uppercase', color: TEXT_MAIN, marginBottom: 10, letterSpacing: '0.02em', margin: '0 0 10px' }}>
-                    {step.title}
-                  </h3>
-                  <p style={{ fontSize: 13.5, lineHeight: 1.8, color: TEXT_MUTED, margin: 0 }}>{step.desc}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 52 }}>
-            <button className="mm-btn-pri" onClick={() => showPage('games')} style={{
-              background: NETFLIX_RED, color: '#fff', border: 'none', cursor: 'pointer',
-              fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
-              fontFamily: "'Sarabun',sans-serif", padding: '16px 52px', borderRadius: 8,
-              boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
-            }}>
-              {t('home','startPlaying')}
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          6. LUXURY VIP EVENT TICKET / PROMOTION (WHITE THEME)
+          3. LUXURY VIP EVENT TICKET / PROMOTION (WHITE THEME)
       ══════════════════════════════════════════ */}
       <section style={{
         background: BG_SURFACE,
@@ -1569,6 +1362,168 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          4. HOW TO PLAY (WHITE THEME)
+      ══════════════════════════════════════════ */}
+      <section style={{ background: BG_PAGE, color: TEXT_MAIN, padding: 'clamp(64px,8vw,104px) clamp(20px,5vw,60px)' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div className="mm-reveal" style={{ marginBottom: 48, textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED, padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+              HOW TO PLAY
+            </div>
+            <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(40px,6vw,80px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
+              {t('home','howStartHeading')}
+            </h2>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 24 }}>
+            {[
+              { n: '01', icon: 'fas fa-folder-open', title: t('home','step1Title'), desc: t('home','step1Desc'), d: 'mm-d1' },
+              { n: '02', icon: 'fas fa-user-secret', title: t('home','step2Title'), desc: t('home','step2Desc'), d: 'mm-d2' },
+              { n: '03', icon: 'fas fa-search',      title: t('home','step3Title'), desc: t('home','step3Desc'), d: 'mm-d3' },
+            ].map((step, i) => (
+              <div key={i} className={`mm-reveal ${step.d} mm-step-card`} style={{
+                padding: 'clamp(28px,3.5vw,44px)',
+                position: 'relative',
+                border: `1px solid ${BORDER_CLR}`,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.04)',
+              }}>
+                <div aria-hidden className="mm-step-num">{step.n}</div>
+                <div style={{ marginTop: -14 }}>
+                  <div style={{ width: 28, height: 3, background: NETFLIX_RED, marginBottom: 14, borderRadius: 2 }} />
+                  <i className={step.icon} style={{ fontSize: 24, color: NETFLIX_RED, display: 'block', marginBottom: 14 }} />
+                  <h3 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(22px,2.6vw,32px)', textTransform: 'uppercase', color: TEXT_MAIN, marginBottom: 10, letterSpacing: '0.02em', margin: '0 0 10px' }}>
+                    {step.title}
+                  </h3>
+                  <p style={{ fontSize: 13.5, lineHeight: 1.8, color: TEXT_MUTED, margin: 0 }}>{step.desc}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 52 }}>
+            <button className="mm-btn-pri" onClick={() => showPage('games')} style={{
+              background: NETFLIX_RED, color: '#fff', border: 'none', cursor: 'pointer',
+              fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
+              fontFamily: "'Sarabun',sans-serif", padding: '16px 52px', borderRadius: 8,
+              boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
+            }}>
+              {t('home','startPlaying')}
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          5. NETFLIX SWIMLANES CATALOG (WHITE THEME)
+      ══════════════════════════════════════════ */}
+      <section style={{ background: BG_PAGE, padding: 'clamp(56px,7vw,84px) 0 40px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto' }}>
+
+          {/* Section Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 28, flexWrap: 'wrap', gap: 14 }}>
+            <div className="mm-reveal-l">
+              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(38px,5.5vw,68px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
+                {t('home','catalogHeading')}
+              </h2>
+            </div>
+            <div className="mm-reveal-r">
+              <button
+                className="mm-btn-gho"
+                onClick={() => showPage('games')}
+                style={{
+                  background: 'transparent',
+                  color: TEXT_MAIN,
+                  border: `1.5px solid ${BORDER_CLR}`,
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  padding: '12px 24px',
+                  borderRadius: 8,
+                }}
+              >
+                ดูสคริปต์ทั้งหมด {scriptCount}+ เรื่อง &gt;
+              </button>
+            </div>
+          </div>
+
+          {/* Swimlane 1: Trending Now */}
+          <HomeNetflixSwimlaneRow
+            title="กำลังมาแรงติดเทรนด์"
+            games={trendingGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Catalog Footer Link */}
+          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>
+            <button
+              className="mm-btn-pri"
+              onClick={() => showPage('games')}
+              style={{
+                background: NETFLIX_RED,
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                padding: '16px 48px',
+                borderRadius: 8,
+                boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
+              }}
+            >
+              เปิดดูคลังสคริปต์ทั้งหมด {scriptCount}+ เรื่อง
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          6. STATS BAR (WHITE THEME)
+      ══════════════════════════════════════════ */}
+      <section style={{ background: BG_SURFACE, color: TEXT_MAIN, padding: 'clamp(56px,7vw,88px) clamp(20px,5vw,60px)', borderTop: `1px solid ${BORDER_CLR}`, borderBottom: `1px solid ${BORDER_CLR}` }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+            {[
+              { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
+              { num: '200+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
+              { num: 'B499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
+              { num: '5',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
+            ].map((s, i) => (
+              <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
+                padding: 'clamp(24px,3vw,40px) clamp(16px,2vw,28px)',
+                background: '#ffffff',
+                borderRadius: 12,
+                border: `1px solid ${BORDER_CLR}`,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}>
+                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,76px)', color: TEXT_MAIN, lineHeight: 0.9 }}>
+                  {s.num}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: NETFLIX_RED, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>
+                  {s.unit}
+                </div>
+                <div style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 4 }}>
+                  {s.sub}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mm-reveal" style={{ marginTop: 40, textAlign: 'center' }}>
+            <p style={{ fontSize: 'clamp(13px,1.4vw,16px)', fontWeight: 600, color: TEXT_MUTED, maxWidth: '64ch', margin: '0 auto', lineHeight: 1.7 }}>
+              <strong>Sofun Club Thailand</strong> ผู้บุกเบิกและสตูดิโอเกม <strong>Script Murder</strong> คุณภาพพรีเมียมแห่งแรกใจกลาง RCA พร้อม Game Master มืออาชีพดูแลห้องสืบคดีทุกรอบ
+            </p>
           </div>
         </div>
       </section>
