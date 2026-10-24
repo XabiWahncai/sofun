@@ -20,7 +20,7 @@ import ProfilePage from './components/ProfilePage'
 import QRPage from './components/QRPage'
 import ScanModal from './components/ScanModal'
 import AdminScanPage from './components/AdminScanPage'
-import POSPage, { newPOSSession } from './components/POSPage'
+import POSPage, { newPOSSession, dedupeSessions } from './components/POSPage'
 import MemberOrderPage from './components/MemberOrderPage'
 import BookingPage from './components/BookingPage'
 import RandomWheelPage from './components/RandomWheelPage'
@@ -77,7 +77,7 @@ export default function App() {
   const [posSessions, setPosSessions] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('sofun_pos_sessions'))
-      if (Array.isArray(saved?.sessions) && saved.sessions.length > 0) return saved.sessions
+      if (Array.isArray(saved?.sessions) && saved.sessions.length > 0) return dedupeSessions(saved.sessions)
     } catch {}
     return [newPOSSession()]
   })
@@ -96,17 +96,17 @@ export default function App() {
       if (snap.exists()) {
         const data = snap.data()
         if (Array.isArray(data.sessions) && data.sessions.length > 0) {
-          setPosSessions(data.sessions)
+          setPosSessions(dedupeSessions(data.sessions, posActiveId))
         }
         posLoadedRef.current = true
       } else if (!posLoadedRef.current) {
         posLoadedRef.current = true
-        const first = posSessions.length > 0 ? posSessions : [newPOSSession()]
+        const first = posSessions.length > 0 ? dedupeSessions(posSessions, posActiveId) : [newPOSSession()]
         setDoc(docRef, { sessions: first }).catch(e => console.warn('POS init failed:', e))
       }
     }, err => console.warn('POS sync subscribe failed:', err))
     return unsub
-  }, [])
+  }, [posActiveId])
 
   // ── Persist POS sessions and active party id across refresh ───────
   useEffect(() => {
@@ -121,7 +121,8 @@ export default function App() {
   // Setter wrapper: writes to Firestore (debounced for edits, immediate for add/remove)
   const handlePosSessionsChange = useCallback((updater) => {
     setPosSessions(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater
+      const rawNext = typeof updater === 'function' ? updater(prev) : updater
+      const next = dedupeSessions(rawNext, posActiveId)
       try {
         if (Array.isArray(next) && next.length > 0) {
           localStorage.setItem('sofun_pos_sessions', JSON.stringify({ sessions: next, activeId: posActiveId }))

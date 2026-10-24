@@ -270,6 +270,86 @@ export const newPOSSession = () => ({
   discount: 0,
 })
 
+// ── Deduplicate session tabs to prevent duplicate/ghost parties ──────────────
+export function dedupeSessions(sessions, activeId) {
+  if (!Array.isArray(sessions)) return []
+  const seenIds = new Set()
+  const seenOrderIds = new Map()
+  const result = []
+
+  for (const s of sessions) {
+    if (!s || typeof s !== 'object') continue
+
+    const sId = String(s.id ?? '')
+    if (!sId || seenIds.has(sId)) continue
+
+    const isActive = Boolean(activeId && String(s.id) === String(activeId))
+
+    if (s.confirmedOrderId) {
+      const ordId = String(s.confirmedOrderId)
+      if (seenOrderIds.has(ordId)) {
+        if (isActive) {
+          const prevIdx = seenOrderIds.get(ordId)
+          seenIds.delete(String(result[prevIdx].id))
+          result[prevIdx] = s
+          seenIds.add(sId)
+        }
+        continue
+      }
+
+      // Check if an unconfirmed draft with identical script + members already exists in result
+      const existingDraftIdx = result.findIndex(prev => {
+        if (prev.confirmedOrderId) return false
+        if (!s.scriptId || s.scriptId !== prev.scriptId) return false
+        if ((s.room || '') !== (prev.room || '')) return false
+        const sMems = s.members || []
+        const pMems = prev.members || []
+        if (sMems.length !== pMems.length || sMems.length === 0) return false
+        const pUids = new Set(pMems.map(m => m.uid || m.id))
+        return sMems.every(m => pUids.has(m.uid || m.id))
+      })
+
+      if (existingDraftIdx !== -1) {
+        const draft = result[existingDraftIdx]
+        seenIds.delete(String(draft.id))
+        const targetId = (activeId && String(draft.id) === String(activeId)) ? draft.id : s.id
+        result[existingDraftIdx] = { ...s, id: targetId }
+        seenIds.add(String(targetId))
+        seenOrderIds.set(ordId, existingDraftIdx)
+        continue
+      }
+
+      seenOrderIds.set(ordId, result.length)
+    } else {
+      // Unconfirmed session
+      const existingIdx = result.findIndex(prev => {
+        if (!s.scriptId || s.scriptId !== prev.scriptId) return false
+        if ((s.room || '') !== (prev.room || '')) return false
+        const sMems = s.members || []
+        const pMems = prev.members || []
+        if (sMems.length !== pMems.length || sMems.length === 0) return false
+        const pUids = new Set(pMems.map(m => m.uid || m.id))
+        return sMems.every(m => pUids.has(m.uid || m.id))
+      })
+
+      if (existingIdx !== -1) {
+        const prev = result[existingIdx]
+        if (!prev.confirmedOrderId && isActive) {
+          seenIds.delete(String(prev.id))
+          result[existingIdx] = s
+          seenIds.add(sId)
+        }
+        continue
+      }
+    }
+
+    seenIds.add(sId)
+    result.push(s)
+  }
+
+  return result
+}
+
 export default function POSPage({
   initialUid, adminUser, allGames, showToast, onClose,
   sessions, activeId,
@@ -361,8 +441,20 @@ export default function POSPage({
   const setActiveId = onActiveIdChange
 
   const fallbackSession = useMemo(() => newPOSSession(), [])
-  const safeSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
+  const safeSessions = useMemo(() => {
+    const base = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
+    return dedupeSessions(base, activeId)
+  }, [sessions, activeId, fallbackSession])
   const activeSession = safeSessions.find(s => String(s.id) === String(activeId)) || safeSessions[0]
+
+  // ── Auto-clean duplicate sessions from state/storage ──────────────
+  useEffect(() => {
+    if (!Array.isArray(sessions) || sessions.length === 0) return
+    const deduped = dedupeSessions(sessions, activeId)
+    if (deduped.length !== sessions.length) {
+      setSessions(deduped)
+    }
+  }, [sessions, activeId])
   // Owner DM OR 'manager' admin — can edit/pay/cancel/close any party.
   // Manager = either (a) LINE admin with 'manager' achievement
   //           or (b) Firebase-authenticated admin (store owner/staff).
@@ -459,6 +551,22 @@ export default function POSPage({
         let changed = false
         missingOrders.forEach(mo => {
           if (!list.some(s => s.confirmedOrderId === mo.id)) {
+            // Check if an unconfirmed draft with the same scriptId and matching members exists in list
+            const matchingDraftIdx = list.findIndex(s =>
+              !s.confirmedOrderId &&
+              s.scriptId === mo.scriptId &&
+              ((s.members || []).length > 0 && (mo.members || []).length > 0 &&
+                s.members.every(m => (mo.members || []).some(mom => mom.uid === m.uid)))
+            )
+            if (matchingDraftIdx !== -1) {
+              list[matchingDraftIdx] = {
+                ...list[matchingDraftIdx],
+                confirmedOrderId: mo.id,
+              }
+              changed = true
+              return
+            }
+
             const orderItems = (mo.foodItems || []).map(x => ({
               key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
               menuId: x.menuId || '',
@@ -494,7 +602,7 @@ export default function POSPage({
             changed = true
           }
         })
-        return changed ? list : prev
+        return changed ? dedupeSessions(list, activeId) : prev
       })
     }
   }, [todayOrders, sessions])
@@ -1350,7 +1458,7 @@ export default function POSPage({
 
   const addSession = () => {
     const s = newPOSSession()
-    setSessions(prev => [...prev, s])
+    setSessions(prev => dedupeSessions([...(Array.isArray(prev) ? prev : []), s], s.id))
     setActiveId(s.id)
   }
 
@@ -1360,10 +1468,14 @@ export default function POSPage({
 
     // Close confirmed order in the background without blocking the UI
     if (session?.confirmedOrderId) {
-      updateDoc(doc(db, 'orders', session.confirmedOrderId), {
-        status: 'closed',
-        closedAt: serverTimestamp(),
-      }).catch(e => console.warn('close order failed:', e.message))
+      // Only close in Firestore if no other session shares this confirmedOrderId (protect against duplicate tab closure)
+      const hasDuplicateOrder = list.some(s => String(s.id) !== String(id) && s.confirmedOrderId === session.confirmedOrderId)
+      if (!hasDuplicateOrder) {
+        updateDoc(doc(db, 'orders', session.confirmedOrderId), {
+          status: 'closed',
+          closedAt: serverTimestamp(),
+        }).catch(e => console.warn('close order failed:', e.message))
+      }
     }
 
     setSessions(prev => {
@@ -1378,7 +1490,7 @@ export default function POSPage({
         const nextActive = remaining[remaining.length - 1]
         setActiveId(nextActive ? nextActive.id : null)
       }
-      return remaining
+      return dedupeSessions(remaining, activeId)
     })
     showToast('ปิดปาร์ตี้แล้ว')
   }
@@ -1470,7 +1582,6 @@ export default function POSPage({
   }
 
   const openExistingOrder = (order) => {
-    const existing = safeSessions.find(s => s.confirmedOrderId === order.id)
     const orderItems = (order.foodItems || []).map(x => ({
       key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
       menuId: x.menuId || '',
@@ -1483,35 +1594,45 @@ export default function POSPage({
       note: x.note || '',
     }))
 
-    if (existing) {
-      if (orderItems.length > 0) {
-        updateSession(existing.id, { order: orderItems })
+    setSessions(prev => {
+      const list = Array.isArray(prev) ? [...prev] : []
+      const existing = list.find(s => s.confirmedOrderId === order.id)
+
+      if (existing) {
+        setActiveId(existing.id)
+        if (orderItems.length > 0 || ((existing.members || []).length === 0 && (order.members || []).length > 0)) {
+          return list.map(s => s.id === existing.id ? {
+            ...s,
+            order: orderItems.length > 0 ? orderItems : s.order,
+            members: (s.members || []).length === 0 && (order.members || []).length > 0 ? order.members : s.members,
+          } : s)
+        }
+        return list
       }
-      // Re-hydrate members if session lost them (e.g. from stale pos_live/current sync)
-      if ((existing.members || []).length === 0 && (order.members || []).length > 0) {
-        updateSession(existing.id, { members: order.members })
+
+      const newS = {
+        id: Date.now() + Math.random(),
+        label: order.scriptTitle ? `${order.scriptTitle} (${order.room || 'ตี้'})` : `ปาร์ตี้ ${sessionCounter++}`,
+        createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : new Date().toISOString(),
+        members: order.members || [],
+        scriptId: order.scriptId || '',
+        eventName: '',
+        customPrice: '',
+        dm: order.dm || '',
+        npc: order.npc || '',
+        room: order.room || '',
+        order: orderItems,
+        confirmedOrderId: order.id,
+        promoName: order.promoName || '',
+        discount: order.discount || 0,
       }
-      setActiveId(existing.id)
-      return
-    }
-    const newS = {
-      id: Date.now() + Math.random(),
-      label: order.scriptTitle ? `${order.scriptTitle} (${order.room || 'ตี้'})` : `ปาร์ตี้ ${sessionCounter++}`,
-      createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : new Date().toISOString(),
-      members: order.members || [],
-      scriptId: order.scriptId || '',
-      eventName: '',
-      customPrice: '',
-      dm: order.dm || '',
-      npc: order.npc || '',
-      room: order.room || '',
-      order: orderItems,
-      confirmedOrderId: order.id,
-      promoName: order.promoName || '',
-      discount: order.discount || 0,
-    }
-    setSessions(prev => [...(Array.isArray(prev) ? prev : []), newS])
-    setActiveId(newS.id)
+
+      setActiveId(newS.id)
+      if (list.length === 1 && !list[0].confirmedOrderId && (!list[0].members || list[0].members.length === 0) && (!list[0].order || list[0].order.length === 0) && !list[0].scriptId) {
+        return [newS]
+      }
+      return dedupeSessions([...list, newS], newS.id)
+    })
   }
 
   const closeTable = () => {
@@ -1609,11 +1730,11 @@ export default function POSPage({
       }
 
       const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
-      const remaining = list.filter(s => String(s.id) !== String(activeId))
+      const remaining = list.filter(s => String(s.id) !== String(activeId) && (!orderId || s.confirmedOrderId !== orderId))
       if (remaining.length === 0) {
         const fresh = newPOSSession(); setSessions([fresh]); setActiveId(fresh.id)
       } else {
-        setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
+        setSessions(dedupeSessions(remaining, remaining[remaining.length - 1].id)); setActiveId(remaining[remaining.length - 1].id)
       }
       showToast('บันทึก report และปิดตี้แล้ว')
     } catch (e) { showToast('ปิดตี้ล้มเหลว: ' + e.message, 'error') }
@@ -1742,8 +1863,11 @@ export default function POSPage({
             playedAt: serverTimestamp(), recordedBy: adminUser?.name || 'admin',
           })
         }
-        const ref = await addDoc(collection(db, 'orders'), { ...payload, createdAt: serverTimestamp() })
-        updateActive({ confirmedOrderId: ref.id })
+        const orderRef = doc(collection(db, 'orders'))
+        const orderId = orderRef.id
+        // Associate confirmedOrderId to active session BEFORE writing to Firestore to eliminate onSnapshot race condition
+        updateActive({ confirmedOrderId: orderId })
+        await setDoc(orderRef, { ...payload, createdAt: serverTimestamp() })
         showToast('บันทึกออเดอร์สำเร็จ ✓')
       }
     } catch (e) {
