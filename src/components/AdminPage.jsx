@@ -540,20 +540,25 @@ const getDiffBadgeStyle = (diff) => {
 
 export const getMissingScriptFields = (g) => {
   if (!g) return []
-  const missing = []
-  if (!g.title || !String(g.title).trim()) missing.push('ชื่อเกม')
-  if (!g.image && !g.coverUrl) missing.push('รูปปก')
-  if (!g.players || !String(g.players).trim()) missing.push('จำนวนคน')
-  if (!g.time || !String(g.time).trim()) missing.push('ระยะเวลา')
-  if (!(Number(g.payPrice) > 0 || Number(g.price) > 0 || Number(g.fullPrice) > 0)) missing.push('ราคา')
-  if (!g.difficulty || !String(g.difficulty).trim()) missing.push('ความยาก')
-  if (!(g.synopsis || g.description)?.trim()) missing.push('เรื่องย่อ')
-  if (!g.mainRoom && (!Array.isArray(g.rooms) || g.rooms.length === 0)) missing.push('ห้องเล่น')
-  if (!Array.isArray(g.characters) || g.characters.length === 0 || !g.characters.some(c => c.name?.trim())) {
-    missing.push('ตัวละคร')
+  try {
+    const missing = []
+    if (!String(g.title || '').trim()) missing.push('ชื่อเกม')
+    if (!g.image && !g.coverUrl) missing.push('รูปปก')
+    if (!String(g.players || '').trim()) missing.push('จำนวนคน')
+    if (!String(g.time || '').trim()) missing.push('ระยะเวลา')
+    if (!(Number(g.payPrice || 0) > 0 || Number(g.price || 0) > 0 || Number(g.fullPrice || 0) > 0)) missing.push('ราคา')
+    if (!String(g.difficulty || '').trim()) missing.push('ความยาก')
+    if (!String(g.synopsis || g.description || '').trim()) missing.push('เรื่องย่อ')
+    if (!String(g.mainRoom || '').trim() && (!Array.isArray(g.rooms) || g.rooms.length === 0)) missing.push('ห้องเล่น')
+    if (!Array.isArray(g.characters) || g.characters.length === 0 || !g.characters.some(c => c && String(c.name || '').trim())) {
+      missing.push('ตัวละคร')
+    }
+    if (!Array.isArray(g.tags) || g.tags.length === 0) missing.push('แท็กแนวเกม')
+    return missing
+  } catch (err) {
+    console.warn('getMissingScriptFields error:', err)
+    return []
   }
-  if (!Array.isArray(g.tags) || g.tags.length === 0) missing.push('แท็กแนวเกม')
-  return missing
 }
 
 function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {

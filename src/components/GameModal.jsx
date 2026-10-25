@@ -321,14 +321,34 @@ export default function GameModal({ editingGame, onClose, showToast }) {
   const currentTabIndex = TABS.findIndex(t => t.id === activeTab)
   const prevTab = currentTabIndex > 0 ? TABS[currentTabIndex - 1] : null
   const nextTab = currentTabIndex < TABS.length - 1 ? TABS[currentTabIndex + 1] : null
-
-  
   const isTabIncomplete = (tabId) => {
-    if (tabId === 'basic') return !title.trim() || !players.trim() || !time.trim() || !difficulty.trim() || tags.length === 0
-    if (tabId === 'pricing') return !(parseFloat(fullPrice) > 0 || parseFloat(payPrice) > 0) || (!mainRoom && selectedRooms.length === 0)
-    if (tabId === 'story') return !synopsis.trim()
-    if (tabId === 'chars') return characters.length === 0 || !characters.some(c => c.name?.trim())
-    if (tabId === 'media') return !imageFile && !imageDriveUrl.trim() && !currentImageUrl.trim()
+    try {
+      if (tabId === 'basic') {
+        const hasTitle = Boolean(String(title || '').trim())
+        const hasPlayers = Boolean(String(players || '').trim())
+        const hasTime = Boolean(String(time || '').trim())
+        const hasDiff = Boolean(String(difficulty || '').trim())
+        const hasTags = Array.isArray(tags) && tags.length > 0
+        return !hasTitle || !hasPlayers || !hasTime || !hasDiff || !hasTags
+      }
+      if (tabId === 'pricing') {
+        const hasPrice = (parseFloat(fullPrice || 0) > 0) || (parseFloat(payPrice || 0) > 0)
+        const hasRoom = Boolean(String(mainRoom || '').trim()) || (Array.isArray(selectedRooms) && selectedRooms.length > 0)
+        return !hasPrice || !hasRoom
+      }
+      if (tabId === 'story') {
+        return !String(synopsis || '').trim()
+      }
+      if (tabId === 'chars') {
+        return !Array.isArray(characters) || characters.length === 0 || !characters.some(c => c && String(c.name || '').trim())
+      }
+      if (tabId === 'media') {
+        const hasImg = Boolean(imageFile) || Boolean(String(imageDriveUrl || '').trim()) || Boolean(String(currentImageUrl || '').trim())
+        return !hasImg
+      }
+    } catch (e) {
+      console.warn('isTabIncomplete error:', e)
+    }
     return false
   }
 
