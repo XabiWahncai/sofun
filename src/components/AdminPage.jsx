@@ -949,7 +949,7 @@ function EditMemberModal({ member, onClose, showToast }) {
         position:     form.position.trim(),
         pictureUrl:   form.pictureUrl.trim(),
         achievements: form.achievements,
-        achievement:  form.achievements.includes('golden') ? 'golden' : null,
+        achievement:  form.achievements.length > 0 ? form.achievements[0] : null,
         updatedAt:    serverTimestamp(),
       })
       showToast('บันทึกข้อมูลสำเร็จ')

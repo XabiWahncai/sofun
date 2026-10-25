@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 
-const C = '#c62419'
+const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
 const INK_2 = 'rgba(26,26,26,0.65)'
 const INK_3 = 'rgba(26,26,26,0.4)'
@@ -25,6 +25,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
 
   const [myAchievements, setMyAchievements] = useState([])
   const [pinned, setPinned] = useState([])
+  const [activeTheme, setActiveTheme] = useState(() => localStorage.getItem('sofun_active_theme') || null)
   const [pinnedSaved, setPinnedSaved] = useState(false)
   const [pinnedSaving, setPinnedSaving] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -55,6 +56,10 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
 
         const fp = Array.isArray(d.pinnedAchievements) ? d.pinnedAchievements : owned
         setPinned(fp.filter(id => owned.includes(id)))
+        if (d.activeAchievement) {
+          setActiveTheme(d.activeAchievement)
+          localStorage.setItem('sofun_active_theme', d.activeAchievement)
+        }
       }
     }).finally(() => setLoading(false))
   }, [lineUser])
@@ -85,6 +90,27 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
         ? prev.filter(x => x !== id)
         : prev.length < MAX_PINNED ? [...prev, id] : prev
     )
+  }
+
+  
+  const handleEquipTheme = async (achId) => {
+    const next = activeTheme === achId ? null : achId
+    setActiveTheme(next)
+    if (next) {
+      localStorage.setItem('sofun_active_theme', next)
+      document.documentElement.setAttribute('data-achievement', next)
+    } else {
+      localStorage.removeItem('sofun_active_theme')
+      document.documentElement.removeAttribute('data-achievement')
+    }
+    if (lineUser?.uid) {
+      try {
+        await updateDoc(doc(db, 'members', lineUser.uid), { activeAchievement: next })
+      } catch (e) {
+        console.warn('Update activeAchievement failed:', e)
+      }
+    }
+    window.dispatchEvent(new Event('sofun-theme-change'))
   }
 
   const savePinned = async () => {
@@ -210,6 +236,124 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
           </div>
         ) : (
           <>
+            
+            {/* ── Active Achievement Theme Wardrobe ── */}
+            <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1.5px solid ${activeTheme ? 'var(--red)' : BORDER}`, boxShadow: '0 2px 10px rgba(0,0,0,0.04)', transition: 'all 0.2s' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-palette" style={{ color: 'var(--red)', fontSize: 16 }} />
+                  <span style={{ fontSize: 15, fontWeight: 900, color: INK }}>สวมใส่ธีมเว็บ (Achievement Themes)</span>
+                </div>
+                {activeTheme && (
+                  <button
+                    onClick={() => handleEquipTheme(activeTheme)}
+                    style={{
+                      background: 'none', border: '1px solid #cbd5e1', borderRadius: 999,
+                      padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#64748b', cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-rotate-left" style={{ marginRight: 5 }} />คืนค่าธีมมาตรฐาน Sofun
+                  </button>
+                )}
+              </div>
+
+              <div style={{ fontSize: 12.5, color: INK_2, marginBottom: 16, lineHeight: 1.5 }}>
+                {activeTheme ? (
+                  <span>
+                    กำลังสวมใส่ธีม: <strong style={{ color: 'var(--red)', fontWeight: 800 }}>{ACHIEVEMENTS[activeTheme]?.labelTH || activeTheme}</strong>
+                    {' '}· สีหลักของเว็บและเอฟเฟคจะเปลี่ยนตามความสำเร็จนี้
+                  </span>
+                ) : (
+                  <span>กำลังใช้งานธีมมาตรฐาน (สีแดง Sofun) · เลือกสวมใส่ความสำเร็จด้านล่างเพื่อเปลี่ยนสีเว็บและเปิดเอฟเฟคพิเศษ</span>
+                )}
+              </div>
+
+              {/* Quick switch cards for owned achievements */}
+              {myAchievements.length > 0 ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
+                  {myAchievements.map(id => {
+                    const ach = ACHIEVEMENTS[id]
+                    if (!ach) return null
+                    const isEquipped = activeTheme === id
+                    return (
+                      <div
+                        key={id}
+                        style={{
+                          borderRadius: 12, padding: '12px 10px', textAlign: 'center',
+                          background: isEquipped ? ach.bg : '#f8fafc',
+                          border: isEquipped ? `2px solid ${ach.color}` : '1px solid #e2e8f0',
+                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                          boxShadow: isEquipped ? `0 4px 14px ${ach.color}40` : 'none',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        <div style={{ fontSize: 22, color: ach.color, lineHeight: 1 }}>
+                          <i className={`fas ${ach.icon}`} />
+                        </div>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                          {ach.labelTH}
+                        </div>
+                        <button
+                          onClick={() => handleEquipTheme(id)}
+                          style={{
+                            marginTop: 4, width: '100%', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 800,
+                            background: isEquipped ? ach.color : '#ffffff',
+                            color: isEquipped ? '#ffffff' : INK,
+                            border: isEquipped ? 'none' : '1px solid #cbd5e1',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {isEquipped ? 'ใช้งานอยู่' : 'สวมใส่ธีมนี้'}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : null}
+
+              {/* Theme Previewer / Tester */}
+              <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px dashed #e2e8f0' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+                  <i className="fas fa-flask" style={{ marginRight: 6 }} />ทดสอบธีมความสำเร็จ (Theme Previewer)
+                </div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <button
+                    onClick={() => handleEquipTheme('golden')}
+                    style={{
+                      background: activeTheme === 'golden' ? '#D4AF37' : 'rgba(212,175,55,0.12)',
+                      color: activeTheme === 'golden' ? '#ffffff' : '#A16207',
+                      border: '1.5px solid #D4AF37', borderRadius: 999, padding: '5px 12px',
+                      fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-star" style={{ marginRight: 5 }} />Golden Player (สีทอง + ประกาย)
+                  </button>
+                  <button
+                    onClick={() => handleEquipTheme('hunger')}
+                    style={{
+                      background: activeTheme === 'hunger' ? '#F97316' : 'rgba(249,115,22,0.12)',
+                      color: activeTheme === 'hunger' ? '#ffffff' : '#EA580C',
+                      border: '1.5px solid #F97316', borderRadius: 999, padding: '5px 12px',
+                      fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-utensils" style={{ marginRight: 5 }} />The Hunger (สีส้ม + อาหาร)
+                  </button>
+                  <button
+                    onClick={() => handleEquipTheme('sadness')}
+                    style={{
+                      background: activeTheme === 'sadness' ? '#64748B' : 'rgba(100,116,139,0.12)',
+                      color: activeTheme === 'sadness' ? '#ffffff' : '#334155',
+                      border: '1.5px solid #64748B', borderRadius: 999, padding: '5px 12px',
+                      fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                    }}
+                  >
+                    <i className="fas fa-cloud-rain" style={{ marginRight: 5 }} />Sadness (สีเทา + ฝนตก)
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* ── Achievements ── */}
             {myAchievements.length > 0 && (
               <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>

@@ -283,9 +283,9 @@
   --crimson-600: #5B21B6; --crimson-700: #4C1D95;
 }
 :root[data-achievement="golden"] {
-  --crimson-300: #F5D76E; --crimson-400: #E8BA2A;
-  --crimson-500: #C9A227; --crimson-500-rgb: 201, 162, 39;
-  --crimson-600: #9A7A1A; --crimson-700: #7A5F10;
+  --crimson-300: #FDE047; --crimson-400: #FACC15;
+  --crimson-500: #D4AF37; --crimson-500-rgb: 212, 175, 55;
+  --crimson-600: #CA8A04; --crimson-700: #A16207;
 }
 :root[data-achievement="explorer"] {
   --crimson-300: #6EE7B7; --crimson-400: #10B981;
@@ -298,9 +298,9 @@
   --crimson-600: #15803D; --crimson-700: #166534;
 }
 :root[data-achievement="hunger"] {
-  --crimson-300: #FED7AA; --crimson-400: #F97316;
-  --crimson-500: #EA580C; --crimson-500-rgb: 234, 88, 12;
-  --crimson-600: #C2410C; --crimson-700: #9A3412;
+  --crimson-300: #FED7AA; --crimson-400: #FB923C;
+  --crimson-500: #F97316; --crimson-500-rgb: 249, 115, 22;
+  --crimson-600: #EA580C; --crimson-700: #C2410C;
 }
 :root[data-achievement="silver"] {
   --crimson-300: #CBD5E1; --crimson-400: #94A3B8;
@@ -313,9 +313,9 @@
   --crimson-600: #9A5A20; --crimson-700: #7A3F15;
 }
 :root[data-achievement="sadness"] {
-  --crimson-300: #D1D5DB; --crimson-400: #9CA3AF;
-  --crimson-500: #6B7280; --crimson-500-rgb: 107, 114, 128;
-  --crimson-600: #4B5563; --crimson-700: #374151;
+  --crimson-300: #CBD5E1; --crimson-400: #94A3B8;
+  --crimson-500: #64748B; --crimson-500-rgb: 100, 116, 139;
+  --crimson-600: #475569; --crimson-700: #334155;
 }
 :root[data-achievement="charity"] {
   --crimson-300: #FBCFE8; --crimson-400: #EC4899;

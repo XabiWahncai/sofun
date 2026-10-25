@@ -9,7 +9,7 @@ const BG_PAGE       = '#fcfcfc'
 const CARD_BG       = '#ffffff'
 const CARD_BG_HOVER = '#f8f8f8'
 const SURFACE_ELEV  = '#f3f4f6'
-const NETFLIX_RED   = '#e50914'
+const NETFLIX_RED = 'var(--red, #e50914)'
 const CRIMSON_DEEP  = '#b80710'
 const GOLD_AMBER    = '#f59e0b'
 const TEXT_PRIMARY  = '#111827'
@@ -372,7 +372,7 @@ const RESPONSIVE_CSS = `
   }
   .netflix-billboard-btn-book:hover {
     transform: scale(1.03) translateY(-1px) !important;
-    box-shadow: 0 8px 24px rgba(229,9,20,0.38) !important;
+    box-shadow: 0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.38) !important;
   }
   .netflix-billboard-btn-book:active {
     transform: scale(0.97) !important;
@@ -397,7 +397,7 @@ const RESPONSIVE_CSS = `
   @media (hover: hover) and (min-width: 769px) {
     .netflix-card:hover {
       transform: translateY(-8px) scale(1.05) !important;
-      box-shadow: 0 20px 42px rgba(0,0,0,0.18), 0 0 0 1.5px rgba(229,9,20,0.35) !important;
+      box-shadow: 0 20px 42px rgba(0,0,0,0.18), 0 0 0 1.5px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.35) !important;
       z-index: 10 !important;
     }
     .netflix-card:hover .netflix-card-img {
@@ -435,7 +435,7 @@ const RESPONSIVE_CSS = `
   }
   .netflix-card-btn-play:hover {
     transform: scale(1.03);
-    box-shadow: 0 4px 12px rgba(229,9,20,0.35);
+    box-shadow: 0 4px 12px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.35);
   }
   .netflix-card-btn-play:active {
     transform: scale(0.96);
@@ -470,7 +470,7 @@ const RESPONSIVE_CSS = `
   }
   .netflix-row-header:hover .netflix-row-indicator {
     transform: scaleY(1.22);
-    box-shadow: 0 0 10px rgba(229,9,20,0.55);
+    box-shadow: 0 0 10px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.55);
   }
 
   /* Carousel Navigation Arrows Micro-Animations */
@@ -482,9 +482,9 @@ const RESPONSIVE_CSS = `
   }
   .netflix-scroll-arrow:hover .netflix-scroll-arrow-circle {
     transform: scale(1.15) !important;
-    border-color: rgba(229,9,20,0.4) !important;
+    border-color: rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.4) !important;
     color: #e50914 !important;
-    box-shadow: 0 6px 20px rgba(229,9,20,0.22), 0 2px 8px rgba(0,0,0,0.1) !important;
+    box-shadow: 0 6px 20px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.22), 0 2px 8px rgba(0,0,0,0.1) !important;
   }
   .netflix-scroll-arrow:active .netflix-scroll-arrow-circle {
     transform: scale(0.95) !important;
@@ -515,7 +515,7 @@ const RESPONSIVE_CSS = `
     transform: scale(0.95) !important;
   }
   .netflix-cat-pill.active {
-    box-shadow: 0 4px 14px rgba(229,9,20,0.3) !important;
+    box-shadow: 0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3) !important;
   }
 
   .netflix-filter-btn {
@@ -532,8 +532,8 @@ const RESPONSIVE_CSS = `
     transition: border-color 0.2s ease, box-shadow 0.2s ease, width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .netflix-search-box input:focus {
-    border-color: rgba(229,9,20,0.6) !important;
-    box-shadow: 0 0 0 3px rgba(229,9,20,0.12) !important;
+    border-color: rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.6) !important;
+    box-shadow: 0 0 0 3px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.12) !important;
   }
 
   .netflix-view-toggle button {
@@ -597,7 +597,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
         overflow: 'hidden',
         background: CARD_BG,
         cursor: 'pointer',
-        border: `1.5px solid ${hovered ? 'rgba(229,9,20,0.35)' : BORDER_SUBTLE}`,
+        border: `1.5px solid ${hovered ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.35)' : BORDER_SUBTLE}`,
         boxShadow: hovered
           ? '0 16px 36px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.06)'
           : '0 2px 8px rgba(0,0,0,0.06)',
@@ -1202,7 +1202,7 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings,
               display: 'flex',
               alignItems: 'center',
               gap: 8,
-              boxShadow: '0 4px 16px rgba(229,9,20,0.3)',
+              boxShadow: '0 4px 16px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)',
             }}
           >
             <i className="fas fa-play" style={{ fontSize: 13 }} /> จองรอบเล่นเกมนี้
@@ -1415,7 +1415,7 @@ function NetflixSubBar({
             height: 34,
             padding: '0 12px',
             borderRadius: 18,
-            background: isFilterOpen || activeFilterCount > 0 ? 'rgba(229,9,20,0.08)' : '#f3f4f6',
+            background: isFilterOpen || activeFilterCount > 0 ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.08)' : '#f3f4f6',
             border: `1px solid ${isFilterOpen || activeFilterCount > 0 ? NETFLIX_RED : 'transparent'}`,
             color: isFilterOpen || activeFilterCount > 0 ? NETFLIX_RED : TEXT_MUTED,
             fontSize: 12,
@@ -1838,7 +1838,7 @@ function NetflixFilterDrawer({
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 6,
-                boxShadow: '0 4px 14px rgba(229,9,20,0.3)',
+                boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)',
               }}
             >
               <span>ดูผลลัพธ์ ({resultCount} เรื่อง)</span>

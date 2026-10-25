@@ -9,7 +9,7 @@ import { useTopPlayedGames90d } from '../utils/playStats';
 /* Design tokens - Netflix White Theme */
 const C          = 'var(--crimson-500)';
 const C_DEEP     = 'var(--crimson-700)';
-const NETFLIX_RED = '#e50914';
+const NETFLIX_RED = 'var(--red, #e50914)';
 const BG_PAGE    = '#ffffff';
 const BG_SURFACE = '#f8fafc';
 const CARD_BG    = '#ffffff';
@@ -128,7 +128,7 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEn
         overflow: 'hidden',
         background: CARD_BG,
         cursor: 'pointer',
-        border: `1.5px solid ${hovered ? 'rgba(229,9,20,0.35)' : BORDER_CLR}`,
+        border: `1.5px solid ${hovered ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.35)' : BORDER_CLR}`,
         boxShadow: hovered
           ? '0 16px 36px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.06)'
           : '0 2px 8px rgba(0,0,0,0.05)',
@@ -718,12 +718,12 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           border: 1.5px solid rgba(0, 0, 0, 0.08);
           border-radius: 22px;
           position: relative;
-          box-shadow: 0 24px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(229,9,20,0.08);
+          box-shadow: 0 24px 60px rgba(0,0,0,0.08), 0 0 0 1px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.08);
           transition: transform .5s cubic-bezier(.16,1,.3,1), box-shadow .5s cubic-bezier(.16,1,.3,1)!important;
         }
         .mm-ticket-card:hover {
           transform: translateY(-6px)!important;
-          box-shadow: 0 36px 80px rgba(0,0,0,0.12), 0 0 35px rgba(229,9,20,0.12)!important;
+          box-shadow: 0 36px 80px rgba(0,0,0,0.12), 0 0 35px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.12)!important;
         }
         .mm-ticket-stub {
           padding: 24px 22px;
@@ -1259,7 +1259,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                     fontSize: 12, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
                     fontFamily: "'Sarabun',sans-serif", padding: '12px 20px', borderRadius: 8,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                    boxShadow: '0 4px 14px rgba(229,9,20,0.25)',
+                    boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.25)',
                   }}
                 >
                   <span>{String(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย').replace(/->/g, '').trim()}</span>
@@ -1306,7 +1306,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   }}>
                     <div style={{
                       width: 56, height: 56, borderRadius: '50%',
-                      background: 'rgba(229,9,20,0.08)', border: '1px solid rgba(229,9,20,0.2)',
+                      background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.08)', border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.2)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       color: NETFLIX_RED, fontSize: 22, marginBottom: 10,
                     }}>
@@ -1369,7 +1369,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               background: NETFLIX_RED, color: '#fff', border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
               fontFamily: "'Sarabun',sans-serif", padding: '16px 52px', borderRadius: 8,
-              boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
+              boxShadow: '0 8px 32px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)',
             }}>
               {t('home','startPlaying')}
             </button>
@@ -1443,7 +1443,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 textTransform: 'uppercase',
                 padding: '16px 48px',
                 borderRadius: 8,
-                boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
+                boxShadow: '0 8px 32px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)',
               }}
             >
               เปิดดูคลังสคริปต์ทั้งหมด {scriptCount}+ เรื่อง
@@ -1509,7 +1509,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: NETFLIX_RED, animation: 'mmPulse 2s ease-in-out infinite' }} />
                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: NETFLIX_RED, animation: 'mmPing 2s ease-out infinite' }} />
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, background: 'rgba(229,9,20,.08)', color: NETFLIX_RED }}>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),.08)', color: NETFLIX_RED }}>
                   {openParties.length} {t('home','partiesOpen')}
                 </span>
               </div>
@@ -1522,7 +1522,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   border: `1px solid ${BORDER_CLR}`, gap: 14,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(229,9,20,.08)', color: NETFLIX_RED, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),.08)', color: NETFLIX_RED, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
                       {(party.ownerName || '?')[0]}
                     </div>
                     <div>
@@ -1599,7 +1599,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: 12,
-                  background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED,
+                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.08)', color: NETFLIX_RED,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                 }}>
                   <i className={item.icon} />

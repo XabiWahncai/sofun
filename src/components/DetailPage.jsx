@@ -9,7 +9,7 @@ const BG_DARK      = '#0c0c0c'
 const CARD_BG      = '#161616'
 const CARD_BG_HOVER= '#1f1f1f'
 const SURFACE_ELEV = '#222222'
-const NETFLIX_RED  = '#e50914'
+const NETFLIX_RED = 'var(--red, #e50914)'
 const CRIMSON_DEEP = '#b80710'
 const GOLD_AMBER   = '#f59e0b'
 const GREEN_MATCH  = '#46d369'
@@ -390,7 +390,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
         .dp-char-item:hover {
           transform: translateY(-6px) scale(1.03);
           border-color: ${NETFLIX_RED};
-          box-shadow: 0 14px 32px rgba(229,9,20,0.25);
+          box-shadow: 0 14px 32px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.25);
         }
         .dp-char-item:hover .dp-char-poster {
           transform: scale(1.06);
@@ -413,7 +413,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
         .dp-primary-btn:hover {
           background: ${CRIMSON_DEEP};
           transform: translateY(-2px);
-          box-shadow: 0 10px 28px rgba(229,9,20,0.45);
+          box-shadow: 0 10px 28px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.45);
         }
 
         .dp-secondary-btn {
@@ -526,7 +526,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
             {/* Gradient Overlays: Left shadow for desktop readability + Bottom fade to background */}
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to right, rgba(12,12,12,0.95) 0%, rgba(12,12,12,0.7) 40%, rgba(12,12,12,0.15) 75%, rgba(12,12,12,0.6) 100%)' }} />
             <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to bottom, transparent 30%, rgba(12,12,12,0.75) 70%, #0c0c0c 100%)' }} />
-            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 60% at 80% 30%, rgba(229,9,20,0.12) 0%, transparent 65%)' }} />
+            <div style={{ position: 'absolute', inset: 0, background: 'radial-gradient(ellipse 70% 60% at 80% 30%, rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.12) 0%, transparent 65%)' }} />
 
             {/* Hero Foreground Content */}
             <div style={{ position: 'relative', zIndex: 3, maxWidth: 1240, width: '100%', margin: '0 auto', padding: '0 20px 48px' }}>
@@ -670,7 +670,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                       {game.rooms.map(rm => (
                         <span key={rm} style={{
                           fontSize: 11, fontWeight: 600, padding: '3px 9px', borderRadius: 6,
-                          background: rm === game.mainRoom ? 'rgba(229,9,20,0.18)' : 'rgba(255,255,255,0.06)',
+                          background: rm === game.mainRoom ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.18)' : 'rgba(255,255,255,0.06)',
                           color: rm === game.mainRoom ? '#fff' : TEXT_MUTED,
                           border: rm === game.mainRoom ? `1px solid ${NETFLIX_RED}` : `1px solid ${BORDER_SUBTLE}`,
                         }}>
@@ -736,8 +736,8 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
               {/* Trigger Warning Notice */}
               {(game.trigger || game.triggerWarning) && (
                 <div style={{
-                  marginTop: 16, background: 'rgba(229,9,20,0.08)',
-                  border: '1px solid rgba(229,9,20,0.28)', borderRadius: 12,
+                  marginTop: 16, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.08)',
+                  border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.28)', borderRadius: 12,
                   padding: '16px 20px', display: 'flex', alignItems: 'flex-start', gap: 12,
                 }}>
                   <i className="fas fa-exclamation-triangle" style={{ color: NETFLIX_RED, fontSize: 16, marginTop: 2, flexShrink: 0 }} />
@@ -941,7 +941,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                           <span style={{ fontSize: 13.5, fontWeight: 700, color: '#fff' }}>{r.name || 'ผู้เล่น'}</span>
                           {r.uid === lineUser?.uid && (
-                            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '2px 7px', borderRadius: 4, background: 'rgba(229,9,20,0.15)', color: NETFLIX_RED, border: `1px solid rgba(229,9,20,0.3)` }}>คุณ</span>
+                            <span style={{ fontSize: 9.5, fontWeight: 800, padding: '2px 7px', borderRadius: 4, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.15)', color: NETFLIX_RED, border: `1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)` }}>คุณ</span>
                           )}
                           <StarRow value={r.rating} size={11} />
                           {r.createdAt && (

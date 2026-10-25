@@ -315,7 +315,7 @@ export default function App() {
   // ── Live-sync achievements from Firestore (admin may update them) ───
   useEffect(() => {
     const uid = lineUser?.uid
-    if (!uid || lineUser?.role === 'admin') return
+    if (!uid) return
     return onSnapshot(doc(db, 'members', uid), snap => {
       if (!snap.exists()) return
       const d = snap.data()

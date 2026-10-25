@@ -1,6 +1,6 @@
 import logoImg from '../assets/Logo.jpg'
 
-const C = '#c62419'
+const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
 const INK_LIGHT = 'rgba(255,255,255,0.75)'
 const INK_DIM = 'rgba(255,255,255,0.5)'

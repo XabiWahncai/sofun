@@ -21,7 +21,7 @@ const ROOM_COLORS = {
   'Chinese Room': '#ea580c', 'Europe Room': '#2563eb',
   'Ghost Room': '#7c3aed', 'Projector Room': '#0891b2',
   '5 Floor': '#16a34a', 'Yang': '#db2777',
-  'Chinese DM': '#e50914', 'Thai DM': '#b45309',
+  'Chinese DM': 'var(--red, #e50914)', 'Thai DM': '#b45309',
 }
 
 const STATUS_LABELS = {
@@ -34,7 +34,7 @@ const STATUS_LABELS = {
 
 const STATUS_COLORS = {
   pending:   { bg: 'rgba(245, 158, 11, 0.08)', color: '#b45309', border: 'rgba(245, 158, 11, 0.25)' },
-  confirmed: { bg: 'rgba(229, 9, 20, 0.08)',   color: '#e50914', border: 'rgba(229, 9, 20, 0.25)' },
+  confirmed: { bg: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',   color: '#e50914', border: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25)' },
   locked:    { bg: 'rgba(16, 185, 129, 0.08)', color: '#15803d', border: 'rgba(16, 185, 129, 0.25)' },
   collapsed: { bg: 'rgba(239, 68, 68, 0.08)',  color: '#dc2626', border: 'rgba(239, 68, 68, 0.25)' },
   cancelled: { bg: 'rgba(100, 116, 139, 0.08)',color: '#64748b', border: 'rgba(100, 116, 139, 0.2)' },
@@ -97,7 +97,7 @@ const NETFLIX_BOOKING_CSS = `
   }
   .nfx-btn-primary:hover {
     transform: scale(1.02) translateY(-1px) !important;
-    box-shadow: 0 8px 24px rgba(229, 9, 20, 0.35) !important;
+    box-shadow: 0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35) !important;
   }
   .nfx-btn-primary:active {
     transform: scale(0.97) !important;
@@ -129,7 +129,7 @@ const NETFLIX_BOOKING_CSS = `
   }
   .nfx-script-card.selected {
     border-color: #e50914 !important;
-    box-shadow: 0 8px 24px rgba(229, 9, 20, 0.25) !important;
+    box-shadow: 0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25) !important;
     transform: translateY(-2px) !important;
   }
 `
@@ -480,8 +480,8 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               width: '42px',
               height: '42px',
               borderRadius: '12px',
-              background: 'rgba(229, 9, 20, 0.08)',
-              border: '1px solid rgba(229, 9, 20, 0.2)',
+              background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
+              border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
               color: '#e50914',
               display: 'flex',
               alignItems: 'center',
@@ -511,7 +511,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                   fontSize: '14px',
                   fontWeight: 800,
                   color: '#e50914',
-                  background: 'rgba(229, 9, 20, 0.08)',
+                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                   padding: '2px 8px',
                   borderRadius: '6px',
                 }}
@@ -551,8 +551,8 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             style={{
               padding: '7px 12px',
               borderRadius: '10px',
-              border: `1px solid ${useBarMode ? 'rgba(229, 9, 20, 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
-              background: useBarMode ? 'rgba(229, 9, 20, 0.08)' : '#ffffff',
+              border: `1px solid ${useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
+              background: useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#ffffff',
               color: useBarMode ? '#e50914' : '#4b5563',
               fontSize: '12px',
               fontWeight: 800,
@@ -587,7 +587,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             onMouseEnter={e => {
               e.currentTarget.style.borderColor = '#e50914'
               e.currentTarget.style.color = '#e50914'
-              e.currentTarget.style.background = 'rgba(229, 9, 20, 0.04)'
+              e.currentTarget.style.background = 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.04)'
             }}
             onMouseLeave={e => {
               e.currentTarget.style.borderColor = 'rgba(0, 0, 0, 0.08)'
@@ -731,7 +731,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             const isPast = dateStr < todayStr
 
             const cellBg = isSel
-              ? 'rgba(229, 9, 20, 0.03)'
+              ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.03)'
               : isToday
                 ? 'rgba(245, 158, 11, 0.02)'
                 : isPast
@@ -820,9 +820,9 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                       background: isToday
                         ? '#e50914'
                         : isSel
-                          ? 'rgba(229, 9, 20, 0.12)'
+                          ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.12)'
                           : 'transparent',
-                      boxShadow: isToday ? '0 2px 6px rgba(229, 9, 20, 0.35)' : 'none',
+                      boxShadow: isToday ? '0 2px 6px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)' : 'none',
                     }}
                   >
                     {day}
@@ -917,7 +917,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               width: '40px',
               height: '40px',
               borderRadius: '12px',
-              background: activeDateStr === todayStr ? 'rgba(229, 9, 20, 0.08)' : '#f1f5f9',
+              background: activeDateStr === todayStr ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#f1f5f9',
               color: activeDateStr === todayStr ? '#e50914' : '#4b5563',
               display: 'flex',
               alignItems: 'center',
@@ -949,9 +949,9 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                     fontWeight: 800,
                     padding: '2px 8px',
                     borderRadius: '20px',
-                    background: 'rgba(229, 9, 20, 0.08)',
+                    background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                     color: '#e50914',
-                    border: '1px solid rgba(229, 9, 20, 0.2)',
+                    border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
                   }}
                 >
                   {selectedDayBookings.length} รอบเล่น
@@ -1033,7 +1033,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            boxShadow: '0 4px 14px rgba(229, 9, 20, 0.28)',
+            boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28)',
             whiteSpace: 'nowrap',
           }}
         >
@@ -1187,10 +1187,10 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
                 fontSize: '9.5px',
                 fontWeight: 800,
                 color: '#e50914',
-                background: 'rgba(229, 9, 20, 0.08)',
+                background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                 padding: '1px 6px',
                 borderRadius: '6px',
-                border: '1px solid rgba(229, 9, 20, 0.2)',
+                border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
               }}
             >
               หัวหน้า
@@ -1292,7 +1292,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
             fontWeight: 900,
             padding: '2px 8px',
             borderRadius: '20px',
-            boxShadow: '0 2px 8px rgba(229, 9, 20, 0.4)',
+            boxShadow: '0 2px 8px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.4)',
             pointerEvents: 'none',
           }}
         >
@@ -1503,7 +1503,7 @@ function CreateBookingModal({
                   gap: '6px',
                   padding: '3px 10px',
                   borderRadius: '20px',
-                  background: 'rgba(229, 9, 20, 0.08)',
+                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                   color: C,
                   fontSize: '11px',
                   fontWeight: 800,
@@ -1663,7 +1663,7 @@ function CreateBookingModal({
                           padding: '6px 14px',
                           borderRadius: '20px',
                           border: `1.5px solid ${isActive ? C : 'rgba(0, 0, 0, 0.08)'}`,
-                          background: isActive ? 'rgba(229, 9, 20, 0.08)' : '#ffffff',
+                          background: isActive ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#ffffff',
                           color: isActive ? C : '#4b5563',
                           fontSize: '12px',
                           fontWeight: 700,
@@ -1728,7 +1728,7 @@ function CreateBookingModal({
                         overflow: 'hidden',
                         background: '#ffffff',
                         border: isSel ? `2px solid ${C}` : '1.5px solid rgba(0, 0, 0, 0.08)',
-                        boxShadow: isSel ? '0 8px 24px rgba(229, 9, 20, 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
+                        boxShadow: isSel ? '0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25)' : '0 2px 6px rgba(0, 0, 0, 0.03)',
                         cursor: isLocked ? 'not-allowed' : 'pointer',
                         opacity: isLocked ? 0.5 : 1,
                         transform: isSel ? 'translateY(-2px)' : 'none',
@@ -1753,7 +1753,7 @@ function CreateBookingModal({
                         )}
 
                         {isSel && (
-                          <div style={{ position: 'absolute', top: 6, right: 6, width: '24px', height: '24px', borderRadius: '50%', background: C, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', boxShadow: '0 2px 8px rgba(229,9,20,0.5)' }}>
+                          <div style={{ position: 'absolute', top: 6, right: 6, width: '24px', height: '24px', borderRadius: '50%', background: C, color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '11px', boxShadow: '0 2px 8px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.5)' }}>
                             <i className="fas fa-check" />
                           </div>
                         )}
@@ -1820,7 +1820,7 @@ function CreateBookingModal({
                   <button
                     type="button"
                     onClick={() => setStep('game')}
-                    style={{ fontSize: '11.5px', fontWeight: 700, color: C, background: 'rgba(229, 9, 20, 0.08)', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer' }}
+                    style={{ fontSize: '11.5px', fontWeight: 700, color: C, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', border: 'none', padding: '6px 12px', borderRadius: '20px', cursor: 'pointer' }}
                   >
                     เปลี่ยนสคริปต์
                   </button>
@@ -1890,8 +1890,8 @@ function CreateBookingModal({
                           borderRadius: '12px',
                           background: isActive ? C : '#f8fafc',
                           color: isActive ? '#ffffff' : INK,
-                          border: `1.5px solid ${isActive ? C : count > 0 ? 'rgba(229,9,20,0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
-                          boxShadow: isActive ? '0 6px 16px rgba(229, 9, 20, 0.3)' : 'none',
+                          border: `1.5px solid ${isActive ? C : count > 0 ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
+                          boxShadow: isActive ? '0 6px 16px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)' : 'none',
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
@@ -1967,7 +1967,7 @@ function CreateBookingModal({
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '8px',
-                  boxShadow: selectedGame ? '0 4px 14px rgba(229,9,20,0.3)' : 'none',
+                  boxShadow: selectedGame ? '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)' : 'none',
                   flexShrink: 0,
                 }}
               >
@@ -2020,7 +2020,7 @@ function CreateBookingModal({
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: selectedDate && finalTime && !submitting ? '0 4px 14px rgba(229,9,20,0.3)' : 'none',
+                  boxShadow: selectedDate && finalTime && !submitting ? '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)' : 'none',
                   flexShrink: 0,
                 }}
               >
@@ -2701,14 +2701,14 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               width: 60,
               height: 60,
               borderRadius: 20,
-              background: 'rgba(229, 9, 20, 0.08)',
+              background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
               color: C,
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: 26,
               margin: '0 auto 18px',
-              border: '1px solid rgba(229, 9, 20, 0.2)',
+              border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
             }}
           >
             <i className="fas fa-lock" />
@@ -2722,7 +2722,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
               color: C,
-              background: 'rgba(229, 9, 20, 0.08)',
+              background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
               padding: '3px 10px',
               borderRadius: 20,
               marginBottom: 12,
@@ -3044,7 +3044,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 className="rounded-2xl border overflow-hidden"
                 style={{
                   background: '#ffffff',
-                  borderColor: isUrgent ? 'rgba(229, 9, 20, 0.35)' : 'rgba(0, 0, 0, 0.08)',
+                  borderColor: isUrgent ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)' : 'rgba(0, 0, 0, 0.08)',
                   boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
                 }}
               >
@@ -3068,9 +3068,9 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   <span
                     className="text-[10.5px] font-black px-2.5 py-1 rounded-full shrink-0"
                     style={{
-                      background: isUrgent ? 'rgba(229, 9, 20, 0.1)' : 'rgba(0, 0, 0, 0.06)',
+                      background: isUrgent ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)' : 'rgba(0, 0, 0, 0.06)',
                       color: isUrgent ? C : '#4b5563',
-                      border: `1px solid ${isUrgent ? 'rgba(229, 9, 20, 0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
+                      border: `1px solid ${isUrgent ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
                     }}
                   >
                     {isUrgent ? 'ใกล้หมดเวลา' : `ยังขาดอีก ${remainingToLock} คน`}
@@ -3095,7 +3095,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                       style={{
                         width: `${Math.min(100, Math.max(0, paidPct))}%`,
                         background: `linear-gradient(90deg, ${C} 0%, #ff3344 100%)`,
-                        boxShadow: '0 0 10px rgba(229, 9, 20, 0.4)',
+                        boxShadow: '0 0 10px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.4)',
                       }}
                     />
                   </div>
@@ -3292,7 +3292,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                                 style={{
                                   padding: '1px 5px',
                                   borderRadius: 4,
-                                  background: 'rgba(229, 9, 20, 0.08)',
+                                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                                   color: C,
                                 }}
                               >
@@ -3429,7 +3429,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 >
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(229, 9, 20, 0.08)', color: C }}
+                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
                   >
                     <i className="fas fa-lock text-xs" />
                   </div>
@@ -3445,7 +3445,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 >
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(229, 9, 20, 0.08)', color: C }}
+                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
                   >
                     <i className="fas fa-user-clock text-xs" />
                   </div>
@@ -3461,7 +3461,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 >
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(229, 9, 20, 0.08)', color: C }}
+                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
                   >
                     <i className="fas fa-calendar-check text-xs" />
                   </div>
@@ -3477,7 +3477,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 >
                   <div
                     className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(229, 9, 20, 0.08)', color: C }}
+                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
                   >
                     <i className="fas fa-hourglass-end text-xs" />
                   </div>
@@ -3534,7 +3534,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   color: '#ffffff',
                   border: 'none',
                   cursor: joining ? 'wait' : 'pointer',
-                  boxShadow: '0 8px 24px rgba(229, 9, 20, 0.3)',
+                  boxShadow: '0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)',
                 }}
                 onMouseEnter={e => { if (!joining) e.currentTarget.style.background = '#b80710' }}
                 onMouseLeave={e => { if (!joining) e.currentTarget.style.background = C }}
@@ -3560,8 +3560,8 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 style={{
                   padding: '12px 16px',
                   borderRadius: 14,
-                  background: 'rgba(229, 9, 20, 0.06)',
-                  border: '1px solid rgba(229, 9, 20, 0.2)',
+                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.06)',
+                  border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
                   color: C,
                 }}
               >
@@ -3586,7 +3586,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                     color: '#ffffff',
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(229, 9, 20, 0.3)',
+                    boxShadow: '0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)',
                   }}
                   onMouseEnter={e => e.currentTarget.style.background = '#b80710'}
                   onMouseLeave={e => e.currentTarget.style.background = C}
@@ -3927,8 +3927,8 @@ export default function BookingPage({
                   gap: 7,
                   padding: '4px 12px',
                   borderRadius: 20,
-                  background: 'rgba(229, 9, 20, 0.08)',
-                  border: '1px solid rgba(229, 9, 20, 0.2)',
+                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
+                  border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
                   color: '#e50914',
                   fontSize: 11,
                   fontWeight: 800,
@@ -3979,7 +3979,7 @@ export default function BookingPage({
                     display: 'inline-flex',
                     alignItems: 'center',
                     gap: 8,
-                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.28)',
+                    boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28)',
                     flexShrink: 0,
                   }}
                 >
@@ -4053,7 +4053,7 @@ export default function BookingPage({
                       การจองของฉัน (MY LIST)
                     </h3>
                     {activeMyBookings.length > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 12, background: 'rgba(229, 9, 20, 0.1)', color: '#e50914' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 12, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)', color: '#e50914' }}>
                         {activeMyBookings.length}
                       </span>
                     )}
@@ -4121,7 +4121,7 @@ export default function BookingPage({
                               fontWeight: 800,
                               padding: '0 5px',
                               borderRadius: 10,
-                              background: isActive ? 'rgba(229, 9, 20, 0.1)' : '#e2e8f0',
+                              background: isActive ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)' : '#e2e8f0',
                               color: isActive ? '#e50914' : '#475569',
                             }}
                           >
@@ -4149,7 +4149,7 @@ export default function BookingPage({
                         width: 44,
                         height: 44,
                         borderRadius: 12,
-                        background: 'rgba(229, 9, 20, 0.08)',
+                        background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                         color: '#e50914',
                         display: 'flex',
                         alignItems: 'center',

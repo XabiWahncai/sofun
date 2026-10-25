@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { doc, getDoc, collection, query, where, orderBy, getDocs } from 'firebase/firestore'
 import { ACHIEVEMENTS, RARITY } from '../constants/achievements'
 
-const C = '#c62419'
+const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
 const INK_2 = 'rgba(26,26,26,0.65)'
 const INK_3 = 'rgba(26,26,26,0.4)'
