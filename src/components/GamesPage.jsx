@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { collection, onSnapshot, query, where, orderBy, limit, doc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { handleDirectLineBooking } from '../utils/bookingHelper'
+import { useTopPlayedGames90d } from '../utils/playStats'
 
 /* ── Light / White Theme Tokens ────────────────────────────────────── */
 const BG_PAGE       = '#fcfcfc'
@@ -703,6 +704,14 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
           <span><i className="fas fa-users" style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }} /> {players} คน</span>
           <span>•</span>
           <span>{game.time || '4 ชม.'}</span>
+          {game.playCount90d > 0 && (
+            <>
+              <span>•</span>
+              <span style={{ color: '#fbbf24', fontWeight: 800 }}>
+                <i className="fas fa-fire" style={{ fontSize: 9, marginRight: 3 }} />{game.playCount90d} รอบ
+              </span>
+            </>
+          )}
         </div>
 
         {/* Hover Action Bar */}
@@ -1852,10 +1861,10 @@ function NetflixFilterDrawer({
 
 /* ── Main GamesPage Component (White Theme) ────────────────────────── */
 export default function GamesPage({ allGames = [], showDetail, showPage, lineUser, bookingEnabled = true, showToast = null }) {
-  // 1. Played IDs from playHistory
+  // 1. Played IDs from playHistory & Top Played Games (90 Days)
   const [playedIds, setPlayedIds] = useState(() => new Set())
-  const [recentPlayedIds, setRecentPlayedIds] = useState([])
   const [promoSettings, setPromoSettings] = useState(null)
+  const { topGames: topPlayedGames } = useTopPlayedGames90d(allGames)
 
   // Load Promotion & Spotlight Settings
   useEffect(() => {
@@ -1865,24 +1874,6 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
       }
     })
     return () => unsub()
-  }, [])
-
-  // Load recently played script IDs from orders
-  useEffect(() => {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100))
-    const unsub = onSnapshot(q, snap => {
-      const seen = new Set()
-      const list = []
-      snap.docs.forEach(d => {
-        const sid = d.data().scriptId
-        if (sid && !seen.has(sid)) {
-          seen.add(sid)
-          list.push(sid)
-        }
-      })
-      setRecentPlayedIds(list)
-    }, () => {})
-    return unsub
   }, [])
 
   useEffect(() => {
@@ -2074,7 +2065,18 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
     // 7. Large Group Parties (7+ Players)
     const largeGroups = allGames.filter(g => (g.characters?.length || parsePlayerCount(g.players)) >= 7)
 
-    return [
+    const rows = []
+
+    if (topPlayedGames && topPlayedGames.length > 0) {
+      rows.push({
+        id: 'top_played_90d',
+        title: 'รอบการเล่นสูงสุด (90 วันล่าสุด)',
+        games: topPlayedGames,
+        onSeeAll: () => { setViewMode('grid') }
+      })
+    }
+
+    rows.push(
       {
         id: 'beginner',
         title: 'เหมาะสำหรับมือใหม่',
@@ -2111,8 +2113,10 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
         games: largeGroups,
         onSeeAll: () => { setSelectedPlayerCount(7); setViewMode('grid') }
       },
-    ]
-  }, [allGames, viewMode, recentPlayedIds])
+    )
+
+    return rows
+  }, [allGames, viewMode, topPlayedGames])
 
   return (
     <div style={{ background: BG_PAGE, color: TEXT_PRIMARY, minHeight: '100vh', paddingBottom: 80 }}>

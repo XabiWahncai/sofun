@@ -4,6 +4,7 @@ import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion, onSnapshot, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import Footer from './Footer';
 import { handleDirectLineBooking } from '../utils/bookingHelper';
+import { useTopPlayedGames90d } from '../utils/playStats';
 
 /* Design tokens - Netflix White Theme */
 const C          = 'var(--crimson-500)';
@@ -221,6 +222,14 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEn
           <span><i className="fas fa-users" style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }} /> {players} คน</span>
           <span>•</span>
           <span>{game.time || '4 ชม.'}</span>
+          {game.playCount90d > 0 && (
+            <>
+              <span>•</span>
+              <span style={{ color: '#fbbf24', fontWeight: 800 }}>
+                <i className="fas fa-fire" style={{ fontSize: 9, marginRight: 3 }} />{game.playCount90d} รอบ
+              </span>
+            </>
+          )}
         </div>
 
         {/* Action Bar */}
@@ -452,9 +461,11 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
   const [promoSettings, setPromoSettings] = useState(null);
-  const [recentPlayedIds, setRecentPlayedIds] = useState([]);
   const [playedIds, setPlayedIds] = useState(() => new Set());
   const revealRoot = useRef(null);
+
+  /* Top Played Games in Past 90 Days */
+  const { topGames: topPlayedGames } = useTopPlayedGames90d(allGames);
 
   /* Load Promotion Settings */
   useEffect(() => {
@@ -463,24 +474,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         setPromoSettings(snap.data());
       }
     });
-    return () => unsub();
-  }, []);
-
-  /* Load Recent Store Plays from Orders */
-  useEffect(() => {
-    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
-    const unsub = onSnapshot(q, snap => {
-      const seen = new Set();
-      const list = [];
-      snap.docs.forEach(d => {
-        const sid = d.data().scriptId;
-        if (sid && !seen.has(sid)) {
-          seen.add(sid);
-          list.push(sid);
-        }
-      });
-      setRecentPlayedIds(list);
-    }, () => {});
     return () => unsub();
   }, []);
 
@@ -529,16 +522,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   }, [newGames, allGames]);
 
   /* Swimlanes Data */
-  const trendingGames = useMemo(() => {
-    const recentMap = new Map();
-    recentPlayedIds.forEach((id, idx) => { recentMap.set(id, idx); });
-    return [...allGames].sort((a, b) => {
-      const idxA = recentMap.has(a.id) ? recentMap.get(a.id) : 9999;
-      const idxB = recentMap.has(b.id) ? recentMap.get(b.id) : 9999;
-      return idxA - idxB;
-    });
-  }, [allGames, recentPlayedIds]);
-
   const beginnerGames = useMemo(() => {
     return allGames
       .filter(g => {
@@ -1437,6 +1420,20 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             </div>
           </div>
 
+
+          {/* Swimlane: Top Played in Past 90 Days */}
+          {topPlayedGames.length > 0 && (
+            <HomeNetflixSwimlaneRow
+              title="รอบการเล่นสูงสุด (90 วันล่าสุด)"
+              games={topPlayedGames}
+              showDetail={showDetail}
+              showPage={showPage}
+              playedIds={playedIds}
+              onSeeAll={() => showPage('games')}
+              bookingEnabled={bookingEnabled}
+              showToast={showToast}
+            />
+          )}
 
           {/* Catalog Footer Link */}
           <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>
