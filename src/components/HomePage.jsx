@@ -1437,17 +1437,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             </div>
           </div>
 
-          {/* Swimlane 1: Trending Now */}
-          <HomeNetflixSwimlaneRow
-            title="กำลังมาแรงติดเทรนด์"
-            games={trendingGames}
-            showDetail={showDetail}
-            showPage={showPage}
-            playedIds={playedIds}
-            onSeeAll={() => showPage('games')}
-            bookingEnabled={bookingEnabled}
-            showToast={showToast}
-          />
 
           {/* Catalog Footer Link */}
           <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>

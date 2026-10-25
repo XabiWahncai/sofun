@@ -2026,18 +2026,7 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
   const swimlaneRows = useMemo(() => {
     if (viewMode !== 'swimlanes') return []
 
-    // 1. Trending Now — โชว์เกมที่ถูกเล่นล่าสุดตามลำดับ
-    const recentMap = new Map()
-    recentPlayedIds.forEach((id, idx) => {
-      recentMap.set(id, idx)
-    })
-    const trending = [...allGames].sort((a, b) => {
-      const idxA = recentMap.has(a.id) ? recentMap.get(a.id) : 9999
-      const idxB = recentMap.has(b.id) ? recentMap.get(b.id) : 9999
-      return idxA - idxB
-    })
-
-    // 2. Beginner Friendly — เน้นสืบและสวมบทดาวน้อย (คะแนนรวมสืบสวนและสวมบทบาทน้อยสุดขึ้นก่อน)
+    // 1. Beginner Friendly — เน้นสืบและสวมบทดาวน้อย (คะแนนรวมสืบสวนและสวมบทบาทน้อยสุดขึ้นก่อน)
     const beginner = allGames
       .filter(g => {
         const det = Number(g.detective) || 0
@@ -2086,12 +2075,6 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
     const largeGroups = allGames.filter(g => (g.characters?.length || parsePlayerCount(g.players)) >= 7)
 
     return [
-      {
-        id: 'trending',
-        title: 'กำลังมาแรงติดเทรนด์',
-        games: trending,
-        onSeeAll: () => { setViewMode('grid') }
-      },
       {
         id: 'beginner',
         title: 'เหมาะสำหรับมือใหม่',
