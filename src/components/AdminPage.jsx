@@ -4851,6 +4851,8 @@ function ReceiptSettingsTab({ showToast }) {
 
 // ─── Promotion & New Games Tab ──────────────────────────────────────────────
 function PromotionTab({ showToast, allGames = [] }) {
+  const MAX_NEW_GAMES = 5
+
   const [promo, setPromo] = useState({
     heading: 'โปรเปิดตี้สืบคดีสุดคุ้ม',
     month: 'ประจำเดือนนี้',
@@ -4862,9 +4864,9 @@ function PromotionTab({ showToast, allGames = [] }) {
     bannerUrl: '',
     discountAmount: '100',
     discountType: 'party', // 'party' (ลดทั้งตี้) | 'person' (ลดต่อคน)
-    buttonText: 'จองรอบรับสิทธิ์เลย →',
+    buttonText: 'จองรอบรับสิทธิ์เลย',
     buttonLink: 'booking', // 'booking' | 'games' | 'party'
-    newGameIds: [], // array of up to 3 game IDs
+    newGameIds: [], // array of up to 5 game IDs
     customCovers: {}, // { [gameId]: url }
   })
   const [saving, setSaving] = useState(false)
@@ -4873,6 +4875,7 @@ function PromotionTab({ showToast, allGames = [] }) {
   const [uploadingCoverFor, setUploadingCoverFor] = useState(null)
   const [gameSearch, setGameSearch] = useState('')
   const [showGamePicker, setShowGamePicker] = useState(false)
+  const [pickerTargetSlot, setPickerTargetSlot] = useState(null)
 
   // Drive image helper
   const toWsrv = (id, w = 400) => `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
@@ -4895,7 +4898,7 @@ function PromotionTab({ showToast, allGames = [] }) {
           ...p,
           ...d,
           discountType: d.discountType || 'party',
-          newGameIds: Array.isArray(d.newGameIds) ? d.newGameIds.slice(0, 3) : [],
+          newGameIds: Array.isArray(d.newGameIds) ? d.newGameIds.slice(0, MAX_NEW_GAMES) : [],
           customCovers: d.customCovers || {},
         }))
       }
@@ -4908,13 +4911,13 @@ function PromotionTab({ showToast, allGames = [] }) {
     try {
       await setDoc(doc(db, 'settings', 'promotion'), {
         ...promo,
-        newGameIds: (promo.newGameIds || []).slice(0, 3),
+        newGameIds: (promo.newGameIds || []).slice(0, MAX_NEW_GAMES),
         updatedAt: serverTimestamp(),
       })
       showToast('บันทึกโปรโมชั่นและเกมใหม่สำเร็จ')
     } catch (err) {
       console.error(err)
-      showToast('บันทึกล้มเหลว', 'error')
+      showToast('บันทึกล้มเหลว: ' + err.message, 'error')
     } finally {
       setSaving(false)
     }
@@ -4967,8 +4970,8 @@ function PromotionTab({ showToast, allGames = [] }) {
 
   const handleAddGame = (gameId) => {
     if ((promo.newGameIds || []).includes(gameId)) return
-    if ((promo.newGameIds || []).length >= 3) {
-      showToast('เลือกเกมใหม่ได้สูงสุด 3 เกมเท่านั้น', 'warning')
+    if ((promo.newGameIds || []).length >= MAX_NEW_GAMES) {
+      showToast(`เลือกเกมใหม่ได้สูงสุด ${MAX_NEW_GAMES} เกมเท่านั้น`, 'warning')
       return
     }
     setPromo(p => ({
@@ -4977,6 +4980,7 @@ function PromotionTab({ showToast, allGames = [] }) {
     }))
     setShowGamePicker(false)
     setGameSearch('')
+    setPickerTargetSlot(null)
   }
 
   const handleRemoveGame = (gameId) => {
@@ -4985,6 +4989,16 @@ function PromotionTab({ showToast, allGames = [] }) {
       const nextCovers = { ...(p.customCovers || {}) }
       delete nextCovers[gameId]
       return { ...p, newGameIds: nextIds, customCovers: nextCovers }
+    })
+  }
+
+  const handleMoveGame = (fromIdx, toIdx) => {
+    if (toIdx < 0 || toIdx >= (promo.newGameIds || []).length) return
+    setPromo(p => {
+      const next = [...(p.newGameIds || [])]
+      const [moved] = next.splice(fromIdx, 1)
+      next.splice(toIdx, 0, moved)
+      return { ...p, newGameIds: next }
     })
   }
 
@@ -5006,28 +5020,102 @@ function PromotionTab({ showToast, allGames = [] }) {
   const filteredAvailableGames = allGames.filter(g =>
     !(promo.newGameIds || []).includes(g.id) &&
     ((g.title || g.name || '').toLowerCase().includes(gameSearch.toLowerCase()) ||
-     (g.difficulty || '').toLowerCase().includes(gameSearch.toLowerCase()))
+     (g.difficulty || '').toLowerCase().includes(gameSearch.toLowerCase()) ||
+     (g.tags || []).some(t => t.toLowerCase().includes(gameSearch.toLowerCase())))
   )
 
   const selectedGamesList = (promo.newGameIds || []).map(id => allGames.find(g => g.id === id)).filter(Boolean)
 
+  const DISCOUNT_PRESETS = ['50', '100', '200', '300', '500', '10%', '15%', '20%']
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <style>{`
+        .adm-promo-workspace {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 380px;
+          gap: 24px;
+          align-items: start;
+        }
+        @media (max-width: 1100px) {
+          .adm-promo-workspace {
+            grid-template-columns: 1fr;
+          }
+        }
+        .adm-promo-section-modern {
+          background: rgba(255, 255, 255, 0.025);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 16px;
+          padding: 22px;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .adm-promo-section-modern:hover {
+          border-color: rgba(255, 255, 255, 0.14);
+        }
+        .adm-promo-slots-grid-5 {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+          gap: 14px;
+        }
+        .adm-promo-slot-card-5 {
+          background: rgba(255, 255, 255, 0.035);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          border-radius: 12px;
+          padding: 12px;
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+          position: relative;
+          transition: all 0.2s ease;
+        }
+        .adm-promo-slot-card-5:hover {
+          background: rgba(255, 255, 255, 0.05);
+          border-color: rgba(229, 9, 20, 0.35);
+          transform: translateY(-2px);
+          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+        }
+        .adm-promo-slot-empty-5 {
+          background: rgba(255, 255, 255, 0.015);
+          border: 2px dashed rgba(255, 255, 255, 0.12);
+          border-radius: 12px;
+          padding: 20px 14px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justifyContent: center;
+          gap: 8px;
+          min-height: 200px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+        }
+        .adm-promo-slot-empty-5:hover {
+          background: rgba(229, 9, 20, 0.05);
+          border-color: var(--crimson-500);
+          color: #fff;
+          transform: translateY(-2px);
+        }
+      `}</style>
 
       {/* ── Top Header Bar ── */}
-      <div className="adm-promo-header-bar">
+      <div className="adm-promo-header-bar" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '16px 22px', borderRadius: 16, background: 'rgba(255, 255, 255, 0.025)',
+        border: '1px solid rgba(255, 255, 255, 0.08)', flexWrap: 'wrap', gap: 14,
+      }}>
         <div>
-          <div className="adm-promo-header-title">
-            <i className="fas fa-fire-alt" style={{ color: 'var(--crimson-500)' }} />
-            จัดการโปรโมชั่น & สปอตไลท์ 3 คดีใหม่
+          <div className="adm-promo-header-title" style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 18, fontWeight: 900, color: '#fff' }}>
+            <span style={{ width: 32, height: 32, borderRadius: 8, background: 'rgba(229,9,20,0.15)', color: 'var(--crimson-500)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="fas fa-bullhorn" />
+            </span>
+            จัดการโปรโมชั่น & สปอตไลท์ 5 เกมใหม่
           </div>
-          <div className="adm-promo-header-sub">
-            ควบคุมแบนเนอร์ ส่วนลด แคมเปญ และไฮไลท์ 3 เกมใหม่ที่แสดงบนหน้าหลัก (Live Editorial Studio)
+          <div className="adm-promo-header-sub" style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+            ควบคุมแคมเปญโปรโมชั่น ส่วนลด แบนเนอร์ และคัดสรรเกมใหม่ประจำร้านสูงสุด 5 เกมขึ้นแสดงในหน้าหลักและหน้าเกม
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{
-            display: 'inline-flex', alignItems: 'center', gap: 7, padding: '6px 14px',
+            display: 'inline-flex', alignItems: 'center', gap: 7, padding: '7px 14px',
             borderRadius: 999, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.28)',
             color: '#4ade80', fontSize: 11, fontWeight: 800,
           }}>
@@ -5039,7 +5127,7 @@ function PromotionTab({ showToast, allGames = [] }) {
             className="adm-btn-red"
             onClick={save}
             disabled={saving}
-            style={{ padding: '9px 18px', fontSize: 13, fontWeight: 800, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}
+            style={{ padding: '9px 20px', fontSize: 13, fontWeight: 800, borderRadius: 8, display: 'inline-flex', alignItems: 'center', gap: 8 }}
           >
             {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกการเปลี่ยนแปลง</>}
           </button>
@@ -5050,21 +5138,21 @@ function PromotionTab({ showToast, allGames = [] }) {
       <div className="adm-promo-workspace">
 
         {/* ── LEFT: Controls & Form Sections ── */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
           {/* Section 1: แบนเนอร์และภาพประกอบ */}
-          <div className="adm-promo-section">
-            <div className="adm-promo-section-title">
-              <span>
-                <i className="fas fa-image" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
-                รูปภาพโปรโมชั่น (แบนเนอร์ / โปสเตอร์)
-              </span>
-              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>
-                สัดส่วนแนะนำ 16:9
-              </span>
+          <div className="adm-promo-section-modern">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(229,9,20,0.15)', color: 'var(--crimson-500)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                  <i className="fas fa-image" />
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>รูปภาพโปรโมชั่น (แบนเนอร์ / โปสเตอร์)</span>
+              </div>
+              <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', fontWeight: 600 }}>สัดส่วนแนะนำ 16:9</span>
             </div>
 
-            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 14 }}>
               <label style={{
                 display: 'inline-flex', alignItems: 'center', gap: 8, padding: '10px 18px', borderRadius: 8,
                 background: 'var(--crimson-500)', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer',
@@ -5103,10 +5191,10 @@ function PromotionTab({ showToast, allGames = [] }) {
             {promo.bannerUrl && (
               <div style={{
                 position: 'relative', borderRadius: 12, overflow: 'hidden',
-                border: '1px solid rgba(255,255,255,0.14)', aspectRatio: '16/9', maxHeight: 200, background: '#111',
+                border: '1px solid rgba(255,255,255,0.14)', aspectRatio: '16/9', maxHeight: 220, background: '#111',
               }}>
                 <img
-                  src={convertImg(promo.bannerUrl, 600)}
+                  src={convertImg(promo.bannerUrl, 800)}
                   alt="Promo Banner Preview"
                   style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   onError={e => e.currentTarget.parentElement.style.display = 'none'}
@@ -5116,12 +5204,14 @@ function PromotionTab({ showToast, allGames = [] }) {
           </div>
 
           {/* Section 2: การตั้งค่าส่วนลด */}
-          <div className="adm-promo-section">
-            <div className="adm-promo-section-title">
-              <span>
-                <i className="fas fa-tags" style={{ color: '#fbbf24', marginRight: 8 }} />
-                การตั้งค่าส่วนลด (Discount Price & Type)
-              </span>
+          <div className="adm-promo-section-modern">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(251,191,36,0.15)', color: '#fbbf24', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                  <i className="fas fa-tags" />
+                </span>
+                <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>การตั้งค่าส่วนลด (Discount Price & Type)</span>
+              </div>
               <span style={{ fontSize: 11, color: '#fbbf24', background: 'rgba(251,191,36,0.12)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
                 ตั๋วส่วนลด
               </span>
@@ -5137,7 +5227,24 @@ function PromotionTab({ showToast, allGames = [] }) {
                   placeholder="เช่น 100 บาท หรือ 15%"
                   onChange={e => setPromo(p => ({ ...p, discountAmount: e.target.value }))}
                 />
-                <div className="adm-hint">ตัวอย่าง: "100", "50 บาท", "20%"</div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                  {DISCOUNT_PRESETS.map(preset => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => setPromo(p => ({ ...p, discountAmount: preset }))}
+                      style={{
+                        padding: '3px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                        background: promo.discountAmount === preset ? 'rgba(251,191,36,0.2)' : 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${promo.discountAmount === preset ? '#fbbf24' : 'rgba(255,255,255,0.1)'}`,
+                        color: promo.discountAmount === preset ? '#fbbf24' : 'rgba(255,255,255,0.7)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {preset.includes('%') ? preset : `฿${preset}`}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               <div className="adm-field" style={{ flex: 1.2 }}>
@@ -5147,6 +5254,13 @@ function PromotionTab({ showToast, allGames = [] }) {
                     type="button"
                     onClick={() => setPromo(p => ({ ...p, discountType: 'party' }))}
                     className={`adm-promo-type-btn ${promo.discountType === 'party' ? 'active' : ''}`}
+                    style={{
+                      padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      background: promo.discountType === 'party' ? 'rgba(229,9,20,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: `1.5px solid ${promo.discountType === 'party' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.1)'}`,
+                      color: promo.discountType === 'party' ? '#fff' : 'rgba(255,255,255,0.6)',
+                    }}
                   >
                     <i className="fas fa-users" style={{ color: promo.discountType === 'party' ? 'var(--crimson-500)' : 'inherit' }} />
                     ลดทั้งตี้
@@ -5155,12 +5269,19 @@ function PromotionTab({ showToast, allGames = [] }) {
                     type="button"
                     onClick={() => setPromo(p => ({ ...p, discountType: 'person' }))}
                     className={`adm-promo-type-btn ${promo.discountType === 'person' ? 'active' : ''}`}
+                    style={{
+                      padding: '10px 14px', borderRadius: 8, fontSize: 12, fontWeight: 800,
+                      cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      background: promo.discountType === 'person' ? 'rgba(229,9,20,0.15)' : 'rgba(255,255,255,0.04)',
+                      border: `1.5px solid ${promo.discountType === 'person' ? 'var(--crimson-500)' : 'rgba(255,255,255,0.1)'}`,
+                      color: promo.discountType === 'person' ? '#fff' : 'rgba(255,255,255,0.6)',
+                    }}
                   >
                     <i className="fas fa-user" style={{ color: promo.discountType === 'person' ? 'var(--crimson-500)' : 'inherit' }} />
                     ลดต่อคน
                   </button>
                 </div>
-                <div className="adm-hint">
+                <div className="adm-hint" style={{ marginTop: 6 }}>
                   {promo.discountType === 'person' ? 'คำนวณหักลบรายคนตามจำนวนผู้เล่น' : 'หักลบยอดรวมของปาร์ตี้นั้นทันที'}
                 </div>
               </div>
@@ -5168,17 +5289,17 @@ function PromotionTab({ showToast, allGames = [] }) {
           </div>
 
           {/* Section 3: เนื้อหาและข้อความแคมเปญ */}
-          <div className="adm-promo-section">
-            <div className="adm-promo-section-title">
-              <span>
-                <i className="fas fa-pen-nib" style={{ color: 'var(--crimson-500)', marginRight: 8 }} />
-                ข้อความโปรโมชั่นและปุ่มกด (Campaign Details)
+          <div className="adm-promo-section-modern">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+              <span style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(56,189,248,0.15)', color: '#38bdf8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                <i className="fas fa-pen-nib" />
               </span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>ข้อความโปรโมชั่นและปุ่มกด (Campaign Details)</span>
             </div>
 
             <div className="adm-field-row">
               {field('หัวข้อโปรโมชั่น', 'heading', 'เช่น โปรเปิดตี้สืบคดีสุดคุ้ม')}
-              {field('ช่วงเวลา / เดือน', 'month', 'เช่น ประจำเดือนนี้ หรือ จำกัดเวลา')}
+              {field('ช่วงเวลา / เทศกาล', 'month', 'เช่น ประจำเดือนนี้ หรือ ฉลองฮาโลวีน')}
             </div>
 
             {field('คำอธิบายโปรโมชั่น', 'description', 'รายละเอียดและเงื่อนไขโปรโมชั่น...', 'textarea')}
@@ -5201,40 +5322,30 @@ function PromotionTab({ showToast, allGames = [] }) {
             </div>
           </div>
 
-          {/* Section 4: จุดเด่นและแท็กพิเศษ */}
-          <div className="adm-promo-section">
-            <div className="adm-promo-section-title">
-              <span>
-                <i className="fas fa-check-circle" style={{ color: '#4ade80', marginRight: 8 }} />
-                ไฮไลท์และจุดเด่น 3 ข้อ (Pill Badges)
-              </span>
-            </div>
-            <div className="adm-field-row">
-              {field('จุดเด่นข้อที่ 1', 'badge1', 'สคริปต์ยอดฮิต')}
-              {field('จุดเด่นข้อที่ 2', 'badge2', 'ส่วนลดพิเศษ')}
-              {field('จุดเด่นข้อที่ 3', 'badge3', 'จำนวนจำกัด')}
-            </div>
-          </div>
-
-          {/* Section 5: สปอตไลท์ 3 คดีใหม่ล่าสุด */}
-          <div className="adm-promo-section">
-            <div className="adm-promo-section-title">
-              <span>
-                <i className="fas fa-sparkles" style={{ color: '#fbbf24', marginRight: 8 }} />
-                สปอตไลท์ 3 คดีใหม่ล่าสุด (Spotlight Slots)
-              </span>
-              <span style={{ fontSize: 11, background: 'rgba(251,191,36,0.12)', color: '#fbbf24', padding: '2px 8px', borderRadius: 6, fontWeight: 800 }}>
-                {(promo.newGameIds || []).length} / 3 สล็อต
+          {/* Section 4: สปอตไลท์ 5 เกมใหม่ล่าสุด (Spotlight Slots) */}
+          <div className="adm-promo-section-modern">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 6, background: 'rgba(168,85,247,0.15)', color: '#c084fc', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12 }}>
+                  <i className="fas fa-layer-group" />
+                </span>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>สปอตไลท์ 5 เกมใหม่ของร้าน (Spotlight Slots)</div>
+                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>เลือกลำดับเกมใหม่เพื่อนำเสนอใน Hero Carousel หน้าหลักและหน้าสคริปต์ (สูงสุด 5 เกม)</div>
+                </div>
+              </div>
+              <span style={{
+                fontSize: 12, background: (promo.newGameIds || []).length === MAX_NEW_GAMES ? 'rgba(34,197,94,0.15)' : 'rgba(251,191,36,0.15)',
+                color: (promo.newGameIds || []).length === MAX_NEW_GAMES ? '#4ade80' : '#fbbf24',
+                padding: '4px 10px', borderRadius: 8, fontWeight: 800, border: '1px solid rgba(255,255,255,0.1)',
+              }}>
+                {(promo.newGameIds || []).length} / {MAX_NEW_GAMES} สล็อต
               </span>
             </div>
 
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', marginBottom: 16, lineHeight: 1.6 }}>
-              เลือกสคริปต์ 3 เกมเพื่อนำเสนอเป็นไฮไลท์บนการ์ดขวาของหน้าหลัก สามารถอัพโหลดรูปปกเฉพาะสำหรับการโปรโมทได้ (หากเว้นว่าง ระบบจะดึง 3 เกมล่าสุดจากคลังอัตโนมัติ)
-            </div>
-
-            {/* Selected 3 Slots */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14, marginBottom: 18 }}>
-              {[0, 1, 2].map(slotIdx => {
+            {/* Slots Grid: 5 Slots */}
+            <div className="adm-promo-slots-grid-5" style={{ marginBottom: 16 }}>
+              {Array.from({ length: MAX_NEW_GAMES }, (_, slotIdx) => {
                 const gameId = (promo.newGameIds || [])[slotIdx]
                 const game = gameId ? allGames.find(g => g.id === gameId) : null
                 const customCover = gameId ? promo.customCovers?.[gameId] : null
@@ -5244,16 +5355,19 @@ function PromotionTab({ showToast, allGames = [] }) {
                   return (
                     <div
                       key={slotIdx}
-                      className="adm-promo-slot-empty"
-                      onClick={() => setShowGamePicker(true)}
+                      className="adm-promo-slot-empty-5"
+                      onClick={() => {
+                        setPickerTargetSlot(slotIdx)
+                        setShowGamePicker(true)
+                      }}
                     >
-                      <div style={{ width: 42, height: 42, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, color: 'rgba(255,255,255,0.6)' }}>
+                      <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
                         <i className="fas fa-plus" />
                       </div>
-                      <div style={{ fontSize: 13, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>
+                      <div style={{ fontSize: 12, fontWeight: 800, color: 'rgba(255,255,255,0.85)' }}>
                         สล็อต #{slotIdx + 1} (ว่าง)
                       </div>
-                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)' }}>
                         คลิกเพื่อเลือกเกมจากคลัง
                       </div>
                     </div>
@@ -5261,28 +5375,50 @@ function PromotionTab({ showToast, allGames = [] }) {
                 }
 
                 return (
-                  <div key={slotIdx} className="adm-promo-slot-card">
-                    {/* Badge Slot Header */}
+                  <div key={slotIdx} className="adm-promo-slot-card-5">
+                    {/* Badge Slot Header & Reordering */}
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <span style={{ fontSize: 11, fontWeight: 900, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.15)', padding: '2px 8px', borderRadius: 6 }}>
+                      <span style={{ fontSize: 10, fontWeight: 900, color: 'var(--crimson-500)', background: 'rgba(198,36,25,0.15)', padding: '2px 7px', borderRadius: 5 }}>
                         สล็อต #{slotIdx + 1}
                       </span>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveGame(game.id)}
-                        title="นำออกจากเกมใหม่"
-                        style={{
-                          background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer',
-                          fontSize: 14, padding: 4,
-                        }}
-                      >
-                        <i className="fas fa-times" />
-                      </button>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {slotIdx > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => handleMoveGame(slotIdx, slotIdx - 1)}
+                            title="เลื่อนขึ้นหน้า"
+                            style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 10, padding: '3px 6px', borderRadius: 4 }}
+                          >
+                            <i className="fas fa-chevron-left" />
+                          </button>
+                        )}
+                        {slotIdx < (promo.newGameIds || []).length - 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleMoveGame(slotIdx, slotIdx + 1)}
+                            title="เลื่อนไปหลัง"
+                            style={{ background: 'rgba(255,255,255,0.06)', border: 'none', color: '#ccc', cursor: 'pointer', fontSize: 10, padding: '3px 6px', borderRadius: 4 }}
+                          >
+                            <i className="fas fa-chevron-right" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveGame(game.id)}
+                          title="นำออกจากเกมใหม่"
+                          style={{
+                            background: 'rgba(239,68,68,0.12)', border: 'none', color: '#ef4444', cursor: 'pointer',
+                            fontSize: 11, padding: '3px 6px', borderRadius: 4, marginLeft: 2,
+                          }}
+                        >
+                          <i className="fas fa-times" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Game Info Row */}
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                      <div style={{ width: 56, height: 76, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#111', position: 'relative' }}>
+                    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                      <div style={{ width: 52, height: 70, borderRadius: 6, overflow: 'hidden', flexShrink: 0, background: '#111', position: 'relative' }}>
                         {displayCover ? (
                           <img src={convertImg(displayCover, 300)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
@@ -5291,20 +5427,20 @@ function PromotionTab({ showToast, allGames = [] }) {
                           </div>
                         )}
                         {customCover && (
-                          <span style={{ position: 'absolute', bottom: 2, right: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 8, fontWeight: 800, padding: '1px 4px', borderRadius: 3 }}>
+                          <span style={{ position: 'absolute', bottom: 2, right: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 7, fontWeight: 900, padding: '1px 3px', borderRadius: 2 }}>
                             ปกพิเศษ
                           </span>
                         )}
                       </div>
                       <div style={{ minWidth: 0, flex: 1 }}>
-                        <div style={{ fontSize: 13, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                           {game.title || game.name}
                         </div>
-                        <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
+                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)', marginTop: 2 }}>
                           {game.players ? `${game.players} คน` : ''} · {game.difficulty || ''}
                         </div>
                         {game.price !== undefined && (
-                          <div style={{ fontSize: 12, fontWeight: 800, color: '#fbbf24', marginTop: 4 }}>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: '#fbbf24', marginTop: 3 }}>
                             ฿{game.fullPrice ?? game.price}
                           </div>
                         )}
@@ -5312,15 +5448,15 @@ function PromotionTab({ showToast, allGames = [] }) {
                     </div>
 
                     {/* Upload Custom Cover */}
-                    <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                    <div style={{ marginTop: 'auto', paddingTop: 6, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                       <label style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                        padding: '7px 10px', borderRadius: 6, background: 'rgba(255,255,255,0.08)',
-                        color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                        padding: '5px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.06)',
+                        color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer',
                         transition: 'background 0.15s',
                       }}>
                         <i className={`fas ${uploadingCoverFor === game.id ? 'fa-spinner fa-spin' : 'fa-camera'}`} />
-                        {uploadingCoverFor === game.id ? 'กำลังอัพโหลด...' : customCover ? 'เปลี่ยนรูปปกใหม่' : 'อัพโหลดปกเฉพาะเกมนี้'}
+                        {uploadingCoverFor === game.id ? 'กำลังอัพ...' : customCover ? 'เปลี่ยนปก' : 'อัพโหลดปกพิเศษ'}
                         <input type="file" accept="image/*" onChange={e => handleGameCoverUpload(game.id, e)} disabled={uploadingCoverFor === game.id} style={{ display: 'none' }} />
                       </label>
                       {customCover && (
@@ -5332,11 +5468,11 @@ function PromotionTab({ showToast, allGames = [] }) {
                             return { ...p, customCovers: nextCovers }
                           })}
                           style={{
-                            width: '100%', marginTop: 4, background: 'none', border: 'none',
-                            color: 'rgba(255,255,255,0.45)', fontSize: 10, cursor: 'pointer', padding: 2,
+                            width: '100%', marginTop: 3, background: 'none', border: 'none',
+                            color: 'rgba(255,255,255,0.4)', fontSize: 9.5, cursor: 'pointer', padding: 2,
                           }}
                         >
-                          รีเซ็ตกลับเป็นรูปปกเดิม
+                          รีเซ็ตเป็นปกเดิม
                         </button>
                       )}
                     </div>
@@ -5345,33 +5481,39 @@ function PromotionTab({ showToast, allGames = [] }) {
               })}
             </div>
 
-            {/* Picker Drawer */}
-            {(promo.newGameIds || []).length < 3 && (
+            {/* Picker Button / Drawer */}
+            {(promo.newGameIds || []).length < MAX_NEW_GAMES && (
               <div>
                 {!showGamePicker ? (
                   <button
                     type="button"
-                    onClick={() => setShowGamePicker(true)}
+                    onClick={() => {
+                      setPickerTargetSlot(null)
+                      setShowGamePicker(true)
+                    }}
                     style={{
-                      padding: '10px 18px', borderRadius: 8, background: 'rgba(251,191,36,0.15)',
-                      border: '1px solid rgba(251,191,36,0.3)', color: '#fbbf24', fontSize: 13,
+                      padding: '10px 18px', borderRadius: 8, background: 'rgba(168,85,247,0.12)',
+                      border: '1px solid rgba(168,85,247,0.28)', color: '#c084fc', fontSize: 12,
                       fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
                     }}
                   >
-                    <i className="fas fa-plus" /> เลือกเกมจากคลังมาเพิ่ม (เหลืออีก {3 - (promo.newGameIds || []).length} สล็อต)
+                    <i className="fas fa-plus" /> เลือกเกมจากคลังมาเพิ่ม (ว่างอีก {MAX_NEW_GAMES - (promo.newGameIds || []).length} สล็อต)
                   </button>
                 ) : (
                   <div style={{
-                    background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.12)',
                     borderRadius: 14, padding: 16,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
-                        เลือกเกมจากคลัง ({filteredAvailableGames.length} เกมที่พร้อมเลือก)
+                        เลือกเกมจากคลังเพื่อเข้าสล็อต ({filteredAvailableGames.length} เกมที่เลือกได้)
                       </div>
                       <button
                         type="button"
-                        onClick={() => setShowGamePicker(false)}
+                        onClick={() => {
+                          setShowGamePicker(false)
+                          setPickerTargetSlot(null)
+                        }}
                         style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: 14 }}
                       >
                         <i className="fas fa-times" /> ปิด
@@ -5380,12 +5522,12 @@ function PromotionTab({ showToast, allGames = [] }) {
                     <input
                       type="text"
                       className="adm-input"
-                      placeholder="ค้นหาชื่อเกม..."
+                      placeholder="ค้นหาชื่อเกม หมวดหมู่ หรือความยาก..."
                       value={gameSearch}
                       onChange={e => setGameSearch(e.target.value)}
                       style={{ marginBottom: 12 }}
                     />
-                    <div style={{ maxHeight: 240, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div style={{ maxHeight: 250, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {filteredAvailableGames.length === 0 ? (
                         <div style={{ textAlign: 'center', color: '#888', padding: 20, fontSize: 12 }}>
                           ไม่พบเกมที่ค้นหา
@@ -5426,7 +5568,7 @@ function PromotionTab({ showToast, allGames = [] }) {
                                 padding: '5px 12px', borderRadius: 6, fontSize: 11, fontWeight: 800, cursor: 'pointer',
                               }}
                             >
-                              + เลือก
+                              + เลือกเข้าสล็อต
                             </button>
                           </div>
                         ))
@@ -5441,8 +5583,15 @@ function PromotionTab({ showToast, allGames = [] }) {
         </div>
 
         {/* ── RIGHT: Sticky Editorial Live Preview ── */}
-        <div className="adm-promo-preview-sticky">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14, paddingBottom: 10, borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+        <div style={{
+          position: 'sticky', top: 20, display: 'flex', flexDirection: 'column', gap: 16,
+        }}>
+          {/* Preview Header */}
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            padding: '12px 16px', borderRadius: 12, background: 'rgba(255, 255, 255, 0.025)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+          }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <i className="fas fa-desktop" style={{ color: 'var(--crimson-500)', fontSize: 13 }} />
               <span style={{ fontSize: 13, fontWeight: 800, color: '#fff' }}>
@@ -5455,11 +5604,7 @@ function PromotionTab({ showToast, allGames = [] }) {
             </div>
           </div>
 
-          <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 16 }}>
-            จำลองหน้าตาที่ลูกค้าเห็นบนหน้าหลักของร้านแบบ 1:1
-          </div>
-
-          {/* Miniature replica of Homepage split section */}
+          {/* Miniature replica of Homepage cards */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
             {/* Promo Dossier Card */}
@@ -5469,7 +5614,6 @@ function PromotionTab({ showToast, allGames = [] }) {
               padding: '20px', position: 'relative', overflow: 'hidden',
               boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
             }}>
-              {/* Subtle top red bar */}
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, var(--crimson-500), transparent 70%)' }} />
 
               {/* Eyebrow Pill */}
@@ -5480,12 +5624,12 @@ function PromotionTab({ showToast, allGames = [] }) {
                 textTransform: 'uppercase', marginBottom: 12, width: 'fit-content',
               }}>
                 <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--crimson-500)', boxShadow: '0 0 6px var(--crimson-500)', display: 'inline-block' }} />
-                <span>PROMOTION · {promo.month || 'สิทธิพิเศษประจำเดือน'}</span>
+                <span>PROMOTION · {promo.month || 'สิทธิพิเศษ'}</span>
               </div>
 
               {/* Heading */}
               <div style={{
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, lineHeight: 0.95,
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1,
                 textTransform: 'uppercase', color: '#fff', marginBottom: 12,
               }}>
                 {promo.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
@@ -5507,7 +5651,7 @@ function PromotionTab({ showToast, allGames = [] }) {
                         สิทธิ์ส่วนลดพิเศษ
                       </div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: '#fff' }}>
-                        {promo.discountType === 'person' ? 'ลดต่อคนทันทีในรอบเล่น' : 'ส่วนลดรอบเล่นทั้งปาร์ตี้'}
+                        {promo.discountType === 'person' ? 'ลดต่อคนในรอบเล่น' : 'ส่วนลดทั้งปาร์ตี้'}
                       </div>
                     </div>
                   </div>
@@ -5530,7 +5674,7 @@ function PromotionTab({ showToast, allGames = [] }) {
               {promo.bannerUrl && (
                 <div style={{
                   borderRadius: 12, overflow: 'hidden', marginBottom: 14,
-                  border: '1px solid rgba(255,255,255,0.12)', aspectRatio: '16/9', maxHeight: 160, background: '#111',
+                  border: '1px solid rgba(255,255,255,0.12)', aspectRatio: '16/9', maxHeight: 150, background: '#111',
                 }}>
                   <img
                     src={convertImg(promo.bannerUrl, 600)}
@@ -5541,28 +5685,15 @@ function PromotionTab({ showToast, allGames = [] }) {
               )}
 
               {/* Description */}
-              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)', lineHeight: 1.6, marginBottom: 14 }}>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.7)', lineHeight: 1.5, marginBottom: 14 }}>
                 {promo.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน...'}
-              </div>
-
-              {/* Feature Tags */}
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-                {[promo.badge1, promo.badge2, promo.badge3].filter(Boolean).map((b, i) => (
-                  <span key={i} style={{
-                    fontSize: 9.5, fontWeight: 700, padding: '4px 9px', borderRadius: 12,
-                    background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.85)',
-                  }}>
-                    {b}
-                  </span>
-                ))}
               </div>
 
               {/* Action Button */}
               <div style={{
                 background: 'linear-gradient(135deg, var(--crimson-500) 0%, var(--crimson-600) 100%)',
                 color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '0.12em',
-                textTransform: 'uppercase', padding: '10px 18px', borderRadius: 8,
+                textTransform: 'uppercase', padding: '9px 16px', borderRadius: 8,
                 display: 'inline-flex', alignItems: 'center', gap: 8, width: 'fit-content',
                 boxShadow: '0 4px 16px rgba(198,36,25,0.4)',
               }}>
@@ -5571,14 +5702,13 @@ function PromotionTab({ showToast, allGames = [] }) {
               </div>
             </div>
 
-            {/* New Games Spotlight Preview Card */}
+            {/* New Games Spotlight Preview Card (up to 5 games) */}
             <div style={{
               background: 'linear-gradient(145deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.015) 100%)',
               borderRadius: 18, border: '1px solid rgba(255,255,255,0.09)',
               padding: '20px', position: 'relative', overflow: 'hidden',
               boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
             }}>
-              {/* Subtle top gold bar */}
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #fbbf24, transparent 70%)' }} />
 
               {/* Eyebrow Pill */}
@@ -5594,47 +5724,47 @@ function PromotionTab({ showToast, allGames = [] }) {
 
               {/* Heading */}
               <div style={{
-                fontFamily: "'Bebas Neue',sans-serif", fontSize: 32, lineHeight: 0.95,
-                textTransform: 'uppercase', color: '#fff', marginBottom: 6,
+                fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1,
+                textTransform: 'uppercase', color: '#fff', marginBottom: 4,
               }}>
-                3 คดีใหม่ล่าสุด
+                {selectedGamesList.length > 0 ? `${selectedGamesList.length} คดีใหม่ล่าสุด` : '5 คดีใหม่ล่าสุด'}
               </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 14 }}>
-                คัดสรรสคริปต์ส่งตรงสู่เลานจ์ พร้อมเปิดแฟ้มสืบสวนทุกสัปดาห์
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)', marginBottom: 12 }}>
+                คัดสรรสคริปต์ส่งตรงสู่เลานจ์ พร้อมเปิดแฟ้มสืบสวน
               </div>
 
-              {/* Game Rows */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {/* Game Rows (up to 5) */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 7, maxHeight: 340, overflowY: 'auto' }}>
                 {selectedGamesList.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '16px 0', color: 'rgba(255,255,255,0.35)', fontSize: 11 }}>
-                    ยังไม่ได้เลือกเกมใหม่ (ระบบจะดึง 3 เกมล่าสุดจากคลังอัตโนมัติ)
+                    ยังไม่ได้เลือกเกมใหม่ (ระบบจะดึง 5 เกมล่าสุดจากคลังอัตโนมัติ)
                   </div>
                 ) : (
-                  selectedGamesList.map(g => {
+                  selectedGamesList.map((g, idx) => {
                     const cover = promo.customCovers?.[g.id] || g.image || g.coverUrl
                     return (
                       <div
                         key={g.id}
                         style={{
-                          display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
+                          display: 'flex', alignItems: 'center', gap: 10, padding: '7px 9px',
                           borderRadius: 8, background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.07)',
                         }}
                       >
-                        <div style={{ width: 36, height: 48, borderRadius: 4, overflow: 'hidden', background: '#222', flexShrink: 0, position: 'relative' }}>
+                        <div style={{ width: 34, height: 46, borderRadius: 4, overflow: 'hidden', background: '#222', flexShrink: 0, position: 'relative' }}>
                           {cover && <img src={convertImg(cover, 200)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
                           <span style={{ position: 'absolute', top: 2, left: 2, background: 'var(--crimson-500)', color: '#fff', fontSize: 7, fontWeight: 900, padding: '1px 3px', borderRadius: 2 }}>
-                            NEW
+                            #{idx + 1}
                           </span>
                         </div>
                         <div style={{ minWidth: 0, flex: 1 }}>
-                          <div style={{ fontSize: 12, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          <div style={{ fontSize: 11.5, fontWeight: 800, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {g.title || g.name}
                           </div>
-                          <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
+                          <div style={{ fontSize: 9.5, color: 'rgba(255,255,255,0.4)', marginTop: 2 }}>
                             {g.players} คน · {g.difficulty}
                           </div>
                         </div>
-                        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 16, color: '#fff' }}>
+                        <div style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 15, color: '#fff' }}>
                           ฿{g.fullPrice ?? g.price}
                         </div>
                       </div>
@@ -5652,11 +5782,15 @@ function PromotionTab({ showToast, allGames = [] }) {
       {/* ── Bottom Save Action Bar ── */}
       <button
         className="adm-btn-red"
-        style={{ width: '100%', padding: '15px', fontSize: '15px', fontWeight: 800, borderRadius: 12, marginTop: 10 }}
+        style={{
+          width: '100%', padding: '16px', fontSize: '15px', fontWeight: 800,
+          borderRadius: 14, marginTop: 10, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          boxShadow: '0 8px 24px rgba(229,9,20,0.3)',
+        }}
         onClick={save}
         disabled={saving}
       >
-        {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกโปรโมชั่นและเกมใหม่</>}
+        {saving ? <span className="spinner-sm" /> : <><i className="fas fa-save" /> บันทึกโปรโมชั่นและเกมใหม่ (${selectedGamesList.length} / ${MAX_NEW_GAMES} สล็อต)</>}
       </button>
 
     </div>

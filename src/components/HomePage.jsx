@@ -495,22 +495,22 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     });
   }, [allGames]);
 
-  /* 3 New Games to display in Hero Card */
+  /* New Games to display in Hero Card (up to 5) */
   const newGames = useMemo(() => {
     if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds) && promoSettings.newGameIds.length > 0) {
       const mapped = promoSettings.newGameIds
         .map(id => allGames.find(g => g.id === id))
         .filter(Boolean);
-      if (mapped.length > 0) return mapped.slice(0, 3);
+      if (mapped.length > 0) return mapped.slice(0, 5);
     }
     const source = sortedNewestGames.length > 0 ? sortedNewestGames : (allGames.length > 0 ? allGames : PLACEHOLDER);
-    return source.slice(0, 3);
+    return source.slice(0, 5);
   }, [promoSettings?.newGameIds, allGames, sortedNewestGames]);
 
   /* Hero Featured Games */
   const heroFeaturedGames = useMemo(() => {
     if (newGames && newGames.length > 0) return newGames;
-    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 3);
+    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 5);
   }, [newGames, allGames]);
 
   /* Swimlanes Data */
