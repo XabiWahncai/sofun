@@ -1259,28 +1259,12 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
                 <p style={{
                   fontSize: 'clamp(12.5px, 1.1vw, 13.5px)', color: TEXT_MUTED,
-                  lineHeight: 1.6, margin: '0 0 14px 0',
+                  lineHeight: 1.6, margin: '0 0 18px 0',
                 }}>
                   {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
                 </p>
 
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>
-                  {([promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean).length > 0
-                    ? [promoSettings?.badge1, promoSettings?.badge2, promoSettings?.badge3].filter(Boolean)
-                    : ['สคริปต์ยอดนิยม', 'ส่วนลดพิเศษ', 'จำนวนจำกัด']
-                  ).map((b, i) => {
-                    const cleanText = String(b || '').replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '').trim();
-                    return (
-                      <span key={i} style={{
-                        fontSize: 10.5, color: TEXT_MUTED,
-                        display: 'inline-flex', alignItems: 'center', gap: 6,
-                      }}>
-                        {i > 0 && <span style={{ color: TEXT_LIGHT }}>*</span>}
-                        <span>{cleanText}</span>
-                      </span>
-                    );
-                  })}
-                </div>
+
               </div>
 
               <div>
@@ -1362,18 +1346,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   </div>
                 )}
 
-                {/* VIP Gold Foil Badge */}
-                <div style={{
-                  position: 'absolute', top: 16, right: 16,
-                  background: 'linear-gradient(135deg, #d4af37 0%, #aa820a 100%)',
-                  color: '#ffffff', padding: '4px 12px', borderRadius: 6,
-                  fontSize: 9.5, fontWeight: 900, letterSpacing: '0.14em',
-                  textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 6,
-                  boxShadow: '0 4px 14px rgba(0,0,0,0.2)', zIndex: 5,
-                }}>
-                  <i className="fas fa-crown" style={{ fontSize: 9 }} />
-                  <span>VIP ADMISSION PASS</span>
-                </div>
+
               </div>
             </div>
           </div>
