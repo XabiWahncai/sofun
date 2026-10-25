@@ -78,9 +78,15 @@ export function useTopPlayedGames90d(allGames = []) {
   const topGames = useMemo(() => {
     if (!allGames || allGames.length === 0) return []
 
-    // Filter games with at least 1 round played in the past 90 days
+    const isSpecialEventGame = (g) => {
+      const title = (g.title || '').toLowerCase()
+      const id = (g.id || '').toLowerCase()
+      return title.includes('special event') || title.includes('secial event') || id === 'vqpyqhfwsbq3niklsqtc'
+    }
+
+    // Filter games with at least 1 round played in the past 90 days, excluding Special Event
     const withCounts = allGames
-      .filter(g => (playCounts[g.id] || 0) > 0)
+      .filter(g => (playCounts[g.id] || 0) > 0 && !isSpecialEventGame(g))
       .map(g => ({
         ...g,
         playCount90d: playCounts[g.id] || 0,

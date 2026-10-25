@@ -704,14 +704,6 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
           <span><i className="fas fa-users" style={{ fontSize: 10, color: 'rgba(255,255,255,0.5)' }} /> {players} คน</span>
           <span>•</span>
           <span>{game.time || '4 ชม.'}</span>
-          {game.playCount90d > 0 && (
-            <>
-              <span>•</span>
-              <span style={{ color: '#fbbf24', fontWeight: 800 }}>
-                <i className="fas fa-fire" style={{ fontSize: 9, marginRight: 3 }} />{game.playCount90d} รอบ
-              </span>
-            </>
-          )}
         </div>
 
         {/* Hover Action Bar */}
