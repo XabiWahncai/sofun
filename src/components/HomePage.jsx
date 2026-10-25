@@ -1359,9 +1359,6 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       <section style={{ background: BG_PAGE, color: TEXT_MAIN, padding: 'clamp(64px,8vw,104px) clamp(20px,5vw,60px)' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div className="mm-reveal" style={{ marginBottom: 48, textAlign: 'center' }}>
-            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED, padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
-              HOW TO PLAY
-            </div>
             <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(40px,6vw,80px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
               {t('home','howStartHeading')}
             </h2>
