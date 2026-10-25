@@ -7673,6 +7673,44 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
   const [confirmModal, setConfirmModal] = useState(null)
   const [editModal, setEditModal]       = useState(null)
   const [mockModal, setMockModal]       = useState(false)
+  const [bookingEnabled, setBookingEnabled] = useState(true)
+  const [settingUpdating, setSettingUpdating] = useState(false)
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'booking'), snap => {
+      if (snap.exists()) {
+        setBookingEnabled(snap.data().enabled !== false)
+      } else {
+        setBookingEnabled(true)
+      }
+    }, err => {
+      console.warn('Failed to listen to settings/booking:', err)
+    })
+    return unsub
+  }, [])
+
+  const handleToggleBookingSystem = async () => {
+    if (settingUpdating) return
+    const nextState = !bookingEnabled
+    const confirmMsg = nextState
+      ? 'ต้องการ "เปิด" ระบบจองและปาร์ตี้ใช่หรือไม่?\n(เมนู จอง และ ปาร์ตี้ ใน Navbar จะแสดงตามปกติ)'
+      : 'ต้องการ "ปิด" ระบบจองและปาร์ตี้ใช่หรือไม่?\n(เมนู จอง และ ปาร์ตี้ ใน Navbar จะถูกซ่อน และปุ่มจองจะคัดลอกข้อมูลเกมพร้อมเปิด LINE @sofunclub แทน)'
+    if (!window.confirm(confirmMsg)) return
+
+    setSettingUpdating(true)
+    try {
+      await setDoc(doc(db, 'settings', 'booking'), {
+        enabled: nextState,
+        updatedAt: serverTimestamp(),
+        updatedBy: adminUser?.email || adminUser?.displayName || 'admin',
+      }, { merge: true })
+      showToast(nextState ? 'เปิดระบบจองและปาร์ตี้เรียบร้อยแล้ว' : 'ปิดระบบจองเรียบร้อยแล้ว (เปลี่ยนเป็นส่งข้อมูลไป LINE)')
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการเปลี่ยนสถานะ: ' + e.message, 'error')
+    } finally {
+      setSettingUpdating(false)
+    }
+  }
 
   useEffect(() => {
     const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'))
@@ -7755,6 +7793,103 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
         @keyframes pendingPulse{0%,100%{opacity:1}50%{opacity:0.4}}
         @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
       `}</style>
+
+      {/* ── Master Switch: Booking & Party System ── */}
+      <div style={{
+        background: bookingEnabled ? 'var(--surface-elevated)' : 'rgba(239, 68, 68, 0.04)',
+        border: `1.5px solid ${bookingEnabled ? 'var(--border-default)' : 'rgba(239, 68, 68, 0.35)'}`,
+        borderRadius: 14,
+        padding: '16px 20px',
+        marginBottom: 20,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 16,
+        boxShadow: bookingEnabled ? 'none' : '0 2px 14px rgba(239, 68, 68, 0.08)',
+        transition: 'all 0.2s ease',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260, flex: '1 1 auto' }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: bookingEnabled ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+            color: bookingEnabled ? '#16a34a' : '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 20,
+            flexShrink: 0,
+            transition: 'all 0.2s',
+          }}>
+            <i className={bookingEnabled ? 'fas fa-calendar-check' : 'fas fa-calendar-times'} />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
+              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
+                สถานะระบบจองและปาร์ตี้ (Booking & Party System)
+              </span>
+              <span style={{
+                fontSize: 11,
+                fontWeight: 800,
+                padding: '2px 9px',
+                borderRadius: 20,
+                background: bookingEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                color: bookingEnabled ? '#16a34a' : '#dc2626',
+                border: `1px solid ${bookingEnabled ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+              }}>
+                <span style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  background: bookingEnabled ? '#16a34a' : '#dc2626',
+                }} />
+                {bookingEnabled ? 'เปิดใช้งาน (Online)' : 'ปิดระบบจอง (Redirect to LINE)'}
+              </span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+              {bookingEnabled
+                ? 'ระบบจองบนเว็บและระบบค้นหาปาร์ตี้เปิดให้บริการปกติ ปุ่มจองและปาร์ตี้แสดงใน Navbar'
+                : 'ซ่อนเมนู "ปาร์ตี้" และ "จอง" ใน Navbar — ทุกปุ่มจองบนเว็บจะคัดลอกรูปภาพและข้อมูลเกม แล้วนำทางไปที่ LINE @sofunclub อัตโนมัติ'}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Toggle Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <button
+            type="button"
+            onClick={handleToggleBookingSystem}
+            disabled={settingUpdating}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 18px',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 800,
+              cursor: settingUpdating ? 'wait' : 'pointer',
+              border: `1px solid ${bookingEnabled ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.4)'}`,
+              background: bookingEnabled ? 'rgba(239, 68, 68, 0.08)' : '#16a34a',
+              color: bookingEnabled ? '#dc2626' : '#ffffff',
+              transition: 'all 0.18s ease',
+              boxShadow: bookingEnabled ? 'none' : '0 2px 8px rgba(22, 163, 74, 0.25)',
+            }}
+          >
+            {settingUpdating ? (
+              <span className="spinner-sm" style={{ width: 14, height: 14, borderColor: 'currentColor', borderTopColor: 'transparent' }} />
+            ) : (
+              <i className={bookingEnabled ? 'fas fa-power-off' : 'fas fa-check-circle'} />
+            )}
+            <span>{bookingEnabled ? 'คลิกเพื่อปิดระบบจอง' : 'คลิกเพื่อเปิดระบบจอง'}</span>
+          </button>
+        </div>
+      </div>
 
       {/* Room availability grid */}
       <RoomGrid bookings={bookings} onSelectBooking={setEditModal} />

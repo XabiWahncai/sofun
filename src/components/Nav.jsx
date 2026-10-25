@@ -14,6 +14,7 @@ export default function Nav({
   pendingOrdersCount = 0,
   soundMuted = false,
   onToggleSound,
+  bookingEnabled = true,
 }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { lang, toggle, t } = useLang()
@@ -43,12 +44,16 @@ export default function Nav({
           <button className={`nav-btn${currentPage === 'games'  ? ' active' : ''}`} onClick={() => handleNav('games')}>
             {t('nav', 'scripts')}
           </button>
-          <button className={`nav-btn${currentPage === 'party'  ? ' active' : ''}`} onClick={() => handleNav('party')}>
-            <i className="fas fa-users" style={{ marginRight: '5px', fontSize: '11px' }} />{t('nav', 'party')}
-          </button>
-          <button className={`nav-btn${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
-            <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />จอง
-          </button>
+          {bookingEnabled && (
+            <>
+              <button className={`nav-btn${currentPage === 'party'  ? ' active' : ''}`} onClick={() => handleNav('party')}>
+                <i className="fas fa-users" style={{ marginRight: '5px', fontSize: '11px' }} />{t('nav', 'party')}
+              </button>
+              <button className={`nav-btn${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
+                <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />จอง
+              </button>
+            </>
+          )}
           {lineUser && !effectiveAdmin ? (
             hasActiveOrder ? (
               <button className={`nav-btn${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
@@ -97,9 +102,11 @@ export default function Nav({
                     <div className="nav-user-menu-name">{lineUser.name}</div>
                     <div className="nav-user-menu-sub">{t('nav', 'lineMember')}</div>
                   </div>
-                  <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
-                    <i className="fas fa-users" /> {t('nav', 'myParty')}
-                  </button>
+                  {bookingEnabled && (
+                    <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
+                      <i className="fas fa-users" /> {t('nav', 'myParty')}
+                    </button>
+                  )}
                   <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
                     <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
                   </button>
@@ -229,14 +236,18 @@ export default function Nav({
           <i className="fas fa-scroll" />
           <span>{t('nav', 'scripts')}</span>
         </button>
-        <button className={`bottom-nav-item${currentPage === 'party' ? ' active' : ''}`} onClick={() => handleNav('party')}>
-          <i className="fas fa-users" />
-          <span>{t('nav', 'party')}</span>
-        </button>
-        <button className={`bottom-nav-item${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
-          <i className="fas fa-calendar-check" />
-          <span>จอง</span>
-        </button>
+        {bookingEnabled && (
+          <>
+            <button className={`bottom-nav-item${currentPage === 'party' ? ' active' : ''}`} onClick={() => handleNav('party')}>
+              <i className="fas fa-users" />
+              <span>{t('nav', 'party')}</span>
+            </button>
+            <button className={`bottom-nav-item${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
+              <i className="fas fa-calendar-check" />
+              <span>จอง</span>
+            </button>
+          </>
+        )}
         {lineUser && !effectiveAdmin ? (
           hasActiveOrder ? (
             <button className={`bottom-nav-item bottom-nav-order${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>

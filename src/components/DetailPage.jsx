@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { db } from '../firebase'
 import { doc, getDoc, collection, onSnapshot, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore'
 import { useLang } from '../LangContext'
+import { handleDirectLineBooking } from '../utils/bookingHelper'
 
 /* ── Netflix Design Tokens ─────────────────────────────────────────── */
 const BG_DARK      = '#0c0c0c'
@@ -219,7 +220,7 @@ function RelatedCard({ game, showDetail }) {
 }
 
 /* ── Main DetailPage Component ─────────────────────────────────────── */
-export default function DetailPage({ id, showPage, showDetail, allGames = [], lineUser = null }) {
+export default function DetailPage({ id, showPage, showDetail, allGames = [], lineUser = null, bookingEnabled = true, showToast = null }) {
   const [game, setGame] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -293,8 +294,12 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
   // 5. Booking navigation with Game ID
   const handleBookNow = () => {
     if (!game) return
+    if (!bookingEnabled) {
+      handleDirectLineBooking(game, showToast)
+      return
+    }
     if (typeof showPage === 'function') {
-      showPage('booking', { gameId: game.id })
+      showPage('booking', { gameId: game.id, game })
     } else {
       window.location.href = `/booking?gameId=${game.id}`
     }

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { collection, onSnapshot, query, where, orderBy, limit, doc } from 'firebase/firestore'
 import { db } from '../firebase'
+import { handleDirectLineBooking } from '../utils/bookingHelper'
 
 /* ── Light / White Theme Tokens ────────────────────────────────────── */
 const BG_PAGE       = '#fcfcfc'
@@ -556,7 +557,7 @@ const RESPONSIVE_CSS = `
 `
 
 /* ── Netflix Poster Card Component (White Theme) ───────────────────── */
-function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
+function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = true, showToast = null }) {
   const [hovered, setHovered] = useState(false)
   const posterImg = getCleanImgUrl(game.image, 400)
   const diff = getDifficultyBadge(game.difficulty)
@@ -564,8 +565,12 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
 
   const handleBook = (e) => {
     e.stopPropagation()
+    if (!bookingEnabled) {
+      handleDirectLineBooking(game, showToast)
+      return
+    }
     if (typeof showPage === 'function') {
-      showPage('booking', { gameId: game.id })
+      showPage('booking', { gameId: game.id, game })
     } else {
       window.location.href = `/booking?gameId=${game.id}`
     }
@@ -772,7 +777,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
 }
 
 /* ── Netflix Horizontal Swimlane Row (White Theme) ─────────────────── */
-function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll }) {
+function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = true, showToast = null }) {
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
@@ -892,6 +897,8 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
               showDetail={showDetail}
               showPage={showPage}
               isPlayed={playedIds.has(game.id)}
+              bookingEnabled={bookingEnabled}
+              showToast={showToast}
             />
           ))}
         </div>
@@ -929,7 +936,7 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
 }
 
 /* ── Hero Billboard Spotlight Component (White Theme) ──────────────── */
-function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings }) {
+function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings, bookingEnabled = true, showToast = null }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
 
@@ -1004,8 +1011,12 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings 
   const players = getGamePlayerCount(currentGame)
 
   const handleBook = () => {
+    if (!bookingEnabled) {
+      handleDirectLineBooking(currentGame, showToast)
+      return
+    }
     if (typeof showPage === 'function') {
-      showPage('booking', { gameId: currentGame.id })
+      showPage('booking', { gameId: currentGame.id, game: currentGame })
     } else {
       window.location.href = `/booking?gameId=${currentGame.id}`
     }
@@ -1840,7 +1851,7 @@ function NetflixFilterDrawer({
 }
 
 /* ── Main GamesPage Component (White Theme) ────────────────────────── */
-export default function GamesPage({ allGames = [], showDetail, showPage, lineUser }) {
+export default function GamesPage({ allGames = [], showDetail, showPage, lineUser, bookingEnabled = true, showToast = null }) {
   // 1. Played IDs from playHistory
   const [playedIds, setPlayedIds] = useState(() => new Set())
   const [recentPlayedIds, setRecentPlayedIds] = useState([])
@@ -2130,6 +2141,8 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
         showDetail={showDetail}
         showPage={showPage}
         promoSettings={promoSettings}
+        bookingEnabled={bookingEnabled}
+        showToast={showToast}
       />
 
       {/* 2. Sticky SubBar for Search, Categories, and Mode Toggle */}
@@ -2230,6 +2243,8 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
                 showPage={showPage}
                 playedIds={playedIds}
                 onSeeAll={row.onSeeAll}
+                bookingEnabled={bookingEnabled}
+                showToast={showToast}
               />
             ))}
           </div>
@@ -2330,6 +2345,8 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
                     showDetail={showDetail}
                     showPage={showPage}
                     isPlayed={playedIds.has(game.id)}
+                    bookingEnabled={bookingEnabled}
+                    showToast={showToast}
                   />
                 ))}
               </div>

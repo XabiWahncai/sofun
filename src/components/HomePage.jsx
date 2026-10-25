@@ -3,6 +3,7 @@ import { useLang } from '../LangContext';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion, onSnapshot, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import Footer from './Footer';
+import { handleDirectLineBooking } from '../utils/bookingHelper';
 
 /* Design tokens - Netflix White Theme */
 const C          = 'var(--crimson-500)';
@@ -88,15 +89,19 @@ function getGamePlayerCount(g) {
 }
 
 /* Netflix Poster Card */
-function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
+function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = true, showToast = null }) {
   const [hovered, setHovered] = useState(false);
   const posterImg = convertImageUrl(game.image || game.coverUrl, 400);
   const players = getGamePlayerCount(game);
 
   const handleBook = (e) => {
     e.stopPropagation();
+    if (!bookingEnabled) {
+      handleDirectLineBooking(game, showToast);
+      return;
+    }
     if (typeof showPage === 'function') {
-      showPage('booking', { gameId: game.id });
+      showPage('booking', { gameId: game.id, game });
     } else {
       window.location.href = `/booking?gameId=${game.id}`;
     }
@@ -282,7 +287,7 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
 }
 
 /* Netflix Swimlane Row */
-function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playedIds, onSeeAll }) {
+function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = true, showToast = null }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -396,6 +401,8 @@ function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playe
               showDetail={showDetail}
               showPage={showPage}
               isPlayed={playedIds.has(game.id)}
+              bookingEnabled={bookingEnabled}
+              showToast={showToast}
             />
           ))}
         </div>
@@ -440,7 +447,7 @@ const PLACEHOLDER = Array.from({ length: 12 }, (_, i) => ({
   price: [0,299,399,499,0,349,399,299,0,349,399,0][i],
 }));
 
-export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser }) {
+export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser, bookingEnabled = true, showToast = null }) {
   const { t } = useLang();
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
@@ -1278,7 +1285,14 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
               <div>
                 <button
-                  onClick={() => showPage(promoSettings?.buttonLink || 'booking')}
+                  onClick={() => {
+                    const targetLink = promoSettings?.buttonLink || 'booking';
+                    if ((targetLink === 'booking' || targetLink === 'party') && !bookingEnabled) {
+                      handleDirectLineBooking(null, showToast);
+                      return;
+                    }
+                    showPage(targetLink);
+                  }}
                   style={{
                     width: '100%',
                     background: NETFLIX_RED,
@@ -1461,6 +1475,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             showPage={showPage}
             playedIds={playedIds}
             onSeeAll={() => showPage('games')}
+            bookingEnabled={bookingEnabled}
+            showToast={showToast}
           />
 
           {/* Catalog Footer Link */}

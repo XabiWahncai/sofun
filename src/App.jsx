@@ -23,6 +23,7 @@ import AdminScanPage from './components/AdminScanPage'
 import POSPage, { newPOSSession, dedupeSessions } from './components/POSPage'
 import MemberOrderPage from './components/MemberOrderPage'
 import BookingPage from './components/BookingPage'
+import { handleDirectLineBooking } from './utils/bookingHelper'
 import RandomWheelPage from './components/RandomWheelPage'
 import AllOfUsWillDiePage from './components/AllOfUsWillDiePage'
 import TierEffect from './components/TierEffect'
@@ -59,6 +60,23 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [bookingGameId, setBookingGameId] = useState("")
+  const [bookingEnabled, setBookingEnabled] = useState(true)
+
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'booking'), snap => {
+      if (snap.exists()) {
+        const isEnabled = snap.data().enabled !== false
+        setBookingEnabled(isEnabled)
+      } else {
+        setBookingEnabled(true)
+      }
+    }, err => {
+      console.warn('Failed to listen to settings/booking in App:', err)
+    })
+    return unsub
+  }, [])
+
+
   const [toast, setToast] = useState({ msg: '', type: 'success', visible: false })
   const [lineUser, setLineUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('sofun_line_user')) } catch { return null }
@@ -450,6 +468,18 @@ export default function App() {
     setTimeout(() => setToast(t => ({ ...t, visible: false })), 3000)
   }, [])
 
+  useEffect(() => {
+    if (!bookingEnabled && (currentPage === 'booking' || currentPage === 'party')) {
+      setCurrentPage('games')
+      window.history.replaceState({ page: 'games' }, '', '/games')
+      showToast('ระบบจองและปาร์ตี้ปิดให้บริการชั่วคราว นำทางไปหน้ารวมสคริปต์')
+      if (bookingGameId) {
+        const targetGame = allGames.find(g => g.id === bookingGameId)
+        handleDirectLineBooking(targetGame, showToast)
+      }
+    }
+  }, [bookingEnabled, currentPage, bookingGameId, allGames, showToast])
+
   // ── Global POS sound alert state and controls ─────────────────────
   const [posSoundMuted, setPosSoundMuted] = useState(() => {
     try {
@@ -560,6 +590,11 @@ export default function App() {
   }, [isEffectiveAdmin, globalPendingOrdersCount, posSoundMuted])
 
   const showPage = useCallback((page, extra) => {
+    if ((page === 'booking' || page === 'party') && !bookingEnabled) {
+      const targetGame = extra?.game || (extra?.gameId ? allGames.find(g => g.id === extra.gameId) : null)
+      handleDirectLineBooking(targetGame, showToast)
+      return
+    }
     if (page === 'booking' && extra?.gameId) {
       setBookingGameId(extra.gameId)
     }
@@ -567,7 +602,7 @@ export default function App() {
     setCurrentPage(page)
     window.history.pushState({ page }, '', buildUrl(page))
     window.scrollTo(0, 0)
-  }, [])
+  }, [bookingEnabled, allGames, showToast])
 
   const showDetail = useCallback((id) => {
     setDetailId(id)
@@ -591,12 +626,13 @@ export default function App() {
           pendingOrdersCount={globalPendingOrdersCount}
           soundMuted={posSoundMuted}
           onToggleSound={togglePosSoundMute}
+          bookingEnabled={bookingEnabled}
         />
       )}
 
-      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} />}
-      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} />}
-      {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} />}
+      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
+      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
+      {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}
       {currentPage === 'qr' && <QRPage lineUser={lineUser} />}
