@@ -322,6 +322,16 @@ export default function GameModal({ editingGame, onClose, showToast }) {
   const prevTab = currentTabIndex > 0 ? TABS[currentTabIndex - 1] : null
   const nextTab = currentTabIndex < TABS.length - 1 ? TABS[currentTabIndex + 1] : null
 
+  
+  const isTabIncomplete = (tabId) => {
+    if (tabId === 'basic') return !title.trim() || !players.trim() || !time.trim() || !difficulty.trim() || tags.length === 0
+    if (tabId === 'pricing') return !(parseFloat(fullPrice) > 0 || parseFloat(payPrice) > 0) || (!mainRoom && selectedRooms.length === 0)
+    if (tabId === 'story') return !synopsis.trim()
+    if (tabId === 'chars') return characters.length === 0 || !characters.some(c => c.name?.trim())
+    if (tabId === 'media') return !imageFile && !imageDriveUrl.trim() && !currentImageUrl.trim()
+    return false
+  }
+
   return (
     <div
       className="sc-modal-overlay"
@@ -1226,6 +1236,21 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                 {tab.label}
                 {tab.id === 'chars' && (
                   <span className="sc-tab-count">{characters.length}</span>
+                )}
+                {isTabIncomplete(tab.id) && (
+                  <span
+                    title="ส่วนนี้ยังกรอกข้อมูลไม่ครบ"
+                    style={{
+                      width: 6,
+                      height: 6,
+                      borderRadius: '50%',
+                      background: '#ef4444',
+                      boxShadow: '0 0 6px #ef4444',
+                      marginLeft: 4,
+                      display: 'inline-block',
+                      flexShrink: 0,
+                    }}
+                  />
                 )}
               </button>
             )

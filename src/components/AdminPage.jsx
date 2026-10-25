@@ -537,12 +537,32 @@ const getDiffBadgeStyle = (diff) => {
   return { background: 'var(--surface-elevated)', color: 'var(--text-secondary)', border: '1px solid var(--border-default)' }
 }
 
+
+export const getMissingScriptFields = (g) => {
+  if (!g) return []
+  const missing = []
+  if (!g.title || !String(g.title).trim()) missing.push('ชื่อเกม')
+  if (!g.image && !g.coverUrl) missing.push('รูปปก')
+  if (!g.players || !String(g.players).trim()) missing.push('จำนวนคน')
+  if (!g.time || !String(g.time).trim()) missing.push('ระยะเวลา')
+  if (!(Number(g.payPrice) > 0 || Number(g.price) > 0 || Number(g.fullPrice) > 0)) missing.push('ราคา')
+  if (!g.difficulty || !String(g.difficulty).trim()) missing.push('ความยาก')
+  if (!(g.synopsis || g.description)?.trim()) missing.push('เรื่องย่อ')
+  if (!g.mainRoom && (!Array.isArray(g.rooms) || g.rooms.length === 0)) missing.push('ห้องเล่น')
+  if (!Array.isArray(g.characters) || g.characters.length === 0 || !g.characters.some(c => c.name?.trim())) {
+    missing.push('ตัวละคร')
+  }
+  if (!Array.isArray(g.tags) || g.tags.length === 0) missing.push('แท็กแนวเกม')
+  return missing
+}
+
 function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
   const [search, setSearch] = useState('')
   const [difficultyFilter, setDifficultyFilter] = useState('ALL')
   const [playerFilter, setPlayerFilter] = useState('ALL')
   const [tagFilter, setTagFilter] = useState('ALL')
   const [sortBy, setSortBy] = useState('default')
+  const [incompleteFilter, setIncompleteFilter] = useState(false)
 
   const handleDelete = async (id, title) => {
     if (!confirm(`ลบ "${title}" ออกจากระบบ?`)) return
@@ -630,7 +650,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
     })
   }, [filteredGames, sortBy])
 
-  const hasActiveFilters = search || difficultyFilter !== 'ALL' || playerFilter !== 'ALL' || tagFilter !== 'ALL' || sortBy !== 'default'
+  const hasActiveFilters = search || difficultyFilter !== 'ALL' || playerFilter !== 'ALL' || tagFilter !== 'ALL' || sortBy !== 'default' || incompleteFilter
 
   const handleResetFilters = () => {
     setSearch('')
@@ -638,6 +658,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
     setPlayerFilter('ALL')
     setTagFilter('ALL')
     setSortBy('default')
+    setIncompleteFilter(false)
   }
 
   return (
