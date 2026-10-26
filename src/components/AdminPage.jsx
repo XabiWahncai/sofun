@@ -14,6 +14,8 @@ import {
 } from 'recharts'
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
 import { calculateDepositDeadline } from './BookingPage'
+import SecurityTab from './SecurityTab'
+import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSecurityEvent } from '../utils/security'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
@@ -6884,6 +6886,12 @@ function DataTab({ showToast }) {
       if (target === 'payments'    || target === 'all') total += await deleteCollection('payments')
       if (target === 'orders'      || target === 'all') total += await deleteCollection('orders')
       if (target === 'playHistory' || target === 'all') total += await deleteCollection('playHistory')
+      logSecurityEvent({
+        eventType: 'DATA_COLLECTION_PURGED',
+        severity: 'warning',
+        details: `Administrator purged database target: ${target}. Total items removed: ${total}`,
+        user: 'admin_dashboard'
+      })
       showToast(`ลบแล้ว ${total} รายการ`)
     } catch (e) {
       showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
@@ -8917,6 +8925,7 @@ const NAV_SECTIONS = [
       { key: 'payment',   icon: 'fa-mobile-alt',          label: 'การชำระเงิน' },
       { key: 'receipt',   icon: 'fa-file-invoice-dollar', label: 'แก้ไขบิล' },
       { key: 'promotion', icon: 'fa-bullhorn',             label: 'โปรโมชั่น' },
+      { key: 'security',  icon: 'fa-shield-halved',       label: 'Cyber Security' },
       { key: 'data',      icon: 'fa-exclamation-triangle', label: 'จัดการข้อมูล' },
     ],
   },
@@ -8932,6 +8941,14 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
   const [tab, setTab] = useState('dashboard')
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [historyInitialMember, setHistoryInitialMember] = useState(null)
+  const [lockout, setLockout] = useState({ locked: false, attempts: 0, remainingSeconds: 0 })
+
+  useEffect(() => {
+    const updateLockout = () => setLockout(checkBruteForceLockout())
+    updateLockout()
+    const timer = setInterval(updateLockout, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   useEffect(() => onAuthStateChanged(auth, user => setIsAdmin(!!user)), [])
 
@@ -8944,10 +8961,25 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
 
   const handleLogin = async () => {
     if (!email || !password) { showToast('กรุณากรอกข้อมูล', 'error'); return }
+    const currentLock = checkBruteForceLockout()
+    if (currentLock.locked) {
+      showToast('ระบบถูกระงับชั่วคราวเนื่องจากพยายามเข้าสู่ระบบผิดเกินกำหนด กรุณารอ ' + currentLock.remainingSeconds + ' วินาที', 'error')
+      return
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password)
+      recordSuccessfulLogin(email)
       showToast('เข้าสู่ระบบสำเร็จ')
-    } catch { showToast('อีเมลหรือรหัสผ่านไม่ถูกต้อง', 'error') }
+    } catch {
+      const res = recordFailedLogin(email)
+      setLockout(res)
+      if (res.locked) {
+        showToast('เข้าสู่ระบบผิดเกิน 5 ครั้ง ระบบถูกระงับ 5 นาที เพื่อความปลอดภัย', 'error')
+      } else {
+        const remaining = 5 - res.attempts
+        showToast('อีเมลหรือรหัสผ่านไม่ถูกต้อง (เหลือโอกาส ' + remaining + ' ครั้งก่อนระบบล็อก)', 'error')
+      }
+    }
   }
 
   const handleLogout = async () => { await signOut(auth); showToast('ออกจากระบบแล้ว') }
@@ -8963,6 +8995,24 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
           <div className="login-logo">So<span>Fun</span></div>
           <div className="login-sub">Admin Panel · ระบบจัดการ</div>
           <div className="login-card">
+            {lockout.locked && (
+              <div style={{
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(220, 38, 38, 0.1)',
+                border: '1px solid rgba(220, 38, 38, 0.3)',
+                color: '#dc2626',
+                fontSize: '12px',
+                fontWeight: '700',
+                marginBottom: '16px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+              }}>
+                <i className="fas fa-lock" />
+                <span>ระบบถูกระงับชั่วคราว กรุณารอ {lockout.remainingSeconds} วินาที</span>
+              </div>
+            )}
             <div className="form-group">
               <label className="form-label">อีเมล</label>
               <input className="form-input" type="email" placeholder="admin@sofun.com"
@@ -8974,7 +9024,8 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
                 value={password} onChange={e => setPassword(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleLogin()} />
             </div>
-            <button className="adm-btn-red" style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '12px', marginTop: '8px' }}
+            <button className="adm-btn-red" style={{ width: '100%', padding: '14px', fontSize: '15px', borderRadius: '12px', marginTop: '8px', opacity: lockout.locked ? 0.6 : 1, cursor: lockout.locked ? 'not-allowed' : 'pointer' }}
+              disabled={lockout.locked}
               onClick={handleLogin}>
               <i className="fas fa-sign-in-alt" /> เข้าสู่ระบบ
             </button>
@@ -9090,6 +9141,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
               {tab === 'payment'   && <PaymentTab showToast={showToast} />}
               {tab === 'receipt'   && <ReceiptSettingsTab showToast={showToast} />}
               {tab === 'promotion' && <PromotionTab showToast={showToast} allGames={allGames} />}
+              {tab === 'security'  && <SecurityTab showToast={showToast} />}
               {tab === 'data'      && <DataTab showToast={showToast} />}
             </div>
           </main>

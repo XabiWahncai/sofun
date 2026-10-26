@@ -24,11 +24,11 @@ service cloud.firestore {
       }
     }
 
-    // Members — public read (profile lookups), any user can create/update own doc
+    // Members — public read (profile lookups), any user can create own doc, hardened update against privilege escalation
     match /members/{userId} {
       allow read: if true;
       allow create: if true;
-      allow update: if true;
+      allow update: if request.auth != null || (!('role' in request.resource.data) || request.resource.data.role == resource.data.role || (resource.data.role == null && request.resource.data.role != 'admin'));
       allow delete: if request.auth != null;
     }
 
@@ -67,6 +67,12 @@ service cloud.firestore {
       allow write: if request.auth != null;
     }
 
+    // Security logs — public create for audit trail/threat detection, admin read/update/delete
+    match /security_logs/{id} {
+      allow create: if true;
+      allow read, update, delete: if request.auth != null;
+    }
+
     // Settings — promotion: public read; payment: admin only
     match /settings/promotion {
       allow read: if true;
@@ -84,6 +90,10 @@ service cloud.firestore {
       allow read, write: if true;
     }
     match /settings/booking {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /settings/security {
       allow read: if true;
       allow write: if request.auth != null;
     }
