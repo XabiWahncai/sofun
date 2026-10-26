@@ -7259,12 +7259,12 @@ nav {
 
 /* ===== RAIN EFFECT (sadness achievement) ===== */
 .rain-overlay {
-  position: fixed; inset: 0; z-index: 398; pointer-events: none;
+  position: fixed; inset: 0; z-index: 10; pointer-events: none;
   background: rgba(15,23,42,0.08);
 }
 .rain-container {
   position: fixed; inset: -30%; width: 160%; height: 160%;
-  transform: rotate(12deg); pointer-events: none; overflow: hidden; z-index: 399;
+  transform: rotate(12deg); pointer-events: none; overflow: hidden; z-index: 10;
 }
 .rain-drop {
   position: absolute; top: -80px;

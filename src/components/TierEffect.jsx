@@ -2,7 +2,7 @@
 // Custom bespoke visual effects for 100% of achievement themes
 // Zero emojis rule strictly applied.
 
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 
 const rand = (min, max) => min + Math.random() * (max - min)
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
@@ -42,7 +42,7 @@ function SparkleEffect({ tier }) {
   }, [tier, config])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {particles.map(p => (
         <span
           key={p.id}
@@ -81,7 +81,7 @@ function RainEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 398 }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10 }}>
       <div className="rain-overlay" />
       <div className="rain-container">
         {drops.map(d => (
@@ -134,7 +134,7 @@ function FoodEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(f => (
         <span
           key={f.id}
@@ -182,7 +182,7 @@ function MoneyEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {bills.map(b => (
         <span
           key={b.id}
@@ -230,7 +230,7 @@ function CharityEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(f => (
         <span
           key={f.id}
@@ -280,13 +280,13 @@ function GodfatherEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       <div style={{
         position: 'fixed',
         inset: 0,
         background: 'radial-gradient(circle at 50% 50%, transparent 60%, rgba(139, 0, 0, 0.08) 100%)',
         pointerEvents: 'none',
-        zIndex: 397
+        zIndex: 10
       }} />
       {items.map(item => (
         <span
@@ -337,7 +337,7 @@ function ChampionEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -386,7 +386,7 @@ function DetectiveEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -434,7 +434,7 @@ function VillainEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -483,7 +483,7 @@ function VeteranEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -532,7 +532,7 @@ function ExplorerEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -580,7 +580,7 @@ function PotterEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -626,7 +626,7 @@ function NewEraEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -674,7 +674,7 @@ function ManagerEffect() {
   ), [])
 
   return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 399, overflow: 'hidden' }}>
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
       {items.map(item => (
         <span
           key={item.id}
@@ -721,10 +721,55 @@ const TIER_COLOR = {
 
 // ── Master TierEffect Component ─────────────────────────────────────────────
 export default function TierEffect({ tier }) {
-  if (!tier) return null
+  const [active, setActive] = useState(true)
+  const [opacity, setOpacity] = useState(1)
+
+  useEffect(() => {
+    if (!tier) return
+    setActive(true)
+    setOpacity(1)
+
+    // At 8.8s start 1.2s smooth fadeout
+    const fadeTimer = setTimeout(() => {
+      setOpacity(0)
+    }, 8800)
+
+    // At 10.0s completely unmount particles
+    const dismissTimer = setTimeout(() => {
+      setActive(false)
+    }, 10000)
+
+    return () => {
+      clearTimeout(fadeTimer)
+      clearTimeout(dismissTimer)
+    }
+  }, [tier])
+
+  // Listen for replay trigger events
+  useEffect(() => {
+    const handleReplay = () => {
+      setActive(true)
+      setOpacity(1)
+    }
+    window.addEventListener('sofun-replay-effect', handleReplay)
+    return () => window.removeEventListener('sofun-replay-effect', handleReplay)
+  }, [])
+
+  if (!tier || !active) return null
 
   return (
-    <>
+    <div
+      className="tier-effect-master-wrap"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: 10,
+        opacity,
+        transition: 'opacity 1.2s cubic-bezier(0.16, 1, 0.3, 1)',
+        overflow: 'hidden'
+      }}
+    >
       <style>{`
         /* Godfather embers floating up */
         .tier-godfather-ember {
@@ -896,10 +941,10 @@ export default function TierEffect({ tier }) {
             background: TIER_COLOR[tier],
             boxShadow: `0 0 10px ${TIER_COLOR[tier]}`,
             pointerEvents: 'none',
-            zIndex: 399,
+            zIndex: 10,
           }}
         />
       )}
-    </>
+    </div>
   )
 }

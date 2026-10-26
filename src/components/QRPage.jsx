@@ -398,6 +398,8 @@ export default function QRPage({ lineUser, allGames = [] }) {
 
       <style>{`
         .qr-pass-wrapper {
+          position: relative;
+          z-index: 30;
           max-width: 440px;
           margin: 0 auto;
           padding: 16px 16px 40px;
@@ -409,6 +411,7 @@ export default function QRPage({ lineUser, allGames = [] }) {
         /* ── Digital Member Pass Card ── */
         .qr-member-pass {
           position: relative;
+          z-index: 40;
           border-radius: 24px;
           padding: 24px 20px 22px;
           color: #ffffff;
@@ -440,6 +443,8 @@ export default function QRPage({ lineUser, allGames = [] }) {
 
         .qr-target-box {
           position: relative;
+          z-index: 50;
+          isolation: isolate;
           padding: 14px;
           background: #ffffff;
           border-radius: 20px;
@@ -535,6 +540,31 @@ export default function QRPage({ lineUser, allGames = [] }) {
               <i className="fas fa-palette" style={{ color: theme.accent }} />
               <span>สกินธีมความสำเร็จ (Achievement Theme)</span>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  window.dispatchEvent(new Event('sofun-replay-effect'));
+                  setCopiedText('เริ่มเล่นเอฟเฟกต์ธีม (10 วินาที)');
+                  setTimeout(() => setCopiedText(''), 2000);
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: theme.accent,
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  padding: '2px 6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 4
+                }}
+                title="เล่นเอฟเฟกต์บรรยากาศอีกครั้ง (10 วินาที)"
+              >
+                <i className="fas fa-play" style={{ fontSize: 9 }} />
+                <span>เล่นเอฟเฟกต์</span>
+              </button>
             <button
               onClick={() => setShowAllThemes(prev => !prev)}
               style={{
@@ -549,6 +579,7 @@ export default function QRPage({ lineUser, allGames = [] }) {
             >
               {showAllThemes ? 'ย่อตัวเลือก' : 'ดูธีมทั้งหมด'}
             </button>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
