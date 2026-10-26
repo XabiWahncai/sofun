@@ -232,7 +232,6 @@ export default function QRPage({ lineUser, allGames = [] }) {
   const [filterMonth, setFilterMonth] = useState('')
   const [copiedText, setCopiedText]   = useState('')
   const [fullscreenQr, setFullscreenQr] = useState(false)
-  const [showAllThemes, setShowAllThemes] = useState(false)
 
   // Track active achievement theme
   const [activeTheme, setActiveTheme] = useState(() => {
@@ -328,29 +327,6 @@ export default function QRPage({ lineUser, allGames = [] }) {
     const unique = Array.from(new Set(raw.filter(Boolean)))
     return unique
   }, [lineUser?.achievements, lineUser?.achievement])
-
-  // Equip / Switch theme
-  const handleSelectTheme = async (themeKey) => {
-    const next = themeKey === 'default' ? null : themeKey
-    setActiveTheme(themeKey)
-    if (next) {
-      localStorage.setItem('sofun_active_theme', next)
-      document.documentElement.setAttribute('data-achievement', next)
-    } else {
-      localStorage.removeItem('sofun_active_theme')
-      document.documentElement.removeAttribute('data-achievement')
-    }
-    if (lineUser?.uid) {
-      try {
-        await updateDoc(doc(db, 'members', lineUser.uid), { activeAchievement: next })
-      } catch {
-        // Ignore
-      }
-    }
-    window.dispatchEvent(new Event('sofun-theme-change'))
-    setCopiedText(`สวมใส่ธีม ${THEME_PROFILES[themeKey]?.name || 'ดั้งเดิม'} เรียบร้อย`)
-    setTimeout(() => setCopiedText(''), 2200)
-  }
 
   // Copy helper
   const handleCopy = (text, label) => {
@@ -470,22 +446,6 @@ export default function QRPage({ lineUser, allGames = [] }) {
         .qr-hud-bl { bottom: 6px; left: 6px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
         .qr-hud-br { bottom: 6px; right: 6px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
 
-        /* Theme Selector Pill */
-        .qr-theme-chip {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 7px 12px;
-          border-radius: 20px;
-          font-size: 11px;
-          font-weight: 700;
-          cursor: pointer;
-          border: 1.5px solid transparent;
-          transition: all 0.2s ease;
-          white-space: nowrap;
-          user-select: none;
-        }
-
         /* History Card */
         .qr-game-item {
           background: #ffffff;
@@ -528,125 +488,6 @@ export default function QRPage({ lineUser, allGames = [] }) {
           </div>
         )}
 
-        {/* ── Theme Switcher Bar ── */}
-        <div style={{
-          background: 'var(--surface-card, #f8f8fc)',
-          border: '1px solid var(--border-default, #e5e7eb)',
-          borderRadius: 18,
-          padding: '12px 14px'
-        }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: 'var(--text-primary)' }}>
-              <i className="fas fa-palette" style={{ color: theme.accent }} />
-              <span>สกินธีมความสำเร็จ (Achievement Theme)</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  window.dispatchEvent(new Event('sofun-replay-effect'));
-                  setCopiedText('เริ่มเล่นเอฟเฟกต์ธีม (10 วินาที)');
-                  setTimeout(() => setCopiedText(''), 2000);
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: theme.accent,
-                  fontSize: 11,
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  padding: '2px 6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 4
-                }}
-                title="เล่นเอฟเฟกต์บรรยากาศอีกครั้ง (10 วินาที)"
-              >
-                <i className="fas fa-play" style={{ fontSize: 9 }} />
-                <span>เล่นเอฟเฟกต์</span>
-              </button>
-            <button
-              onClick={() => setShowAllThemes(prev => !prev)}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: theme.accent,
-                fontSize: 11,
-                fontWeight: 700,
-                cursor: 'pointer',
-                padding: '2px 6px'
-              }}
-            >
-              {showAllThemes ? 'ย่อตัวเลือก' : 'ดูธีมทั้งหมด'}
-            </button>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
-            {/* Default Theme */}
-            <button
-              onClick={() => handleSelectTheme('default')}
-              className="qr-theme-chip"
-              style={{
-                background: activeTheme === 'default' ? '#c62419' : '#ffffff',
-                color: activeTheme === 'default' ? '#ffffff' : '#4b5563',
-                borderColor: activeTheme === 'default' ? '#c62419' : 'var(--border-default, #e5e7eb)',
-                boxShadow: activeTheme === 'default' ? '0 2px 8px rgba(198,36,25,0.4)' : 'none'
-              }}
-            >
-              <i className="fas fa-mask" />
-              <span>คลาสสิก (Crimson)</span>
-            </button>
-
-            {/* Unlocked Themes */}
-            {memberAchs.map(achId => {
-              const ach = ACHIEVEMENTS[achId]
-              const p = THEME_PROFILES[achId] || { accent: ach?.color || '#D4AF37', icon: ach?.icon || 'fa-award' }
-              const isEquipped = activeTheme === achId
-              return (
-                <button
-                  key={achId}
-                  onClick={() => handleSelectTheme(achId)}
-                  className="qr-theme-chip"
-                  style={{
-                    background: isEquipped ? p.accent : '#ffffff',
-                    color: isEquipped ? '#ffffff' : '#374151',
-                    borderColor: isEquipped ? p.accent : 'var(--border-default, #e5e7eb)',
-                    boxShadow: isEquipped ? `0 2px 10px rgba(${p.accentRgb || '212,175,55'}, 0.45)` : 'none'
-                  }}
-                >
-                  <i className={`fas ${p.icon || ach?.icon || 'fa-star'}`} />
-                  <span>{ach?.labelTH || ach?.label || achId}</span>
-                </button>
-              )
-            })}
-
-            {/* Extra Previewable Themes if toggled */}
-            {showAllThemes && Object.keys(THEME_PROFILES)
-              .filter(k => k !== 'default' && !memberAchs.includes(k))
-              .map(themeKey => {
-                const p = THEME_PROFILES[themeKey]
-                const isEquipped = activeTheme === themeKey
-                return (
-                  <button
-                    key={themeKey}
-                    onClick={() => handleSelectTheme(themeKey)}
-                    className="qr-theme-chip"
-                    style={{
-                      background: isEquipped ? p.accent : 'rgba(0,0,0,0.03)',
-                      color: isEquipped ? '#ffffff' : '#6b7280',
-                      borderColor: isEquipped ? p.accent : 'rgba(0,0,0,0.1)',
-                      opacity: isEquipped ? 1 : 0.85
-                    }}
-                  >
-                    <i className={`fas ${p.watermarkIcon}`} />
-                    <span>{p.name}</span>
-                  </button>
-                )
-              })}
-          </div>
-        </div>
-
         {/* ── DIGITAL MEMBER PASS (The VIP Card) ── */}
         <div
           className="qr-member-pass"
@@ -661,18 +502,27 @@ export default function QRPage({ lineUser, allGames = [] }) {
           {/* Pass Top Bar */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, position: 'relative', zIndex: 2 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: 8,
-                background: `rgba(${theme.accentRgb}, 0.22)`,
-                color: theme.accent,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 14,
-                border: `1px solid rgba(${theme.accentRgb}, 0.4)`
-              }}>
+              <div
+                onClick={() => {
+                  window.dispatchEvent(new Event('sofun-replay-effect'))
+                  setCopiedText('เริ่มเล่นเอฟเฟกต์ธีม (10 วินาที)')
+                  setTimeout(() => setCopiedText(''), 2000)
+                }}
+                title="แตะเพื่อเล่นเอฟเฟกต์บรรยากาศอีกครั้ง (10 วินาที)"
+                style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: 8,
+                  background: `rgba(${theme.accentRgb}, 0.22)`,
+                  color: theme.accent,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 14,
+                  border: `1px solid rgba(${theme.accentRgb}, 0.4)`,
+                  cursor: 'pointer'
+                }}
+              >
                 <i className={`fas ${theme.watermarkIcon}`} />
               </div>
               <div>
@@ -770,19 +620,12 @@ export default function QRPage({ lineUser, allGames = [] }) {
                 alignItems: 'center',
                 gap: 5,
                 marginTop: 4,
-                padding: '2px 8px',
-                borderRadius: 10,
-                background: `rgba(${theme.accentRgb}, 0.25)`,
-                border: `1px solid rgba(${theme.accentRgb}, 0.5)`,
-                color: theme.accent,
-                fontSize: 11,
-                fontWeight: 800
+                fontSize: 12,
+                color: 'rgba(255, 255, 255, 0.75)',
+                fontWeight: 600
               }}>
-                <i className={`fas ${theme.watermarkIcon}`} />
-                <span>{theme.name}</span>
-              </div>
-              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
-                {theme.subtitle}
+                <i className="fab fa-line" style={{ color: '#06C755' }} />
+                <span>สมาชิก Sofun Club</span>
               </div>
             </div>
           </div>
