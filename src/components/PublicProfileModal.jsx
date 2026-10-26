@@ -10,12 +10,7 @@ const INK_3 = 'rgba(26,26,26,0.4)'
 const PAPER = '#faf7f5'
 const BORDER = 'rgba(26,26,26,0.08)'
 
-const convertImageUrl = (url) => {
-  if (!url) return url
-  const m = url.match(/[?&]id=([^&]+)/) || url.match(/\/d\/([^/]+)/)
-  if (m) return `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${m[1]}%26export%3Dview&w=400&output=webp`
-  return url
-}
+import { convertImageUrl } from '../utils/imageUrl'
 
 function formatDate(ts) {
   if (!ts) return ''

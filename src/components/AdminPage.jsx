@@ -15,6 +15,7 @@ import {
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
 import { calculateDepositDeadline } from './BookingPage'
 import SecurityTab from './SecurityTab'
+import { toOptimizedUrl as convertImg, convertImageUrl } from '../utils/imageUrl'
 import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSecurityEvent } from '../utils/security'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
@@ -859,7 +860,7 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
               >
                 <div className="adm-script-img" style={{ position: 'relative' }}>
                   {g.image || g.coverUrl ? (
-                    <img src={g.image || g.coverUrl} alt="" />
+                    <img src={convertImageUrl(g.image || g.coverUrl, 200)} alt="" loading="lazy" decoding="async" />
                   ) : (
                     <i className="fas fa-scroll" style={{ color: '#888' }} />
                   )}
@@ -4981,18 +4982,7 @@ function PromotionTab({ showToast, allGames = [] }) {
   const [gameSearch, setGameSearch] = useState('')
   const [showGamePicker, setShowGamePicker] = useState(false)
 
-  // Drive image helper
-  const toWsrv = (id, w = 400) => `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
-  const convertImg = (url, w = 400) => {
-    if (!url) return url
-    const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-    if (lh3) return toWsrv(lh3[1], w)
-    const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-    if (m1) return toWsrv(m1[1], w)
-    const m2 = url.match(/[?&]id=([^&]+)/)
-    if (m2) return toWsrv(m2[1], w)
-    return url
-  }
+  // Using shared high-speed Google Edge CDN (convertImg imported from imageUrl)
 
   useEffect(() => {
     getDoc(doc(db, 'settings', 'promotion')).then(snap => {

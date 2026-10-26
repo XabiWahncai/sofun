@@ -20,19 +20,7 @@ const BORDER_SUBTLE= 'rgba(255,255,255,0.08)'
 const BORDER_FOCUS = 'rgba(255,255,255,0.22)'
 
 /* ── Image Helpers ─────────────────────────────────────────────────── */
-const toWsrv = (id, w = 900) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
-
-const convertImageUrl = (url, w = 900) => {
-  if (!url) return url
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-  if (lh3) return toWsrv(lh3[1], w)
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m1) return toWsrv(m1[1], w)
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return toWsrv(m2[1], w)
-  return url
-}
+import { convertImageUrl } from '../utils/imageUrl'
 
 /* ── Difficulty Badge Helper ───────────────────────────────────────── */
 function diffConfig(level) {

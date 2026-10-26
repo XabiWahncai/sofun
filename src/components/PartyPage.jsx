@@ -10,19 +10,7 @@ import {
 import { BookingDetailModal, isRoomLocked, canViewBookingDetail, getPublicGameName } from './BookingPage'
 import { useOpenProfile } from '../UserProfileContext'
 
-const toWsrv = (fileId) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${fileId}%26export%3Dview&w=400&output=webp`
-
-const convertImageUrl = (url) => {
-  if (!url) return url
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-  if (lh3) return toWsrv(lh3[1])
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m1) return toWsrv(m1[1])
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return toWsrv(m2[1])
-  return url
-}
+import { convertImageUrl } from '../utils/imageUrl'
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''

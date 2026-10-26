@@ -19,17 +19,7 @@ const BORDER_SUBTLE = 'rgba(0,0,0,0.08)'
 const BORDER_FOCUS  = 'rgba(0,0,0,0.2)'
 
 /* ── Image CDN Helper ──────────────────────────────────────────────── */
-const toWsrv = (id, w = 600) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
-
-const getCleanImgUrl = (url, w = 600) => {
-  if (!url) return ''
-  const gdriveMatch = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || url.match(/id=([a-zA-Z0-9_-]+)/)
-  if (gdriveMatch && gdriveMatch[1]) {
-    return toWsrv(gdriveMatch[1], w)
-  }
-  return url
-}
+import { toOptimizedUrl as getCleanImgUrl } from '../utils/imageUrl'
 
 /* ── Difficulty Badge Helper ───────────────────────────────────────── */
 function getDifficultyBadge(level) {

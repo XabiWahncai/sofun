@@ -240,19 +240,7 @@ export function calculateDepositDeadline(booking, paidCountOverride) {
   return new Date(targetMs).toISOString()
 }
 
-const toWsrv = (id, w = 400) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
-
-function convertImg(url, w = 400) {
-  if (!url) return url
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-  if (lh3) return toWsrv(lh3[1], w)
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m1) return toWsrv(m1[1], w)
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return toWsrv(m2[1], w)
-  return url
-}
+import { toOptimizedUrl as convertImg } from '../utils/imageUrl'
 
 // ── Status Badge Component ─────────────────────────────────────────────────────
 function StatusBadge({ status, label }) {

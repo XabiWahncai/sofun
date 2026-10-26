@@ -1,18 +1,10 @@
 // Universal Booking Helper for SoFun Club
 // Handles LINE redirection and game clipboard formatting when booking is disabled
 
-const toWsrv = (id, w = 900) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`
+import { toOptimizedUrl } from './imageUrl'
 
 export const resolveGameImageUrl = (url, w = 900) => {
-  if (!url) return ''
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-  if (lh3) return toWsrv(lh3[1], w)
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m1) return toWsrv(m1[1], w)
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return toWsrv(m2[1], w)
-  return url
+  return toOptimizedUrl(url, w)
 }
 
 export const getGamePlayerText = (game) => {

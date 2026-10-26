@@ -18,25 +18,7 @@ const TEXT_MUTED = '#4b5563';
 const TEXT_LIGHT = '#9ca3af';
 const BORDER_CLR = 'rgba(0, 0, 0, 0.08)';
 
-const toWsrv = (id, w = 900) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`;
-
-const extractDriveId = (url) => {
-  if (!url) return null;
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/);
-  if (lh3) return lh3[1];
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
-  if (m1) return m1[1];
-  const m2 = url.match(/[?&]id=([^&]+)/);
-  if (m2) return m2[1];
-  return null;
-};
-
-const convertImageUrl = (url, w = 900) => {
-  if (!url) return url;
-  const id = extractDriveId(url);
-  return id ? toWsrv(id, w) : url;
-};
+import { convertImageUrl, extractDriveId, toOptimizedUrl } from '../utils/imageUrl';
 
 /* Difficulty Badge */
 function DiffBadge({ d }) {

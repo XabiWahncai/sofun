@@ -3,19 +3,7 @@ import { db, storage } from '../firebase'
 import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 
-const toWsrv = (fileId) =>
-  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${fileId}%26export%3Dview&w=600&output=webp`
-
-const convertImageUrl = (url) => {
-  if (!url) return url
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/)
-  if (lh3) return toWsrv(lh3[1])
-  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/)
-  if (m1) return toWsrv(m1[1])
-  const m2 = url.match(/[?&]id=([^&]+)/)
-  if (m2) return toWsrv(m2[1])
-  return url
-}
+import { convertImageUrl, toOptimizedUrl } from '../utils/imageUrl'
 
 const ALL_ROOMS = [
   { name: 'Waiting Area 1', icon: 'fa-couch' },
@@ -1892,7 +1880,7 @@ export default function GameModal({ editingGame, onClose, showToast }) {
                         return (
                           <div className="sc-convert-box">
                             <div className="sc-convert-label">
-                              <i className="fas fa-check-circle" /> แปลงเป็น CDN ความเร็วสูงแล้ว (wsrv.nl webp)
+                              <i className="fas fa-bolt" /> แปลงเป็น Google Edge CDN ความเร็วสูงแล้ว (WebP Direct)
                             </div>
                             <div className="sc-convert-row">
                               <input className="sc-convert-input" readOnly value={converted} />
