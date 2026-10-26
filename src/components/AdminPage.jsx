@@ -842,51 +842,128 @@ function ScriptsTab({ allGames = [], showToast, openModal, openEdit }) {
             )}
           </div>
         ) : (
-          sortedGames.map(g => (
-            <div key={g.id} className="adm-script-row">
-              <div className="adm-script-img">
-                {g.image || g.coverUrl ? <img src={g.image || g.coverUrl} alt="" /> : <i className="fas fa-scroll" style={{ color: '#888' }} />}
-              </div>
-              <div className="adm-list-info">
-                <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span>{g.title || 'ไม่มีชื่อ'}</span>
-                  {g.difficulty && (
-                    <span style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      padding: '1px 7px',
-                      borderRadius: 12,
-                      ...getDiffBadgeStyle(g.difficulty)
-                    }}>
-                      {g.difficulty}
-                    </span>
+          sortedGames.map(g => {
+            const missingFields = getMissingScriptFields(g)
+            const isIncomplete = missingFields.length > 0
+            return (
+              <div
+                key={g.id}
+                className="adm-script-row"
+                style={isIncomplete ? {
+                  borderLeft: '4px solid #ef4444',
+                  background: 'rgba(254, 242, 242, 0.35)',
+                  position: 'relative'
+                } : {}}
+              >
+                <div className="adm-script-img" style={{ position: 'relative' }}>
+                  {g.image || g.coverUrl ? (
+                    <img src={g.image || g.coverUrl} alt="" />
+                  ) : (
+                    <i className="fas fa-scroll" style={{ color: '#888' }} />
                   )}
-                  {Array.isArray(g.tags) && g.tags.slice(0, 2).map((tg, tIdx) => (
-                    <span key={tIdx} style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--surface-page)', padding: '1px 6px', borderRadius: 6, border: '1px solid var(--border-default)' }}>
-                      #{tg}
-                    </span>
-                  ))}
-                </div>
-                <div className="adm-list-sub">
-                  <span><i className="fas fa-users" style={{ marginRight: 4, fontSize: 10 }} />{g.players || '-'} คน</span>
-                  <span> · </span>
-                  <span><i className="fas fa-clock" style={{ marginRight: 4, fontSize: 10 }} />{g.time || '-'}</span>
-                  <span> · </span>
-                  <span style={{ fontWeight: 800, color: 'var(--crimson-500)' }}>฿{(g.payPrice || g.price || 0).toLocaleString()}</span>
-                  {g.mainRoom && (
-                    <>
-                      <span> · </span>
-                      <span style={{ color: 'var(--text-tertiary)' }}><i className="fas fa-door-open" style={{ marginRight: 3, fontSize: 10 }} />{g.mainRoom}</span>
-                    </>
+                  {isIncomplete && (
+                    <span
+                      title={`ข้อมูลยังไม่ครบ: ขาด ${missingFields.join(', ')}`}
+                      style={{
+                        position: 'absolute',
+                        top: -4,
+                        right: -4,
+                        width: 10,
+                        height: 10,
+                        borderRadius: '50%',
+                        background: '#ef4444',
+                        border: '2px solid #ffffff',
+                        boxShadow: '0 0 6px #ef4444',
+                        zIndex: 2,
+                      }}
+                    />
                   )}
                 </div>
+                <div className="adm-list-info">
+                  <div className="adm-list-name" style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontWeight: 800, color: '#0f172a' }}>{g.title || 'ไม่มีชื่อ'}</span>
+                    {isIncomplete && (
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 800,
+                          padding: '1px 8px',
+                          borderRadius: 12,
+                          background: 'rgba(239, 68, 68, 0.12)',
+                          color: '#dc2626',
+                          border: '1px solid rgba(239, 68, 68, 0.32)',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        title={`ข้อมูลยังไม่ครบ: ขาด ${missingFields.join(', ')}`}
+                      >
+                        <i className="fas fa-exclamation-triangle" style={{ fontSize: 9.5 }} />
+                        <span>ข้อมูลไม่ครบ ({missingFields.length})</span>
+                      </span>
+                    )}
+                    {g.difficulty && (
+                      <span style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        padding: '1px 7px',
+                        borderRadius: 12,
+                        ...getDiffBadgeStyle(g.difficulty)
+                      }}>
+                        {g.difficulty}
+                      </span>
+                    )}
+                    {Array.isArray(g.tags) && g.tags.slice(0, 2).map((tg, tIdx) => (
+                      <span key={tIdx} style={{ fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--surface-page)', padding: '1px 6px', borderRadius: 6, border: '1px solid var(--border-default)' }}>
+                        #{tg}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="adm-list-sub">
+                    <span><i className="fas fa-users" style={{ marginRight: 4, fontSize: 10 }} />{g.players || '-'} คน</span>
+                    <span> · </span>
+                    <span><i className="fas fa-clock" style={{ marginRight: 4, fontSize: 10 }} />{g.time || '-'}</span>
+                    <span> · </span>
+                    <span style={{ fontWeight: 800, color: 'var(--crimson-500)' }}>฿{(g.payPrice || g.price || 0).toLocaleString()}</span>
+                    {g.mainRoom && (
+                      <>
+                        <span> · </span>
+                        <span style={{ color: 'var(--text-tertiary)' }}><i className="fas fa-door-open" style={{ marginRight: 3, fontSize: 10 }} />{g.mainRoom}</span>
+                      </>
+                    )}
+                  </div>
+                  {isIncomplete && (
+                    <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap', fontSize: 11 }}>
+                      <span style={{ color: '#dc2626', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                        <i className="fas fa-circle-info" style={{ fontSize: 10 }} />
+                        ยังขาด:
+                      </span>
+                      {missingFields.map((field, fIdx) => (
+                        <span
+                          key={fIdx}
+                          style={{
+                            background: '#fef2f2',
+                            border: '1px solid #fecaca',
+                            padding: '1px 7px',
+                            borderRadius: 5,
+                            fontSize: 10.5,
+                            fontWeight: 700,
+                            color: '#b91c1c',
+                          }}
+                        >
+                          {field}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <div className="adm-row-actions">
+                  <button className="adm-icon-btn adm-edit" onClick={() => handleEdit(g.id)} title="แก้ไขสคริปต์"><i className="fas fa-edit" /></button>
+                  <button className="adm-icon-btn adm-del" onClick={() => handleDelete(g.id, g.title || '')} title="ลบสคริปต์"><i className="fas fa-trash" /></button>
+                </div>
               </div>
-              <div className="adm-row-actions">
-                <button className="adm-icon-btn adm-edit" onClick={() => handleEdit(g.id)} title="แก้ไขสคริปต์"><i className="fas fa-edit" /></button>
-                <button className="adm-icon-btn adm-del" onClick={() => handleDelete(g.id, g.title || '')} title="ลบสคริปต์"><i className="fas fa-trash" /></button>
-              </div>
-            </div>
-          ))
+            )
+          })
         )}
       </div>
     </div>
