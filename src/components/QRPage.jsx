@@ -592,40 +592,11 @@ export default function QRPage({ lineUser, allGames = [] }) {
                   {(lineUser.name || '?')[0]}
                 </div>
               )}
-              <div style={{
-                position: 'absolute',
-                bottom: -2,
-                right: -2,
-                width: 20,
-                height: 20,
-                borderRadius: '50%',
-                background: '#06C755',
-                color: '#ffffff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 11,
-                border: '2px solid #18141e'
-              }}>
-                <i className="fab fa-line" />
-              </div>
             </div>
 
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 19, fontWeight: 900, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {lineUser.name}
-              </div>
-              <div style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-                marginTop: 4,
-                fontSize: 12,
-                color: 'rgba(255, 255, 255, 0.75)',
-                fontWeight: 600
-              }}>
-                <i className="fab fa-line" style={{ color: '#06C755' }} />
-                <span>สมาชิก Sofun Club</span>
               </div>
             </div>
           </div>
