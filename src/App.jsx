@@ -239,6 +239,8 @@ export default function App() {
         achievement: data.achievement || null,
         achievements: Array.isArray(data.achievements) ? data.achievements
           : data.achievement ? [data.achievement] : [],
+        pinnedAchievements: Array.isArray(data.pinnedAchievements) ? data.pinnedAchievements : [],
+        activeAchievement: data.activeAchievement || (Array.isArray(data.pinnedAchievements) ? data.pinnedAchievements[0] : null) || null,
       })
     } else {
       // ไม่เคยสมัคร → โชว์ register modal
@@ -311,7 +313,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    const currentTheme = activeThemeOverride || lineUser?.activeAchievement
+    const currentTheme = activeThemeOverride ||
+      (lineUser?.pinnedAchievements?.length > 0 ? lineUser.pinnedAchievements[0] : null) ||
+      lineUser?.activeAchievement
     if (currentTheme) {
       document.documentElement.setAttribute('data-achievement', currentTheme)
       return
@@ -335,14 +339,16 @@ export default function App() {
       const achievement = d.achievement || null
       const achievements = Array.isArray(d.achievements) ? d.achievements
         : achievement ? [achievement] : []
-      const activeAchievement = d.activeAchievement || null
+      const pinnedAchievements = Array.isArray(d.pinnedAchievements) ? d.pinnedAchievements : []
+      const activeAchievement = d.activeAchievement || pinnedAchievements[0] || null
       setLineUser(prev => {
         if (!prev) return prev
         const same = prev.achievement === achievement
           && JSON.stringify(prev.achievements) === JSON.stringify(achievements)
+          && JSON.stringify(prev.pinnedAchievements) === JSON.stringify(pinnedAchievements)
           && prev.activeAchievement === activeAchievement
         if (same) return prev
-        const updated = { ...prev, achievement, achievements, activeAchievement }
+        const updated = { ...prev, achievement, achievements, pinnedAchievements, activeAchievement }
         localStorage.setItem('sofun_line_user', JSON.stringify(updated))
         return updated
       })

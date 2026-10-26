@@ -93,30 +93,40 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
   }
 
   
-  const handleEquipTheme = async (achId) => {
-    const next = activeTheme === achId ? null : achId
-    setActiveTheme(next)
-    if (next) {
-      localStorage.setItem('sofun_active_theme', next)
-      document.documentElement.setAttribute('data-achievement', next)
-    } else {
-      localStorage.removeItem('sofun_active_theme')
-      document.documentElement.removeAttribute('data-achievement')
-    }
-    if (lineUser?.uid) {
-      try {
-        await updateDoc(doc(db, 'members', lineUser.uid), { activeAchievement: next })
-      } catch (e) {
-        console.warn('Update activeAchievement failed:', e)
-      }
-    }
-    window.dispatchEvent(new Event('sofun-theme-change'))
+
+
+  const moveToFirst = (id) => {
+    setPinned(prev => [id, ...prev.filter(x => x !== id)])
+  }
+
+  const movePinned = (from, to) => {
+    setPinned(prev => {
+      if (to < 0 || to >= prev.length) return prev
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
   }
 
   const savePinned = async () => {
     setPinnedSaving(true)
+    const primaryTheme = pinned[0] || null
     try {
-      await updateDoc(doc(db, 'members', lineUser.uid), { pinnedAchievements: pinned })
+      await updateDoc(doc(db, 'members', lineUser.uid), {
+        pinnedAchievements: pinned,
+        activeAchievement: primaryTheme
+      })
+      if (primaryTheme) {
+        localStorage.setItem('sofun_active_theme', primaryTheme)
+        document.documentElement.setAttribute('data-achievement', primaryTheme)
+        setActiveTheme(primaryTheme)
+      } else {
+        localStorage.removeItem('sofun_active_theme')
+        document.documentElement.removeAttribute('data-achievement')
+        setActiveTheme(null)
+      }
+      window.dispatchEvent(new Event('sofun-theme-change'))
       setPinnedSaved(true)
       setEditingAch(false)
       setPinnedSnapshot(null)
@@ -207,21 +217,28 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
           {/* Pinned achievements strip */}
           {pinned.length > 0 && (
             <div style={{ marginTop: 18, display: 'flex', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
-              {pinned.map(id => {
+              {pinned.map((id, idx) => {
                 const ach = ACHIEVEMENTS[id]
                 if (!ach) return null
                 const rar = RARITY[ach.rarity]
+                const isPrimary = idx === 0
                 return (
                   <span key={id} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
-                    padding: '5px 11px', borderRadius: 999,
+                    padding: '5px 12px', borderRadius: 999,
                     fontSize: 11, fontWeight: 700,
-                    color: ach.color, background: ach.bg,
-                    border: `1px solid ${ach.border}`,
-                    boxShadow: ach.rarity !== 'common' ? `0 0 8px ${rar.glow}` : 'none',
+                    color: isPrimary ? '#ffffff' : ach.color,
+                    background: isPrimary ? ach.color : ach.bg,
+                    border: isPrimary ? `1px solid ${ach.color}` : `1px solid ${ach.border}`,
+                    boxShadow: isPrimary ? `0 2px 10px ${ach.color}50` : (ach.rarity !== 'common' ? `0 0 8px ${rar.glow}` : 'none'),
                   }}>
                     <i className={`fas ${ach.icon}`} style={{ fontSize: 10 }} />
                     <span>{ach.labelTH}</span>
+                    {isPrimary && (
+                      <span style={{ fontSize: 9, opacity: 0.9, background: 'rgba(0,0,0,0.18)', padding: '1px 5px', borderRadius: 8 }}>
+                        ธีมหลัก
+                      </span>
+                    )}
                   </span>
                 )
               })}
@@ -237,124 +254,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
         ) : (
           <>
             
-            {/* ── Active Achievement Theme Wardrobe ── */}
-            <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1.5px solid ${activeTheme ? 'var(--red)' : BORDER}`, boxShadow: '0 2px 10px rgba(0,0,0,0.04)', transition: 'all 0.2s' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <i className="fas fa-palette" style={{ color: 'var(--red)', fontSize: 16 }} />
-                  <span style={{ fontSize: 15, fontWeight: 900, color: INK }}>สวมใส่ธีมเว็บ (Achievement Themes)</span>
-                </div>
-                {activeTheme && (
-                  <button
-                    onClick={() => handleEquipTheme(activeTheme)}
-                    style={{
-                      background: 'none', border: '1px solid #cbd5e1', borderRadius: 999,
-                      padding: '4px 12px', fontSize: 11, fontWeight: 700, color: '#64748b', cursor: 'pointer',
-                    }}
-                  >
-                    <i className="fas fa-rotate-left" style={{ marginRight: 5 }} />คืนค่าธีมมาตรฐาน Sofun
-                  </button>
-                )}
-              </div>
-
-              <div style={{ fontSize: 12.5, color: INK_2, marginBottom: 16, lineHeight: 1.5 }}>
-                {activeTheme ? (
-                  <span>
-                    กำลังสวมใส่ธีม: <strong style={{ color: 'var(--red)', fontWeight: 800 }}>{ACHIEVEMENTS[activeTheme]?.labelTH || activeTheme}</strong>
-                    {' '}· สีหลักของเว็บและเอฟเฟคจะเปลี่ยนตามความสำเร็จนี้
-                  </span>
-                ) : (
-                  <span>กำลังใช้งานธีมมาตรฐาน (สีแดง Sofun) · เลือกสวมใส่ความสำเร็จด้านล่างเพื่อเปลี่ยนสีเว็บและเปิดเอฟเฟคพิเศษ</span>
-                )}
-              </div>
-
-              {/* Quick switch cards for owned achievements */}
-              {myAchievements.length > 0 ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 10 }}>
-                  {myAchievements.map(id => {
-                    const ach = ACHIEVEMENTS[id]
-                    if (!ach) return null
-                    const isEquipped = activeTheme === id
-                    return (
-                      <div
-                        key={id}
-                        style={{
-                          borderRadius: 12, padding: '12px 10px', textAlign: 'center',
-                          background: isEquipped ? ach.bg : '#f8fafc',
-                          border: isEquipped ? `2px solid ${ach.color}` : '1px solid #e2e8f0',
-                          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-                          boxShadow: isEquipped ? `0 4px 14px ${ach.color}40` : 'none',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        <div style={{ fontSize: 22, color: ach.color, lineHeight: 1 }}>
-                          <i className={`fas ${ach.icon}`} />
-                        </div>
-                        <div style={{ fontSize: 12, fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                          {ach.labelTH}
-                        </div>
-                        <button
-                          onClick={() => handleEquipTheme(id)}
-                          style={{
-                            marginTop: 4, width: '100%', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 800,
-                            background: isEquipped ? ach.color : '#ffffff',
-                            color: isEquipped ? '#ffffff' : INK,
-                            border: isEquipped ? 'none' : '1px solid #cbd5e1',
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {isEquipped ? 'ใช้งานอยู่' : 'สวมใส่ธีมนี้'}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              ) : null}
-
-              {/* Theme Previewer / Tester */}
-              <div style={{ marginTop: 18, paddingTop: 14, borderTop: '1px dashed #e2e8f0' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-                  <i className="fas fa-flask" style={{ marginRight: 6 }} />ทดสอบธีมความสำเร็จ (Theme Previewer)
-                </div>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  <button
-                    onClick={() => handleEquipTheme('golden')}
-                    style={{
-                      background: activeTheme === 'golden' ? '#D4AF37' : 'rgba(212,175,55,0.12)',
-                      color: activeTheme === 'golden' ? '#ffffff' : '#A16207',
-                      border: '1.5px solid #D4AF37', borderRadius: 999, padding: '5px 12px',
-                      fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
-                    }}
-                  >
-                    <i className="fas fa-star" style={{ marginRight: 5 }} />Golden Player (สีทอง + ประกาย)
-                  </button>
-                  <button
-                    onClick={() => handleEquipTheme('hunger')}
-                    style={{
-                      background: activeTheme === 'hunger' ? '#F97316' : 'rgba(249,115,22,0.12)',
-                      color: activeTheme === 'hunger' ? '#ffffff' : '#EA580C',
-                      border: '1.5px solid #F97316', borderRadius: 999, padding: '5px 12px',
-                      fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
-                    }}
-                  >
-                    <i className="fas fa-utensils" style={{ marginRight: 5 }} />The Hunger (สีส้ม + อาหาร)
-                  </button>
-                  <button
-                    onClick={() => handleEquipTheme('sadness')}
-                    style={{
-                      background: activeTheme === 'sadness' ? '#64748B' : 'rgba(100,116,139,0.12)',
-                      color: activeTheme === 'sadness' ? '#ffffff' : '#334155',
-                      border: '1.5px solid #64748B', borderRadius: 999, padding: '5px 12px',
-                      fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
-                    }}
-                  >
-                    <i className="fas fa-cloud-rain" style={{ marginRight: 5 }} />Sadness (สีเทา + ฝนตก)
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Achievements ── */}
+            {/* ── Achievements (First item is website theme) ── */}
             {myAchievements.length > 0 && (
               <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
                 {sectionLabel(
@@ -377,6 +277,10 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                   )
                 )}
 
+                <div style={{ fontSize: 12, color: INK_2, marginBottom: 14, lineHeight: 1.5 }}>
+                  ความสำเร็จอันดับแรกสุดจะถูกใช้เป็นสีหลักและเอฟเฟกต์บรรยากาศของเว็บไซต์โดยอัตโนมัติ
+                </div>
+
                 {!editingAch ? (
                   /* ── VIEW MODE ── show pinned only ── */
                   pinned.length === 0 ? (
@@ -385,29 +289,61 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                         <i className="fas fa-award" />
                       </div>
                       <div style={{ fontSize: 13.5, fontWeight: 700, color: INK }}>ยังไม่ได้เลือก Achievement มาแสดง</div>
-                      <div style={{ fontSize: 12, color: INK_2, marginTop: 4 }}>กดปุ่ม "แก้ไข" เพื่อเลือก achievement ที่ต้องการโชว์</div>
+                      <div style={{ fontSize: 12, color: INK_2, marginTop: 4 }}>กดปุ่ม "แก้ไข" เพื่อเลือกความสำเร็จและกำหนดธีมหลักของเว็บ</div>
                     </div>
                   ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 8 }}>
-                      {pinned.map(id => {
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(104px, 1fr))', gap: 10 }}>
+                      {pinned.map((id, idx) => {
                         const ach = ACHIEVEMENTS[id]
                         if (!ach) return null
                         const rar = RARITY[ach.rarity]
+                        const isPrimary = idx === 0
                         return (
                           <div
                             key={id}
-                            title={ach.labelTH}
+                            title={`${ach.labelTH}${isPrimary ? ' (อันดับ 1 · ธีมหลักของเว็บ)' : ''}`}
                             style={{
                               position: 'relative',
-                              padding: '10px 6px 8px',
-                              background: ach.bg,
-                              border: `1.5px solid ${ach.border}`,
-                              borderRadius: 10,
+                              padding: '14px 6px 10px',
+                              background: isPrimary ? ach.bg : ach.bg,
+                              border: isPrimary ? `2px solid ${ach.color}` : `1.5px solid ${ach.border}`,
+                              borderRadius: 12,
                               textAlign: 'center',
-                              boxShadow: ach.rarity !== 'common' ? `0 0 10px ${rar.glow}` : 'none',
+                              boxShadow: isPrimary ? `0 0 14px ${ach.color}55` : (ach.rarity !== 'common' ? `0 0 10px ${rar.glow}` : 'none'),
                             }}
                           >
-                            <div style={{ fontSize: 20, color: ach.color, marginBottom: 4, lineHeight: 1 }}>
+                            {isPrimary ? (
+                              <div style={{
+                                position: 'absolute',
+                                top: -7,
+                                left: '50%',
+                                transform: 'translateX(-50%)',
+                                background: ach.color,
+                                color: '#ffffff',
+                                fontSize: 8.5,
+                                fontWeight: 900,
+                                padding: '1px 6px',
+                                borderRadius: 10,
+                                whiteSpace: 'nowrap',
+                                letterSpacing: '0.04em',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.18)',
+                                zIndex: 2
+                              }}>
+                                ธีมหลักของเว็บ
+                              </div>
+                            ) : (
+                              <div style={{
+                                position: 'absolute',
+                                top: 4,
+                                left: 6,
+                                fontSize: 9,
+                                fontWeight: 800,
+                                color: INK_3
+                              }}>
+                                #{idx + 1}
+                              </div>
+                            )}
+                            <div style={{ fontSize: 22, color: ach.color, marginBottom: 5, lineHeight: 1, marginTop: isPrimary ? 2 : 0 }}>
                               <i className={`fas ${ach.icon}`} />
                             </div>
                             <div style={{ fontSize: 10, fontWeight: 900, color: ach.color, letterSpacing: '0.03em', textTransform: 'uppercase', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ach.label}</div>
@@ -417,12 +353,105 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                     </div>
                   )
                 ) : (
-                  /* ── EDIT MODE ── show all with selection ── */
+                  /* ── EDIT MODE ── show order manager + all catalog ── */
                   <>
-                    <p style={{ margin: '0 0 16px', fontSize: 12.5, color: INK_2, lineHeight: 1.55 }}>
-                      เลือก achievement ที่ต้องการแสดงในโปรไฟล์ (สูงสุด {MAX_PINNED} อัน) ·
-                      <span style={{ color: C, fontWeight: 700, marginLeft: 4 }}>เลือกแล้ว {pinned.length}/{MAX_PINNED}</span>
-                    </p>
+                    <div style={{ background: '#f8fafc', borderRadius: 14, padding: '12px 14px', marginBottom: 18, border: '1px solid #e2e8f0' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800, color: INK, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <i className="fas fa-sort-amount-down" style={{ color: C }} />
+                          <span>ลำดับที่เลือกแสดง (อันดับ 1 = ธีมหลักของเว็บ)</span>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: C }}>{pinned.length}/{MAX_PINNED}</span>
+                      </div>
+
+                      {pinned.length === 0 ? (
+                        <div style={{ fontSize: 12, color: INK_3, textAlign: 'center', padding: '10px 0' }}>
+                          ยังไม่ได้เลือกความสำเร็จ (คลิกความสำเร็จด้านล่างเพื่อเลือก)
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          {pinned.map((id, idx) => {
+                            const ach = ACHIEVEMENTS[id]
+                            if (!ach) return null
+                            const isFirst = idx === 0
+                            return (
+                              <div
+                                key={id}
+                                style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  background: isFirst ? ach.color : '#ffffff',
+                                  color: isFirst ? '#ffffff' : INK,
+                                  padding: '5px 10px',
+                                  borderRadius: 10,
+                                  fontSize: 11.5,
+                                  fontWeight: 800,
+                                  border: isFirst ? 'none' : '1px solid #cbd5e1',
+                                  boxShadow: isFirst ? `0 2px 8px ${ach.color}40` : '0 1px 3px rgba(0,0,0,0.05)'
+                                }}
+                              >
+                                <span style={{ fontSize: 10, opacity: isFirst ? 0.9 : 0.6 }}>#{idx + 1}</span>
+                                <i className={`fas ${ach.icon}`} />
+                                <span>{ach.labelTH}</span>
+                                {isFirst ? (
+                                  <span style={{ fontSize: 9, background: 'rgba(255,255,255,0.25)', padding: '1px 5px', borderRadius: 6, marginLeft: 2 }}>
+                                    ธีมหลัก
+                                  </span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => moveToFirst(id)}
+                                    title="ตั้งเป็นอันดับ 1 (ใช้เป็นธีมหลักของเว็บ)"
+                                    style={{
+                                      background: 'rgba(0,0,0,0.06)',
+                                      border: 'none',
+                                      color: INK,
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      borderRadius: 6,
+                                      padding: '2px 6px',
+                                      cursor: 'pointer',
+                                      marginLeft: 2
+                                    }}
+                                  >
+                                    ตั้งเป็นธีม
+                                  </button>
+                                )}
+                                {idx > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => movePinned(idx, idx - 1)}
+                                    title="เลื่อนขึ้นหน้า"
+                                    style={{ background: 'none', border: 'none', color: isFirst ? '#ffffff' : INK_2, cursor: 'pointer', padding: '0 2px' }}
+                                  >
+                                    <i className="fas fa-chevron-left" style={{ fontSize: 9 }} />
+                                  </button>
+                                )}
+                                {idx < pinned.length - 1 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => movePinned(idx, idx + 1)}
+                                    title="เลื่อนไปหลัง"
+                                    style={{ background: 'none', border: 'none', color: isFirst ? '#ffffff' : INK_2, cursor: 'pointer', padding: '0 2px' }}
+                                  >
+                                    <i className="fas fa-chevron-right" style={{ fontSize: 9 }} />
+                                  </button>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => togglePin(id)}
+                                  title="ยกเลิกการเลือก"
+                                  style={{ background: 'none', border: 'none', color: isFirst ? '#ffffff' : INK_3, cursor: 'pointer', padding: '0 2px', marginLeft: 2 }}
+                                >
+                                  <i className="fas fa-times" style={{ fontSize: 10 }} />
+                                </button>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
 
                     {ACHIEVEMENTS_BY_RARITY.map(({ rarity: rar, items }) => {
                       const ownedInGroup = items.filter(a => myAchievements.includes(a.id))
