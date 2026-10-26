@@ -77,6 +77,12 @@ export default function Nav({
             </>
           ) : null}
 
+          {lineUser && (
+            <button className={`nav-btn${currentPage === 'profile' ? ' active' : ''}`} onClick={() => handleNav('profile')}>
+              <i className="fas fa-user-circle" style={{ marginRight: '5px', fontSize: '11px' }} />{t('profile', 'title')}
+            </button>
+          )}
+
           {/* Language toggle */}
           <button className="lang-toggle-btn" onClick={toggle} title="Switch language">
             <span className={lang === 'th' ? 'lang-active' : ''}>TH</span>
@@ -102,6 +108,9 @@ export default function Nav({
                     <div className="nav-user-menu-name">{lineUser.name}</div>
                     <div className="nav-user-menu-sub">{t('nav', 'lineMember')}</div>
                   </div>
+                  <button className="nav-user-menu-item" onClick={() => handleNav('profile')}>
+                    <i className="fas fa-id-card" /> {lang === 'th' ? 'โปรไฟล์ของฉัน' : lang === 'zh' ? '我的资料' : 'My Profile'}
+                  </button>
                   {bookingEnabled && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                       <i className="fas fa-users" /> {t('nav', 'myParty')}
@@ -188,6 +197,9 @@ export default function Nav({
                     <div className="nav-user-menu-name">{lineUser.name}</div>
                     <div className="nav-user-menu-sub">{t('nav', 'lineMember')}</div>
                   </div>
+                  <button className="nav-user-menu-item" onClick={() => handleNav('profile')}>
+                    <i className="fas fa-id-card" /> {lang === 'th' ? 'โปรไฟล์ของฉัน' : lang === 'zh' ? '我的资料' : 'My Profile'}
+                  </button>
                   <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
                     <i className="fas fa-users" /> {t('nav', 'myParty')}
                   </button>
