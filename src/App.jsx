@@ -301,8 +301,21 @@ export default function App() {
     }
   }, [liffReady])
 
-  // ── Apply achievement theme to <html> — pick highest-rarity owned ──
+  // ── Apply achievement theme to <html> with equipped theme priority ──
+  const [activeThemeOverride, setActiveThemeOverride] = useState(() => localStorage.getItem('sofun_active_theme') || null)
+
   useEffect(() => {
+    const handleSync = () => setActiveThemeOverride(localStorage.getItem('sofun_active_theme') || null)
+    window.addEventListener('sofun-theme-change', handleSync)
+    return () => window.removeEventListener('sofun-theme-change', handleSync)
+  }, [])
+
+  useEffect(() => {
+    const currentTheme = activeThemeOverride || lineUser?.activeAchievement
+    if (currentTheme) {
+      document.documentElement.setAttribute('data-achievement', currentTheme)
+      return
+    }
     const achs = lineUser?.achievements || (lineUser?.achievement ? [lineUser.achievement] : [])
     const top = ACHIEVEMENT_LIST.find(a => achs.includes(a.id))
     if (top) {
@@ -310,7 +323,7 @@ export default function App() {
     } else {
       document.documentElement.removeAttribute('data-achievement')
     }
-  }, [lineUser?.achievements, lineUser?.achievement])
+  }, [activeThemeOverride, lineUser?.achievements, lineUser?.achievement, lineUser?.activeAchievement])
 
   // ── Live-sync achievements from Firestore (admin may update them) ───
   useEffect(() => {
@@ -322,12 +335,14 @@ export default function App() {
       const achievement = d.achievement || null
       const achievements = Array.isArray(d.achievements) ? d.achievements
         : achievement ? [achievement] : []
+      const activeAchievement = d.activeAchievement || null
       setLineUser(prev => {
         if (!prev) return prev
         const same = prev.achievement === achievement
           && JSON.stringify(prev.achievements) === JSON.stringify(achievements)
+          && prev.activeAchievement === activeAchievement
         if (same) return prev
-        const updated = { ...prev, achievement, achievements }
+        const updated = { ...prev, achievement, achievements, activeAchievement }
         localStorage.setItem('sofun_line_user', JSON.stringify(updated))
         return updated
       })
@@ -788,11 +803,10 @@ export default function App() {
       )}
 
       {(() => {
-        if (lineUser?.role === 'admin') return null
-        if (currentPage === 'qr') return null
+        if (lineUser?.role === 'admin' && currentPage === 'admin') return null
         const achs = lineUser?.achievements || (lineUser?.achievement ? [lineUser.achievement] : [])
-        const tier = ['golden', 'silver', 'bronze', 'sadness', 'hunger', 'billionaire', 'charity'].find(t => achs.includes(t))
-        return tier ? <TierEffect tier={tier} /> : null
+        const currentTheme = activeThemeOverride || lineUser?.activeAchievement || ACHIEVEMENT_LIST.find(a => achs.includes(a.id))?.id
+        return currentTheme ? <TierEffect tier={currentTheme} /> : null
       })()}
 
       {isEffectiveAdmin && currentPage !== 'pos' && globalPendingOrdersCount > 0 && (

@@ -13,7 +13,7 @@
 
 /* ── Primitive: Curtain Crimson ─────────────────────────────────
    oklch ramp H=27.5°. Brand anchor = 500. Chroma peaks at 0.210.
-   500 on white: 5.72:1 ✓ text  |  600 on white: 7.4:1 ✓ UI
+   500 on white: 5.72:1 [OK] text  |  600 on white: 7.4:1 [OK] UI
    ──────────────────────────────────────────────────────────────── */
 :root {
   --crimson-50:  #fff2f1;
@@ -49,8 +49,8 @@
   --void-200: #d5d5e8;
   --void-300: #b0b0ca;
   --void-400: #8686a6;
-  --void-500: #5c5c7e;  /* 6.1:1 on white ✓ placeholder text */
-  --void-600: #3c3c5e;  /* 10.1:1 on white ✓ */
+  --void-500: #5c5c7e;  /* 6.1:1 on white [OK] placeholder text */
+  --void-600: #3c3c5e;  /* 10.1:1 on white [OK] */
   --void-700: #252540;
   --void-800: #181828;  /* CARD */
   --void-900: #0e0e1a;  /* SURFACE */
@@ -74,11 +74,11 @@
   --action-destructive-hover: var(--crimson-700);
 
   /* ── Semantic: Text ──────────────────────────────────────────── */
-  --text-primary:    var(--void-950);  /* #09090f — 15.3:1 on white ✓ */
-  --text-secondary:  var(--void-600);  /* #3c3c5e — 10.1:1 on white ✓ */
-  --text-tertiary:   var(--void-500);  /* #5c5c7e —  6.1:1 on white ✓ (placeholder min) */
+  --text-primary:    var(--void-950);  /* #09090f — 15.3:1 on white [OK] */
+  --text-secondary:  var(--void-600);  /* #3c3c5e — 10.1:1 on white [OK] */
+  --text-tertiary:   var(--void-500);  /* #5c5c7e —  6.1:1 on white [OK] (placeholder min) */
   --text-disabled:   var(--void-300);  /* exempt — decorative disabled state */
-  --text-on-action:  #ffffff;          /* 5.72:1 on crimson-500 ✓ */
+  --text-on-action:  #ffffff;          /* 5.72:1 on crimson-500 [OK] */
   --text-link:       var(--crimson-500);
   --text-link-hover: var(--crimson-600);
 
@@ -96,7 +96,7 @@
 
   /* ── Semantic: Border ────────────────────────────────────────── */
   --border-default:      var(--void-200);               /* decorative — sub-3:1 by design */
-  --border-strong:       var(--void-400);               /* 3.1:1 on white ✓ WCAG 1.4.11 */
+  --border-strong:       var(--void-400);               /* 3.1:1 on white [OK] WCAG 1.4.11 */
   --border-focus:        var(--crimson-500);
   --border-error:        var(--crimson-500);
   --border-dark-wire:    rgba(255, 255, 255, 0.07);     /* WIRE */
@@ -207,7 +207,7 @@
 [data-theme="dark"],
 [data-register="dark"] {
   /* Text */
-  --text-primary:    var(--chalk);                     /* #e8e4dc on #09090f — high contrast ✓ */
+  --text-primary:    var(--chalk);                     /* #e8e4dc on #09090f — high contrast [OK] */
   --text-secondary:  rgba(232, 228, 220, 0.62);        /* CHALK_2 */
   --text-tertiary:   rgba(232, 228, 220, 0.42);
   --text-disabled:   rgba(232, 228, 220, 0.25);
@@ -231,7 +231,7 @@
   --active-overlay:  rgba(255, 255, 255, 0.08);
   --selected-bg:     rgba(var(--crimson-500-rgb), 0.12);
 
-  /* Action — primary stays crimson (white text on it ✓) */
+  /* Action — primary stays crimson (white text on it [OK]) */
   --action-primary-hover: var(--crimson-400);          /* slightly lighter on hover in dark */
   --action-secondary:      var(--void-800);
   --action-secondary-hover: var(--void-700);
@@ -321,4 +321,20 @@
   --crimson-300: #FBCFE8; --crimson-400: #EC4899;
   --crimson-500: #BE185D; --crimson-500-rgb: 190, 24, 93;
   --crimson-600: #9D174D; --crimson-700: #831843;
+}
+
+:root[data-achievement="potterhead"] {
+  --crimson-300: #FDA4AF; --crimson-400: #FB7185;
+  --crimson-500: #E11D48; --crimson-500-rgb: 225, 29, 72;
+  --crimson-600: #BE123C; --crimson-700: #9F1239;
+}
+:root[data-achievement="new_era"] {
+  --crimson-300: #67E8F9; --crimson-400: #22D3EE;
+  --crimson-500: #06B6D4; --crimson-500-rgb: 6, 182, 212;
+  --crimson-600: #0891B2; --crimson-700: #0E7490;
+}
+:root[data-achievement="manager"] {
+  --crimson-300: #6EE7B7; --crimson-400: #34D399;
+  --crimson-500: #10B981; --crimson-500-rgb: 16, 185, 129;
+  --crimson-600: #059669; --crimson-700: #047857;
 }
