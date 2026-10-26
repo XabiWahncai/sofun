@@ -1,7 +1,12 @@
+// Redesigned QR Member Pass with Dynamic Achievement Theme Engine
+// Zero emojis rule strictly applied.
+
 import { useEffect, useState, useMemo } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore'
+import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
+import { convertImageUrl } from '../utils/imageUrl'
 
 const p2 = n => String(Math.round(n)).padStart(2, '0')
 const fmtDT = d => {
@@ -84,14 +89,186 @@ function printBill(h, meUid) {
   setTimeout(() => w.print(), 400)
 }
 
-export default function QRPage({ lineUser }) {
-  const [history, setHistory]       = useState([])
+// ── Achievement Theme Profiles ───────────────────────────────────────────────
+const THEME_PROFILES = {
+  default: {
+    id: 'default',
+    name: 'Curtain Crimson',
+    title: 'SOFUN CLUB PASS',
+    subtitle: 'สมาชิกระดับมาตรฐานแห่งสโมสรนักสืบ',
+    accent: '#c62419',
+    accentRgb: '198, 36, 25',
+    cardBg: 'linear-gradient(145deg, #18141e 0%, #290808 60%, #140404 100%)',
+    borderGlow: 'rgba(198, 36, 25, 0.45)',
+    cardBorder: 'rgba(198, 36, 25, 0.35)',
+    watermarkIcon: 'fa-mask'
+  },
+  golden: {
+    id: 'golden',
+    name: 'Golden Player',
+    title: 'GOLDEN VIP PASS',
+    subtitle: 'สมาชิกระดับ Gold ผู้ไม่เคยพลาดคดี',
+    accent: '#D4AF37',
+    accentRgb: '212, 175, 55',
+    cardBg: 'linear-gradient(145deg, #1c180e 0%, #3a2e12 55%, #18140a 100%)',
+    borderGlow: 'rgba(212, 175, 55, 0.65)',
+    cardBorder: 'rgba(212, 175, 55, 0.55)',
+    watermarkIcon: 'fa-crown'
+  },
+  hunger: {
+    id: 'hunger',
+    name: 'The Hunger',
+    title: 'THE HUNGER PASS',
+    subtitle: 'นักสืบสายกิน พลังงานสมองขับเคลื่อนด้วยของอร่อย',
+    accent: '#F97316',
+    accentRgb: '249, 115, 22',
+    cardBg: 'linear-gradient(145deg, #1e1208 0%, #3d1c07 55%, #160a04 100%)',
+    borderGlow: 'rgba(249, 115, 22, 0.65)',
+    cardBorder: 'rgba(249, 115, 22, 0.55)',
+    watermarkIcon: 'fa-utensils'
+  },
+  sadness: {
+    id: 'sadness',
+    name: 'Sadness Noir',
+    title: 'MELANCHOLY NOIR PASS',
+    subtitle: 'ความเศร้าภายใต้สายฝนแห่งความจริงอันเจ็บปวด',
+    accent: '#94A3B8',
+    accentRgb: '148, 163, 184',
+    cardBg: 'linear-gradient(145deg, #0f172a 0%, #1e293b 55%, #0a0f1d 100%)',
+    borderGlow: 'rgba(148, 163, 184, 0.55)',
+    cardBorder: 'rgba(148, 163, 184, 0.45)',
+    watermarkIcon: 'fa-cloud-rain'
+  },
+  godfather: {
+    id: 'godfather',
+    name: 'Godfather',
+    title: 'GODFATHER EXECUTIVE PASS',
+    subtitle: 'เจ้าพ่อแห่งค่ำคืน ผู้คุมทุกคดีในเงามืด',
+    accent: '#8B0000',
+    accentRgb: '139, 0, 0',
+    cardBg: 'linear-gradient(145deg, #170404 0%, #320707 55%, #0f0202 100%)',
+    borderGlow: 'rgba(139, 0, 0, 0.65)',
+    cardBorder: 'rgba(139, 0, 0, 0.55)',
+    watermarkIcon: 'fa-crown'
+  },
+  champion: {
+    id: 'champion',
+    name: 'Champion',
+    title: 'CHAMPION TROPHY PASS',
+    subtitle: 'ผู้ยืนหยัดเป็นผู้ชนะเหนือทุกคดีฆาตกรรม',
+    accent: '#D97706',
+    accentRgb: '217, 119, 6',
+    cardBg: 'linear-gradient(145deg, #1b1206 0%, #382405 55%, #130c02 100%)',
+    borderGlow: 'rgba(217, 119, 6, 0.65)',
+    cardBorder: 'rgba(217, 119, 6, 0.55)',
+    watermarkIcon: 'fa-trophy'
+  },
+  detective: {
+    id: 'detective',
+    name: 'Master Detective',
+    title: 'MASTER DETECTIVE PASS',
+    subtitle: 'สมองอันเฉียบแหลมที่มองทะลุทุกคำโกหก',
+    accent: '#2563EB',
+    accentRgb: '37, 99, 235',
+    cardBg: 'linear-gradient(145deg, #061129 0%, #0d2250 55%, #040919 100%)',
+    borderGlow: 'rgba(37, 99, 235, 0.65)',
+    cardBorder: 'rgba(37, 99, 235, 0.55)',
+    watermarkIcon: 'fa-magnifying-glass'
+  },
+  villain: {
+    id: 'villain',
+    name: 'Phantom Villain',
+    title: 'PHANTOM VILLAIN PASS',
+    subtitle: 'สวมหน้ากากฆาตกร หลอกล่อทุกคนอย่างไร้ร่องรอย',
+    accent: '#DB2777',
+    accentRgb: '219, 39, 119',
+    cardBg: 'linear-gradient(145deg, #1d0615 0%, #390d28 55%, #13030c 100%)',
+    borderGlow: 'rgba(219, 39, 119, 0.65)',
+    cardBorder: 'rgba(219, 39, 119, 0.55)',
+    watermarkIcon: 'fa-user-secret'
+  },
+  veteran: {
+    id: 'veteran',
+    name: 'Veteran Sleuth',
+    title: 'VETERAN SLEUTH PASS',
+    subtitle: 'นักเล่นเก๋าเกม ผู้ผ่านสมรภูมิคดีมานับไม่ถ้วน',
+    accent: '#7C3AED',
+    accentRgb: '124, 58, 237',
+    cardBg: 'linear-gradient(145deg, #140825 0%, #281048 55%, #0d041a 100%)',
+    borderGlow: 'rgba(124, 58, 237, 0.65)',
+    cardBorder: 'rgba(124, 58, 237, 0.55)',
+    watermarkIcon: 'fa-medal'
+  },
+  billionaire: {
+    id: 'billionaire',
+    name: 'The Billionaire',
+    title: 'BILLIONAIRE PASS',
+    subtitle: 'มหาเศรษฐีใจถึง ผู้ขับเคลื่อนทุกค่ำคืนด้วยความมั่งคั่ง',
+    accent: '#16A34A',
+    accentRgb: '22, 163, 74',
+    cardBg: 'linear-gradient(145deg, #08190d 0%, #0e321a 55%, #041008 100%)',
+    borderGlow: 'rgba(22, 163, 74, 0.65)',
+    cardBorder: 'rgba(22, 163, 74, 0.55)',
+    watermarkIcon: 'fa-money-bill-wave'
+  },
+  explorer: {
+    id: 'explorer',
+    name: 'The Explorer',
+    title: 'EXPLORER PASS',
+    subtitle: 'ผู้กล้าบุกเบิกคดีใหม่ ไม่เคยหยุดค้นหาความจริง',
+    accent: '#059669',
+    accentRgb: '5, 150, 105',
+    cardBg: 'linear-gradient(145deg, #061914 0%, #0d3529 55%, #030e0b 100%)',
+    borderGlow: 'rgba(5, 150, 105, 0.65)',
+    border: 'rgba(5, 150, 105, 0.45)',
+    watermarkIcon: 'fa-compass'
+  }
+}
+
+export default function QRPage({ lineUser, allGames = [] }) {
+  const [history, setHistory]         = useState([])
   const [expandedMap, setExpandedMap] = useState({})
-  const [search, setSearch]         = useState('')
+  const [search, setSearch]           = useState('')
   const [filterMonth, setFilterMonth] = useState('')
+  const [copiedText, setCopiedText]   = useState('')
+  const [fullscreenQr, setFullscreenQr] = useState(false)
+  const [showAllThemes, setShowAllThemes] = useState(false)
+
+  // Track active achievement theme
+  const [activeTheme, setActiveTheme] = useState(() => {
+    return localStorage.getItem('sofun_active_theme') ||
+      document.documentElement.getAttribute('data-achievement') ||
+      lineUser?.activeAchievement ||
+      lineUser?.achievement ||
+      'default'
+  })
+
+  // Sync theme changes from window events
+  useEffect(() => {
+    const handleThemeSync = () => {
+      const stored = localStorage.getItem('sofun_active_theme') || document.documentElement.getAttribute('data-achievement') || 'default'
+      setActiveTheme(stored)
+    }
+    window.addEventListener('sofun-theme-change', handleThemeSync)
+    return () => window.removeEventListener('sofun-theme-change', handleThemeSync)
+  }, [])
+
+  // Listen to member doc for activeAchievement updates
+  useEffect(() => {
+    if (!lineUser?.uid) return
+    return onSnapshot(doc(db, 'members', lineUser.uid), snap => {
+      if (snap.exists()) {
+        const d = snap.data()
+        if (d.activeAchievement) {
+          setActiveTheme(d.activeAchievement)
+        }
+      }
+    })
+  }, [lineUser?.uid])
 
   const toggleExpanded = id => setExpandedMap(prev => ({ ...prev, [id]: !prev[id] }))
 
+  // Load play history for member
   useEffect(() => {
     if (!lineUser?.uid) return
     const q = query(
@@ -113,6 +290,7 @@ export default function QRPage({ lineUser }) {
     return unsub
   }, [lineUser?.uid])
 
+  // Extract month filter options
   const monthOptions = useMemo(() => {
     const seen = new Set()
     const opts = []
@@ -128,6 +306,7 @@ export default function QRPage({ lineUser }) {
     return opts
   }, [history])
 
+  // Filter history
   const filtered = useMemo(() => history.filter(h => {
     if (search) {
       if (!(h.scriptTitle || '').toLowerCase().includes(search.toLowerCase())) return false
@@ -140,79 +319,634 @@ export default function QRPage({ lineUser }) {
     return true
   }), [history, search, filterMonth])
 
+  // Resolve active theme profile
+  const theme = THEME_PROFILES[activeTheme] || THEME_PROFILES.default
+
+  // Get list of member achievements
+  const memberAchs = useMemo(() => {
+    const raw = lineUser?.achievements || (lineUser?.achievement ? [lineUser.achievement] : [])
+    const unique = Array.from(new Set(raw.filter(Boolean)))
+    return unique
+  }, [lineUser?.achievements, lineUser?.achievement])
+
+  // Equip / Switch theme
+  const handleSelectTheme = async (themeKey) => {
+    const next = themeKey === 'default' ? null : themeKey
+    setActiveTheme(themeKey)
+    if (next) {
+      localStorage.setItem('sofun_active_theme', next)
+      document.documentElement.setAttribute('data-achievement', next)
+    } else {
+      localStorage.removeItem('sofun_active_theme')
+      document.documentElement.removeAttribute('data-achievement')
+    }
+    if (lineUser?.uid) {
+      try {
+        await updateDoc(doc(db, 'members', lineUser.uid), { activeAchievement: next })
+      } catch {
+        // Ignore
+      }
+    }
+    window.dispatchEvent(new Event('sofun-theme-change'))
+    setCopiedText(`สวมใส่ธีม ${THEME_PROFILES[themeKey]?.name || 'ดั้งเดิม'} เรียบร้อย`)
+    setTimeout(() => setCopiedText(''), 2200)
+  }
+
+  // Copy helper
+  const handleCopy = (text, label) => {
+    navigator.clipboard.writeText(text)
+    setCopiedText(label)
+    setTimeout(() => setCopiedText(''), 2000)
+  }
+
+  // Resolve game poster image helper
+  const getGameCover = (h) => {
+    if (h.scriptImage || h.gameImage) return convertImageUrl(h.scriptImage || h.gameImage, 200)
+    if (allGames?.length > 0) {
+      const matched = allGames.find(g =>
+        (h.scriptId && g.id === h.scriptId) ||
+        (h.scriptTitle && g.title === h.scriptTitle) ||
+        (h.scriptTitle && g.name === h.scriptTitle)
+      )
+      if (matched?.image || matched?.coverUrl) {
+        return convertImageUrl(matched.image || matched.coverUrl, 200)
+      }
+    }
+    return null
+  }
+
   if (!lineUser) {
     return (
       <div id="qr-page" className="page active">
         <div className="qr-not-login">
           <i className="fab fa-line" />
-          <p>กรุณาเข้าสู่ระบบด้วย LINE ก่อน</p>
+          <p>กรุณาเข้าสู่ระบบด้วย LINE ก่อนใช้งาน Member Pass</p>
         </div>
       </div>
     )
   }
 
+  const memberIdTag = `SF-${String(lineUser.uid || '').slice(-6).toUpperCase()}`
   const qrUrl = `${window.location.origin}/?scan=${lineUser.uid}`
+  const totalSpent = history.reduce((acc, h) => {
+    const myBill = h.memberBills?.find(m => m.uid === lineUser.uid)
+    return acc + (myBill?.total ?? h.grandTotal ?? 0)
+  }, 0)
 
   return (
-    <div id="qr-page" className="page active">
-      <div className="qr-container">
+    <div id="qr-page" className="page active" style={{ paddingTop: 60, paddingBottom: 100, background: 'var(--surface-page)' }}>
 
-        {/* Profile card */}
-        <div className="qr-profile-card">
-          {lineUser.avatar
-            ? <img src={lineUser.avatar} alt="" className="qr-avatar" onError={e => e.currentTarget.style.display = 'none'} />
-            : <div className="qr-avatar-placeholder">{(lineUser.name || '?')[0]}</div>
-          }
-          <div className="qr-profile-name">{lineUser.name}</div>
-          <div className="qr-profile-badge"><i className="fab fa-line" /> สมาชิก Sofun Club</div>
+      <style>{`
+        .qr-pass-wrapper {
+          max-width: 440px;
+          margin: 0 auto;
+          padding: 16px 16px 40px;
+          display: flex;
+          flex-direction: column;
+          gap: 20px;
+        }
+
+        /* ── Digital Member Pass Card ── */
+        .qr-member-pass {
+          position: relative;
+          border-radius: 24px;
+          padding: 24px 20px 22px;
+          color: #ffffff;
+          overflow: hidden;
+          box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28), 0 0 0 1px ${theme.cardBorder};
+          transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .qr-pass-shimmer {
+          position: absolute;
+          top: -50%;
+          left: -50%;
+          width: 200%;
+          height: 200%;
+          background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.12), transparent 60%);
+          pointer-events: none;
+        }
+
+        .qr-pass-watermark {
+          position: absolute;
+          right: -18px;
+          bottom: -22px;
+          font-size: 140px;
+          opacity: 0.06;
+          color: ${theme.accent};
+          pointer-events: none;
+          transform: rotate(-10deg);
+        }
+
+        .qr-target-box {
+          position: relative;
+          padding: 14px;
+          background: #ffffff;
+          border-radius: 20px;
+          box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+        }
+
+        /* Corner HUD Brackets */
+        .qr-hud-corner {
+          position: absolute;
+          width: 18px;
+          height: 18px;
+          border-color: ${theme.accent};
+          border-style: solid;
+          pointer-events: none;
+          filter: drop-shadow(0 0 4px ${theme.accent});
+        }
+        .qr-hud-tl { top: 6px; left: 6px; border-width: 3px 0 0 3px; border-top-left-radius: 8px; }
+        .qr-hud-tr { top: 6px; right: 6px; border-width: 3px 3px 0 0; border-top-right-radius: 8px; }
+        .qr-hud-bl { bottom: 6px; left: 6px; border-width: 0 0 3px 3px; border-bottom-left-radius: 8px; }
+        .qr-hud-br { bottom: 6px; right: 6px; border-width: 0 3px 3px 0; border-bottom-right-radius: 8px; }
+
+        /* Theme Selector Pill */
+        .qr-theme-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          padding: 7px 12px;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 700;
+          cursor: pointer;
+          border: 1.5px solid transparent;
+          transition: all 0.2s ease;
+          white-space: nowrap;
+          user-select: none;
+        }
+
+        /* History Card */
+        .qr-game-item {
+          background: #ffffff;
+          border: 1px solid var(--border-default, #e5e7eb);
+          border-radius: 16px;
+          padding: 14px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+          transition: all 0.2s ease;
+        }
+        .qr-game-item:hover {
+          border-color: ${theme.accent};
+          box-shadow: 0 6px 18px rgba(0, 0, 0, 0.07);
+        }
+      `}</style>
+
+      <div className="qr-pass-wrapper">
+
+        {/* ── Toast Feedback Notification ── */}
+        {copiedText && (
+          <div style={{
+            position: 'fixed',
+            top: 75,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: '#111827',
+            color: '#ffffff',
+            padding: '8px 18px',
+            borderRadius: 30,
+            fontSize: 12,
+            fontWeight: 700,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            animation: 'fadeIn 0.2s ease'
+          }}>
+            <i className="fas fa-check-circle" style={{ color: theme.accent }} />
+            <span>{copiedText}</span>
+          </div>
+        )}
+
+        {/* ── Theme Switcher Bar ── */}
+        <div style={{
+          background: 'var(--surface-card, #f8f8fc)',
+          border: '1px solid var(--border-default, #e5e7eb)',
+          borderRadius: 18,
+          padding: '12px 14px'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: 'var(--text-primary)' }}>
+              <i className="fas fa-palette" style={{ color: theme.accent }} />
+              <span>สกินธีมความสำเร็จ (Achievement Theme)</span>
+            </div>
+            <button
+              onClick={() => setShowAllThemes(prev => !prev)}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: theme.accent,
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                padding: '2px 6px'
+              }}
+            >
+              {showAllThemes ? 'ย่อตัวเลือก' : 'ดูธีมทั้งหมด'}
+            </button>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4, scrollbarWidth: 'none' }}>
+            {/* Default Theme */}
+            <button
+              onClick={() => handleSelectTheme('default')}
+              className="qr-theme-chip"
+              style={{
+                background: activeTheme === 'default' ? '#c62419' : '#ffffff',
+                color: activeTheme === 'default' ? '#ffffff' : '#4b5563',
+                borderColor: activeTheme === 'default' ? '#c62419' : 'var(--border-default, #e5e7eb)',
+                boxShadow: activeTheme === 'default' ? '0 2px 8px rgba(198,36,25,0.4)' : 'none'
+              }}
+            >
+              <i className="fas fa-mask" />
+              <span>คลาสสิก (Crimson)</span>
+            </button>
+
+            {/* Unlocked Themes */}
+            {memberAchs.map(achId => {
+              const ach = ACHIEVEMENTS[achId]
+              const p = THEME_PROFILES[achId] || { accent: ach?.color || '#D4AF37', icon: ach?.icon || 'fa-award' }
+              const isEquipped = activeTheme === achId
+              return (
+                <button
+                  key={achId}
+                  onClick={() => handleSelectTheme(achId)}
+                  className="qr-theme-chip"
+                  style={{
+                    background: isEquipped ? p.accent : '#ffffff',
+                    color: isEquipped ? '#ffffff' : '#374151',
+                    borderColor: isEquipped ? p.accent : 'var(--border-default, #e5e7eb)',
+                    boxShadow: isEquipped ? `0 2px 10px rgba(${p.accentRgb || '212,175,55'}, 0.45)` : 'none'
+                  }}
+                >
+                  <i className={`fas ${p.icon || ach?.icon || 'fa-star'}`} />
+                  <span>{ach?.labelTH || ach?.label || achId}</span>
+                </button>
+              )
+            })}
+
+            {/* Extra Previewable Themes if toggled */}
+            {showAllThemes && Object.keys(THEME_PROFILES)
+              .filter(k => k !== 'default' && !memberAchs.includes(k))
+              .map(themeKey => {
+                const p = THEME_PROFILES[themeKey]
+                const isEquipped = activeTheme === themeKey
+                return (
+                  <button
+                    key={themeKey}
+                    onClick={() => handleSelectTheme(themeKey)}
+                    className="qr-theme-chip"
+                    style={{
+                      background: isEquipped ? p.accent : 'rgba(0,0,0,0.03)',
+                      color: isEquipped ? '#ffffff' : '#6b7280',
+                      borderColor: isEquipped ? p.accent : 'rgba(0,0,0,0.1)',
+                      opacity: isEquipped ? 1 : 0.85
+                    }}
+                  >
+                    <i className={`fas ${p.watermarkIcon}`} />
+                    <span>{p.name}</span>
+                  </button>
+                )
+              })}
+          </div>
         </div>
 
-        {/* QR Code */}
-        <div className="qr-card">
-          <div className="qr-card-label">แสดง QR นี้ให้แอดมินสแกน</div>
-          <div className="qr-code-wrap">
-            <QRCodeSVG
-              value={qrUrl}
-              size={220}
-              bgColor="#ffffff" /* ds-allow-hardcode: QRCodeSVG API prop */
-              fgColor="#1a1a1a" /* ds-allow-hardcode */
-              level="M"
-              includeMargin={true}
-            />
+        {/* ── DIGITAL MEMBER PASS (The VIP Card) ── */}
+        <div
+          className="qr-member-pass"
+          style={{
+            background: theme.cardBg,
+            borderColor: theme.cardBorder
+          }}
+        >
+          <div className="qr-pass-shimmer" />
+          <i className={`fas ${theme.watermarkIcon} qr-pass-watermark`} />
+
+          {/* Pass Top Bar */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, position: 'relative', zIndex: 2 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{
+                width: 28,
+                height: 28,
+                borderRadius: 8,
+                background: `rgba(${theme.accentRgb}, 0.22)`,
+                color: theme.accent,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 14,
+                border: `1px solid rgba(${theme.accentRgb}, 0.4)`
+              }}>
+                <i className={`fas ${theme.watermarkIcon}`} />
+              </div>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.08em', color: theme.accent }}>
+                  {theme.title}
+                </div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
+                  SOFUN CLUB THAILAND
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleCopy(memberIdTag, 'คัดลอกรหัสสมาชิกแล้ว')}
+              title="คัดลอกรหัสสมาชิก"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '4px 9px',
+                borderRadius: 14,
+                background: 'rgba(255, 255, 255, 0.12)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#ffffff',
+                fontSize: 11,
+                fontWeight: 800,
+                cursor: 'pointer',
+                fontFamily: 'monospace'
+              }}
+            >
+              <span>{memberIdTag}</span>
+              <i className="fas fa-copy" style={{ fontSize: 10, opacity: 0.8 }} />
+            </button>
           </div>
-          <div className="qr-card-sub">เพื่อบันทึกประวัติการเล่น</div>
+
+          {/* Member Avatar & Details */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, position: 'relative', zIndex: 2 }}>
+            <div style={{ position: 'relative' }}>
+              {lineUser.avatar ? (
+                <img
+                  src={lineUser.avatar}
+                  alt={lineUser.name}
+                  style={{
+                    width: 68,
+                    height: 68,
+                    borderRadius: '50%',
+                    objectFit: 'cover',
+                    border: `3px solid ${theme.accent}`,
+                    boxShadow: `0 0 16px ${theme.borderGlow}`
+                  }}
+                  onError={e => e.currentTarget.style.display = 'none'}
+                />
+              ) : (
+                <div style={{
+                  width: 68,
+                  height: 68,
+                  borderRadius: '50%',
+                  background: theme.accent,
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 28,
+                  fontWeight: 900,
+                  boxShadow: `0 0 16px ${theme.borderGlow}`
+                }}>
+                  {(lineUser.name || '?')[0]}
+                </div>
+              )}
+              <div style={{
+                position: 'absolute',
+                bottom: -2,
+                right: -2,
+                width: 20,
+                height: 20,
+                borderRadius: '50%',
+                background: '#06C755',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                border: '2px solid #18141e'
+              }}>
+                <i className="fab fa-line" />
+              </div>
+            </div>
+
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 19, fontWeight: 900, color: '#ffffff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {lineUser.name}
+              </div>
+              <div style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                marginTop: 4,
+                padding: '2px 8px',
+                borderRadius: 10,
+                background: `rgba(${theme.accentRgb}, 0.25)`,
+                border: `1px solid rgba(${theme.accentRgb}, 0.5)`,
+                color: theme.accent,
+                fontSize: 11,
+                fontWeight: 800
+              }}>
+                <i className={`fas ${theme.watermarkIcon}`} />
+                <span>{theme.name}</span>
+              </div>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 4 }}>
+                {theme.subtitle}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Centered High-Tech QR Target ── */}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', position: 'relative', zIndex: 2 }}>
+            <div
+              className="qr-target-box"
+              onClick={() => setFullscreenQr(true)}
+              title="แตะเพื่อขยาย QR เต็มจอ"
+            >
+              <div className="qr-hud-corner qr-hud-tl" />
+              <div className="qr-hud-corner qr-hud-tr" />
+              <div className="qr-hud-corner qr-hud-bl" />
+              <div className="qr-hud-corner qr-hud-br" />
+
+              <QRCodeSVG
+                value={qrUrl}
+                size={210}
+                bgColor="#ffffff"
+                fgColor="#09090f"
+                level="M"
+                includeMargin={true}
+              />
+            </div>
+
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginTop: 14,
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.85)',
+              textAlign: 'center'
+            }}>
+              <i className="fas fa-qrcode" style={{ color: theme.accent }} />
+              <span>แสดงให้ Game Master หรือเคาน์เตอร์สแกนเพื่อสะสมแต้ม</span>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, width: '100%' }}>
+              <button
+                onClick={() => setFullscreenQr(true)}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  background: 'rgba(255, 255, 255, 0.12)',
+                  border: '1px solid rgba(255, 255, 255, 0.22)',
+                  color: '#ffffff',
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6
+                }}
+              >
+                <i className="fas fa-expand" />
+                <span>ขยายเต็มจอ</span>
+              </button>
+
+              <button
+                onClick={() => handleCopy(qrUrl, 'คัดลอกลิงก์สแกนแล้ว')}
+                style={{
+                  flex: 1,
+                  padding: '9px 12px',
+                  borderRadius: 10,
+                  background: `rgba(${theme.accentRgb}, 0.22)`,
+                  border: `1px solid rgba(${theme.accentRgb}, 0.5)`,
+                  color: theme.accent,
+                  fontSize: 12,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6
+                }}
+              >
+                <i className="fas fa-link" />
+                <span>คัดลอกลิงก์</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Member Stat Strip */}
+          <div style={{
+            marginTop: 20,
+            paddingTop: 14,
+            borderTop: '1px solid rgba(255, 255, 255, 0.12)',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(3, 1fr)',
+            textAlign: 'center',
+            position: 'relative',
+            zIndex: 2
+          }}>
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>ลงคดีแล้ว</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', marginTop: 2 }}>
+                {history.length} <span style={{ fontSize: 11, color: theme.accent }}>คดี</span>
+              </div>
+            </div>
+            <div style={{ borderLeft: '1px solid rgba(255,255,255,0.1)', borderRight: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>ความสำเร็จ</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', marginTop: 2 }}>
+                {memberAchs.length} <span style={{ fontSize: 11, color: theme.accent }}>รายการ</span>
+              </div>
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.6)', fontWeight: 700 }}>ยอดใช้จ่ายรวม</div>
+              <div style={{ fontSize: 15, fontWeight: 900, color: '#ffffff', marginTop: 2 }}>
+                ฿{totalSpent.toLocaleString()}
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Play History */}
-        <div className="qr-history-section">
-          <div className="qr-history-title">
-            <i className="fas fa-history" /> ประวัติการเล่น
-            {history.length > 0 && <span className="qr-history-count">{history.length} ครั้ง</span>}
+        {/* ── Play History Timeline Section ── */}
+        <div style={{ marginTop: 8 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 900, color: 'var(--text-primary)' }}>
+              <i className="fas fa-history" style={{ color: theme.accent }} />
+              <span>ประวัติการลงคดี & บิลย้อนหลัง</span>
+            </div>
+            {history.length > 0 && (
+              <span style={{
+                fontSize: 11,
+                fontWeight: 800,
+                padding: '3px 9px',
+                borderRadius: 12,
+                background: `rgba(${theme.accentRgb}, 0.12)`,
+                color: theme.accent,
+                border: `1px solid rgba(${theme.accentRgb}, 0.25)`
+              }}>
+                {history.length} รายการ
+              </span>
+            )}
           </div>
 
-          {/* Filters */}
+          {/* Search & Month Filter */}
           {history.length > 0 && (
-            <div className="qr-filter-row">
-              <div className="qr-filter-search">
-                <i className="fas fa-search" />
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
+              <div style={{
+                flex: 1,
+                minWidth: 180,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                background: 'var(--surface-card, #f8f8fc)',
+                border: '1px solid var(--border-default, #e5e7eb)',
+                borderRadius: 10,
+                padding: '7px 12px'
+              }}>
+                <i className="fas fa-search" style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: 12 }} />
                 <input
                   type="text"
                   placeholder="ค้นหาชื่อเกม..."
                   value={search}
                   onChange={e => setSearch(e.target.value)}
-                  className="qr-filter-input"
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    outline: 'none',
+                    fontSize: 12,
+                    color: 'var(--text-primary)',
+                    width: '100%',
+                    fontFamily: 'inherit'
+                  }}
                 />
                 {search && (
-                  <button className="qr-filter-clear" onClick={() => setSearch('')}>
+                  <button
+                    onClick={() => setSearch('')}
+                    style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
+                  >
                     <i className="fas fa-times" />
                   </button>
                 )}
               </div>
+
               {monthOptions.length > 1 && (
                 <select
-                  className="qr-filter-month"
                   value={filterMonth}
                   onChange={e => setFilterMonth(e.target.value)}
+                  style={{
+                    border: '1px solid var(--border-default, #e5e7eb)',
+                    borderRadius: 10,
+                    padding: '7px 12px',
+                    fontSize: 12,
+                    color: 'var(--text-primary)',
+                    background: 'var(--surface-card, #f8f8fc)',
+                    outline: 'none',
+                    fontWeight: 700
+                  }}
                 >
                   <option value="">ทุกเดือน</option>
                   {monthOptions.map(m => (
@@ -223,12 +957,22 @@ export default function QRPage({ lineUser }) {
             </div>
           )}
 
+          {/* History Items List */}
           {filtered.length === 0 ? (
-            <div className="qr-history-empty">
-              {history.length === 0 ? 'ยังไม่มีประวัติการเล่น' : 'ไม่พบผลลัพธ์'}
+            <div style={{
+              textAlign: 'center',
+              padding: '36px 16px',
+              borderRadius: 16,
+              background: 'var(--surface-card, #f8f8fc)',
+              border: '1px dashed var(--border-default, #e5e7eb)',
+              color: 'var(--text-tertiary, #9ca3af)',
+              fontSize: 13
+            }}>
+              <i className="fas fa-scroll" style={{ fontSize: 24, marginBottom: 8, opacity: 0.5, display: 'block' }} />
+              {history.length === 0 ? 'ยังไม่มีประวัติการเล่นคดี' : 'ไม่พบคดีที่ตรงกับคำค้นหา'}
             </div>
           ) : (
-            <div className="qr-history-list">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {filtered.map(h => {
                 const me       = h.members?.find(m => m.uid === lineUser.uid)
                 const myBill   = h.memberBills?.find(m => m.uid === lineUser.uid)
@@ -238,80 +982,207 @@ export default function QRPage({ lineUser }) {
                 const myTotal  = myBill?.total ?? h.grandTotal ?? 0
                 const hasFood  = (myBill?.foodItems?.length > 0 || (h.foodItems?.length > 0))
                 const discAmt  = h.discount?.applied || 0
+                const gameCover = getGameCover(h)
 
                 return (
-                  <div key={h.id} className="qr-history-item">
+                  <div key={h.id} className="qr-game-item">
+                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                      {/* Game Poster Thumbnail */}
+                      <div style={{
+                        width: 58,
+                        height: 76,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        background: '#f3f4f6',
+                        flexShrink: 0,
+                        border: '1px solid rgba(0,0,0,0.06)'
+                      }}>
+                        {gameCover ? (
+                          <img
+                            src={gameCover}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            onError={e => e.currentTarget.style.display = 'none'}
+                          />
+                        ) : (
+                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
+                            <i className="fas fa-mask" style={{ fontSize: 20 }} />
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Top row: game name + date */}
-                    <div className="qr-history-item-top">
-                      <div className="qr-history-game">{h.scriptTitle || 'ไม่ระบุเกม'}</div>
-                      <div className="qr-history-date">
-                        {paidAt ? paidAt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : ''}
+                      {/* Info Body */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                          <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                            {h.scriptTitle || 'คดีไม่ระบุชื่อ'}
+                          </div>
+                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
+                            {paidAt ? paidAt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : ''}
+                          </div>
+                        </div>
+
+                        {/* Metadata Tag Row */}
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                          {me?.character && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `rgba(${theme.accentRgb}, 0.12)`, color: theme.accent }}>
+                              <i className="fas fa-user-secret" style={{ marginRight: 3 }} /> {me.character}
+                            </span>
+                          )}
+                          {h.room && (
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'var(--surface-sunken, #f3f4f6)', color: 'var(--text-secondary)' }}>
+                              <i className="fas fa-door-open" style={{ marginRight: 3 }} /> {h.room}
+                            </span>
+                          )}
+                          {h.dm && (
+                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'var(--surface-sunken, #f3f4f6)', color: 'var(--text-secondary)' }}>
+                              <i className="fas fa-crown" style={{ marginRight: 3 }} /> GM: {h.dm}
+                            </span>
+                          )}
+                          {h.ending && (
+                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.12)', color: '#d97706' }}>
+                              <i className="fas fa-flag-checkered" style={{ marginRight: 3 }} /> {h.ending}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Avatars of party */}
+                        {allMembers.length > 0 && (
+                          <div style={{ display: 'flex', gap: 3, marginTop: 8, alignItems: 'center' }}>
+                            {allMembers.slice(0, 7).map((m, idx) => (
+                              m.avatar ? (
+                                <img
+                                  key={idx}
+                                  src={m.avatar}
+                                  alt={m.name}
+                                  title={m.name}
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: '50%',
+                                    objectFit: 'cover',
+                                    border: m.uid === lineUser.uid ? `2px solid ${theme.accent}` : '1.5px solid #ffffff'
+                                  }}
+                                  onError={e => e.currentTarget.style.display = 'none'}
+                                />
+                              ) : (
+                                <div
+                                  key={idx}
+                                  style={{
+                                    width: 22,
+                                    height: 22,
+                                    borderRadius: '50%',
+                                    background: m.uid === lineUser.uid ? theme.accent : '#d1d5db',
+                                    color: '#ffffff',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontSize: 9,
+                                    fontWeight: 700
+                                  }}
+                                  title={m.name}
+                                >
+                                  {(m.name || '?')[0]}
+                                </div>
+                              )
+                            ))}
+                            {allMembers.length > 7 && (
+                              <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700, marginLeft: 2 }}>
+                                +{allMembers.length - 7}
+                              </span>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
 
-                    {/* Tags */}
-                    <div className="qr-history-meta">
-                      {me?.character && <span className="qr-history-tag"><i className="fas fa-user-secret" /> {me.character}</span>}
-                      {h.dm         && <span className="qr-history-tag"><i className="fas fa-crown" /> {h.dm}</span>}
-                      {h.room       && <span className="qr-history-tag"><i className="fas fa-door-open" /> {h.room}</span>}
-                      {allMembers.length > 0 && <span className="qr-history-tag"><i className="fas fa-users" /> {allMembers.length} คน</span>}
-                      {h.ending     && <span className="qr-history-tag qr-tag-ending"><i className="fas fa-flag-checkered" /> {h.ending}</span>}
-                    </div>
-
-                    {/* Member avatars */}
-                    {allMembers.length > 0 && (
-                      <div className="qr-member-avatars">
-                        {allMembers.slice(0, 9).map((m, i) => (
-                          m.avatar
-                            ? <img key={i} src={m.avatar} alt={m.name} title={m.name} className={`qr-member-av${m.uid === lineUser.uid ? ' qr-member-av-me' : ''}`} onError={e => e.currentTarget.style.display = 'none'} />
-                            : <div key={i} className={`qr-member-av qr-member-av-ph${m.uid === lineUser.uid ? ' qr-member-av-me' : ''}`} title={m.name}>{(m.name||'?')[0]}</div>
-                        ))}
-                        {allMembers.length > 9 && <div className="qr-member-av qr-member-av-more">+{allMembers.length - 9}</div>}
+                    {/* Bottom Action / Price Bar */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      marginTop: 12,
+                      paddingTop: 10,
+                      borderTop: '1px solid var(--border-default, #f3f4f6)'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
+                        <i className="fas fa-receipt" style={{ color: theme.accent }} />
+                        <span>ยอดของคุณ:</span>
+                        <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>฿{myTotal.toLocaleString()}</strong>
                       </div>
-                    )}
 
-                    {/* Bill summary + action buttons */}
-                    <div className="qr-bill-row">
-                      <div className="qr-bill-total">
-                        <i className="fas fa-receipt" />
-                        <span>ยอดของคุณ</span>
-                        <strong>฿{myTotal.toLocaleString()}</strong>
-                      </div>
-                      <div className="qr-bill-actions">
-                        <button className="qr-bill-btn" onClick={() => toggleExpanded(h.id)}>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button
+                          onClick={() => toggleExpanded(h.id)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            border: '1px solid var(--border-default, #e5e7eb)',
+                            background: 'var(--surface-sunken, #f9fafb)',
+                            color: 'var(--text-secondary)',
+                            cursor: 'pointer'
+                          }}
+                        >
                           <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} />
-                          {expanded ? 'ซ่อน' : 'ดูบิล'}
+                          <span>{expanded ? 'ซ่อน' : 'ดูบิล'}</span>
                         </button>
-                        <button className="qr-bill-btn qr-bill-print" onClick={() => printBill(h, lineUser.uid)}>
-                          <i className="fas fa-print" /> ปริ้น
+
+                        <button
+                          onClick={() => printBill(h, lineUser.uid)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            border: `1px solid rgba(${theme.accentRgb}, 0.3)`,
+                            background: `rgba(${theme.accentRgb}, 0.1)`,
+                            color: theme.accent,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <i className="fas fa-print" />
+                          <span>พิมพ์ใบเสร็จ</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* Expanded detail */}
+                    {/* Expanded Detail Panel */}
                     {expanded && (
-                      <div className="qr-history-detail">
-
+                      <div style={{
+                        marginTop: 10,
+                        paddingTop: 10,
+                        borderTop: '1px dashed var(--border-default, #e5e7eb)',
+                        fontSize: 12,
+                        color: 'var(--text-secondary)'
+                      }}>
                         {/* Game cost */}
                         {(h.gameUnitPrice > 0 || h.gameTotal > 0) && (
-                          <div className="qr-hist-detail-section">
-                            <div className="qr-hist-detail-label"><i className="fas fa-gamepad" /> ค่าเกม</div>
-                            <div className="qr-hist-food-row">
-                              <span>{h.scriptTitle || 'เกม'}{h.gameUnitPrice > 0 ? ` (฿${h.gameUnitPrice}/คน × ${allMembers.length || 1})` : ''}</span>
-                              <span>฿{(h.gameTotal || 0).toLocaleString()}</span>
-                            </div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                            <span>ค่าเล่นเกม {h.gameUnitPrice > 0 ? `(฿${h.gameUnitPrice}/คน)` : ''}</span>
+                            <span>฿{(h.gameTotal || 0).toLocaleString()}</span>
                           </div>
                         )}
 
                         {/* Food items */}
                         {hasFood && (
-                          <div className="qr-hist-detail-section">
-                            <div className="qr-hist-detail-label"><i className="fas fa-utensils" /> รายการอาหาร</div>
-                            {(myBill?.foodItems || h.foodItems || []).map((f, i) => (
-                              <div key={i} className="qr-hist-food-row">
-                                <span>{f.name}{f.addons?.length > 0 ? ` (${f.addons.map(a => a.name||a).join(', ')})` : ''} × {f.qty}</span>
-                                <span>฿{((f.price||0)*f.qty).toLocaleString()}</span>
+                          <div style={{ marginTop: 6, marginBottom: 6 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+                              อาหาร & เครื่องดื่ม
+                            </div>
+                            {(myBill?.foodItems || h.foodItems || []).map((f, fi) => (
+                              <div key={fi} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                <span>{f.name} × {f.qty}</span>
+                                <span>฿{((f.price || 0) * f.qty).toLocaleString()}</span>
                               </div>
                             ))}
                           </div>
@@ -319,43 +1190,26 @@ export default function QRPage({ lineUser }) {
 
                         {/* Discount */}
                         {discAmt > 0 && (
-                          <div className="qr-hist-food-row qr-hist-discount">
-                            <span><i className="fas fa-tag" /> ส่วนลด</span>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
+                            <span>ส่วนลดพิเศษ</span>
                             <span>-฿{discAmt.toLocaleString()}</span>
                           </div>
                         )}
 
-                        {/* Party members */}
-                        {allMembers.length > 0 && (
-                          <div className="qr-hist-detail-section">
-                            <div className="qr-hist-detail-label"><i className="fas fa-users" /> เพื่อนร่วมปาร์ตี้</div>
-                            {allMembers.map((m, i) => (
-                              <div key={i} className="qr-hist-member-row">
-                                {m.avatar
-                                  ? <img src={m.avatar} alt="" className="qr-hist-avatar" onError={e => e.currentTarget.style.display = 'none'} />
-                                  : <div className="qr-hist-avatar-ph">{(m.name||'?')[0]}</div>
-                                }
-                                <span className="qr-hist-member-name">{m.name}</span>
-                                {m.character && <span className="qr-hist-member-char">({m.character})</span>}
-                                {m.uid === lineUser.uid && <span className="qr-hist-me-badge">คุณ</span>}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Game ending */}
-                        {h.ending && (
-                          <div className="qr-hist-ending">
-                            <i className="fas fa-flag-checkered" /> ผลเกม: <strong>{h.ending}</strong>
-                          </div>
-                        )}
-
                         {/* Total */}
-                        <div className="qr-hist-total-row">
-                          <span>ยอดรวมของคุณ</span>
-                          <strong>฿{myTotal.toLocaleString()}</strong>
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          paddingTop: 8,
+                          marginTop: 6,
+                          borderTop: '1px solid var(--border-default, #f3f4f6)',
+                          fontWeight: 800,
+                          fontSize: 13,
+                          color: 'var(--text-primary)'
+                        }}>
+                          <span>ยอดรวมสุทธิ</span>
+                          <span>฿{myTotal.toLocaleString()}</span>
                         </div>
-
                       </div>
                     )}
                   </div>
@@ -366,6 +1220,78 @@ export default function QRPage({ lineUser }) {
         </div>
 
       </div>
+
+      {/* ── Fullscreen QR Zoom Modal ── */}
+      {fullscreenQr && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            zIndex: 99999,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24
+          }}
+          onClick={() => setFullscreenQr(false)}
+        >
+          <div
+            style={{
+              background: '#ffffff',
+              padding: 24,
+              borderRadius: 24,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              maxWidth: 360,
+              width: '100%',
+              boxShadow: `0 0 40px ${theme.borderGlow}`,
+              border: `3px solid ${theme.accent}`
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: 13, fontWeight: 900, color: theme.accent, letterSpacing: '0.08em', marginBottom: 6 }}>
+              {theme.title}
+            </div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: '#111827', marginBottom: 16 }}>
+              {lineUser.name}
+            </div>
+
+            <QRCodeSVG
+              value={qrUrl}
+              size={260}
+              bgColor="#ffffff"
+              fgColor="#09090f"
+              level="H"
+              includeMargin={true}
+            />
+
+            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 16, textAlign: 'center' }}>
+              แตะส่วนใดก็ได้เพื่อปิดหน้าต่าง
+            </div>
+
+            <button
+              onClick={() => setFullscreenQr(false)}
+              style={{
+                marginTop: 18,
+                padding: '10px 24px',
+                borderRadius: 12,
+                background: theme.accent,
+                color: '#ffffff',
+                border: 'none',
+                fontWeight: 800,
+                fontSize: 13,
+                cursor: 'pointer'
+              }}
+            >
+              ปิดหน้าต่าง
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

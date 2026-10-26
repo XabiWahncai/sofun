@@ -635,7 +635,7 @@ export default function App() {
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}
-      {currentPage === 'qr' && <QRPage lineUser={lineUser} />}
+      {currentPage === 'qr' && <QRPage lineUser={lineUser} allGames={allGames} />}
       {currentPage === 'order' && activeMemberOrder && (
         <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} allGames={allGames} showPage={showPage} />
       )}
