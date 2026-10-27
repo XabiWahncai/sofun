@@ -1442,9 +1442,9 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
             {[
               { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
-              { num: '200+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
-              { num: 'B499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
-              { num: '5',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
+              { num: '699+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
+              { num: '599฿',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
+              { num: '3',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
             ].map((s, i) => (
               <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
                 padding: 'clamp(24px,3vw,40px) clamp(16px,2vw,28px)',
