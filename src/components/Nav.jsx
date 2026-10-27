@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useLang } from '../LangContext'
-import logoImg from '../assets/Logo.jpg'
+import logoImg from '../assets/Logo.png'
 
 export default function Nav({
   currentPage,

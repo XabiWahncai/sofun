@@ -1,4 +1,4 @@
-import logoImg from '../assets/Logo.jpg'
+import logoImg from '../assets/Logo.png'
 
 const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
