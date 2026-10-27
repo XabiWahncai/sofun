@@ -725,7 +725,7 @@ export default function TierEffect({ tier }) {
   const [opacity, setOpacity] = useState(1)
 
   useEffect(() => {
-    if (!tier) return
+    if (!tier || tier === 'default' || tier === 'none') return
     setActive(true)
     setOpacity(1)
 
@@ -755,7 +755,7 @@ export default function TierEffect({ tier }) {
     return () => window.removeEventListener('sofun-replay-effect', handleReplay)
   }, [])
 
-  if (!tier || !active) return null
+  if (!tier || tier === 'default' || tier === 'none' || !active) return null
 
   return (
     <div

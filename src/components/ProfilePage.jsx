@@ -25,7 +25,19 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
 
   const [myAchievements, setMyAchievements] = useState([])
   const [pinned, setPinned] = useState([])
-  const [activeTheme, setActiveTheme] = useState(() => localStorage.getItem('sofun_active_theme') || null)
+  const [activeTheme, setActiveTheme] = useState(() => {
+    const s = localStorage.getItem('sofun_active_theme')
+    return (s && s !== 'default' && s !== 'none') ? s : null
+  })
+
+  useEffect(() => {
+    const handleSync = () => {
+      const s = localStorage.getItem('sofun_active_theme')
+      setActiveTheme((s && s !== 'default' && s !== 'none') ? s : null)
+    }
+    window.addEventListener('sofun-theme-change', handleSync)
+    return () => window.removeEventListener('sofun-theme-change', handleSync)
+  }, [])
   const [pinnedSaved, setPinnedSaved] = useState(false)
   const [pinnedSaving, setPinnedSaving] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -54,11 +66,20 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
           : d.achievement ? [d.achievement] : []
         setMyAchievements(owned)
 
-        const fp = Array.isArray(d.pinnedAchievements) ? d.pinnedAchievements : owned
+        const fp = Array.isArray(d.pinnedAchievements) ? d.pinnedAchievements : []
         setPinned(fp.filter(id => owned.includes(id)))
-        if (d.activeAchievement) {
+        if (d.activeAchievement && d.activeAchievement !== 'default' && d.activeAchievement !== 'none') {
           setActiveTheme(d.activeAchievement)
           localStorage.setItem('sofun_active_theme', d.activeAchievement)
+        } else if (d.activeAchievement === 'default' || d.activeAchievement === 'none') {
+          setActiveTheme(null)
+          localStorage.removeItem('sofun_active_theme')
+        } else if (fp.length > 0) {
+          setActiveTheme(fp[0])
+          localStorage.setItem('sofun_active_theme', fp[0])
+        } else {
+          setActiveTheme(null)
+          localStorage.removeItem('sofun_active_theme')
         }
       }
     }).finally(() => setLoading(false))
@@ -111,11 +132,11 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
 
   const savePinned = async () => {
     setPinnedSaving(true)
-    const primaryTheme = pinned[0] || null
+    const primaryTheme = pinned.length > 0 ? pinned[0] : null
     try {
       await updateDoc(doc(db, 'members', lineUser.uid), {
         pinnedAchievements: pinned,
-        activeAchievement: primaryTheme
+        activeAchievement: primaryTheme || 'default'
       })
       if (primaryTheme) {
         localStorage.setItem('sofun_active_theme', primaryTheme)
@@ -130,6 +151,25 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
       setPinnedSaved(true)
       setEditingAch(false)
       setPinnedSnapshot(null)
+      setTimeout(() => setPinnedSaved(false), 2000)
+    } catch (e) {
+      alert('บันทึกล้มเหลว: ' + e.message)
+    } finally {
+      setPinnedSaving(false)
+    }
+  }
+
+  const resetToDefaultTheme = async () => {
+    setPinnedSaving(true)
+    try {
+      await updateDoc(doc(db, 'members', lineUser.uid), {
+        activeAchievement: 'default'
+      })
+      localStorage.removeItem('sofun_active_theme')
+      document.documentElement.removeAttribute('data-achievement')
+      setActiveTheme(null)
+      window.dispatchEvent(new Event('sofun-theme-change'))
+      setPinnedSaved(true)
       setTimeout(() => setPinnedSaved(false), 2000)
     } catch (e) {
       alert('บันทึกล้มเหลว: ' + e.message)
@@ -221,7 +261,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                 const ach = ACHIEVEMENTS[id]
                 if (!ach) return null
                 const rar = RARITY[ach.rarity]
-                const isPrimary = idx === 0
+                const isPrimary = (activeTheme && activeTheme !== 'default') && idx === 0
                 return (
                   <span key={id} style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
@@ -259,26 +299,52 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
               <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
                 {sectionLabel(
                   <><i className="fas fa-award" style={{ marginRight: 6, color: C }} />Achievements</>,
-                  !editingAch && myAchievements.length > 1 && (
-                    <button
-                      onClick={startEditAch}
-                      className="pp-btn-ghost"
-                      style={{
-                        display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '6px 12px', borderRadius: 999,
-                        background: `${C}0c`, color: C,
-                        border: `1px solid ${C}2c`, cursor: 'pointer',
-                        fontSize: 12, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
-                        transition: 'all 0.18s',
-                      }}
-                    >
-                      <i className="fas fa-pen" style={{ fontSize: 10 }} />แก้ไข
-                    </button>
-                  )
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {!editingAch && activeTheme && activeTheme !== 'default' && (
+                      <button
+                        type="button"
+                        onClick={resetToDefaultTheme}
+                        disabled={pinnedSaving}
+                        className="pp-btn-ghost"
+                        title="คืนค่าธีมสีหลักและปิดเอฟเฟกต์บรรยากาศทั้งหมด"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 5,
+                          padding: '5px 12px', borderRadius: 999,
+                          background: 'rgba(0,0,0,0.04)', color: INK_2,
+                          border: `1px solid ${BORDER}`, cursor: 'pointer',
+                          fontSize: 11, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
+                          transition: 'all 0.18s',
+                        }}
+                      >
+                        <i className="fas fa-rotate-left" style={{ fontSize: 9 }} />
+                        คืนค่าธีมมาตรฐาน
+                      </button>
+                    )}
+                    {!editingAch && myAchievements.length > 0 && (
+                      <button
+                        onClick={startEditAch}
+                        className="pp-btn-ghost"
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          padding: '6px 12px', borderRadius: 999,
+                          background: `${C}0c`, color: C,
+                          border: `1px solid ${C}2c`, cursor: 'pointer',
+                          fontSize: 12, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
+                          transition: 'all 0.18s',
+                        }}
+                      >
+                        <i className="fas fa-pen" style={{ fontSize: 10 }} />แก้ไข
+                      </button>
+                    )}
+                  </div>
                 )}
 
                 <div style={{ fontSize: 12, color: INK_2, marginBottom: 14, lineHeight: 1.5 }}>
-                  ความสำเร็จอันดับแรกสุดจะถูกใช้เป็นสีหลักและเอฟเฟกต์บรรยากาศของเว็บไซต์โดยอัตโนมัติ
+                  {activeTheme && activeTheme !== 'default' ? (
+                    <span>กำลังใช้ธีม: <strong style={{ color: ACHIEVEMENTS[activeTheme]?.color || C }}>{ACHIEVEMENTS[activeTheme]?.labelTH || activeTheme}</strong> (อันดับ 1) · สีหลักของเว็บและเอฟเฟกต์จะเปลี่ยนตามความสำเร็จนี้</span>
+                  ) : (
+                    <span>ธีมปัจจุบัน: <strong style={{ color: C }}>ธีมมาตรฐาน Sofun (Curtain Crimson)</strong> · ไม่มีเอฟเฟกต์บรรยากาศ</span>
+                  )}
                 </div>
 
                 {!editingAch ? (
@@ -297,7 +363,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                         const ach = ACHIEVEMENTS[id]
                         if (!ach) return null
                         const rar = RARITY[ach.rarity]
-                        const isPrimary = idx === 0
+                        const isPrimary = (activeTheme && activeTheme !== 'default') && idx === 0
                         return (
                           <div
                             key={id}
@@ -361,7 +427,22 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                           <i className="fas fa-sort-amount-down" style={{ color: C }} />
                           <span>ลำดับที่เลือกแสดง (อันดับ 1 = ธีมหลักของเว็บ)</span>
                         </div>
-                        <span style={{ fontSize: 11, fontWeight: 700, color: C }}>{pinned.length}/{MAX_PINNED}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {pinned.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setPinned([])}
+                              style={{
+                                background: 'none', border: 'none', color: INK_3,
+                                fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                                padding: '2px 6px', borderRadius: 4
+                              }}
+                            >
+                              ล้างทั้งหมด
+                            </button>
+                          )}
+                          <span style={{ fontSize: 11, fontWeight: 700, color: C }}>{pinned.length}/{MAX_PINNED}</span>
+                        </div>
                       </div>
 
                       {pinned.length === 0 ? (

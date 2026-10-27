@@ -307,19 +307,24 @@ export default function QRPage({ lineUser, allGames = [] }) {
 
   // Track active achievement theme
   const [activeTheme, setActiveTheme] = useState(() => {
-    return localStorage.getItem('sofun_active_theme') ||
-      document.documentElement.getAttribute('data-achievement') ||
-      (Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements[0]) ||
-      lineUser?.activeAchievement ||
-      lineUser?.achievement ||
-      'default'
+    const stored = localStorage.getItem('sofun_active_theme')
+    if (stored && stored !== 'default') return stored
+    const docAttr = document.documentElement.getAttribute('data-achievement')
+    if (docAttr && docAttr !== 'default') return docAttr
+    if (lineUser?.activeAchievement && lineUser.activeAchievement !== 'default') return lineUser.activeAchievement
+    if (Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements.length > 0) {
+      return lineUser.pinnedAchievements[0]
+    }
+    return 'default'
   })
 
   // Sync theme changes from window events
   useEffect(() => {
     const handleThemeSync = () => {
-      const stored = localStorage.getItem('sofun_active_theme') || document.documentElement.getAttribute('data-achievement') || 'default'
-      setActiveTheme(stored)
+      const stored = localStorage.getItem('sofun_active_theme')
+      const docAttr = document.documentElement.getAttribute('data-achievement')
+      const effective = (stored && stored !== 'default') ? stored : (docAttr && docAttr !== 'default') ? docAttr : 'default'
+      setActiveTheme(effective)
     }
     window.addEventListener('sofun-theme-change', handleThemeSync)
     return () => window.removeEventListener('sofun-theme-change', handleThemeSync)
@@ -331,8 +336,12 @@ export default function QRPage({ lineUser, allGames = [] }) {
     return onSnapshot(doc(db, 'members', lineUser.uid), snap => {
       if (snap.exists()) {
         const d = snap.data()
+        if (d.activeAchievement === 'default' || d.activeAchievement === 'none') {
+          setActiveTheme('default')
+          return
+        }
         const topPinned = Array.isArray(d.pinnedAchievements) && d.pinnedAchievements.length > 0 ? d.pinnedAchievements[0] : null
-        const themeId = topPinned || d.activeAchievement || d.achievement || 'default'
+        const themeId = d.activeAchievement || topPinned || 'default'
         setActiveTheme(themeId)
       }
     })

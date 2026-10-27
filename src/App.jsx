@@ -304,31 +304,39 @@ export default function App() {
   }, [liffReady])
 
   // ── Apply achievement theme to <html> with equipped theme priority ──
-  const [activeThemeOverride, setActiveThemeOverride] = useState(() => localStorage.getItem('sofun_active_theme') || null)
+  const [activeThemeOverride, setActiveThemeOverride] = useState(() => {
+    const val = localStorage.getItem('sofun_active_theme')
+    return (val && val !== 'default' && val !== 'none') ? val : null
+  })
 
   useEffect(() => {
-    const handleSync = () => setActiveThemeOverride(localStorage.getItem('sofun_active_theme') || null)
+    const handleSync = () => {
+      const val = localStorage.getItem('sofun_active_theme')
+      setActiveThemeOverride((val && val !== 'default' && val !== 'none') ? val : null)
+    }
     window.addEventListener('sofun-theme-change', handleSync)
     return () => window.removeEventListener('sofun-theme-change', handleSync)
   }, [])
 
   useEffect(() => {
-    const topPinned = Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements.length > 0 ? lineUser.pinnedAchievements[0] : null
-    const currentTheme = activeThemeOverride ||
-      topPinned ||
-      lineUser?.activeAchievement
-    if (currentTheme) {
-      document.documentElement.setAttribute('data-achievement', currentTheme)
+    // If explicitly set to default or none, revert to default website theme without achievement
+    if (lineUser?.activeAchievement === 'default' || lineUser?.activeAchievement === 'none') {
+      document.documentElement.removeAttribute('data-achievement')
       return
     }
-    const achs = lineUser?.achievements || (lineUser?.achievement ? [lineUser.achievement] : [])
-    const top = ACHIEVEMENT_LIST.find(a => achs.includes(a.id))
-    if (top) {
-      document.documentElement.setAttribute('data-achievement', top.id)
+
+    const topPinned = Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements.length > 0 ? lineUser.pinnedAchievements[0] : null
+    const currentTheme = activeThemeOverride ||
+      lineUser?.activeAchievement ||
+      topPinned ||
+      null
+
+    if (currentTheme && currentTheme !== 'default' && currentTheme !== 'none') {
+      document.documentElement.setAttribute('data-achievement', currentTheme)
     } else {
       document.documentElement.removeAttribute('data-achievement')
     }
-  }, [activeThemeOverride, lineUser?.achievements, lineUser?.achievement, lineUser?.activeAchievement, lineUser?.pinnedAchievements])
+  }, [activeThemeOverride, lineUser?.activeAchievement, lineUser?.pinnedAchievements])
 
   // ── Live-sync achievements from Firestore (admin may update them) ───
   useEffect(() => {
@@ -341,7 +349,9 @@ export default function App() {
       const achievements = Array.isArray(d.achievements) ? d.achievements
         : achievement ? [achievement] : []
       const pinnedAchievements = Array.isArray(d.pinnedAchievements) ? d.pinnedAchievements : []
-      const activeAchievement = d.activeAchievement || pinnedAchievements[0] || null
+      const activeAchievement = d.activeAchievement !== undefined
+        ? d.activeAchievement
+        : (pinnedAchievements.length > 0 ? pinnedAchievements[0] : null)
       setLineUser(prev => {
         if (!prev) return prev
         const same = prev.achievement === achievement
@@ -811,10 +821,14 @@ export default function App() {
 
       {(() => {
         if (lineUser?.role === 'admin' && currentPage === 'admin') return null
-        const achs = lineUser?.achievements || (lineUser?.achievement ? [lineUser.achievement] : [])
+        if (lineUser?.activeAchievement === 'default' || lineUser?.activeAchievement === 'none') return null
+
         const topPinned = Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements.length > 0 ? lineUser.pinnedAchievements[0] : null
-        const currentTheme = activeThemeOverride || topPinned || lineUser?.activeAchievement || ACHIEVEMENT_LIST.find(a => achs.includes(a.id))?.id
-        return currentTheme ? <TierEffect tier={currentTheme} /> : null
+        const currentTheme = activeThemeOverride || lineUser?.activeAchievement || topPinned || null
+        if (!currentTheme || currentTheme === 'default' || currentTheme === 'none') {
+          return null
+        }
+        return <TierEffect tier={currentTheme} />
       })()}
 
       {isEffectiveAdmin && currentPage !== 'pos' && globalPendingOrdersCount > 0 && (
