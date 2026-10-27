@@ -220,8 +220,80 @@ const THEME_PROFILES = {
     accentRgb: '5, 150, 105',
     cardBg: 'linear-gradient(145deg, #061914 0%, #0d3529 55%, #030e0b 100%)',
     borderGlow: 'rgba(5, 150, 105, 0.65)',
-    border: 'rgba(5, 150, 105, 0.45)',
+    cardBorder: 'rgba(5, 150, 105, 0.45)',
     watermarkIcon: 'fa-compass'
+  },
+  potterhead: {
+    id: 'potterhead',
+    name: 'PotterHead',
+    title: 'WIZARDING PASS',
+    subtitle: 'สาวกเวทมนตร์ ถือไม้กายสิทธิ์ร่ายมนตร์คลี่คลายปริศนา',
+    accent: '#E11D48',
+    accentRgb: '225, 29, 72',
+    cardBg: 'linear-gradient(145deg, #1f0810 0%, #3d0c1e 55%, #14030a 100%)',
+    borderGlow: 'rgba(225, 29, 72, 0.65)',
+    cardBorder: 'rgba(225, 29, 72, 0.55)',
+    watermarkIcon: 'fa-wand-magic-sparkles'
+  },
+  new_era: {
+    id: 'new_era',
+    name: 'New Era',
+    title: 'NEW ERA GENESIS PASS',
+    subtitle: 'ผู้เปิดศักราชใหม่ ก้าวสู่หน้าประวัติศาสตร์ที่ไม่เคยมีใครทำได้',
+    accent: '#06B6D4',
+    accentRgb: '6, 182, 212',
+    cardBg: 'linear-gradient(145deg, #04161c 0%, #082d3a 55%, #020f14 100%)',
+    borderGlow: 'rgba(6, 182, 212, 0.65)',
+    cardBorder: 'rgba(6, 182, 212, 0.55)',
+    watermarkIcon: 'fa-bolt'
+  },
+  manager: {
+    id: 'manager',
+    name: 'Manager',
+    title: 'CLUB MANAGER PASS',
+    subtitle: 'คุณผู้จัดการร้าน ดูแลทุกรายละเอียด บริหารความสนุกอย่างสมบูรณ์แบบ',
+    accent: '#10B981',
+    accentRgb: '16, 185, 129',
+    cardBg: 'linear-gradient(145deg, #061912 0%, #0c3325 55%, #03110c 100%)',
+    borderGlow: 'rgba(16, 185, 129, 0.65)',
+    cardBorder: 'rgba(16, 185, 129, 0.55)',
+    watermarkIcon: 'fa-user-tie'
+  },
+  silver: {
+    id: 'silver',
+    name: 'Silver Player',
+    title: 'SILVER SLEUTH PASS',
+    subtitle: 'สมาชิกระดับ Silver มั่นคงและน่าเชื่อถือ กระดูกสันหลังของทุกปาร์ตี้',
+    accent: '#94A3B8',
+    accentRgb: '148, 163, 184',
+    cardBg: 'linear-gradient(145deg, #131722 0%, #242c3d 55%, #0d1017 100%)',
+    borderGlow: 'rgba(148, 163, 184, 0.60)',
+    cardBorder: 'rgba(148, 163, 184, 0.50)',
+    watermarkIcon: 'fa-star-half-stroke'
+  },
+  bronze: {
+    id: 'bronze',
+    name: 'Bronze Player',
+    title: 'BRONZE INITIATE PASS',
+    subtitle: 'สมาชิกระดับ Bronze ผู้เริ่มต้นที่มีแววตาแห่งยอดนักสืบ',
+    accent: '#CD7F32',
+    accentRgb: '205, 127, 50',
+    cardBg: 'linear-gradient(145deg, #1c1106 0%, #36220d 55%, #130b04 100%)',
+    borderGlow: 'rgba(205, 127, 50, 0.65)',
+    cardBorder: 'rgba(205, 127, 50, 0.55)',
+    watermarkIcon: 'fa-award'
+  },
+  charity: {
+    id: 'charity',
+    name: 'Charity Chairman',
+    title: 'PHILANTHROPIST PASS',
+    subtitle: 'ประธานสมาคมการกุศล ใจใหญ่และเปี่ยมด้วยน้ำใจ คอยดูแลทุกคนเสมอ',
+    accent: '#BE185D',
+    accentRgb: '190, 24, 93',
+    cardBg: 'linear-gradient(145deg, #1f0714 0%, #3a0d26 55%, #14040d 100%)',
+    borderGlow: 'rgba(190, 24, 93, 0.65)',
+    cardBorder: 'rgba(190, 24, 93, 0.55)',
+    watermarkIcon: 'fa-heart'
   }
 }
 
@@ -237,6 +309,7 @@ export default function QRPage({ lineUser, allGames = [] }) {
   const [activeTheme, setActiveTheme] = useState(() => {
     return localStorage.getItem('sofun_active_theme') ||
       document.documentElement.getAttribute('data-achievement') ||
+      (Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements[0]) ||
       lineUser?.activeAchievement ||
       lineUser?.achievement ||
       'default'
@@ -258,9 +331,9 @@ export default function QRPage({ lineUser, allGames = [] }) {
     return onSnapshot(doc(db, 'members', lineUser.uid), snap => {
       if (snap.exists()) {
         const d = snap.data()
-        if (d.activeAchievement) {
-          setActiveTheme(d.activeAchievement)
-        }
+        const topPinned = Array.isArray(d.pinnedAchievements) && d.pinnedAchievements.length > 0 ? d.pinnedAchievements[0] : null
+        const themeId = topPinned || d.activeAchievement || d.achievement || 'default'
+        setActiveTheme(themeId)
       }
     })
   }, [lineUser?.uid])

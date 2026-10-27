@@ -34,7 +34,7 @@ const STATUS_LABELS = {
 
 const STATUS_COLORS = {
   pending:   { bg: 'rgba(245, 158, 11, 0.08)', color: '#b45309', border: 'rgba(245, 158, 11, 0.25)' },
-  confirmed: { bg: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',   color: '#e50914', border: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25)' },
+  confirmed: { bg: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',   color: 'var(--curtain-crimson, #e50914)', border: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25)' },
   locked:    { bg: 'rgba(16, 185, 129, 0.08)', color: '#15803d', border: 'rgba(16, 185, 129, 0.25)' },
   collapsed: { bg: 'rgba(239, 68, 68, 0.08)',  color: '#dc2626', border: 'rgba(239, 68, 68, 0.25)' },
   cancelled: { bg: 'rgba(100, 116, 139, 0.08)',color: '#64748b', border: 'rgba(100, 116, 139, 0.2)' },
@@ -122,13 +122,13 @@ const NETFLIX_BOOKING_CSS = `
   }
   @media (hover: hover) {
     .nfx-script-card:not(.selected):not(.locked):hover {
-      border-color: #e50914 !important;
+      border-color: var(--curtain-crimson, #e50914) !important;
       box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08) !important;
       transform: translateY(-2px) !important;
     }
   }
   .nfx-script-card.selected {
-    border-color: #e50914 !important;
+    border-color: var(--curtain-crimson, #e50914) !important;
     box-shadow: 0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25) !important;
     transform: translateY(-2px) !important;
   }
@@ -470,7 +470,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               borderRadius: '12px',
               background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
               border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
-              color: '#e50914',
+              color: 'var(--curtain-crimson, #e50914)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -498,7 +498,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                 style={{
                   fontSize: '14px',
                   fontWeight: 800,
-                  color: '#e50914',
+                  color: 'var(--curtain-crimson, #e50914)',
                   background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                   padding: '2px 8px',
                   borderRadius: '6px',
@@ -541,7 +541,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               borderRadius: '10px',
               border: `1px solid ${useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
               background: useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#ffffff',
-              color: useBarMode ? '#e50914' : '#4b5563',
+              color: useBarMode ? 'var(--curtain-crimson, #e50914)' : '#4b5563',
               fontSize: '12px',
               fontWeight: 800,
               cursor: 'pointer',
@@ -573,7 +573,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               transition: 'all 0.15s ease',
             }}
             onMouseEnter={e => {
-              e.currentTarget.style.borderColor = '#e50914'
+              e.currentTarget.style.borderColor = 'var(--curtain-crimson, #e50914)'
               e.currentTarget.style.color = '#e50914'
               e.currentTarget.style.background = 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.04)'
             }}
@@ -583,7 +583,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               e.currentTarget.style.background = '#ffffff'
             }}
           >
-            <i className="fas fa-bullseye" style={{ fontSize: '11px', color: '#e50914' }} />
+            <i className="fas fa-bullseye" style={{ fontSize: '11px', color: 'var(--curtain-crimson, #e50914)' }} />
             วันนี้
           </button>
 
@@ -667,7 +667,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
           {DAY_NAMES_FULL.map((d, i) => {
             const isSun = i === 0
             const isSat = i === 6
-            const headerColor = isSun ? '#e50914' : isSat ? '#2563eb' : '#475569'
+            const headerColor = isSun ? 'var(--curtain-crimson, #e50914)' : isSat ? '#2563eb' : '#475569'
             return (
               <div
                 key={d}
@@ -743,7 +743,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                   borderBottom,
                   transition: 'background 0.12s',
                   position: 'relative',
-                  boxShadow: isSel ? 'inset 0 0 0 2px #e50914' : 'none',
+                  boxShadow: isSel ? 'inset 0 0 0 2px var(--curtain-crimson, #e50914)' : 'none',
                 }}
                 onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0, 0, 0, 0.025)' }}
                 onMouseLeave={e => e.currentTarget.style.background = cellBg}
@@ -763,7 +763,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                       style={{
                         fontSize: '8.5px',
                         fontWeight: 900,
-                        color: '#e50914',
+                        color: 'var(--curtain-crimson, #e50914)',
                         letterSpacing: '0.02em',
                         textTransform: 'uppercase',
                       }}
@@ -776,7 +776,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                         width: '5px',
                         height: '5px',
                         borderRadius: '50%',
-                        background: '#e50914',
+                        background: 'var(--curtain-crimson, #e50914)',
                         opacity: 0.85,
                       }}
                     />
@@ -797,16 +797,16 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                       color: isToday
                         ? '#ffffff'
                         : isSel
-                          ? '#e50914'
+                          ? 'var(--curtain-crimson, #e50914)'
                           : isSun
-                            ? '#e50914'
+                            ? 'var(--curtain-crimson, #e50914)'
                             : isSat
                               ? '#2563eb'
                               : isPast
                                 ? '#94a3b8'
                                 : '#1e293b',
                       background: isToday
-                        ? '#e50914'
+                        ? 'var(--curtain-crimson, #e50914)'
                         : isSel
                           ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.12)'
                           : 'transparent',
@@ -906,7 +906,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               height: '40px',
               borderRadius: '12px',
               background: activeDateStr === todayStr ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#f1f5f9',
-              color: activeDateStr === todayStr ? '#e50914' : '#4b5563',
+              color: activeDateStr === todayStr ? 'var(--curtain-crimson, #e50914)' : '#4b5563',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -938,7 +938,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                     padding: '2px 8px',
                     borderRadius: '20px',
                     background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-                    color: '#e50914',
+                    color: 'var(--curtain-crimson, #e50914)',
                     border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
                   }}
                 >
@@ -1012,7 +1012,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             flexShrink: 0,
             padding: '10px 22px',
             borderRadius: '12px',
-            background: '#e50914',
+            background: 'var(--curtain-crimson, #e50914)',
             border: 'none',
             color: '#ffffff',
             fontSize: '13px',
@@ -1067,7 +1067,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
       }}
       onMouseEnter={e => {
         if (!isCollapsed) {
-          e.currentTarget.style.borderColor = '#e50914'
+          e.currentTarget.style.borderColor = 'var(--curtain-crimson, #e50914)'
           e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.08)'
           e.currentTarget.style.transform = 'translateY(-2px)'
         }
@@ -1154,7 +1154,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
         {/* Meta chips */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontSize: '11.5px', color: '#4b5563', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <i className="fas fa-calendar text-[10px]" style={{ color: '#e50914' }} />
+            <i className="fas fa-calendar text-[10px]" style={{ color: 'var(--curtain-crimson, #e50914)' }} />
             {fmtDate(booking.date)}
           </span>
           {booking.time && (
@@ -1174,7 +1174,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
               style={{
                 fontSize: '9.5px',
                 fontWeight: 800,
-                color: '#e50914',
+                color: 'var(--curtain-crimson, #e50914)',
                 background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                 padding: '1px 6px',
                 borderRadius: '6px',
@@ -1196,7 +1196,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
           ) : (
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10.5px', color: '#64748b', fontWeight: 600 }}>
               <span>สมาชิก {total}/{max} คน</span>
-              <span style={{ color: isLocked || allPaid ? '#15803d' : '#e50914', fontWeight: 700 }}>
+              <span style={{ color: isLocked || allPaid ? '#15803d' : 'var(--curtain-crimson, #e50914)', fontWeight: 700 }}>
                 {isLocked ? 'ล็อกห้องแล้ว 100%' : `มัดจำ ${paidCount}/${max} คน`}
               </span>
             </div>
@@ -1207,7 +1207,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
               style={{
                 height: '100%',
                 width: isLocked && !canView ? '100%' : `${paidPct}%`,
-                background: isLocked || allPaid ? '#16a34a' : '#e50914',
+                background: isLocked || allPaid ? '#16a34a' : 'var(--curtain-crimson, #e50914)',
                 borderRadius: '5px',
                 transition: 'width 0.3s ease-out',
               }}
@@ -1260,7 +1260,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
               ปิดตี้
             </button>
           ) : (
-            <span style={{ fontSize: '11px', fontWeight: 800, color: '#e50914', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: 'var(--curtain-crimson, #e50914)', display: 'flex', alignItems: 'center', gap: '4px', marginLeft: 'auto' }}>
               ดูรายละเอียด <i className="fas fa-chevron-right text-[9px]" />
             </span>
           )}
@@ -1274,7 +1274,7 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
             position: 'absolute',
             top: '8px',
             right: '8px',
-            background: '#e50914',
+            background: 'var(--curtain-crimson, #e50914)',
             color: '#ffffff',
             fontSize: '10px',
             fontWeight: 900,
@@ -1435,7 +1435,7 @@ function CreateBookingModal({
     }
   }
 
-  const C = '#e50914'
+  const C = 'var(--curtain-crimson, #e50914)'
   const INK = '#111827'
 
   return (
@@ -2149,7 +2149,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   }
 
   const stepIndex = step === 'qr' ? 0 : step === 'upload' ? 1 : 2
-  const C = '#e50914'
+  const C = 'var(--curtain-crimson, #e50914)'
   const INK = '#111827'
 
   return (
@@ -2661,7 +2661,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
     showToast('คัดลอกลิงก์แล้ว')
   }
 
-  const C = '#e50914'
+  const C = 'var(--curtain-crimson, #e50914)'
   const INK = '#111827'
 
   if (isLockedRestricted) {
@@ -3865,7 +3865,7 @@ export default function BookingPage({
   if (loading) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '60vh', gap: 12, color: '#64748b', fontFamily: 'Sarabun, sans-serif', background: '#f8fafc' }}>
-        <div style={{ width: 36, height: 36, border: '3px solid rgba(0,0,0,0.1)', borderTopColor: '#e50914', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ width: 36, height: 36, border: '3px solid rgba(0,0,0,0.1)', borderTopColor: 'var(--curtain-crimson, #e50914)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: '0.04em' }}>กำลังโหลดระบบจองรอบเกม...</div>
       </div>
     )
@@ -3880,8 +3880,6 @@ export default function BookingPage({
         fontFamily: 'Sarabun, sans-serif',
         paddingTop: 56,
         paddingBottom: 80,
-        '--crimson-500': '#e50914',
-        '--crimson-400': '#ef4444',
         '--surface-card': '#ffffff',
         '--surface-raised': '#ffffff',
         '--surface-sunken': '#f8fafc',
@@ -3917,7 +3915,7 @@ export default function BookingPage({
                   borderRadius: 20,
                   background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
                   border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
-                  color: '#e50914',
+                  color: 'var(--curtain-crimson, #e50914)',
                   fontSize: 11,
                   fontWeight: 800,
                   letterSpacing: '0.14em',
@@ -3925,7 +3923,7 @@ export default function BookingPage({
                   marginBottom: 12,
                 }}
               >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#e50914' }} />
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--curtain-crimson, #e50914)' }} />
                 SOFUN CLUB THAILAND · SCRIPT MURDER BOOKING
               </div>
 
@@ -3944,7 +3942,7 @@ export default function BookingPage({
                       textTransform: 'uppercase',
                     }}
                   >
-                    จองรอบเกม <span style={{ color: '#e50914' }}>& ตารางห้องสืบคดี</span>
+                    จองรอบเกม <span style={{ color: 'var(--curtain-crimson, #e50914)' }}>& ตารางห้องสืบคดี</span>
                   </h1>
                   <p style={{ fontSize: 13.5, color: '#4b5563', lineHeight: 1.7, margin: 0, maxWidth: 680 }}>
                     จองรอบเล่นเกม Script Murder ที่ Sofun Club Thailand เช็คตารางห้องว่างแบบเรียลไทม์ หรือเปิดปาร์ตี้ใหม่เพื่อชวนเพื่อนร่วมไขปริศนา
@@ -3958,7 +3956,7 @@ export default function BookingPage({
                   style={{
                     padding: '12px 24px',
                     borderRadius: 12,
-                    background: '#e50914',
+                    background: 'var(--curtain-crimson, #e50914)',
                     color: '#ffffff',
                     border: 'none',
                     fontSize: 14,
@@ -3998,7 +3996,7 @@ export default function BookingPage({
                       color: '#4b5563',
                     }}
                   >
-                    <i className={stat.icon} style={{ color: '#e50914', fontSize: 11 }} />
+                    <i className={stat.icon} style={{ color: 'var(--curtain-crimson, #e50914)', fontSize: 11 }} />
                     <span>{stat.label}</span>
                   </div>
                 ))}
@@ -4036,12 +4034,12 @@ export default function BookingPage({
                 {/* Header */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 4, height: 18, borderRadius: 2, background: '#e50914' }} />
+                    <div style={{ width: 4, height: 18, borderRadius: 2, background: 'var(--curtain-crimson, #e50914)' }} />
                     <h3 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.01em' }}>
                       การจองของฉัน (MY LIST)
                     </h3>
                     {activeMyBookings.length > 0 && (
-                      <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 12, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)', color: '#e50914' }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, padding: '1px 8px', borderRadius: 12, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)', color: 'var(--curtain-crimson, #e50914)' }}>
                         {activeMyBookings.length}
                       </span>
                     )}
@@ -4054,7 +4052,7 @@ export default function BookingPage({
                     style={{
                       padding: '5px 12px',
                       borderRadius: 8,
-                      background: '#e50914',
+                      background: 'var(--curtain-crimson, #e50914)',
                       color: '#ffffff',
                       border: 'none',
                       fontSize: 11.5,
@@ -4110,7 +4108,7 @@ export default function BookingPage({
                               padding: '0 5px',
                               borderRadius: 10,
                               background: isActive ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)' : '#e2e8f0',
-                              color: isActive ? '#e50914' : '#475569',
+                              color: isActive ? 'var(--curtain-crimson, #e50914)' : '#475569',
                             }}
                           >
                             {t.count}
@@ -4138,7 +4136,7 @@ export default function BookingPage({
                         height: 44,
                         borderRadius: 12,
                         background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-                        color: '#e50914',
+                        color: 'var(--curtain-crimson, #e50914)',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -4161,7 +4159,7 @@ export default function BookingPage({
                       style={{
                         padding: '8px 18px',
                         borderRadius: 10,
-                        background: '#e50914',
+                        background: 'var(--curtain-crimson, #e50914)',
                         color: '#ffffff',
                         border: 'none',
                         fontSize: 12,
@@ -4236,7 +4234,7 @@ export default function BookingPage({
                     { icon: 'fas fa-door-closed', col: '#d97706', text: 'ล็อคห้องส่วนตัว & เลือกรอบเวลาที่ต้องการ' },
                     { icon: 'fas fa-users', col: '#2563eb', text: 'สร้างปาร์ตี้ ส่งลิงก์ชวนเพื่อนร่วมตี้' },
                     { icon: 'fab fa-line', col: '#06c755', text: 'แจ้งเตือนสถานะการจองผ่าน LINE ทันที' },
-                    { icon: 'fas fa-gem', col: '#e50914', text: 'สะสมแต้มเล่นเกมเพื่อรับส่วนลดพิเศษ' },
+                    { icon: 'fas fa-gem', col: 'var(--curtain-crimson, #e50914)', text: 'สะสมแต้มเล่นเกมเพื่อรับส่วนลดพิเศษ' },
                   ].map((item, idx) => (
                     <div
                       key={idx}
@@ -4324,7 +4322,7 @@ export default function BookingPage({
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 4, height: 18, borderRadius: 2, background: '#e50914' }} />
+                  <div style={{ width: 4, height: 18, borderRadius: 2, background: 'var(--curtain-crimson, #e50914)' }} />
                   <h3 style={{ fontSize: 15, fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.01em' }}>
                     ตารางห้อง & ปฏิทินรอบเล่น
                   </h3>

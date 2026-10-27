@@ -473,7 +473,7 @@ const RESPONSIVE_CSS = `
   .netflix-scroll-arrow:hover .netflix-scroll-arrow-circle {
     transform: scale(1.15) !important;
     border-color: rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.4) !important;
-    color: #e50914 !important;
+    color: var(--curtain-crimson, #e50914) !important;
     box-shadow: 0 6px 20px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.22), 0 2px 8px rgba(0,0,0,0.1) !important;
   }
   .netflix-scroll-arrow:active .netflix-scroll-arrow-circle {

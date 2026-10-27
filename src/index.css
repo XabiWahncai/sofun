@@ -7168,93 +7168,442 @@ nav {
 }
 
 /* ===== ACHIEVEMENT THEMES ===== */
-/* Each block overrides both light-mode --red vars AND dark-mode --curtain-crimson vars */
-
+/* ================================================================
+   Achievement Theme Overrides (Comprehensive Design Tokens)
+   Unifies --curtain-crimson, --red, --crimson-*, and semantic tokens
+   for all 16 achievements across the entire platform.
+   ================================================================ */
+:root[data-achievement="potterhead"] {
+  --curtain-crimson: #E11D48;
+  --curtain-crimson-light: #FB7185;
+  --curtain-crimson-deep: #BE123C;
+  --curtain-crimson-rgb: 225, 29, 72;
+  --red: #E11D48;
+  --red-light: #FB7185;
+  --red-dark: #BE123C;
+  --red-glow: rgba(225, 29, 72, 0.20);
+  --n-border-red: rgba(225, 29, 72, 0.25);
+  --ed-red: #E11D48;
+  --ed-red-bg: rgba(225, 29, 72, 0.08);
+  --ed-border-red: rgba(225, 29, 72, 0.25);
+  --crimson-300: #FDA4AF;
+  --crimson-400: #FB7185;
+  --crimson-500: #E11D48;
+  --crimson-500-rgb: 225, 29, 72;
+  --crimson-600: #BE123C;
+  --crimson-700: #9F1239;
+  --action-primary: #E11D48;
+  --action-primary-hover: #BE123C;
+  --text-link: #E11D48;
+  --text-link-hover: #BE123C;
+  --border-focus: #E11D48;
+  --focus-ring: #E11D48;
+  --focus-ring-glow: rgba(225, 29, 72, 0.12);
+}
 :root[data-achievement="godfather"] {
-  --red: #8B0000; --red-light: #b91c1c; --red-dark: #6B0000; --red-glow: rgba(139,0,0,0.15);
-  --curtain-crimson: #8B0000; --curtain-crimson-light: #b91c1c; --curtain-crimson-deep: #6B0000;
+  --curtain-crimson: #8B0000;
+  --curtain-crimson-light: #B91C1C;
+  --curtain-crimson-deep: #700000;
   --curtain-crimson-rgb: 139, 0, 0;
-  --n-border-red: rgba(139,0,0,0.20);
+  --red: #8B0000;
+  --red-light: #B91C1C;
+  --red-dark: #700000;
+  --red-glow: rgba(139, 0, 0, 0.20);
+  --n-border-red: rgba(139, 0, 0, 0.25);
+  --ed-red: #8B0000;
+  --ed-red-bg: rgba(139, 0, 0, 0.08);
+  --ed-border-red: rgba(139, 0, 0, 0.25);
+  --crimson-300: #D03030;
+  --crimson-400: #B91C1C;
+  --crimson-500: #8B0000;
+  --crimson-500-rgb: 139, 0, 0;
+  --crimson-600: #700000;
+  --crimson-700: #550000;
+  --action-primary: #8B0000;
+  --action-primary-hover: #700000;
+  --text-link: #8B0000;
+  --text-link-hover: #700000;
+  --border-focus: #8B0000;
+  --focus-ring: #8B0000;
+  --focus-ring-glow: rgba(139, 0, 0, 0.12);
 }
 :root[data-achievement="champion"] {
-  --red: #D97706; --red-light: #F59E0B; --red-dark: #B45309; --red-glow: rgba(217,119,6,0.15);
-  --curtain-crimson: #D97706; --curtain-crimson-light: #F59E0B; --curtain-crimson-deep: #B45309;
+  --curtain-crimson: #D97706;
+  --curtain-crimson-light: #F59E0B;
+  --curtain-crimson-deep: #B45309;
   --curtain-crimson-rgb: 217, 119, 6;
-  --n-border-red: rgba(217,119,6,0.22);
+  --red: #D97706;
+  --red-light: #F59E0B;
+  --red-dark: #B45309;
+  --red-glow: rgba(217, 119, 6, 0.20);
+  --n-border-red: rgba(217, 119, 6, 0.25);
+  --ed-red: #D97706;
+  --ed-red-bg: rgba(217, 119, 6, 0.08);
+  --ed-border-red: rgba(217, 119, 6, 0.25);
+  --crimson-300: #FCD34D;
+  --crimson-400: #F59E0B;
+  --crimson-500: #D97706;
+  --crimson-500-rgb: 217, 119, 6;
+  --crimson-600: #B45309;
+  --crimson-700: #92400E;
+  --action-primary: #D97706;
+  --action-primary-hover: #B45309;
+  --text-link: #D97706;
+  --text-link-hover: #B45309;
+  --border-focus: #D97706;
+  --focus-ring: #D97706;
+  --focus-ring-glow: rgba(217, 119, 6, 0.12);
+}
+:root[data-achievement="new_era"] {
+  --curtain-crimson: #06B6D4;
+  --curtain-crimson-light: #22D3EE;
+  --curtain-crimson-deep: #0891B2;
+  --curtain-crimson-rgb: 6, 182, 212;
+  --red: #06B6D4;
+  --red-light: #22D3EE;
+  --red-dark: #0891B2;
+  --red-glow: rgba(6, 182, 212, 0.20);
+  --n-border-red: rgba(6, 182, 212, 0.25);
+  --ed-red: #06B6D4;
+  --ed-red-bg: rgba(6, 182, 212, 0.08);
+  --ed-border-red: rgba(6, 182, 212, 0.25);
+  --crimson-300: #67E8F9;
+  --crimson-400: #22D3EE;
+  --crimson-500: #06B6D4;
+  --crimson-500-rgb: 6, 182, 212;
+  --crimson-600: #0891B2;
+  --crimson-700: #0E7490;
+  --action-primary: #06B6D4;
+  --action-primary-hover: #0891B2;
+  --text-link: #06B6D4;
+  --text-link-hover: #0891B2;
+  --border-focus: #06B6D4;
+  --focus-ring: #06B6D4;
+  --focus-ring-glow: rgba(6, 182, 212, 0.12);
 }
 :root[data-achievement="villain"] {
-  --red: #DB2777; --red-light: #EC4899; --red-dark: #9D174D; --red-glow: rgba(219,39,119,0.15);
-  --curtain-crimson: #DB2777; --curtain-crimson-light: #EC4899; --curtain-crimson-deep: #9D174D;
+  --curtain-crimson: #DB2777;
+  --curtain-crimson-light: #EC4899;
+  --curtain-crimson-deep: #9D174D;
   --curtain-crimson-rgb: 219, 39, 119;
-  --n-border-red: rgba(219,39,119,0.20);
+  --red: #DB2777;
+  --red-light: #EC4899;
+  --red-dark: #9D174D;
+  --red-glow: rgba(219, 39, 119, 0.20);
+  --n-border-red: rgba(219, 39, 119, 0.25);
+  --ed-red: #DB2777;
+  --ed-red-bg: rgba(219, 39, 119, 0.08);
+  --ed-border-red: rgba(219, 39, 119, 0.25);
+  --crimson-300: #F9A8D4;
+  --crimson-400: #EC4899;
+  --crimson-500: #DB2777;
+  --crimson-500-rgb: 219, 39, 119;
+  --crimson-600: #9D174D;
+  --crimson-700: #831843;
+  --action-primary: #DB2777;
+  --action-primary-hover: #9D174D;
+  --text-link: #DB2777;
+  --text-link-hover: #9D174D;
+  --border-focus: #DB2777;
+  --focus-ring: #DB2777;
+  --focus-ring-glow: rgba(219, 39, 119, 0.12);
 }
 :root[data-achievement="detective"] {
-  --red: #2563EB; --red-light: #3B82F6; --red-dark: #1D4ED8; --red-glow: rgba(37,99,235,0.15);
-  --curtain-crimson: #2563EB; --curtain-crimson-light: #3B82F6; --curtain-crimson-deep: #1D4ED8;
+  --curtain-crimson: #2563EB;
+  --curtain-crimson-light: #3B82F6;
+  --curtain-crimson-deep: #1D4ED8;
   --curtain-crimson-rgb: 37, 99, 235;
-  --n-border-red: rgba(37,99,235,0.22);
+  --red: #2563EB;
+  --red-light: #3B82F6;
+  --red-dark: #1D4ED8;
+  --red-glow: rgba(37, 99, 235, 0.20);
+  --n-border-red: rgba(37, 99, 235, 0.25);
+  --ed-red: #2563EB;
+  --ed-red-bg: rgba(37, 99, 235, 0.08);
+  --ed-border-red: rgba(37, 99, 235, 0.25);
+  --crimson-300: #93C5FD;
+  --crimson-400: #3B82F6;
+  --crimson-500: #2563EB;
+  --crimson-500-rgb: 37, 99, 235;
+  --crimson-600: #1D4ED8;
+  --crimson-700: #1E40AF;
+  --action-primary: #2563EB;
+  --action-primary-hover: #1D4ED8;
+  --text-link: #2563EB;
+  --text-link-hover: #1D4ED8;
+  --border-focus: #2563EB;
+  --focus-ring: #2563EB;
+  --focus-ring-glow: rgba(37, 99, 235, 0.12);
 }
 :root[data-achievement="veteran"] {
-  --red: #7C3AED; --red-light: #8B5CF6; --red-dark: #5B21B6; --red-glow: rgba(124,58,237,0.15);
-  --curtain-crimson: #7C3AED; --curtain-crimson-light: #8B5CF6; --curtain-crimson-deep: #5B21B6;
+  --curtain-crimson: #7C3AED;
+  --curtain-crimson-light: #8B5CF6;
+  --curtain-crimson-deep: #5B21B6;
   --curtain-crimson-rgb: 124, 58, 237;
-  --n-border-red: rgba(124,58,237,0.22);
+  --red: #7C3AED;
+  --red-light: #8B5CF6;
+  --red-dark: #5B21B6;
+  --red-glow: rgba(124, 58, 237, 0.20);
+  --n-border-red: rgba(124, 58, 237, 0.25);
+  --ed-red: #7C3AED;
+  --ed-red-bg: rgba(124, 58, 237, 0.08);
+  --ed-border-red: rgba(124, 58, 237, 0.25);
+  --crimson-300: #C4B5FD;
+  --crimson-400: #8B5CF6;
+  --crimson-500: #7C3AED;
+  --crimson-500-rgb: 124, 58, 237;
+  --crimson-600: #5B21B6;
+  --crimson-700: #4C1D95;
+  --action-primary: #7C3AED;
+  --action-primary-hover: #5B21B6;
+  --text-link: #7C3AED;
+  --text-link-hover: #5B21B6;
+  --border-focus: #7C3AED;
+  --focus-ring: #7C3AED;
+  --focus-ring-glow: rgba(124, 58, 237, 0.12);
+}
+:root[data-achievement="manager"] {
+  --curtain-crimson: #10B981;
+  --curtain-crimson-light: #34D399;
+  --curtain-crimson-deep: #059669;
+  --curtain-crimson-rgb: 16, 185, 129;
+  --red: #10B981;
+  --red-light: #34D399;
+  --red-dark: #059669;
+  --red-glow: rgba(16, 185, 129, 0.20);
+  --n-border-red: rgba(16, 185, 129, 0.25);
+  --ed-red: #10B981;
+  --ed-red-bg: rgba(16, 185, 129, 0.08);
+  --ed-border-red: rgba(16, 185, 129, 0.25);
+  --crimson-300: #6EE7B7;
+  --crimson-400: #34D399;
+  --crimson-500: #10B981;
+  --crimson-500-rgb: 16, 185, 129;
+  --crimson-600: #059669;
+  --crimson-700: #047857;
+  --action-primary: #10B981;
+  --action-primary-hover: #059669;
+  --text-link: #10B981;
+  --text-link-hover: #059669;
+  --border-focus: #10B981;
+  --focus-ring: #10B981;
+  --focus-ring-glow: rgba(16, 185, 129, 0.12);
 }
 :root[data-achievement="golden"] {
-  --red: #D4AF37; --red-light: #FACC15; --red-dark: #CA8A04; --red-glow: rgba(212,175,55,0.25);
-  --curtain-crimson: #D4AF37; --curtain-crimson-light: #FACC15; --curtain-crimson-deep: #CA8A04;
+  --curtain-crimson: #D4AF37;
+  --curtain-crimson-light: #FACC15;
+  --curtain-crimson-deep: #CA8A04;
   --curtain-crimson-rgb: 212, 175, 55;
-  --crimson-500: #D4AF37; --crimson-400: #FACC15; --crimson-300: #FDE047; --crimson-500-rgb: 212, 175, 55;
-  --n-border-red: rgba(212,175,55,0.35);
+  --red: #D4AF37;
+  --red-light: #FACC15;
+  --red-dark: #CA8A04;
+  --red-glow: rgba(212, 175, 55, 0.20);
+  --n-border-red: rgba(212, 175, 55, 0.25);
+  --ed-red: #D4AF37;
+  --ed-red-bg: rgba(212, 175, 55, 0.08);
+  --ed-border-red: rgba(212, 175, 55, 0.25);
+  --crimson-300: #FDE047;
+  --crimson-400: #FACC15;
+  --crimson-500: #D4AF37;
+  --crimson-500-rgb: 212, 175, 55;
+  --crimson-600: #CA8A04;
+  --crimson-700: #A16207;
+  --action-primary: #D4AF37;
+  --action-primary-hover: #CA8A04;
+  --text-link: #D4AF37;
+  --text-link-hover: #CA8A04;
+  --border-focus: #D4AF37;
+  --focus-ring: #D4AF37;
+  --focus-ring-glow: rgba(212, 175, 55, 0.12);
 }
 :root[data-achievement="explorer"] {
-  --red: #059669; --red-light: #10B981; --red-dark: #047857; --red-glow: rgba(5,150,105,0.18);
-  --curtain-crimson: #059669; --curtain-crimson-light: #10B981; --curtain-crimson-deep: #047857;
+  --curtain-crimson: #059669;
+  --curtain-crimson-light: #10B981;
+  --curtain-crimson-deep: #047857;
   --curtain-crimson-rgb: 5, 150, 105;
-  --crimson-500: #059669; --crimson-400: #10B981; --crimson-300: #6EE7B7; --crimson-500-rgb: 5, 150, 105;
-  --n-border-red: rgba(5,150,105,0.25);
+  --red: #059669;
+  --red-light: #10B981;
+  --red-dark: #047857;
+  --red-glow: rgba(5, 150, 105, 0.20);
+  --n-border-red: rgba(5, 150, 105, 0.25);
+  --ed-red: #059669;
+  --ed-red-bg: rgba(5, 150, 105, 0.08);
+  --ed-border-red: rgba(5, 150, 105, 0.25);
+  --crimson-300: #6EE7B7;
+  --crimson-400: #10B981;
+  --crimson-500: #059669;
+  --crimson-500-rgb: 5, 150, 105;
+  --crimson-600: #047857;
+  --crimson-700: #065F46;
+  --action-primary: #059669;
+  --action-primary-hover: #047857;
+  --text-link: #059669;
+  --text-link-hover: #047857;
+  --border-focus: #059669;
+  --focus-ring: #059669;
+  --focus-ring-glow: rgba(5, 150, 105, 0.12);
 }
 :root[data-achievement="billionaire"] {
-  --red: #16A34A; --red-light: #22C55E; --red-dark: #15803D; --red-glow: rgba(22,163,74,0.20);
-  --curtain-crimson: #16A34A; --curtain-crimson-light: #22C55E; --curtain-crimson-deep: #15803D;
+  --curtain-crimson: #16A34A;
+  --curtain-crimson-light: #22C55E;
+  --curtain-crimson-deep: #15803D;
   --curtain-crimson-rgb: 22, 163, 74;
-  --crimson-500: #16A34A; --crimson-400: #22C55E; --crimson-300: #86EFAC; --crimson-500-rgb: 22, 163, 74;
-  --n-border-red: rgba(22,163,74,0.30);
+  --red: #16A34A;
+  --red-light: #22C55E;
+  --red-dark: #15803D;
+  --red-glow: rgba(22, 163, 74, 0.20);
+  --n-border-red: rgba(22, 163, 74, 0.25);
+  --ed-red: #16A34A;
+  --ed-red-bg: rgba(22, 163, 74, 0.08);
+  --ed-border-red: rgba(22, 163, 74, 0.25);
+  --crimson-300: #86EFAC;
+  --crimson-400: #22C55E;
+  --crimson-500: #16A34A;
+  --crimson-500-rgb: 22, 163, 74;
+  --crimson-600: #15803D;
+  --crimson-700: #166534;
+  --action-primary: #16A34A;
+  --action-primary-hover: #15803D;
+  --text-link: #16A34A;
+  --text-link-hover: #15803D;
+  --border-focus: #16A34A;
+  --focus-ring: #16A34A;
+  --focus-ring-glow: rgba(22, 163, 74, 0.12);
 }
 :root[data-achievement="hunger"] {
-  --red: #F97316; --red-light: #FB923C; --red-dark: #EA580C; --red-glow: rgba(249,115,22,0.25);
-  --curtain-crimson: #F97316; --curtain-crimson-light: #FB923C; --curtain-crimson-deep: #EA580C;
+  --curtain-crimson: #F97316;
+  --curtain-crimson-light: #FB923C;
+  --curtain-crimson-deep: #EA580C;
   --curtain-crimson-rgb: 249, 115, 22;
-  --crimson-500: #F97316; --crimson-400: #FB923C; --crimson-300: #FED7AA; --crimson-500-rgb: 249, 115, 22;
-  --n-border-red: rgba(249,115,22,0.35);
+  --red: #F97316;
+  --red-light: #FB923C;
+  --red-dark: #EA580C;
+  --red-glow: rgba(249, 115, 22, 0.20);
+  --n-border-red: rgba(249, 115, 22, 0.25);
+  --ed-red: #F97316;
+  --ed-red-bg: rgba(249, 115, 22, 0.08);
+  --ed-border-red: rgba(249, 115, 22, 0.25);
+  --crimson-300: #FED7AA;
+  --crimson-400: #FB923C;
+  --crimson-500: #F97316;
+  --crimson-500-rgb: 249, 115, 22;
+  --crimson-600: #EA580C;
+  --crimson-700: #C2410C;
+  --action-primary: #F97316;
+  --action-primary-hover: #EA580C;
+  --text-link: #F97316;
+  --text-link-hover: #EA580C;
+  --border-focus: #F97316;
+  --focus-ring: #F97316;
+  --focus-ring-glow: rgba(249, 115, 22, 0.12);
 }
 :root[data-achievement="silver"] {
-  --red: #64748B; --red-light: #94A3B8; --red-dark: #475569; --red-glow: rgba(100,116,139,0.18);
-  --curtain-crimson: #64748B; --curtain-crimson-light: #94A3B8; --curtain-crimson-deep: #475569;
+  --curtain-crimson: #64748B;
+  --curtain-crimson-light: #94A3B8;
+  --curtain-crimson-deep: #475569;
   --curtain-crimson-rgb: 100, 116, 139;
-  --crimson-500: #64748B; --crimson-400: #94A3B8; --crimson-300: #CBD5E1; --crimson-500-rgb: 100, 116, 139;
-  --n-border-red: rgba(100,116,139,0.25);
+  --red: #64748B;
+  --red-light: #94A3B8;
+  --red-dark: #475569;
+  --red-glow: rgba(100, 116, 139, 0.20);
+  --n-border-red: rgba(100, 116, 139, 0.25);
+  --ed-red: #64748B;
+  --ed-red-bg: rgba(100, 116, 139, 0.08);
+  --ed-border-red: rgba(100, 116, 139, 0.25);
+  --crimson-300: #CBD5E1;
+  --crimson-400: #94A3B8;
+  --crimson-500: #64748B;
+  --crimson-500-rgb: 100, 116, 139;
+  --crimson-600: #475569;
+  --crimson-700: #334155;
+  --action-primary: #64748B;
+  --action-primary-hover: #475569;
+  --text-link: #64748B;
+  --text-link-hover: #475569;
+  --border-focus: #64748B;
+  --focus-ring: #64748B;
+  --focus-ring-glow: rgba(100, 116, 139, 0.12);
 }
 :root[data-achievement="bronze"] {
-  --red: #CD7F32; --red-light: #E8972A; --red-dark: #9A5A20; --red-glow: rgba(205,127,50,0.20);
-  --curtain-crimson: #CD7F32; --curtain-crimson-light: #E8972A; --curtain-crimson-deep: #9A5A20;
+  --curtain-crimson: #CD7F32;
+  --curtain-crimson-light: #E8972A;
+  --curtain-crimson-deep: #9A5A20;
   --curtain-crimson-rgb: 205, 127, 50;
-  --crimson-500: #CD7F32; --crimson-400: #E8972A; --crimson-300: #F5C882; --crimson-500-rgb: 205, 127, 50;
-  --n-border-red: rgba(205,127,50,0.30);
+  --red: #CD7F32;
+  --red-light: #E8972A;
+  --red-dark: #9A5A20;
+  --red-glow: rgba(205, 127, 50, 0.20);
+  --n-border-red: rgba(205, 127, 50, 0.25);
+  --ed-red: #CD7F32;
+  --ed-red-bg: rgba(205, 127, 50, 0.08);
+  --ed-border-red: rgba(205, 127, 50, 0.25);
+  --crimson-300: #F5C882;
+  --crimson-400: #E8972A;
+  --crimson-500: #CD7F32;
+  --crimson-500-rgb: 205, 127, 50;
+  --crimson-600: #9A5A20;
+  --crimson-700: #7A3F15;
+  --action-primary: #CD7F32;
+  --action-primary-hover: #9A5A20;
+  --text-link: #CD7F32;
+  --text-link-hover: #9A5A20;
+  --border-focus: #CD7F32;
+  --focus-ring: #CD7F32;
+  --focus-ring-glow: rgba(205, 127, 50, 0.12);
 }
 :root[data-achievement="sadness"] {
-  --red: #64748B; --red-light: #94A3B8; --red-dark: #475569; --red-glow: rgba(100,116,139,0.25);
-  --curtain-crimson: #64748B; --curtain-crimson-light: #94A3B8; --curtain-crimson-deep: #475569;
+  --curtain-crimson: #64748B;
+  --curtain-crimson-light: #94A3B8;
+  --curtain-crimson-deep: #475569;
   --curtain-crimson-rgb: 100, 116, 139;
-  --crimson-500: #64748B; --crimson-400: #94A3B8; --crimson-300: #CBD5E1; --crimson-500-rgb: 100, 116, 139;
-  --n-border-red: rgba(100,116,139,0.30);
+  --red: #64748B;
+  --red-light: #94A3B8;
+  --red-dark: #475569;
+  --red-glow: rgba(100, 116, 139, 0.20);
+  --n-border-red: rgba(100, 116, 139, 0.25);
+  --ed-red: #64748B;
+  --ed-red-bg: rgba(100, 116, 139, 0.08);
+  --ed-border-red: rgba(100, 116, 139, 0.25);
+  --crimson-300: #CBD5E1;
+  --crimson-400: #94A3B8;
+  --crimson-500: #64748B;
+  --crimson-500-rgb: 100, 116, 139;
+  --crimson-600: #475569;
+  --crimson-700: #334155;
+  --action-primary: #64748B;
+  --action-primary-hover: #475569;
+  --text-link: #64748B;
+  --text-link-hover: #475569;
+  --border-focus: #64748B;
+  --focus-ring: #64748B;
+  --focus-ring-glow: rgba(100, 116, 139, 0.12);
 }
 :root[data-achievement="charity"] {
-  --red: #BE185D; --red-light: #EC4899; --red-dark: #9D174D; --red-glow: rgba(190,24,93,0.20);
-  --curtain-crimson: #BE185D; --curtain-crimson-light: #EC4899; --curtain-crimson-deep: #9D174D;
+  --curtain-crimson: #BE185D;
+  --curtain-crimson-light: #EC4899;
+  --curtain-crimson-deep: #9D174D;
   --curtain-crimson-rgb: 190, 24, 93;
-  --crimson-500: #BE185D; --crimson-400: #EC4899; --crimson-300: #FBCFE8; --crimson-500-rgb: 190, 24, 93;
-  --n-border-red: rgba(190,24,93,0.30);
+  --red: #BE185D;
+  --red-light: #EC4899;
+  --red-dark: #9D174D;
+  --red-glow: rgba(190, 24, 93, 0.20);
+  --n-border-red: rgba(190, 24, 93, 0.25);
+  --ed-red: #BE185D;
+  --ed-red-bg: rgba(190, 24, 93, 0.08);
+  --ed-border-red: rgba(190, 24, 93, 0.25);
+  --crimson-300: #FBCFE8;
+  --crimson-400: #EC4899;
+  --crimson-500: #BE185D;
+  --crimson-500-rgb: 190, 24, 93;
+  --crimson-600: #9D174D;
+  --crimson-700: #831843;
+  --action-primary: #BE185D;
+  --action-primary-hover: #9D174D;
+  --text-link: #BE185D;
+  --text-link-hover: #9D174D;
+  --border-focus: #BE185D;
+  --focus-ring: #BE185D;
+  --focus-ring-glow: rgba(190, 24, 93, 0.12);
 }
 
 /* ===== RAIN EFFECT (sadness achievement) ===== */
@@ -8442,12 +8791,12 @@ body::before {
   --ink:          #1a1a1a;               /* primary text */
   --ink-2:        #555555;               /* secondary text */
   --ink-3:        #888888;               /* tertiary text */
-  --ed-red:       #c62419;               /* curtain crimson */
-  --ed-red-bg:    rgba(var(--crimson-500-rgb),0.08);
+  --ed-red:       var(--curtain-crimson, #c62419); /* tracks active achievement theme */
+  --ed-red-bg:    rgba(var(--crimson-500-rgb, 198, 36, 25), 0.08);
   --ed-dark:      #ffffff;               /* nav surface (light) */
   --ed-white:     #ffffff;               /* card surface */
   --ed-border:    rgba(0,0,0,0.08);
-  --ed-border-red: rgba(var(--crimson-500-rgb),0.25);
+  --ed-border-red: rgba(var(--crimson-500-rgb, 198, 36, 25), 0.25);
   --case-amber:   #c8a050;               /* aged photograph / evidence stamp */
 }
 

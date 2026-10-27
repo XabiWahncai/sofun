@@ -313,8 +313,9 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const topPinned = Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements.length > 0 ? lineUser.pinnedAchievements[0] : null
     const currentTheme = activeThemeOverride ||
-      (lineUser?.pinnedAchievements?.length > 0 ? lineUser.pinnedAchievements[0] : null) ||
+      topPinned ||
       lineUser?.activeAchievement
     if (currentTheme) {
       document.documentElement.setAttribute('data-achievement', currentTheme)
@@ -327,7 +328,7 @@ export default function App() {
     } else {
       document.documentElement.removeAttribute('data-achievement')
     }
-  }, [activeThemeOverride, lineUser?.achievements, lineUser?.achievement, lineUser?.activeAchievement])
+  }, [activeThemeOverride, lineUser?.achievements, lineUser?.achievement, lineUser?.activeAchievement, lineUser?.pinnedAchievements])
 
   // ── Live-sync achievements from Firestore (admin may update them) ───
   useEffect(() => {
@@ -811,7 +812,8 @@ export default function App() {
       {(() => {
         if (lineUser?.role === 'admin' && currentPage === 'admin') return null
         const achs = lineUser?.achievements || (lineUser?.achievement ? [lineUser.achievement] : [])
-        const currentTheme = activeThemeOverride || lineUser?.activeAchievement || ACHIEVEMENT_LIST.find(a => achs.includes(a.id))?.id
+        const topPinned = Array.isArray(lineUser?.pinnedAchievements) && lineUser.pinnedAchievements.length > 0 ? lineUser.pinnedAchievements[0] : null
+        const currentTheme = activeThemeOverride || topPinned || lineUser?.activeAchievement || ACHIEVEMENT_LIST.find(a => achs.includes(a.id))?.id
         return currentTheme ? <TierEffect tier={currentTheme} /> : null
       })()}
 

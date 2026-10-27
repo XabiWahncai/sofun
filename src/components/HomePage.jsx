@@ -650,12 +650,12 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .mm-d5{transition-delay:.28s!important}.mm-d6{transition-delay:.34s!important}
 
         .mm-btn-pri{transition:background .25s ease,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s cubic-bezier(.16,1,.3,1)!important}
-        .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px) scale(1.015)!important;box-shadow:0 18px 48px rgba(198,36,25,.55),0 0 24px rgba(198,36,25,.3)!important}
+        .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px) scale(1.015)!important;box-shadow:0 18px 48px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.55),0 0 24px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.3)!important}
         .mm-btn-pri:active{transform:translateY(0) scale(0.98)!important}
         .mm-btn-pri:hover i.fa-arrow-right{transform:translateX(4px);transition:transform .22s ease}
 
         .mm-btn-gho{transition:border-color .25s,color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s!important}
-        .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(198,36,25,.14)!important}
+        .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.14)!important}
         .mm-btn-gho:active{transform:scale(0.98)!important}
 
         .mm-step-card{transition:transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s ease!important;border-radius:14px;background:#ffffff}
@@ -678,7 +678,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           animation:mmMainFloat 7.5s ease-in-out infinite;
           transform-origin:center bottom;
         }
-        .mm-cover-main:hover{box-shadow:0 64px 120px rgba(0,0,0,.42),0 0 50px rgba(198,36,25,.3)!important;filter:brightness(1.07)!important;animation-play-state:paused!important}
+        .mm-cover-main:hover{box-shadow:0 64px 120px rgba(0,0,0,.42),0 0 50px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.3)!important;filter:brightness(1.07)!important;animation-play-state:paused!important}
         .mm-hero-pill{animation:mmPillFloat 4.6s ease-in-out infinite}
 
         .mm-fa{animation:mmFloatA 5.2s ease-in-out infinite}
@@ -857,7 +857,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       <section style={{ background: '#fff', position: 'relative', overflow: 'hidden', minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
 
         {/* ── dot grid ── */}
-        <div aria-hidden style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(circle, rgba(198,36,25,.055) 1px, transparent 1px)`, backgroundSize:'24px 24px', zIndex:0, pointerEvents:'none' }} />
+        <div aria-hidden style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(circle, rgba(var(--curtain-crimson-rgb, 198, 36, 25),.055) 1px, transparent 1px)`, backgroundSize:'24px 24px', zIndex:0, pointerEvents:'none' }} />
 
         {/* ── MOBILE-ONLY scatter covers — hidden on ≥640px ── */}
         {scatterCovers.length > 0 && [
@@ -1014,7 +1014,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                     {heroGame?.title || 'Script Murder'}
                   </div>
                 </div>
-                <div style={{ position:'absolute', top:14, right:14, background:C, color:'#fff', borderRadius:6, padding:'5px 10px', fontSize:9.5, fontWeight:800, letterSpacing:'0.12em', textTransform:'uppercase', boxShadow:'0 4px 14px rgba(198,36,25,.55)' }}>
+                <div style={{ position:'absolute', top:14, right:14, background:C, color:'#fff', borderRadius:6, padding:'5px 10px', fontSize:9.5, fontWeight:800, letterSpacing:'0.12em', textTransform:'uppercase', boxShadow:'0 4px 14px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.55)' }}>
                   FEATURED
                 </div>
               </div>
@@ -1027,7 +1027,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           position:'absolute', top:'50%', left:'71%',
           transform:'translate(calc(-50% + clamp(120px,13vw,200px)), calc(-50% + clamp(160px,20vw,280px)))',
           background:C, color:'#fff', padding:'11px 18px', borderRadius:10,
-          boxShadow:'0 16px 40px rgba(198,36,25,.45)', zIndex:6, textAlign:'center'
+          boxShadow:'0 16px 40px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.45)', zIndex:6, textAlign:'center'
         }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:26, lineHeight:1, letterSpacing:'0.06em' }}>NEW</div>
           <div style={{ fontFamily:"'Sarabun',sans-serif", fontSize:9, fontWeight:800, letterSpacing:'0.16em', textTransform:'uppercase', opacity:.9, marginTop:3 }}>เกมใหม่</div>
@@ -1090,7 +1090,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 background: C, color: '#fff', border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
                 fontFamily: "'Sarabun',sans-serif", padding: '16px 44px', borderRadius: 6,
-                boxShadow: '0 8px 36px rgba(198,36,25,.38)',
+                boxShadow: '0 8px 36px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.38)',
               }}>
                 {t('home','viewScripts')}
               </button>

@@ -164,7 +164,7 @@ function PartyMemberScanModal({ party, onClose }) {
             <div style={{ textAlign: 'center', padding: '16px 0' }}>
               {addedMember.avatar
                 ? <img src={addedMember.avatar} alt="" referrerPolicy="no-referrer" style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid var(--crimson-500)' }} onError={e => e.currentTarget.style.display = 'none'} />
-                : <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: '28px', fontWeight: 700, color: 'var(--crimson-500)' }}>{addedMember.name[0]}</div>
+                : <div style={{ width: '72px', height: '72px', borderRadius: '50%', background: 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto', fontSize: '28px', fontWeight: 700, color: 'var(--crimson-500)' }}>{addedMember.name[0]}</div>
               }
               <div style={{ marginTop: '12px' }}>
                 <i className="fas fa-check-circle" style={{ color: 'var(--crimson-500)', fontSize: '20px' }} />
@@ -405,7 +405,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                 {party.ownerAvatar
                   ? <img src={party.ownerAvatar} style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-                  : <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--crimson-500)', fontSize: '15px' }}>{(party.ownerName || '?')[0]}</div>
+                  : <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: 'var(--crimson-500)', fontSize: '15px' }}>{(party.ownerName || '?')[0]}</div>
                 }
                 <span style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
                   {isOwner ? 'คุณ' : party.ownerName}
@@ -464,7 +464,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
                       <button onClick={() => onApprove(party, r)} style={{ height: '30px', padding: '0 12px', borderRadius: '8px', background: '#1a1a1a', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                         <i className="fas fa-check" style={{ marginRight: '4px' }} /> รับ
                       </button>
-                      <button onClick={() => onDeny(party, r)} style={{ height: '30px', padding: '0 12px', borderRadius: '8px', background: 'rgba(198,36,25,0.08)', color: 'var(--crimson-500)', border: '1px solid rgba(198,36,25,0.2)', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
+                      <button onClick={() => onDeny(party, r)} style={{ height: '30px', padding: '0 12px', borderRadius: '8px', background: 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.08)', color: 'var(--crimson-500)', border: '1px solid rgba(var(--crimson-500-rgb, 198, 36, 25),0.2)', cursor: 'pointer', fontWeight: 600, fontSize: '12px' }}>
                         <i className="fas fa-times" style={{ marginRight: '4px' }} /> ปฏิเสธ
                       </button>
                     </div>
@@ -595,7 +595,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
   const hasPending = isOwner && (party.pendingRequests?.length || 0) > 0
   const myRequest = !isOwner && (party.pendingRequests || []).some(r => r.uid === user?.uid)
 
-  const statusBg    = (isClosed || isFull) ? 'rgba(198,36,25,0.85)' : 'rgba(0,0,0,0.55)'
+  const statusBg    = (isClosed || isFull) ? 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.85)' : 'rgba(0,0,0,0.55)'
   const statusLabel = isClosed ? 'ปิดแล้ว' : isFull ? 'เต็มแล้ว' : 'เปิดรับ'
 
   const fillPct = Math.min(100, ((party.members?.length || 0) / party.maxPlayers) * 100)
@@ -706,7 +706,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
               <i className="fab fa-line" /> Login
             </span>
           ) : isOwner ? (
-            <button onClick={() => onDetail(party)} style={{ flex: 1, height: '36px', borderRadius: '8px', background: hasPending ? 'rgba(198,36,25,0.08)' : 'var(--surface-sunken)', color: hasPending ? 'var(--crimson-500)' : 'var(--text-secondary)', border: hasPending ? '1px solid rgba(198,36,25,0.2)' : 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
+            <button onClick={() => onDetail(party)} style={{ flex: 1, height: '36px', borderRadius: '8px', background: hasPending ? 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.08)' : 'var(--surface-sunken)', color: hasPending ? 'var(--crimson-500)' : 'var(--text-secondary)', border: hasPending ? '1px solid rgba(var(--crimson-500-rgb, 198, 36, 25),0.2)' : 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
               <i className="fas fa-crown" style={{ marginRight: '4px' }} />
               {hasPending ? `${party.pendingRequests.length} คำขอ` : 'จัดการ'}
             </button>
@@ -747,7 +747,7 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
   const isLockedRestricted = isLocked && !canView
   const hasPending  = booking.joinRequests?.some(r => r.uid === user?.uid)
 
-  const statusBg    = isLockedRestricted ? 'rgba(15,23,42,0.85)' : (isLocked || isFull) ? 'rgba(198,36,25,0.85)' : 'rgba(0,0,0,0.55)'
+  const statusBg    = isLockedRestricted ? 'rgba(15,23,42,0.85)' : (isLocked || isFull) ? 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.85)' : 'rgba(0,0,0,0.55)'
   const statusLabel = isLocked ? 'ล็อกห้องแล้ว' : isFull ? 'เต็มแล้ว' : 'เปิดรับ'
 
   const fillPct = maxMembers > 0 ? Math.min(100, (members.length / maxMembers) * 100) : 0
@@ -772,7 +772,7 @@ function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
         <span style={{ position: 'absolute', top: '10px', right: '10px', padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, color: '#fff', background: statusBg }}>
           {statusLabel}
         </span>
-        <span style={{ position: 'absolute', top: '10px', left: '10px', padding: '2px 7px', borderRadius: '5px', fontSize: '10px', fontWeight: 700, color: 'var(--crimson-500)', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(198,36,25,0.25)' }}>
+        <span style={{ position: 'absolute', top: '10px', left: '10px', padding: '2px 7px', borderRadius: '5px', fontSize: '10px', fontWeight: 700, color: 'var(--crimson-500)', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(var(--crimson-500-rgb, 198, 36, 25),0.25)' }}>
           จองห้อง
         </span>
       </div>
@@ -1032,7 +1032,7 @@ function CreatePartyModal({ user, allGames, onClose, onCreated }) {
           <button onClick={onClose} style={{ flex: 1, height: '44px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '14px' }}>
             ยกเลิก
           </button>
-          <button onClick={submit} disabled={loading} style={{ flex: 2, height: '44px', borderRadius: '8px', background: loading ? 'rgba(198,36,25,0.5)' : 'var(--crimson-500)', color: '#fff', border: 'none', cursor: loading ? 'default' : 'pointer', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+          <button onClick={submit} disabled={loading} style={{ flex: 2, height: '44px', borderRadius: '8px', background: loading ? 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.5)' : 'var(--crimson-500)', color: '#fff', border: 'none', cursor: loading ? 'default' : 'pointer', fontWeight: 700, fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             {loading ? <span className="spinner-sm" /> : <><i className="fas fa-plus" /> สร้างปาร์ตี้</>}
           </button>
         </div>
@@ -1179,12 +1179,12 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
 
       {/* ── HERO HEADER ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid var(--border-default)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: 'radial-gradient(ellipse at 100% 50%, rgba(198,36,25,0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, right: 0, width: '320px', height: '100%', background: 'radial-gradient(ellipse at 100% 50%, rgba(var(--crimson-500-rgb, 198, 36, 25),0.07) 0%, transparent 70%)', pointerEvents: 'none' }} />
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '28px 20px 20px', position: 'relative' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px', flexWrap: 'wrap' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
-                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <i className="fas fa-users" style={{ color: 'var(--crimson-500)', fontSize: '16px' }} />
                 </div>
                 <h1 style={{ margin: 0, fontSize: '22px', fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.02em' }}>ปาร์ตี้เกมสืบสวน</h1>
@@ -1261,7 +1261,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
               )}
             </div>
             {hasFilters && (
-              <button onClick={() => { setGameSearch(''); setDateFilter('') }} style={{ height: '38px', padding: '0 14px', borderRadius: '8px', background: 'rgba(198,36,25,0.08)', color: 'var(--crimson-500)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px', flexShrink: 0 }}>
+              <button onClick={() => { setGameSearch(''); setDateFilter('') }} style={{ height: '38px', padding: '0 14px', borderRadius: '8px', background: 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.08)', color: 'var(--crimson-500)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '12px', flexShrink: 0 }}>
                 ล้างทั้งหมด
               </button>
             )}
