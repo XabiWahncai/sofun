@@ -218,6 +218,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
   const [myRating, setMyRating] = useState(0)
   const [myText, setMyText] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [dmRecs, setDmRecs] = useState([])
   const carouselRef = useRef(null)
   const effectiveId = id === 'cELtBG9IJdB6qK5t1aMa' ? 'cELtBG9IJdB6gK5t1aMa' : id
 
