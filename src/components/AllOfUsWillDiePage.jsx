@@ -528,6 +528,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [emergencyCooldownSec, setEmergencyCooldownSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
   const [showRolePicker, setShowRolePicker] = useState(false)
+  const [selectedPlayerModal, setSelectedPlayerModal] = useState(null)
   const [revealedRole, setRevealedRole] = useState(false)
   const revealRoleTimeoutRef = useRef(null)
 
@@ -3318,161 +3319,313 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   </div>
                 </div>
 
-                {/* Admin Player List & Role Inspector */}
+                {/* Admin Player List (Minimalist Cards) */}
                 <div className="au-card" style={{ padding: 18 }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {allPlayersList.map(p => {
-                  const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'))
-                  const roleLabel = p.role === 'impostor' ? 'คนร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'คนดี'))
-                  return (
-                    <div
-                      key={p.uid}
-                      style={{
-                        padding: 12, borderRadius: 14,
-                        background: 'rgba(255,255,255,0.03)',
-                        border: `1.5px solid ${p.isAlive ? '#1f2c42' : 'rgba(255,255,255,0.04)'}`,
-                        opacity: p.isAlive ? 1 : 0.6,
-                      }}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8, gap: 8, flexWrap: 'wrap' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <AmongUsVisor role={p.role} isAlive={p.isAlive} size={32} color={p.color || null} />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 700, color: '#fff' }}>
-                              {p.name} {!p.isAlive && <span style={{ color: '#9e9e9e', fontSize: 10 }}>(ตาย)</span>}
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                    gap: 10,
+                  }}>
+                    {allPlayersList.map(p => {
+                      const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'));
+                      const roleLabel = p.role === 'impostor' ? 'ร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'ดี'));
+                      const completedTasks = (p.tasks || []).filter(t => t.verified).length;
+                      const totalTasks = (p.tasks || []).length;
+
+                      return (
+                        <div
+                          key={p.uid}
+                          onClick={() => setSelectedPlayerModal(p.uid)}
+                          style={{
+                            padding: '10px 12px',
+                            borderRadius: 14,
+                            background: 'rgba(255,255,255,0.03)',
+                            border: `1.5px solid ${p.isAlive ? (p.role === 'impostor' ? 'rgba(229,57,53,0.5)' : '#1f2c42') : 'rgba(255,82,82,0.3)'}`,
+                            opacity: p.isAlive ? 1 : 0.6,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            cursor: 'pointer',
+                            transition: 'transform 0.15s, background 0.15s, border-color 0.15s',
+                            position: 'relative',
+                          }}
+                          title="คลิกเพื่อจัดการบทบาทและตรวจภารกิจ"
+                        >
+                          <div style={{ position: 'relative', flexShrink: 0 }}>
+                            <AmongUsVisor role={p.role} isAlive={p.isAlive} size={34} color={p.color || null} />
+                            {!p.isAlive && (
+                              <div style={{
+                                position: 'absolute', top: -2, right: -4,
+                                background: '#e53935', color: '#fff', fontSize: 9,
+                                fontWeight: 900, borderRadius: 10, padding: '1px 4px',
+                                lineHeight: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                              }}>
+                                ตาย
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{
+                              fontSize: 13, fontWeight: 700, color: '#fff',
+                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                            }}>
+                              {p.name}
                             </div>
-                            <div style={{ fontSize: 11, color: roleColor, fontWeight: 800 }}>
-                              {roleLabel} {p.role === 'sheriff' && (
-                                <span style={{ color: '#ffd54f', fontSize: 10, marginLeft: 4 }}>
-                                  ({(p.sheriffShots !== undefined ? p.sheriffShots : 1) > 0 ? 'เหลือ 1 สิทธิ์' : 'ยิงแล้ว'})
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 10.5, color: roleColor, fontWeight: 800 }}>
+                                {roleLabel}
+                              </span>
+                              {totalTasks > 0 && (
+                                <span style={{
+                                  fontSize: 9.5,
+                                  color: completedTasks === totalTasks ? '#81c784' : '#ffa726',
+                                  fontWeight: 700,
+                                }}>
+                                  {completedTasks}/{totalTasks}
                                 </span>
                               )}
                             </div>
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
 
-                        {/* Admin Role Changer Dropdown */}
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {['crewmate', 'impostor', 'dodo', 'sheriff'].map(r => {
-                            const btnColor = r === 'impostor' ? '#e53935' : (r === 'dodo' ? '#ab47bc' : (r === 'sheriff' ? '#fbc02d' : '#29b6f6'))
-                            const btnText = r === 'impostor' ? 'ร้าย' : (r === 'dodo' ? 'โดโด้' : (r === 'sheriff' ? 'นายอำเภอ' : 'ดี'))
-                            const isCurrent = p.role === r
-                            return (
-                              <button
-                                key={r}
-                                type="button"
-                                onClick={() => {
-                                  const updates = { [`players.${p.uid}.role`]: r }
-                                  if (r === 'sheriff') {
-                                    updates[`players.${p.uid}.sheriffShots`] = 1
-                                  }
-                                  updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates)
-                                }}
-                                style={{
-                                  padding: '3px 7px', borderRadius: 6,
-                                  background: isCurrent ? btnColor : 'rgba(255,255,255,0.06)',
-                                  color: isCurrent && r === 'sheriff' ? '#111' : '#fff',
-                                  border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                                }}
-                              >
-                                {btnText}
-                              </button>
-                            )
-                          })}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const updated = { ...(gameDoc.players || {}) }
-                              updated[p.uid] = { ...p, isAlive: !p.isAlive }
+            {/* ─── GM PLAYER DETAIL & ROLE / MISSION MODAL ─── */}
+            {selectedPlayerModal && (() => {
+              const p = allPlayersList.find(pl => pl.uid === selectedPlayerModal);
+              if (!p) return null;
+              const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'));
+              const roleLabel = p.role === 'impostor' ? 'คนร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'คนดี'));
+              const completedTasks = (p.tasks || []).filter(t => t.verified).length;
+              const totalTasks = (p.tasks || []).length;
 
-                              if (gameDoc.status === 'playing') {
-                                const allImpostors = Object.values(updated).filter(pl => pl.role === 'impostor')
-                                const livingImpostors = allImpostors.filter(pl => pl.isAlive)
-                                const livingNonImpostors = Object.values(updated).filter(pl => pl.role !== 'impostor' && pl.isAlive)
-
-                                if (livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
-                                  updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-                                    players: updated,
-                                    status: 'ended',
-                                    winner: 'impostor',
-                                    winReason: `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
-                                    gameTimerRunning: false,
-                                    killCooldownUntil: 0,
-          emergencyCooldownUntil: 0,
-                                  })
-                                  return
-                                } else if (allImpostors.length > 0 && livingImpostors.length === 0) {
-                                  updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-                                    players: updated,
-                                    status: 'ended',
-                                    winner: 'crewmate',
-                                    winReason: 'คนร้ายถูกกำจัดหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
-                                    gameTimerRunning: false,
-                                    killCooldownUntil: 0,
-          emergencyCooldownUntil: 0,
-                                  })
-                                  return
-                                }
-                              }
-
-                              updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
-                                [`players.${p.uid}.isAlive`]: !p.isAlive
-                              })
-                            }}
-                            style={{
-                              padding: '3px 7px', borderRadius: 6,
-                              background: p.isAlive ? '#c62828' : '#2e7d32',
-                              color: '#fff', border: 'none', fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                            }}
-                          >
-                            {p.isAlive ? 'ฆ่า' : 'ชุบ'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleDeletePlayer(p.uid)}
-                            style={{
-                              padding: '3px 8px', borderRadius: 6,
-                              background: 'rgba(244, 67, 54, 0.15)',
-                              border: '1px solid rgba(244, 67, 54, 0.35)',
-                              color: '#ff5252', fontSize: 10, fontWeight: 700, cursor: 'pointer',
-                            }}
-                            title="ลบผู้เล่นคนนี้ออกจากห้อง"
-                          >
-                            <i className="fas fa-trash-alt" />
-                          </button>
+              return (
+                <div
+                  style={{
+                    position: 'fixed', inset: 0, zIndex: 160,
+                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(5px)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: 16,
+                  }}
+                  onClick={() => setSelectedPlayerModal(null)}
+                >
+                  <div
+                    className="au-card"
+                    style={{
+                      width: '100%', maxWidth: 460, maxHeight: '90vh', overflowY: 'auto',
+                      padding: 22, background: '#121722', border: `2px solid ${roleColor}`,
+                      borderRadius: 20, boxShadow: '0 16px 50px rgba(0,0,0,0.9)',
+                      display: 'flex', flexDirection: 'column', gap: 16,
+                    }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    {/* Modal Header */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <AmongUsVisor role={p.role} isAlive={p.isAlive} size={42} color={p.color || null} />
+                        <div>
+                          <div style={{ fontSize: 17, fontWeight: 900, color: '#fff' }}>
+                            {p.name} {!p.isAlive && <span style={{ color: '#ff5252', fontSize: 12 }}>(เสียชีวิตแล้ว)</span>}
+                          </div>
+                          <div style={{ fontSize: 12, color: roleColor, fontWeight: 800, marginTop: 2 }}>
+                            ฝ่าย{roleLabel} {p.role === 'sheriff' && (
+                              <span style={{ color: '#ffd54f', fontSize: 11, marginLeft: 4 }}>
+                                ({(p.sheriffShots !== undefined ? p.sheriffShots : 1) > 0 ? 'เหลือ 1 สิทธิ์ยิง' : 'ยิงไปแล้ว'})
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPlayerModal(null)}
+                        style={{
+                          background: 'rgba(255,255,255,0.08)', border: 'none', color: '#fff',
+                          width: 32, height: 32, borderRadius: '50%', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                        }}
+                      >
+                        <i className="fas fa-times" />
+                      </button>
+                    </div>
 
-                      {/* Player Assigned Tasks & Manual Verify Button */}
-                      {(p.tasks || []).length > 0 && (
-                        <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px dashed rgba(255,255,255,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {/* Section 1: Role Selector (เลือกฝ่าย) */}
+                    <div>
+                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.05em', marginBottom: 8, textTransform: 'uppercase' }}>
+                        เลือกบทบาท / ฝ่าย
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 }}>
+                        {['crewmate', 'impostor', 'dodo', 'sheriff'].map(r => {
+                          const btnColor = r === 'impostor' ? '#e53935' : (r === 'dodo' ? '#ab47bc' : (r === 'sheriff' ? '#fbc02d' : '#29b6f6'));
+                          const btnText = r === 'impostor' ? 'ร้าย' : (r === 'dodo' ? 'โดโด้' : (r === 'sheriff' ? 'นายอำเภอ' : 'ดี'));
+                          const isCurrent = p.role === r;
+                          return (
+                            <button
+                              key={r}
+                              type="button"
+                              onClick={() => {
+                                const updates = { [`players.${p.uid}.role`]: r };
+                                if (r === 'sheriff') {
+                                  updates[`players.${p.uid}.sheriffShots`] = 1;
+                                }
+                                updateDoc(doc(db, 'all_of_us_games', 'active_game'), updates);
+                              }}
+                              style={{
+                                padding: '8px 4px', borderRadius: 10,
+                                background: isCurrent ? btnColor : 'rgba(255,255,255,0.05)',
+                                color: isCurrent && r === 'sheriff' ? '#111' : '#fff',
+                                border: `1.5px solid ${isCurrent ? btnColor : 'rgba(255,255,255,0.1)'}`,
+                                fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+                              }}
+                            >
+                              <span>{btnText}</span>
+                              {isCurrent && <span style={{ fontSize: 9, opacity: 0.85 }}>● ปัจจุบัน</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Section 2: Player Actions (ฆ่า / ชุบ / ลบ) */}
+                    <div>
+                      <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.05em', marginBottom: 8, textTransform: 'uppercase' }}>
+                        สถานะและจัดการผู้เล่น
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const updated = { ...(gameDoc.players || {}) };
+                            updated[p.uid] = { ...p, isAlive: !p.isAlive };
+
+                            if (gameDoc.status === 'playing') {
+                              const allImpostors = Object.values(updated).filter(pl => pl.role === 'impostor');
+                              const livingImpostors = allImpostors.filter(pl => pl.isAlive);
+                              const livingNonImpostors = Object.values(updated).filter(pl => pl.role !== 'impostor' && pl.isAlive);
+
+                              if (livingImpostors.length > 0 && livingImpostors.length >= livingNonImpostors.length) {
+                                updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                                  players: updated,
+                                  status: 'ended',
+                                  winner: 'impostor',
+                                  winReason: `จำนวนคนร้าย (${livingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${livingNonImpostors.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
+                                  gameTimerRunning: false,
+                                  killCooldownUntil: 0,
+                                  emergencyCooldownUntil: 0,
+                                });
+                                return;
+                              } else if (allImpostors.length > 0 && livingImpostors.length === 0) {
+                                updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                                  players: updated,
+                                  status: 'ended',
+                                  winner: 'crewmate',
+                                  winReason: 'คนร้ายถูกกำจัดหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
+                                  gameTimerRunning: false,
+                                  killCooldownUntil: 0,
+                                  emergencyCooldownUntil: 0,
+                                });
+                                return;
+                              }
+                            }
+
+                            updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                              [`players.${p.uid}.isAlive`]: !p.isAlive
+                            });
+                          }}
+                          style={{
+                            padding: '10px 12px', borderRadius: 10,
+                            background: p.isAlive ? '#c62828' : '#2e7d32',
+                            color: '#fff', border: 'none', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}
+                        >
+                          <i className={`fas fa-${p.isAlive ? 'skull-crossbones' : 'heart'}`} />
+                          <span>{p.isAlive ? 'สั่งฆ่าผู้เล่น' : 'ชุบชีวิตผู้เล่น'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleDeletePlayer(p.uid);
+                            setSelectedPlayerModal(null);
+                          }}
+                          style={{
+                            padding: '10px 12px', borderRadius: 10,
+                            background: 'rgba(244, 67, 54, 0.15)',
+                            border: '1.5px solid rgba(244, 67, 54, 0.35)',
+                            color: '#ff5252', fontSize: 12, fontWeight: 800, cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                          }}
+                        >
+                          <i className="fas fa-trash-alt" />
+                          <span>ลบออกจากห้อง</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Section 3: Tasks List & Verify Button (ภารกิจและตรวจผ่าน) */}
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)', fontWeight: 800, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                          ภารกิจที่ได้รับมอบหมาย
+                        </div>
+                        <span style={{ fontSize: 11, color: completedTasks === totalTasks ? '#81c784' : '#ffa726', fontWeight: 800 }}>
+                          ผ่านแล้ว {completedTasks}/{totalTasks} ภารกิจ
+                        </span>
+                      </div>
+
+                      {(p.tasks || []).length === 0 ? (
+                        <div style={{ padding: 14, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12, background: 'rgba(255,255,255,0.02)', borderRadius: 10 }}>
+                          ยังไม่มีภารกิจที่มอบหมาย
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                           {p.tasks.map(t => (
                             <div
                               key={t.id}
                               style={{
-                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                fontSize: 11.5, color: t.verified ? '#81c784' : 'rgba(255,255,255,0.7)',
+                                padding: '10px 12px', borderRadius: 10,
+                                background: t.verified ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255,255,255,0.03)',
+                                border: `1px solid ${t.verified ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.06)'}`,
+                                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
                               }}
                             >
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                                <i className={`fas fa-${t.verified ? 'check-circle' : 'circle'}`} style={{ fontSize: 9, color: t.verified ? '#4caf50' : '#ffa726' }} />
-                                <span>{t.title}</span>
-                                <span style={{
-                                  fontSize: 9.5, color: '#64b5f6', background: 'rgba(33, 150, 243, 0.12)',
-                                  padding: '1px 5px', borderRadius: 4, fontWeight: 700
-                                }}>
+                              <div style={{ minWidth: 0, flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                                  <i className={`fas fa-${t.verified ? 'check-circle' : 'circle'}`} style={{ fontSize: 10, color: t.verified ? '#4caf50' : '#ffa726' }} />
+                                  <span style={{ fontSize: 12.5, fontWeight: 700, color: t.verified ? '#81c784' : '#fff' }}>
+                                    {t.title}
+                                  </span>
+                                </div>
+                                <div style={{ fontSize: 10.5, color: '#64b5f6', marginTop: 3 }}>
                                   ชั้น {t.floor || 1} · {t.room || 'โซนหน้า'}
-                                </span>
+                                </div>
                               </div>
-                              {!t.verified && (
+
+                              {t.verified ? (
+                                <span style={{
+                                  padding: '3px 8px', borderRadius: 6,
+                                  background: 'rgba(76, 175, 80, 0.15)',
+                                  color: '#81c784', fontSize: 11, fontWeight: 800,
+                                  display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+                                }}>
+                                  <i className="fas fa-check" /> ตรวจผ่านแล้ว
+                                </span>
+                              ) : (
                                 <button
                                   type="button"
                                   onClick={() => verifyTask(p.uid, t.id)}
                                   style={{
-                                    padding: '2px 8px', borderRadius: 6,
-                                    background: 'rgba(76, 175, 80, 0.15)',
-                                    color: '#81c784', border: '1px solid rgba(76, 175, 80, 0.3)',
-                                    fontSize: 10, fontWeight: 700, cursor: 'pointer',
+                                    padding: '6px 14px', borderRadius: 8,
+                                    background: '#2e7d32', color: '#fff', border: 'none',
+                                    fontSize: 11, fontWeight: 800, cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(46, 125, 50, 0.4)',
+                                    flexShrink: 0,
                                   }}
                                 >
                                   ตรวจผ่าน
@@ -3483,18 +3636,27 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                         </div>
                       )}
                     </div>
-                  )
-                })}
-              </div>
-            </div>
-            </div>
-            )}
+
+                    {/* Modal Footer Close Button */}
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPlayerModal(null)}
+                      className="au-btn au-btn-dark"
+                      style={{ width: '100%', padding: '10px 0', fontSize: 13, marginTop: 4 }}
+                    >
+                      ปิดหน้าต่าง
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* ─── TAB 3: คลังภารกิจและ QR สแกน (TASKS DECK & SCAN) ─── */}
             {adminTab === 'tasks' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
                 {/* GM Camera Scanner Trigger Card */}
+
                 <div className="au-card" style={{
                   padding: 16,
                   display: 'flex',

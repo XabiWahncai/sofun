@@ -24,8 +24,8 @@ circular_im.save('public/logo.png', 'PNG')
 # 2. Multi-resolution ICO (16, 32, 48, 64, 128, 256)
 circular_im.save('public/favicon.ico', format='ICO', sizes=[(16, 16), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
 
-# 3. Google Search multiples of 48px (48x48, 96x96, 144x144, 192x192)
-for sz in [48, 96, 144, 192]:
+# 3. Google Search and Browser standard icons (16, 32, 48, 96, 144, 192)
+for sz in [16, 32, 48, 96, 144, 192]:
     resized = circular_im.resize((sz, sz), Image.Resampling.LANCZOS)
     resized.save(f'public/favicon-{sz}x{sz}.png', 'PNG')
 
