@@ -160,15 +160,43 @@ export default function Footer() {
           borderTop: '1px solid rgba(255,255,255,0.1)',
           padding: '20px 0 24px',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          flexWrap: 'wrap', gap: 10,
-          fontSize: 12, color: INK_DIM,
+          flexWrap: 'wrap', gap: 12,
+          fontSize: 12.5, color: INK_DIM,
         }}>
-          <span>© {new Date().getFullYear()} SoFun Club Thailand. All rights reserved.</span>
-          <span style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-            <span><i className="fas fa-heart" style={{ color: C, marginRight: 5 }} /> Script Murder</span>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <span>© {new Date().getFullYear()} SoFun Club Thailand. All rights reserved.</span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>
+              สร้างและพัฒนาโดย{' '}
+              <a
+                href="https://github.com/XabiWahncai"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  color: '#fff',
+                  fontWeight: 800,
+                  textDecoration: 'none',
+                  transition: 'color 0.18s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = C }}
+                onMouseLeave={e => { e.currentTarget.style.color = '#fff' }}
+              >
+                XabiWahncai
+              </a>
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span>
+              <i className="fas fa-code" style={{ color: C, marginRight: 6 }} />
+              Creator: <strong style={{ color: '#fff' }}>XabiWahncai</strong>
+            </span>
+            <span style={{ opacity: 0.4 }}>·</span>
+            <span>
+              <i className="fas fa-heart" style={{ color: C, marginRight: 5 }} /> Script Murder
+            </span>
             <span style={{ opacity: 0.4 }}>·</span>
             <span>Bangkok, Thailand</span>
-          </span>
+          </div>
         </div>
       </div>
     </footer>
