@@ -2154,7 +2154,6 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
       rows.push({
         id: 'dm_recommendations',
         title: 'เกมที่ DM ที่ร้านแนะนำ',
-        subtitle: 'คัดสรรสคริปต์สุดพิเศษ พร้อมเหตุผลประกอบการตัดสินใจจากทีม Game Master ประจำร้าน',
         games: dmRecommendedGames,
         isDmPicks: true,
         onSeeAll: () => { setActiveCategory('dm_picks'); setViewMode('grid') }
