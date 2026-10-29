@@ -219,18 +219,19 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
   const [myText, setMyText] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const carouselRef = useRef(null)
+  const effectiveId = id === 'cELtBG9IJdB6qK5t1aMa' ? 'cELtBG9IJdB6gK5t1aMa' : id
 
   // 1. Fetch game script by id
   useEffect(() => {
-    if (!id) return
+    if (!effectiveId) return
     setLoading(true)
     setError(null)
     setGame(null)
-    getDoc(doc(db, 'scripts', id))
+    getDoc(doc(db, 'scripts', effectiveId))
       .then(snap => snap.exists() ? setGame({ id: snap.id, ...snap.data() }) : setError('ไม่พบข้อมูลสคริปต์นี้'))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [effectiveId])
 
   // 1.1 Fetch DM Recommendations for this game
   useEffect(() => {
@@ -239,11 +240,11 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
       if (snap.exists()) {
         const d = snap.data()
         const allRecs = Array.isArray(d.recommendations) ? d.recommendations : []
-        setDmRecs(allRecs.filter(r => r.gameId === id))
+        setDmRecs(allRecs.filter(r => r.gameId === effectiveId))
       } else {
         getDoc(doc(db, 'settings', 'promotion')).then(pSnap => {
           if (pSnap.exists() && Array.isArray(pSnap.data().dmRecommendations)) {
-            setDmRecs(pSnap.data().dmRecommendations.filter(r => r.gameId === id))
+            setDmRecs(pSnap.data().dmRecommendations.filter(r => r.gameId === effectiveId))
           }
         }).catch(() => {})
       }
@@ -253,8 +254,8 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
 
   // 2. Real-time reviews subscription
   useEffect(() => {
-    if (!id) return
-    return onSnapshot(collection(db, 'scripts', id, 'reviews'), snap => {
+    if (!effectiveId) return
+    return onSnapshot(collection(db, 'scripts', effectiveId, 'reviews'), snap => {
       const list = snap.docs
         .map(d => ({ uid: d.id, ...d.data() }))
         .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
@@ -267,7 +268,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
         }
       }
     })
-  }, [id, lineUser?.uid])
+  }, [effectiveId, lineUser?.uid])
 
   // 3. Carousel scroll buttons
   const scrollCarousel = (direction) => {

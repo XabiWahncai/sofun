@@ -846,10 +846,9 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
       {/* Row Header */}
       <div className="netflix-row-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', marginBottom: 14 }}>
         <div className="netflix-row-title-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
-          <div className="netflix-row-indicator" style={{ width: 4, height: 18, background: isDmPicks ? '#ec4899' : NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+          <div className="netflix-row-indicator" style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
           <div>
-            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '-0.01em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
-              {isDmPicks && <i className="fas fa-crown" style={{ color: '#ec4899', fontSize: 15 }} />}
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '-0.01em', textAlign: 'left' }}>
               {title}
             </h3>
             {subtitle && (
@@ -1327,7 +1326,7 @@ function NetflixSubBar({
 }) {
   const CATEGORIES = [
     { id: 'all',       label: 'ทั้งหมด' },
-    { id: 'dm_picks',  label: 'เกมที่ DM ที่ร้านแนะนำ', isDm: true },
+    { id: 'dm_picks',  label: 'เกมที่ DM ที่ร้านแนะนำ' },
     { id: 'Detective', label: 'สืบสวน' },
     { id: 'Horror',    label: 'สยองขวัญ' },
     { id: 'Drama',     label: 'ดราม่า' },
@@ -1359,7 +1358,6 @@ function NetflixSubBar({
       <div className="netflix-subbar-categories" style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', maxWidth: '100%', scrollbarWidth: 'none' }}>
         {CATEGORIES.map(cat => {
           const isAct = activeCategory === cat.id
-          const isDm = cat.isDm
           return (
             <button
               key={cat.id}
@@ -1370,26 +1368,20 @@ function NetflixSubBar({
                 padding: '6px 14px',
                 borderRadius: 20,
                 fontSize: 12,
-                fontWeight: isAct ? 800 : (isDm ? 700 : 600),
-                color: isAct ? '#ffffff' : (isDm ? '#db2777' : TEXT_MUTED),
-                background: isAct
-                  ? (isDm ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' : NETFLIX_RED)
-                  : (isDm ? 'rgba(236,72,153,0.1)' : '#f3f4f6'),
-                border: `1px solid ${isAct ? (isDm ? '#db2777' : NETFLIX_RED) : (isDm ? 'rgba(236,72,153,0.35)' : 'transparent')}`,
+                fontWeight: isAct ? 800 : 600,
+                color: isAct ? '#ffffff' : TEXT_MUTED,
+                background: isAct ? NETFLIX_RED : '#f3f4f6',
+                border: `1px solid ${isAct ? NETFLIX_RED : 'transparent'}`,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
               }}
               onMouseEnter={e => {
-                if (!isAct) e.currentTarget.style.background = isDm ? 'rgba(236,72,153,0.18)' : '#e5e7eb'
+                if (!isAct) e.currentTarget.style.background = '#e5e7eb'
               }}
               onMouseLeave={e => {
-                if (!isAct) e.currentTarget.style.background = isDm ? 'rgba(236,72,153,0.1)' : '#f3f4f6'
+                if (!isAct) e.currentTarget.style.background = '#f3f4f6'
               }}
             >
-              {isDm && <i className="fas fa-crown" style={{ fontSize: 11 }} />}
               {cat.label}
             </button>
           )
@@ -2345,9 +2337,8 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
             {/* Header info */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
-                <div style={{ width: 4, height: 18, background: activeCategory === 'dm_picks' ? '#ec4899' : NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
-                  {activeCategory === 'dm_picks' && <i className="fas fa-crown" style={{ color: '#ec4899', fontSize: 15 }} />}
+                <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, textAlign: 'left' }}>
                   {search ? `ผลการค้นหาสำหรับ "${search}"` : activeCategory === 'dm_picks' ? 'เกมที่ DM ที่ร้านแนะนำ' : activeCategory !== 'all' ? `หมวดหมู่: ${activeCategory}` : 'สคริปต์ทั้งหมด'}
                 </h3>
                 <span style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: 600 }}>
@@ -2375,62 +2366,6 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
                 </button>
               )}
             </div>
-
-            {/* DM Recommendations Hero Banner in Grid */}
-            {activeCategory === 'dm_picks' && (
-              <div
-                style={{
-                  padding: '18px 24px',
-                  borderRadius: 14,
-                  background: 'linear-gradient(135deg, rgba(236,72,153,0.12) 0%, rgba(219,39,119,0.04) 100%)',
-                  border: '1.5px solid rgba(236,72,153,0.28)',
-                  marginBottom: 22,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  flexWrap: 'wrap',
-                  gap: 14,
-                }}
-              >
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span
-                      style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 10,
-                        background: '#ec4899',
-                        color: '#fff',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 16,
-                      }}
-                    >
-                      <i className="fas fa-crown" />
-                    </span>
-                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111827' }}>
-                      สคริปต์ที่คัดสรรและแนะนำโดย Game Master ประจำร้าน
-                    </h2>
-                  </div>
-                  <p style={{ margin: '6px 0 0', fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
-                    สคริปต์ยอดเยี่ยมที่เหล่า DM ประทับใจ การันตีความเข้มข้นและความสนุกพร้อมเหตุผลประกอบการตัดสินใจ
-                  </p>
-                </div>
-                <span
-                  style={{
-                    fontSize: 12,
-                    fontWeight: 800,
-                    color: '#ec4899',
-                    background: 'rgba(236,72,153,0.12)',
-                    padding: '5px 14px',
-                    borderRadius: 20,
-                  }}
-                >
-                  แนะนำ {filteredGames.length} เรื่อง
-                </span>
-              </div>
-            )}
 
             {/* Empty state */}
             {filteredGames.length === 0 ? (

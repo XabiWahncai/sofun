@@ -26,7 +26,7 @@ function cleanDescription(desc) {
     .slice(0, 220)
 }
 
-function formatOgImage(imgUrl) {
+function formatFallbackOgImage(imgUrl) {
   if (!imgUrl) return 'https://sofunclub.co/logo.jpg'
   try {
     const parsed = new URL(imgUrl)
@@ -39,6 +39,52 @@ function formatOgImage(imgUrl) {
     // fallback
   }
   return imgUrl
+}
+
+async function ensureLocalCover(id, rawImageUrl) {
+  const publicCoversDir = path.join(rootDir, 'public', 'covers')
+  const distCoversDir = path.join(rootDir, 'dist', 'covers')
+  if (!fs.existsSync(publicCoversDir)) fs.mkdirSync(publicCoversDir, { recursive: true })
+  if (!fs.existsSync(distCoversDir)) fs.mkdirSync(distCoversDir, { recursive: true })
+
+  const publicFilePath = path.join(publicCoversDir, `${id}.jpg`)
+  const distFilePath = path.join(distCoversDir, `${id}.jpg`)
+
+  if (fs.existsSync(publicFilePath) && fs.statSync(publicFilePath).size > 1000) {
+    if (!fs.existsSync(distFilePath) || fs.statSync(distFilePath).size !== fs.statSync(publicFilePath).size) {
+      fs.copyFileSync(publicFilePath, distFilePath)
+    }
+    return `https://sofunclub.co/covers/${id}.jpg`
+  }
+
+  if (!rawImageUrl) return 'https://sofunclub.co/logo.jpg'
+
+  let fetchUrl = rawImageUrl
+  try {
+    const parsed = new URL(rawImageUrl)
+    if (parsed.hostname.includes('wsrv.nl')) {
+      parsed.searchParams.set('output', 'jpg')
+      parsed.searchParams.set('w', '1200')
+      fetchUrl = parsed.toString()
+    }
+  } catch (e) {}
+
+  try {
+    const res = await fetch(fetchUrl)
+    if (res.ok) {
+      const buf = Buffer.from(await res.arrayBuffer())
+      if (buf.length > 1000) {
+        fs.writeFileSync(publicFilePath, buf)
+        fs.writeFileSync(distFilePath, buf)
+        console.log(`[prerender] Downloaded cover for ${id} (${(buf.length / 1024).toFixed(1)} KB)`)
+        return `https://sofunclub.co/covers/${id}.jpg`
+      }
+    }
+  } catch (e) {
+    console.warn(`[prerender] Failed to download cover for ${id}:`, e.message)
+  }
+
+  return formatFallbackOgImage(rawImageUrl)
 }
 
 function setOrInsertMeta(html, attr, attrVal, content) {
@@ -107,6 +153,24 @@ async function main() {
     fs.mkdirSync(gamesOutDir, { recursive: true })
   }
 
+  // Pre-download covers with concurrency pool
+  console.log(`[prerender] Ensuring static cover images for ${games.length} games...`)
+  const coverUrls = {}
+  const poolLimit = 5
+  let index = 0
+
+  async function worker() {
+    while (index < games.length) {
+      const g = games[index++]
+      const id = g._id || g.id
+      if (id) {
+        coverUrls[id] = await ensureLocalCover(id, g.image)
+      }
+    }
+  }
+  const workers = Array.from({ length: poolLimit }, () => worker())
+  await Promise.all(workers)
+
   let generatedCount = 0
 
   for (const game of games) {
@@ -117,7 +181,7 @@ async function main() {
     const pageTitle = `${title} — Script Murder | Sofun Club Thailand`
     const desc = cleanDescription(game.synopsis || game.description)
     const gameUrl = `https://sofunclub.co/games/${id}`
-    const imageUrl = formatOgImage(game.image)
+    const imageUrl = coverUrls[id] || formatFallbackOgImage(game.image)
     const imageType = imageUrl.includes('output=jpg') || imageUrl.endsWith('.jpg') || imageUrl.endsWith('.jpeg')
       ? 'image/jpeg'
       : (imageUrl.endsWith('.png') ? 'image/png' : 'image/jpeg')
@@ -184,7 +248,44 @@ async function main() {
     // 2. Write dist/games/[id].html
     fs.writeFileSync(path.join(gamesOutDir, `${id}.html`), html, 'utf8')
 
+    // 3. Special alias for 'cELtBG9IJdB6gK5t1aMa' -> 'cELtBG9IJdB6qK5t1aMa'
+    if (id === 'cELtBG9IJdB6gK5t1aMa') {
+      const aliasId = 'cELtBG9IJdB6qK5t1aMa'
+      const aliasDir = path.join(gamesOutDir, aliasId)
+      if (!fs.existsSync(aliasDir)) fs.mkdirSync(aliasDir, { recursive: true })
+      fs.writeFileSync(path.join(aliasDir, 'index.html'), html, 'utf8')
+      fs.writeFileSync(path.join(gamesOutDir, `${aliasId}.html`), html, 'utf8')
+      // Also alias the cover image
+      const srcCover = path.join(rootDir, 'dist', 'covers', `${id}.jpg`)
+      const dstCover = path.join(rootDir, 'dist', 'covers', `${aliasId}.jpg`)
+      if (fs.existsSync(srcCover)) fs.copyFileSync(srcCover, dstCover)
+    }
+
     generatedCount++
+  }
+
+  // Update sitemap.xml with game links
+  try {
+    const sitemapPath = path.join(rootDir, 'public', 'sitemap.xml')
+    const distSitemapPath = path.join(rootDir, 'dist', 'sitemap.xml')
+    const today = new Date().toISOString().slice(0, 10)
+    let sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`
+    sitemapXml += `  <url><loc>https://sofunclub.co/</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>1.0</priority></url>\n`
+    sitemapXml += `  <url><loc>https://sofunclub.co/games</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>\n`
+    sitemapXml += `  <url><loc>https://sofunclub.co/booking</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.9</priority></url>\n`
+    sitemapXml += `  <url><loc>https://sofunclub.co/party</loc><lastmod>${today}</lastmod><changefreq>daily</changefreq><priority>0.8</priority></url>\n`
+    for (const game of games) {
+      const id = game._id || game.id
+      if (id) {
+        sitemapXml += `  <url><loc>https://sofunclub.co/games/${id}</loc><lastmod>${today}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>\n`
+      }
+    }
+    sitemapXml += `</urlset>\n`
+    fs.writeFileSync(sitemapPath, sitemapXml, 'utf8')
+    fs.writeFileSync(distSitemapPath, sitemapXml, 'utf8')
+    console.log(`[prerender] Updated sitemap.xml with ${games.length} game URLs`)
+  } catch (err) {
+    console.warn('[prerender] Could not update sitemap:', err.message)
   }
 
   console.log(`[prerender] Successfully generated static Open Graph pages for ${generatedCount} games in dist/games/`)
