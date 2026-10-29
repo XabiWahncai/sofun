@@ -15,6 +15,7 @@ import {
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
 import { calculateDepositDeadline } from './BookingPage'
 import SecurityTab from './SecurityTab'
+import DmRecommendationsTab from './DmRecommendationsTab'
 import { toOptimizedUrl as convertImg, convertImageUrl } from '../utils/imageUrl'
 import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSecurityEvent } from '../utils/security'
 
@@ -8892,6 +8893,7 @@ const NAV_SECTIONS = [
     label: 'จัดการข้อมูล',
     items: [
       { key: 'scripts',  icon: 'fa-scroll',    label: 'สคริปต์' },
+      { key: 'dm_picks', icon: 'fa-crown',     label: 'เกมที่ DM แนะนำ' },
       { key: 'members',  icon: 'fa-users',      label: 'สมาชิก' },
       { key: 'menu',     icon: 'fa-utensils',   label: 'เมนูอาหาร' },
     ],
@@ -9114,6 +9116,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
               )}
               {tab === 'evaluations' && <EvaluationsTab showToast={showToast} allGames={allGames} />}
               {tab === 'scripts'   && <ScriptsTab allGames={allGames} showToast={showToast} openModal={openModal} openEdit={openEdit} />}
+              {tab === 'dm_picks'  && <DmRecommendationsTab showToast={showToast} allGames={allGames} />}
               {tab === 'members'   && (
                 <MembersTab
                   members={members}

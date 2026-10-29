@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { collection, onSnapshot, query, where, orderBy, limit, doc } from 'firebase/firestore'
+import { collection, onSnapshot, query, where, orderBy, limit, doc, getDoc } from 'firebase/firestore'
 import { db } from '../firebase'
 import { handleDirectLineBooking } from '../utils/bookingHelper'
 import { useTopPlayedGames90d } from '../utils/playStats'
@@ -548,7 +548,7 @@ const RESPONSIVE_CSS = `
 `
 
 /* ── Netflix Poster Card Component (White Theme) ───────────────────── */
-function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = true, showToast = null }) {
+function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = true, showToast = null, dmRec = null }) {
   const [hovered, setHovered] = useState(false)
   const posterImg = getCleanImgUrl(game.image, 400)
   const diff = getDifficultyBadge(game.difficulty)
@@ -621,20 +621,40 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
       )}
 
       {/* Top Badges */}
-      <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pointerEvents: 'none', zIndex: 2 }}>
-        <span
-          style={{
-            fontSize: 10,
-            fontWeight: 800,
-            color: diff.text,
-            background: diff.bg,
-            padding: '3px 7px',
-            borderRadius: 6,
-            boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-          }}
-        >
-          {diff.label}
-        </span>
+      <div style={{ position: 'absolute', top: 8, left: 8, right: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', pointerEvents: 'none', zIndex: 2, gap: 4 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+          <span
+            style={{
+              fontSize: 10,
+              fontWeight: 800,
+              color: diff.text,
+              background: diff.bg,
+              padding: '3px 7px',
+              borderRadius: 6,
+              boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+            }}
+          >
+            {diff.label}
+          </span>
+          {dmRec && (
+            <span
+              style={{
+                fontSize: 9.5,
+                fontWeight: 800,
+                color: '#ffffff',
+                background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                padding: '2.5px 7px',
+                borderRadius: 6,
+                boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              <i className="fas fa-crown" style={{ fontSize: 8.5 }} /> DM แนะนำ
+            </span>
+          )}
+        </div>
 
         {isPlayed && (
           <span
@@ -695,6 +715,29 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
           <span>•</span>
           <span>{game.time || '4 ชม.'}</span>
         </div>
+
+        {/* DM Reason Snippet if present */}
+        {dmRec && dmRec.reason && (
+          <div
+            style={{
+              fontSize: 10.5,
+              color: '#fbcfe8',
+              lineHeight: 1.25,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+            title={`${dmRec.dmName}: ${dmRec.reason}`}
+          >
+            <i className="fas fa-crown" style={{ fontSize: 8, color: '#f472b6', flexShrink: 0 }} />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              <strong>{dmRec.dmName}:</strong> {dmRec.reason}
+            </span>
+          </div>
+        )}
 
         {/* Hover Action Bar */}
         <div
@@ -768,7 +811,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
 }
 
 /* ── Netflix Horizontal Swimlane Row (White Theme) ─────────────────── */
-function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = true, showToast = null }) {
+function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = true, showToast = null, dmRecsMap = null, isDmPicks = false }) {
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
@@ -803,10 +846,18 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
       {/* Row Header */}
       <div className="netflix-row-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 40px', marginBottom: 14 }}>
         <div className="netflix-row-title-wrap" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
-          <div className="netflix-row-indicator" style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '-0.01em', textAlign: 'left' }}>
-            {title}
-          </h3>
+          <div className="netflix-row-indicator" style={{ width: 4, height: 18, background: isDmPicks ? '#ec4899' : NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+          <div>
+            <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, letterSpacing: '-0.01em', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
+              {isDmPicks && <i className="fas fa-crown" style={{ color: '#ec4899', fontSize: 15 }} />}
+              {title}
+            </h3>
+            {subtitle && (
+              <p style={{ margin: '3px 0 0', fontSize: 12, color: TEXT_MUTED, fontWeight: 500 }}>
+                {subtitle}
+              </p>
+            )}
+          </div>
         </div>
 
         {onSeeAll && (
@@ -890,6 +941,7 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
               isPlayed={playedIds.has(game.id)}
               bookingEnabled={bookingEnabled}
               showToast={showToast}
+              dmRec={dmRecsMap?.[game.id]?.[0]}
             />
           ))}
         </div>
@@ -1275,6 +1327,7 @@ function NetflixSubBar({
 }) {
   const CATEGORIES = [
     { id: 'all',       label: 'ทั้งหมด' },
+    { id: 'dm_picks',  label: 'เกมที่ DM ที่ร้านแนะนำ', isDm: true },
     { id: 'Detective', label: 'สืบสวน' },
     { id: 'Horror',    label: 'สยองขวัญ' },
     { id: 'Drama',     label: 'ดราม่า' },
@@ -1306,6 +1359,7 @@ function NetflixSubBar({
       <div className="netflix-subbar-categories" style={{ display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', maxWidth: '100%', scrollbarWidth: 'none' }}>
         {CATEGORIES.map(cat => {
           const isAct = activeCategory === cat.id
+          const isDm = cat.isDm
           return (
             <button
               key={cat.id}
@@ -1316,20 +1370,26 @@ function NetflixSubBar({
                 padding: '6px 14px',
                 borderRadius: 20,
                 fontSize: 12,
-                fontWeight: isAct ? 800 : 600,
-                color: isAct ? '#ffffff' : TEXT_MUTED,
-                background: isAct ? NETFLIX_RED : '#f3f4f6',
-                border: `1px solid ${isAct ? NETFLIX_RED : 'transparent'}`,
+                fontWeight: isAct ? 800 : (isDm ? 700 : 600),
+                color: isAct ? '#ffffff' : (isDm ? '#db2777' : TEXT_MUTED),
+                background: isAct
+                  ? (isDm ? 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)' : NETFLIX_RED)
+                  : (isDm ? 'rgba(236,72,153,0.1)' : '#f3f4f6'),
+                border: `1px solid ${isAct ? (isDm ? '#db2777' : NETFLIX_RED) : (isDm ? 'rgba(236,72,153,0.35)' : 'transparent')}`,
                 cursor: 'pointer',
                 whiteSpace: 'nowrap',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
               }}
               onMouseEnter={e => {
-                if (!isAct) e.currentTarget.style.background = '#e5e7eb'
+                if (!isAct) e.currentTarget.style.background = isDm ? 'rgba(236,72,153,0.18)' : '#e5e7eb'
               }}
               onMouseLeave={e => {
-                if (!isAct) e.currentTarget.style.background = '#f3f4f6'
+                if (!isAct) e.currentTarget.style.background = isDm ? 'rgba(236,72,153,0.1)' : '#f3f4f6'
               }}
             >
+              {isDm && <i className="fas fa-crown" style={{ fontSize: 11 }} />}
               {cat.label}
             </button>
           )
@@ -1858,6 +1918,50 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
     return () => unsub()
   }, [])
 
+  // Load DM Recommendations
+  const [dmRecommendations, setDmRecommendations] = useState([])
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'dm_recommendations'), snap => {
+      if (snap.exists()) {
+        const d = snap.data()
+        setDmRecommendations(Array.isArray(d.recommendations) ? d.recommendations : [])
+      } else {
+        getDoc(doc(db, 'settings', 'promotion')).then(pSnap => {
+          if (pSnap.exists() && Array.isArray(pSnap.data().dmRecommendations)) {
+            setDmRecommendations(pSnap.data().dmRecommendations)
+          }
+        }).catch(() => {})
+      }
+    }, err => {
+      console.warn('dm_recommendations listener error:', err.message)
+    })
+    return () => unsub()
+  }, [])
+
+  // Map recommendations by gameId
+  const dmRecsByGameId = useMemo(() => {
+    const map = {}
+    dmRecommendations.forEach(rec => {
+      if (!rec.gameId) return
+      if (!map[rec.gameId]) map[rec.gameId] = []
+      map[rec.gameId].push(rec)
+    })
+    return map
+  }, [dmRecommendations])
+
+  // Games recommended by DMs
+  const dmRecommendedGames = useMemo(() => {
+    const ordered = []
+    const seen = new Set()
+    dmRecommendations.forEach(rec => {
+      if (!rec.gameId || seen.has(rec.gameId)) return
+      seen.add(rec.gameId)
+      const game = allGames.find(g => (g.id || g._id) === rec.gameId)
+      if (game) ordered.push(game)
+    })
+    return ordered
+  }, [allGames, dmRecommendations])
+
   useEffect(() => {
     if (!lineUser?.uid) { setPlayedIds(new Set()); return }
     const q = query(collection(db, 'playHistory'), where('userId', '==', lineUser.uid))
@@ -1938,7 +2042,10 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
 
       // Quick Category Pill
       if (activeCategory !== 'all') {
-        if (activeCategory === 'Beginner') {
+        if (activeCategory === 'dm_picks') {
+          const recs = dmRecsByGameId[g.id || g._id]
+          if (!recs || recs.length === 0) return false
+        } else if (activeCategory === 'Beginner') {
           if ((g.difficulty || '').toLowerCase() !== 'beginner') return false
         } else {
           if (!(g.tags || []).includes(activeCategory)) return false
@@ -1992,7 +2099,8 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
     })
   }, [
     allGames, search, activeCategory, selectedPlayerCount, selectedDiffs,
-    selectedPriceRange, selectedTimeRange, selectedDetective, selectedRoleplay, selectedTags
+    selectedPriceRange, selectedTimeRange, selectedDetective, selectedRoleplay, selectedTags,
+    dmRecsByGameId
   ])
 
   // 5. Swimlane Categories Curation
@@ -2049,6 +2157,18 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
 
     const rows = []
 
+    // 0. DM Recommendations row (Top Priority)
+    if (dmRecommendedGames && dmRecommendedGames.length > 0) {
+      rows.push({
+        id: 'dm_recommendations',
+        title: 'เกมที่ DM ที่ร้านแนะนำ',
+        subtitle: 'คัดสรรสคริปต์สุดพิเศษ พร้อมเหตุผลประกอบการตัดสินใจจากทีม Game Master ประจำร้าน',
+        games: dmRecommendedGames,
+        isDmPicks: true,
+        onSeeAll: () => { setActiveCategory('dm_picks'); setViewMode('grid') }
+      })
+    }
+
     if (topPlayedGames && topPlayedGames.length > 0) {
       rows.push({
         id: 'top_played_90d',
@@ -2098,7 +2218,7 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
     )
 
     return rows
-  }, [allGames, viewMode, topPlayedGames])
+  }, [allGames, viewMode, topPlayedGames, dmRecommendedGames])
 
   return (
     <div style={{ background: BG_PAGE, color: TEXT_PRIMARY, minHeight: '100vh', paddingBottom: 80 }}>
@@ -2214,6 +2334,8 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
                 onSeeAll={row.onSeeAll}
                 bookingEnabled={bookingEnabled}
                 showToast={showToast}
+                dmRecsMap={dmRecsByGameId}
+                isDmPicks={row.isDmPicks}
               />
             ))}
           </div>
@@ -2223,9 +2345,10 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
             {/* Header info */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
-                <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, textAlign: 'left' }}>
-                  {search ? `ผลการค้นหาสำหรับ "${search}"` : activeCategory !== 'all' ? `หมวดหมู่: ${activeCategory}` : 'สคริปต์ทั้งหมด'}
+                <div style={{ width: 4, height: 18, background: activeCategory === 'dm_picks' ? '#ec4899' : NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: TEXT_PRIMARY, textAlign: 'left', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  {activeCategory === 'dm_picks' && <i className="fas fa-crown" style={{ color: '#ec4899', fontSize: 15 }} />}
+                  {search ? `ผลการค้นหาสำหรับ "${search}"` : activeCategory === 'dm_picks' ? 'เกมที่ DM ที่ร้านแนะนำ' : activeCategory !== 'all' ? `หมวดหมู่: ${activeCategory}` : 'สคริปต์ทั้งหมด'}
                 </h3>
                 <span style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: 600 }}>
                   ({filteredGames.length} เรื่อง)
@@ -2252,6 +2375,62 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
                 </button>
               )}
             </div>
+
+            {/* DM Recommendations Hero Banner in Grid */}
+            {activeCategory === 'dm_picks' && (
+              <div
+                style={{
+                  padding: '18px 24px',
+                  borderRadius: 14,
+                  background: 'linear-gradient(135deg, rgba(236,72,153,0.12) 0%, rgba(219,39,119,0.04) 100%)',
+                  border: '1.5px solid rgba(236,72,153,0.28)',
+                  marginBottom: 22,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 14,
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 10,
+                        background: '#ec4899',
+                        color: '#fff',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 16,
+                      }}
+                    >
+                      <i className="fas fa-crown" />
+                    </span>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: '#111827' }}>
+                      สคริปต์ที่คัดสรรและแนะนำโดย Game Master ประจำร้าน
+                    </h2>
+                  </div>
+                  <p style={{ margin: '6px 0 0', fontSize: 13, color: '#4b5563', lineHeight: 1.5 }}>
+                    สคริปต์ยอดเยี่ยมที่เหล่า DM ประทับใจ การันตีความเข้มข้นและความสนุกพร้อมเหตุผลประกอบการตัดสินใจ
+                  </p>
+                </div>
+                <span
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 800,
+                    color: '#ec4899',
+                    background: 'rgba(236,72,153,0.12)',
+                    padding: '5px 14px',
+                    borderRadius: 20,
+                  }}
+                >
+                  แนะนำ {filteredGames.length} เรื่อง
+                </span>
+              </div>
+            )}
 
             {/* Empty state */}
             {filteredGames.length === 0 ? (
@@ -2316,6 +2495,7 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
                     isPlayed={playedIds.has(game.id)}
                     bookingEnabled={bookingEnabled}
                     showToast={showToast}
+                    dmRec={dmRecsByGameId[game.id]?.[0]}
                   />
                 ))}
               </div>

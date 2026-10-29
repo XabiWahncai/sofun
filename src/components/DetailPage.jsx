@@ -232,6 +232,25 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
       .finally(() => setLoading(false))
   }, [id])
 
+  // 1.1 Fetch DM Recommendations for this game
+  useEffect(() => {
+    if (!id) return
+    const unsub = onSnapshot(doc(db, 'settings', 'dm_recommendations'), snap => {
+      if (snap.exists()) {
+        const d = snap.data()
+        const allRecs = Array.isArray(d.recommendations) ? d.recommendations : []
+        setDmRecs(allRecs.filter(r => r.gameId === id))
+      } else {
+        getDoc(doc(db, 'settings', 'promotion')).then(pSnap => {
+          if (pSnap.exists() && Array.isArray(pSnap.data().dmRecommendations)) {
+            setDmRecs(pSnap.data().dmRecommendations.filter(r => r.gameId === id))
+          }
+        }).catch(() => {})
+      }
+    }, () => {})
+    return () => unsub()
+  }, [id])
+
   // 2. Real-time reviews subscription
   useEffect(() => {
     if (!id) return
@@ -530,6 +549,26 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                   <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 6, color: diff.text, background: diff.bg }}>
                     {diff.label}
                   </span>
+                  {dmRecs.length > 0 && (
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 800,
+                        letterSpacing: '0.04em',
+                        padding: '3px 10px',
+                        borderRadius: 6,
+                        color: '#ffffff',
+                        background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        boxShadow: '0 2px 6px rgba(236,72,153,0.35)',
+                      }}
+                    >
+                      <i className="fas fa-crown" style={{ fontSize: 9.5 }} />
+                      DM แนะนำ: {dmRecs.map(r => r.dmName).join(', ')}
+                    </span>
+                  )}
                   {(game.tags || []).slice(0, 3).map(tag => (
                     <span key={tag} style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.1)', color: TEXT_MUTED, border: `1px solid ${BORDER_SUBTLE}` }}>
                       {tag}
@@ -634,6 +673,68 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                   }}>
                     {game.synopsis || game.description}
                   </p>
+                </div>
+              </section>
+            )}
+
+            {/* ── SECTION: DM RECOMMENDATIONS (คำแนะนำจาก Game Master) ── */}
+            {dmRecs.length > 0 && (
+              <section style={{ marginBottom: 44 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+                  <div style={{ width: 4, height: 18, background: '#ec4899', borderRadius: 2 }} />
+                  <h2 style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-crown" style={{ color: '#ec4899', fontSize: 16 }} />
+                    เกมที่ DM ที่ร้านแนะนำ
+                  </h2>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  {dmRecs.map((rec, idx) => (
+                    <div
+                      key={rec.id || idx}
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(236,72,153,0.12) 0%, rgba(22,22,22,0.95) 100%)',
+                        border: '1.5px solid rgba(236,72,153,0.35)',
+                        borderRadius: 14,
+                        padding: '22px 26px',
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, flexWrap: 'wrap' }}>
+                        <span
+                          style={{
+                            fontSize: 12.5,
+                            fontWeight: 800,
+                            color: '#ffffff',
+                            background: 'linear-gradient(135deg, #ec4899 0%, #db2777 100%)',
+                            padding: '4px 12px',
+                            borderRadius: 20,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 6,
+                            boxShadow: '0 2px 6px rgba(236,72,153,0.35)',
+                          }}
+                        >
+                          <i className="fas fa-crown" style={{ fontSize: 11 }} />
+                          แนะนำโดย: {rec.dmName}
+                        </span>
+                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
+                          Game Master ประจำร้าน Sofun Club
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 15,
+                          lineHeight: 1.85,
+                          color: 'rgba(255,255,255,0.92)',
+                          borderLeft: '3px solid #ec4899',
+                          paddingLeft: 14,
+                        }}
+                      >
+                        <i className="fas fa-quote-left" style={{ opacity: 0.35, marginRight: 8, fontSize: 12 }} />
+                        {rec.reason}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </section>
             )}
