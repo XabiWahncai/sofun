@@ -259,14 +259,18 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
 
   // 4. Share link
   const handleShare = async () => {
-    const url = window.location.href
-    const title = game?.title || ''
+    const gameId = game?.id || game?._id
+    const url = gameId ? `${window.location.origin}/games/${gameId}` : window.location.href
+    const title = game?.title ? `${game.title} — Script Murder | Sofun Club` : 'Sofun Club Thailand'
     const synopsis = game?.synopsis || game?.description || ''
-    const clipText = [title, synopsis, url].filter(Boolean).join('\n\n')
 
     if (navigator.share) {
       try {
-        await navigator.share({ title, text: `${synopsis}\n\n${url}`, url })
+        await navigator.share({
+          title,
+          text: synopsis ? `${synopsis.slice(0, 100)}...` : title,
+          url,
+        })
         setCopied(true)
         setTimeout(() => setCopied(false), 2500)
         return
@@ -274,7 +278,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
         if (e.name === 'AbortError') return
       }
     }
-    navigator.clipboard.writeText(clipText).catch(() => {})
+    navigator.clipboard.writeText(url).catch(() => {})
     setCopied(true)
     setTimeout(() => setCopied(false), 2500)
   }
