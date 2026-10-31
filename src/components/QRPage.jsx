@@ -33,7 +33,19 @@ const THEME_PROFILES = {
     cardBg: 'linear-gradient(145deg, #1c180e 0%, #3a2e12 55%, #18140a 100%)',
     borderGlow: 'rgba(212, 175, 55, 0.65)',
     cardBorder: 'rgba(212, 175, 55, 0.55)',
-    watermarkIcon: 'fa-crown'
+    watermarkIcon: 'fa-trophy'
+  },
+  golden_pass: {
+    id: 'golden_pass',
+    name: 'Golden Pass',
+    title: 'GOLDEN PASS VIP',
+    subtitle: 'ผู้เล่นคนนี้ดวงดีกว่าใคร เล่นฟรี 1 ปี เล่นเกมทั้งร้านได้ 100 รอบเลยมั้ง',
+    accent: '#EAB308',
+    accentRgb: '234, 179, 8',
+    cardBg: 'linear-gradient(145deg, #241d08 0%, #4a3b10 55%, #1f1805 100%)',
+    borderGlow: 'rgba(234, 179, 8, 0.70)',
+    cardBorder: 'rgba(234, 179, 8, 0.60)',
+    watermarkIcon: 'fa-ticket'
   },
   hunger: {
     id: 'hunger',
@@ -46,6 +58,18 @@ const THEME_PROFILES = {
     borderGlow: 'rgba(249, 115, 22, 0.65)',
     cardBorder: 'rgba(249, 115, 22, 0.55)',
     watermarkIcon: 'fa-utensils'
+  },
+  food_garden: {
+    id: 'food_garden',
+    name: 'Food Garden',
+    title: 'FOOD GARDEN PASS',
+    subtitle: 'นัดกันมาเล่นเกมหรือกินข้าว ถ้าไม่บอกนึกว่านั้งอยู่ในร้านอาหารตามสั่ง',
+    accent: '#EA580C',
+    accentRgb: '234, 88, 12',
+    cardBg: 'linear-gradient(145deg, #201006 0%, #441f0b 55%, #180a03 100%)',
+    borderGlow: 'rgba(234, 88, 12, 0.65)',
+    cardBorder: 'rgba(234, 88, 12, 0.55)',
+    watermarkIcon: 'fa-bowl-rice'
   },
   sadness: {
     id: 'sadness',

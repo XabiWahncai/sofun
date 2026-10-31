@@ -21,6 +21,10 @@ const SPARKLE_CONFIG = {
     colors: ['#CD7F32', '#E8972A', '#F0A84B', '#FFD4A0', '#B8730A', '#E5A050'],
     count: 20,
   },
+  golden_pass: {
+    colors: ['#FFF59D', '#FFE082', '#FFD54F', '#FFCA28', '#FFC107', '#EAB308'],
+    count: 26,
+  },
 }
 
 function SparkleEffect({ tier }) {
@@ -36,7 +40,7 @@ function SparkleEffect({ tier }) {
       delay: rand(0, 6),
       duration: rand(2.5, 5.5),
       color: pick(config.colors),
-      icon: i % 3 === 0 ? 'fa-star' : 'fa-certificate',
+      icon: tier === 'golden_pass' ? (i % 3 === 0 ? 'fa-ticket' : (i % 2 === 0 ? 'fa-star' : 'fa-certificate')) : (i % 3 === 0 ? 'fa-star' : 'fa-certificate'),
       float: i < Math.floor(config.count * 0.35),
     }))
   }, [tier, config])
@@ -702,10 +706,12 @@ function ManagerEffect() {
 // ── Global Color Fallback ───────────────────────────────────────────────────
 const TIER_COLOR = {
   golden:     '#D4AF37',
+  golden_pass:'#EAB308',
   silver:     '#94A3B8',
   bronze:     '#CD7F32',
   sadness:    '#64748B',
   hunger:     '#F97316',
+  food_garden:'#EA580C',
   billionaire:'#16A34A',
   charity:    '#BE185D',
   godfather:  '#8B0000',
@@ -913,7 +919,7 @@ export default function TierEffect({ tier }) {
 
       {/* Render bespoke effect based on tier */}
       {tier === 'sadness' && <RainEffect />}
-      {tier === 'hunger' && <FoodEffect />}
+      {(tier === 'hunger' || tier === 'food_garden') && <FoodEffect />}
       {tier === 'billionaire' && <MoneyEffect />}
       {tier === 'charity' && <CharityEffect />}
       {tier === 'godfather' && <GodfatherEffect />}

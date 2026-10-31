@@ -7417,6 +7417,33 @@ nav {
   --focus-ring: #D4AF37;
   --focus-ring-glow: rgba(212, 175, 55, 0.12);
 }
+:root[data-achievement="golden_pass"] {
+  --curtain-crimson: #EAB308;
+  --curtain-crimson-light: #FDE047;
+  --curtain-crimson-deep: #CA8A04;
+  --curtain-crimson-rgb: 234, 179, 8;
+  --red: #EAB308;
+  --red-light: #FDE047;
+  --red-dark: #CA8A04;
+  --red-glow: rgba(234, 179, 8, 0.20);
+  --n-border-red: rgba(234, 179, 8, 0.25);
+  --ed-red: #EAB308;
+  --ed-red-bg: rgba(234, 179, 8, 0.08);
+  --ed-border-red: rgba(234, 179, 8, 0.25);
+  --crimson-300: #FEF08A;
+  --crimson-400: #FDE047;
+  --crimson-500: #EAB308;
+  --crimson-500-rgb: 234, 179, 8;
+  --crimson-600: #CA8A04;
+  --crimson-700: #A16207;
+  --action-primary: #EAB308;
+  --action-primary-hover: #CA8A04;
+  --text-link: #EAB308;
+  --text-link-hover: #CA8A04;
+  --border-focus: #EAB308;
+  --focus-ring: #EAB308;
+  --focus-ring-glow: rgba(234, 179, 8, 0.12);
+}
 :root[data-achievement="explorer"] {
   --curtain-crimson: #059669;
   --curtain-crimson-light: #10B981;
@@ -7497,6 +7524,33 @@ nav {
   --border-focus: #F97316;
   --focus-ring: #F97316;
   --focus-ring-glow: rgba(249, 115, 22, 0.12);
+}
+:root[data-achievement="food_garden"] {
+  --curtain-crimson: #EA580C;
+  --curtain-crimson-light: #FB923C;
+  --curtain-crimson-deep: #C2410C;
+  --curtain-crimson-rgb: 234, 88, 12;
+  --red: #EA580C;
+  --red-light: #FB923C;
+  --red-dark: #C2410C;
+  --red-glow: rgba(234, 88, 12, 0.20);
+  --n-border-red: rgba(234, 88, 12, 0.25);
+  --ed-red: #EA580C;
+  --ed-red-bg: rgba(234, 88, 12, 0.08);
+  --ed-border-red: rgba(234, 88, 12, 0.25);
+  --crimson-300: #FFEDD5;
+  --crimson-400: #FB923C;
+  --crimson-500: #EA580C;
+  --crimson-500-rgb: 234, 88, 12;
+  --crimson-600: #C2410C;
+  --crimson-700: #9A3412;
+  --action-primary: #EA580C;
+  --action-primary-hover: #C2410C;
+  --text-link: #EA580C;
+  --text-link-hover: #C2410C;
+  --border-focus: #EA580C;
+  --focus-ring: #EA580C;
+  --focus-ring-glow: rgba(234, 88, 12, 0.12);
 }
 :root[data-achievement="silver"] {
   --curtain-crimson: #64748B;
