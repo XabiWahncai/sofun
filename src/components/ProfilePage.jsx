@@ -633,24 +633,47 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
                 </div>
 
                 {/* Section Header */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 900, color: INK }}>
                     <i className="fas fa-history" style={{ color: C }} />
                     <span>ประวัติการลงคดี & บิลย้อนหลัง</span>
                   </div>
-                  {history.length > 0 && (
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 800,
-                      padding: '3px 10px',
-                      borderRadius: 12,
-                      background: `${C}10`,
-                      color: C,
-                      border: `1px solid ${C}28`
-                    }}>
-                      {history.length} รายการ
-                    </span>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => showPage ? showPage('rehistory') : (window.location.href = '/rehistory')}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        padding: '4px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(220, 38, 38, 0.08)',
+                        color: '#dc2626',
+                        border: '1px solid rgba(220, 38, 38, 0.2)',
+                        cursor: 'pointer'
+                      }}
+                      title="บันทึกคดีที่คุณเคยเล่นย้อนหลัง"
+                    >
+                      <i className="fas fa-history" />
+                      <span>บันทึกย้อนหลัง</span>
+                    </button>
+                    {history.length > 0 && (
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 800,
+                        padding: '3px 10px',
+                        borderRadius: 12,
+                        background: `${C}10`,
+                        color: C,
+                        border: `1px solid ${C}28`
+                      }}>
+                        {history.length} รายการ
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Search & Month Filter */}

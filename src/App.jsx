@@ -26,12 +26,13 @@ import BookingPage from './components/BookingPage'
 import { handleDirectLineBooking } from './utils/bookingHelper'
 import RandomWheelPage from './components/RandomWheelPage'
 import AllOfUsWillDiePage from './components/AllOfUsWillDiePage'
+import RehistoryPage from './components/RehistoryPage'
 import TierEffect from './components/TierEffect'
 import { ACHIEVEMENT_LIST } from './constants/achievements'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 
-const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie']
+const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory']
 
 function parseUrl(pathname) {
   const parts = pathname.replace(/^\//, '').split('/')
@@ -780,6 +781,17 @@ export default function App() {
             isAdmin={isEffectiveAdmin}
             showToast={showToast}
             showPage={showPage}
+          />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'rehistory' && (
+        <ErrorBoundary>
+          <RehistoryPage
+            lineUser={lineUser}
+            allGames={allGames}
+            showToast={showToast}
+            showPage={showPage}
+            handleLineLogin={handleLineLogin}
           />
         </ErrorBoundary>
       )}
