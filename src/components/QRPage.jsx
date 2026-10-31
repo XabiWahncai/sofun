@@ -297,7 +297,7 @@ const THEME_PROFILES = {
   }
 }
 
-export default function QRPage({ lineUser, allGames = [] }) {
+export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false, showPage }) {
   const [history, setHistory]         = useState([])
   const [expandedMap, setExpandedMap] = useState({})
   const [search, setSearch]           = useState('')
@@ -544,6 +544,47 @@ export default function QRPage({ lineUser, allGames = [] }) {
       `}</style>
 
       <div className="qr-pass-wrapper">
+
+        {/* ── Active Party Order Banner ── */}
+        {hasActiveOrder && (
+          <div
+            onClick={() => showPage?.('order')}
+            style={{
+              padding: '14px 18px',
+              background: 'linear-gradient(135deg, rgba(22, 163, 74, 0.15) 0%, rgba(22, 163, 74, 0.08) 100%)',
+              border: '1.5px solid #22c55e',
+              borderRadius: 18,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+              boxShadow: '0 4px 16px rgba(34, 197, 94, 0.15)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: '#22c55e', color: '#fff',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, flexShrink: 0
+              }}>
+                <i className="fas fa-utensils" />
+              </span>
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#166534' }}>คุณอยู่ในปาร์ตี้ที่เปิดใช้งานแล้ว</div>
+                <div style={{ fontSize: 11.5, color: '#15803d' }}>แตะที่นี่เพื่อไปหน้าสั่งอาหารและเครื่องดื่ม</div>
+              </div>
+            </div>
+            <span style={{
+              fontSize: 12, fontWeight: 700, color: '#fff',
+              background: '#16a34a', padding: '6px 12px',
+              borderRadius: 20, whiteSpace: 'nowrap'
+            }}>
+              สั่งอาหาร <i className="fas fa-arrow-right" style={{ marginLeft: 4 }} />
+            </span>
+          </div>
+        )}
 
         {/* ── Toast Feedback Notification ── */}
         {copiedText && (

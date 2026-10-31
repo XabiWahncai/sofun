@@ -10,6 +10,18 @@ import QRScanner from './QRScanner'
 import PaymentModal from './PaymentModal'
 import { buildKitchenTicketHTML } from '../constants/receipt'
 import { playOrderAlertSound } from '../utils/soundAlert'
+import useBarcodeScanner from '../hooks/useBarcodeScanner'
+
+function parseUid(text) {
+  if (!text) return null
+  try {
+    const url = new URL(String(text).trim())
+    const uid = url.searchParams.get('scan')
+    return uid ? uid.trim() : String(text).trim()
+  } catch {
+    return String(text).trim() || null
+  }
+}
 
 // ── Admin slip verifier (camera scan QR → EasySlip v2) ──────────────────────
 function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, onClose, onVerified }) {
@@ -488,10 +500,10 @@ export default function POSPage({
   const updateActive = (patch) => updateSession(activeSession.id, patch)
 
   // ── load initialUid into active session once ──────────────────────
-  const handledUid = useState(null)
+  const handledUidRef = useRef(null)
   useEffect(() => {
-    if (initialUid && initialUid !== handledUid[0] && (activeSession || sessions[0])) {
-      handledUid[1](initialUid)
+    if (initialUid && initialUid !== handledUidRef.current && (activeSession || sessions[0])) {
+      handledUidRef.current = initialUid
       fetchAndAddMember(activeId || sessions[0]?.id, initialUid)
       onScanConsumed?.()
     }
@@ -655,37 +667,36 @@ export default function POSPage({
         members: newMembers
       })
 
-      // If the session is already confirmed in Firestore, auto-sync immediately
+      const g = allGames.find(x => x.id === session.scriptId)
+      const gUnitPay = (session.customPrice !== '' && session.customPrice !== undefined)
+        ? Number(session.customPrice) || 0
+        : g ? (g.payPrice ?? g.price ?? 0) : 0
+      const gFullPrice = g
+        ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
+        : gUnitPay
+      const newGamePrice = newMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gFullPrice : gUnitPay), 0)
+      const fTotal = (session.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+      const dMode = session.discountMode || 'perPerson'
+      const dRaw = Number(session.discount) || 0
+      const dSelIds = Array.isArray(session.discountMemberIds) ? session.discountMemberIds : []
+      const dEffIds = dSelIds.length > 0
+        ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
+        : newMembers.map(mm => mm.uid)
+      const nD = dEffIds.length
+      const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
+      const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+      const newGrandTotal = Math.max(0, fTotal + newGamePrice - totD - totPersonal)
+
+      const membersPayload = newMembers.map(m => ({
+        uid: m.uid, name: m.name, character: m.character || '',
+        avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        unpaidDeposit: Boolean(m.unpaidDeposit),
+      }))
+
       if (session.confirmedOrderId) {
         const orderId = session.confirmedOrderId
-        const g = allGames.find(x => x.id === session.scriptId)
-        const gUnitPay = (session.customPrice !== '' && session.customPrice !== undefined)
-          ? Number(session.customPrice) || 0
-          : g ? (g.payPrice ?? g.price ?? 0) : 0
-        const gFullPrice = g
-          ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
-          : gUnitPay
-        const newGamePrice = newMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gFullPrice : gUnitPay), 0)
-        const fTotal = (session.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
-        const dMode = session.discountMode || 'perPerson'
-        const dRaw = Number(session.discount) || 0
-        const dSelIds = Array.isArray(session.discountMemberIds) ? session.discountMemberIds : []
-        const dEffIds = dSelIds.length > 0
-          ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
-          : newMembers.map(mm => mm.uid)
-        const nD = dEffIds.length
-        const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
-        const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
-        const newGrandTotal = Math.max(0, fTotal + newGamePrice - totD - totPersonal)
-
-        const membersPayload = newMembers.map(m => ({
-          uid: m.uid, name: m.name, character: m.character || '',
-          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
-          personalDiscount: Number(m.personalDiscount) || 0,
-          personalDiscountNote: m.personalDiscountNote || '',
-          unpaidDeposit: Boolean(m.unpaidDeposit),
-        }))
-
         await updateDoc(doc(db, 'orders', orderId), {
           members: membersPayload,
           memberUids: newMembers.map(m => m.uid),
@@ -708,8 +719,62 @@ export default function POSPage({
             recordedBy: adminUser?.name || 'admin',
           }).catch(e => console.warn('Record play history for new member failed:', e))
         }
+      } else {
+        // Auto-create active order so scanned customer immediately gets food ordering screen
+        const orderRef = doc(collection(db, 'orders'))
+        const orderId = orderRef.id
+        updateSession(sessionId, {
+          confirmedOrderId: orderId,
+          members: newMembers,
+        })
+        await setDoc(orderRef, {
+          members: membersPayload,
+          memberUids: newMembers.map(m => m.uid),
+          scriptId: session.scriptId || '',
+          scriptTitle: g?.title || '',
+          dm: session.dm || '',
+          npc: session.npc || '',
+          room: session.room || '',
+          foodItems: (session.order || []).map(x => ({
+            menuId: x.menuId || '', name: x.name, addons: x.addons || [],
+            price: x.totalPrice ?? x.price ?? 0, qty: x.qty || 1,
+            orderedBy: x.orderedBy || null, note: x.note || '',
+          })),
+          memberFoodHistory: [],
+          customPrice: session.customPrice ?? '',
+          gameUnitPrice: gUnitPay,
+          foodTotal: fTotal,
+          gameTotal: newGamePrice,
+          discount: dRaw,
+          discountMode: dMode,
+          discountMemberIds: dSelIds,
+          promoName: session.promoName || '',
+          grandTotal: newGrandTotal,
+          createdBy: adminUser?.name || 'admin',
+          status: 'active',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+
+        if (session.scriptId) {
+          addDoc(collection(db, 'playHistory'), {
+            userId: newMember.uid,
+            userName: newMember.name,
+            userAvatar: newMember.avatar,
+            scriptId: session.scriptId,
+            scriptTitle: g?.title || '',
+            character: '',
+            dm: session.dm || '',
+            room: session.room || '',
+            playedAt: serverTimestamp(),
+            recordedBy: adminUser?.name || 'admin',
+          }).catch(e => console.warn('Record play history for new member failed:', e))
+        }
       }
-    } catch { showToast('โหลดข้อมูลล้มเหลว', 'error') }
+    } catch (err) {
+      console.warn('fetchAndAddMember error:', err)
+      showToast('โหลดข้อมูลสมาชิกล้มเหลว: ' + err.message, 'error')
+    }
   }
 
   const [orderModal, setOrderModal] = useState(null)
@@ -1049,10 +1114,16 @@ export default function POSPage({
     dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${queuedItems.length} รายการ`)
   }
 
-  const handleScan = (uid) => {
+  const handleScan = (scannedText) => {
     setScannerOpen(false)
-    fetchAndAddMember(activeId, uid)
+    const uid = parseUid(scannedText)
+    if (uid) fetchAndAddMember(activeId, uid)
   }
+
+  useBarcodeScanner((scannedText) => {
+    const uid = parseUid(scannedText)
+    if (uid) fetchAndAddMember(activeId || sessions[0]?.id, uid)
+  }, !scannerOpen && !orderModal && !showPayment && !showEndingModal)
 
   const setCharacter = async (uid, val) => {
     const updated = activeSession.members.map(m => m.uid === uid ? { ...m, character: val } : m)

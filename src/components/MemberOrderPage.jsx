@@ -1058,17 +1058,31 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                   ขอบคุณที่มาเล่นกับเรา สามารถดูใบเสร็จหรือประเมินเกมได้ที่ปุ่มบิล
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setShowBill(true)}
-                style={{
-                  background: '#16a34a', color: '#fff', border: 'none',
-                  borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700,
-                  cursor: 'pointer', whiteSpace: 'nowrap',
-                }}
-              >
-                ดูใบเสร็จ
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowBill(true)}
+                  style={{
+                    background: '#16a34a', color: '#fff', border: 'none',
+                    borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                  }}
+                >
+                  ดูใบเสร็จ
+                </button>
+                <button
+                  type="button"
+                  onClick={() => showPage?.('qr')}
+                  style={{
+                    background: '#1a1a1a', color: '#fff', border: 'none',
+                    borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700,
+                    cursor: 'pointer', whiteSpace: 'nowrap',
+                    display: 'flex', alignItems: 'center', gap: 5,
+                  }}
+                >
+                  <i className="fas fa-qrcode" /> ดู QR สมาชิก
+                </button>
+              </div>
             </div>
           )}
         </div>

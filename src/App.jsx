@@ -399,18 +399,12 @@ export default function App() {
     if (!uid) { setActiveMemberOrder(null); return }
 
     const maxAgeMs = 24 * 60 * 60 * 1000 // Only consider active orders from the last 24 hours
-    const maxPaidAgeMs = 2 * 60 * 60 * 1000 // Keep paid order available for 2 hours for receipt & review
     const now = Date.now()
     const isOrderFresh = (o) => {
-      if (!o) return false
-      if (o.status !== 'active' && o.status !== 'paid') return false
-      const orderTime = o.paidAt?.toDate ? o.paidAt.toDate().getTime()
-        : (o.createdAt?.toDate ? o.createdAt.toDate().getTime()
+      if (!o || o.status !== 'active') return false
+      const orderTime = o.createdAt?.toDate ? o.createdAt.toDate().getTime()
         : (o.updatedAt?.toDate ? o.updatedAt.toDate().getTime()
-        : (o.createdAt ? new Date(o.createdAt).getTime() : 0)))
-      if (o.status === 'paid') {
-        return !orderTime || (now - orderTime) < maxPaidAgeMs
-      }
+        : (o.createdAt ? new Date(o.createdAt).getTime() : 0))
       return !orderTime || (now - orderTime) < maxAgeMs
     }
 
@@ -423,8 +417,13 @@ export default function App() {
       const matchingOrders = snap.docs
         .map(d => ({ id: d.id, ...d.data() }))
         .filter(isOrderFresh)
-      // Prioritize active order first; if none, take the most recent paid order
-      const active = matchingOrders.find(o => o.status === 'active') || matchingOrders.find(o => o.status === 'paid')
+      // Sort newest active order first
+      matchingOrders.sort((a, b) => {
+        const ta = a.updatedAt?.toDate ? a.updatedAt.toDate().getTime() : (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : 0)
+        const tb = b.updatedAt?.toDate ? b.updatedAt.toDate().getTime() : (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : 0)
+        return tb - ta
+      })
+      const active = matchingOrders[0] || null
 
       if (active) {
         setActiveMemberOrder(active)
@@ -667,7 +666,7 @@ export default function App() {
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} />}
-      {currentPage === 'qr' && <QRPage lineUser={lineUser} allGames={allGames} />}
+      {currentPage === 'qr' && <QRPage lineUser={lineUser} allGames={allGames} hasActiveOrder={!!activeMemberOrder} showPage={showPage} />}
       {currentPage === 'order' && activeMemberOrder && (
         <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} allGames={allGames} showPage={showPage} />
       )}
