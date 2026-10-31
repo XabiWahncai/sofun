@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { db } from '../firebase'
-import { doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
+import { convertImageUrl } from '../utils/imageUrl'
 
 const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
@@ -13,7 +14,92 @@ const BORDER_2 = 'rgba(26,26,26,0.14)'
 
 const MAX_PINNED = 5
 
-export default function ProfilePage({ lineUser, onLogout, showPage }) {
+const p2 = n => String(Math.round(n)).padStart(2, '0')
+const fmtDT = d => {
+  if (!d) return ''
+  const dt = d instanceof Date ? d : new Date(d)
+  return `${dt.getFullYear()}-${p2(dt.getMonth()+1)}-${p2(dt.getDate())} ${p2(dt.getHours())}:${p2(dt.getMinutes())}`
+}
+
+function buildReceiptHTML(h, meUid) {
+  const myBill = h.memberBills?.find(m => m.uid === meUid)
+  const me = h.members?.find(m => m.uid === meUid)
+  const paidAt = h.paidAt?.toDate?.()
+  const serial = h.serial ? String(h.serial).padStart(10, '0') : '-'
+  const discAmt = h.discount?.applied || 0
+  const myTotal = myBill?.total ?? h.grandTotal ?? 0
+  const tax = myTotal * 7 / 107
+  const subtotal = myTotal - tax
+
+  const itemRows = []
+  if ((h.gameUnitPrice || 0) > 0) {
+    itemRows.push(`<tr><td>${h.scriptTitle || 'เกม'} ×${h.members?.length || 1}</td><td class="r">${(h.gameTotal||0).toFixed(2)}</td></tr>`)
+  }
+  ;(myBill?.foodItems || h.foodItems || []).forEach(fi => {
+    const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name||a).join(',')})` : ''
+    itemRows.push(`<tr><td>${fi.name}${addStr} ×${fi.qty}</td><td class="r">${((fi.price||0)*fi.qty).toFixed(2)}</td></tr>`)
+  })
+
+  return `<!DOCTYPE html><html lang="th"><head>
+<meta charset="utf-8"><title>Receipt #${serial}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;width:302px;margin:0 auto;padding:10px 8px}
+.c{text-align:center}.b{font-weight:bold}.big{font-size:15px}
+.sep{border:none;border-top:1px dashed #000;margin:5px 0}
+table{width:100%;border-collapse:collapse}
+td{padding:2px 0;vertical-align:top}
+td.r{text-align:right;white-space:nowrap;padding-left:6px}
+.foot{font-size:10px;text-align:center}
+@media print{@page{margin:0;size:80mm auto}body{width:80mm}}
+</style></head><body>
+<div class="c b big">Sofun Club Co., Ltd.</div>
+<div class="c">บริษัท โซฟัน จำกัด</div>
+<div class="c">สาขาอาร์ซีเอ (RCA)</div>
+<div>Serial: ${serial}</div>
+<div>Date: ${fmtDT(paidAt)}</div>
+<hr class="sep">
+<div class="c">ROOM: ${h.room || '-'} | ${h.members?.length || 1} คน</div>
+${me?.character ? `<div class="c">บทบาท: ${me.character}</div>` : ''}
+<hr class="sep">
+<div class="c b">รายการ</div>
+<table>${itemRows.join('')}${discAmt > 0 ? `<tr><td>Discount</td><td class="r">-${discAmt.toFixed(2)}</td></tr>` : ''}</table>
+<hr class="sep">
+<table>
+<tr><td>Subtotal:</td><td class="r">${subtotal.toFixed(2)}</td></tr>
+<tr><td>Tax (7%):</td><td class="r">${tax.toFixed(2)}</td></tr>
+<tr class="b"><td>ยอดของคุณ:</td><td class="r">${myTotal.toFixed(2)}</td></tr>
+</table>
+<hr class="sep">
+<div>[PAID]</div>
+${h.ending ? `<div>ผลเกม: ${h.ending}</div>` : ''}
+<br>
+<div class="foot">
+<div>21/81 ซอยศูนย์วิจัย แขวงบางกะปิ เขตห้วยขวาง</div>
+<div>กรุงเทพ 10310</div>
+<div>Tax ID No.0105565117207</div>
+<div>www.sofunclub.com</div>
+<div>Tel +66 0814661166</div>
+<div>Thank you very much!</div>
+</div>
+</body></html>`
+}
+
+function printBill(h, meUid) {
+  const html = buildReceiptHTML(h, meUid)
+  const w = window.open('', '_blank', 'width=440,height=720')
+  if (!w) return
+  w.document.write(html)
+  w.document.close()
+  w.focus()
+  setTimeout(() => w.print(), 400)
+}
+
+export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [] }) {
+  // Tab menu bar state (default to 'history')
+  const [activeTab, setActiveTab] = useState('history')
+
+  // Form states
   const [form, setForm] = useState({
     nickname: '', firstname: '', lastname: '',
     tel_no: '', email: '', birthday: '', gender: '', position: ''
@@ -22,7 +108,9 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [copiedText, setCopiedText] = useState('')
 
+  // Achievements & Themes
   const [myAchievements, setMyAchievements] = useState([])
   const [pinned, setPinned] = useState([])
   const [activeTheme, setActiveTheme] = useState(() => {
@@ -38,6 +126,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
     window.addEventListener('sofun-theme-change', handleSync)
     return () => window.removeEventListener('sofun-theme-change', handleSync)
   }, [])
+
   const [pinnedSaved, setPinnedSaved] = useState(false)
   const [pinnedSaving, setPinnedSaving] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -45,6 +134,15 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
   const [editingAch, setEditingAch] = useState(false)
   const [pinnedSnapshot, setPinnedSnapshot] = useState(null)
 
+  // Play History & Bills
+  const [history, setHistory]         = useState([])
+  const [expandedMap, setExpandedMap] = useState({})
+  const [search, setSearch]           = useState('')
+  const [filterMonth, setFilterMonth] = useState('')
+
+  const toggleExpanded = id => setExpandedMap(prev => ({ ...prev, [id]: !prev[id] }))
+
+  // Load member data
   useEffect(() => {
     if (!lineUser?.uid) return
     getDoc(doc(db, 'members', lineUser.uid)).then(snap => {
@@ -85,6 +183,81 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
     }).finally(() => setLoading(false))
   }, [lineUser])
 
+  // Load play history for member
+  useEffect(() => {
+    if (!lineUser?.uid) return
+    const q = query(
+      collection(db, 'payments'),
+      where('memberUids', 'array-contains', lineUser.uid),
+      orderBy('paidAt', 'desc')
+    )
+    const unsub = onSnapshot(q,
+      snap => setHistory(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => {
+        const q2 = query(collection(db, 'payments'), orderBy('paidAt', 'desc'))
+        onSnapshot(q2, snap => {
+          setHistory(snap.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(p => p.memberUids?.includes(lineUser.uid)))
+        }, () => {})
+      }
+    )
+    return unsub
+  }, [lineUser?.uid])
+
+  // Extract month filter options
+  const monthOptions = useMemo(() => {
+    const seen = new Set()
+    const opts = []
+    history.forEach(h => {
+      const d = h.paidAt?.toDate?.()
+      if (!d) return
+      const key = `${d.getFullYear()}-${p2(d.getMonth()+1)}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        opts.push({ key, label: d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) })
+      }
+    })
+    return opts
+  }, [history])
+
+  // Filter history
+  const filtered = useMemo(() => history.filter(h => {
+    if (search) {
+      if (!(h.scriptTitle || '').toLowerCase().includes(search.toLowerCase())) return false
+    }
+    if (filterMonth) {
+      const d = h.paidAt?.toDate?.()
+      if (!d) return false
+      if (`${d.getFullYear()}-${p2(d.getMonth()+1)}` !== filterMonth) return false
+    }
+    return true
+  }), [history, search, filterMonth])
+
+  // Total spent calculation
+  const totalSpent = useMemo(() => {
+    return history.reduce((acc, h) => {
+      const myBill = h.memberBills?.find(m => m.uid === lineUser?.uid)
+      return acc + (myBill?.total ?? h.grandTotal ?? 0)
+    }, 0)
+  }, [history, lineUser?.uid])
+
+  // Resolve game poster image helper
+  const getGameCover = (h) => {
+    if (h.scriptImage || h.gameImage) return convertImageUrl(h.scriptImage || h.gameImage, 200)
+    if (allGames?.length > 0) {
+      const matched = allGames.find(g =>
+        (h.scriptId && g.id === h.scriptId) ||
+        (h.scriptTitle && g.title === h.scriptTitle) ||
+        (h.scriptTitle && g.name === h.scriptTitle)
+      )
+      if (matched?.image || matched?.coverUrl) {
+        return convertImageUrl(matched.image || matched.coverUrl, 200)
+      }
+    }
+    return null
+  }
+
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const handleSave = async () => {
@@ -112,9 +285,6 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
         : prev.length < MAX_PINNED ? [...prev, id] : prev
     )
   }
-
-  
-
 
   const moveToFirst = (id) => {
     setPinned(prev => [id, ...prev.filter(x => x !== id)])
@@ -181,7 +351,14 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
   const startEditAch = () => { setPinnedSnapshot(pinned); setEditingAch(true) }
   const cancelEditAch = () => { if (pinnedSnapshot) setPinned(pinnedSnapshot); setEditingAch(false); setPinnedSnapshot(null) }
 
+  const handleCopy = (text, label) => {
+    navigator.clipboard.writeText(text)
+    setCopiedText(label)
+    setTimeout(() => setCopiedText(''), 2000)
+  }
+
   const avatarLetter = (form.nickname || form.firstname || lineUser?.name || '?')[0].toUpperCase()
+  const memberIdTag = `SF-${String(lineUser?.uid || '').slice(-6).toUpperCase()}`
 
   if (!lineUser) {
     return (
@@ -214,6 +391,13 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
 
   const labelStyle = { display: 'block', fontSize: 12, fontWeight: 700, color: INK_2, marginBottom: 6 }
 
+  const TABS = [
+    { id: 'history',      label: 'คดี & บิล',   icon: 'fa-history',   badge: history.length > 0 ? history.length : null },
+    { id: 'achievements', label: 'ความสำเร็จ', icon: 'fa-award',     badge: myAchievements.length > 0 ? myAchievements.length : null },
+    { id: 'info',         label: 'ข้อมูลส่วนตัว', icon: 'fa-user' },
+    { id: 'account',      label: 'บัญชี',       icon: 'fa-shield-halved' }
+  ]
+
   return (
     <div style={{ background: PAPER, minHeight: '100vh', paddingTop: 60, paddingBottom: 80, fontFamily: "'Sarabun', sans-serif" }}>
       <style>{`
@@ -223,11 +407,37 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
         .pp-btn-ghost:hover { background: ${PAPER} !important; color: ${INK} !important; }
         .pp-ach-card { transition: all 0.18s; cursor: pointer; }
         .pp-ach-card:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(26,26,26,0.1); }
+        .profile-history-card {
+          background: #ffffff;
+          border: 1px solid ${BORDER};
+          border-radius: 16px;
+          padding: 14px;
+          box-shadow: 0 2px 8px rgba(26,26,26,0.04);
+          transition: all 0.2s ease;
+        }
+        .profile-history-card:hover {
+          border-color: ${C}30;
+          box-shadow: 0 4px 16px rgba(26,26,26,0.08);
+        }
+        .pp-tab-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+          padding: 10px 8px;
+          border-radius: 12px;
+          border: none;
+          cursor: pointer;
+          font-family: 'Sarabun', sans-serif;
+          transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+          outline: none;
+        }
       `}</style>
 
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
 
-        {/* HERO */}
+        {/* HERO CARD */}
         <div style={{ background: '#fff', borderRadius: 24, padding: '32px 24px 28px', textAlign: 'center', marginTop: 24, boxShadow: '0 2px 12px rgba(26,26,26,0.05)', border: `1px solid ${BORDER}`, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 100, background: `linear-gradient(180deg, ${C}08 0%, transparent 100%)`, pointerEvents: 'none' }} />
 
@@ -286,17 +496,492 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
           )}
         </div>
 
-        {/* BODY */}
+        {/* ── MENU BAR / SEGMENTED TABS ── */}
+        <div style={{
+          marginTop: 18,
+          background: '#ffffff',
+          borderRadius: 16,
+          padding: 5,
+          border: `1px solid ${BORDER}`,
+          boxShadow: '0 2px 8px rgba(26,26,26,0.04)',
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, 1fr)',
+          gap: 6
+        }}>
+          {TABS.map(tab => {
+            const isActive = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className="pp-tab-btn"
+                style={{
+                  background: isActive ? C : 'transparent',
+                  color: isActive ? '#ffffff' : INK_2,
+                  boxShadow: isActive ? `0 4px 14px ${C}35` : 'none',
+                }}
+              >
+                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <i className={`fas ${tab.icon}`} style={{ fontSize: 14, color: isActive ? '#ffffff' : INK_3 }} />
+                  {tab.badge !== null && tab.badge !== undefined && (
+                    <span style={{
+                      position: 'absolute',
+                      top: -6,
+                      right: -11,
+                      minWidth: 15,
+                      height: 15,
+                      padding: '0 3px',
+                      borderRadius: 10,
+                      background: isActive ? '#ffffff' : C,
+                      color: isActive ? C : '#ffffff',
+                      fontSize: 9,
+                      fontWeight: 900,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1,
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.15)'
+                    }}>
+                      {tab.badge}
+                    </span>
+                  )}
+                </div>
+                <span style={{
+                  fontSize: 12,
+                  fontWeight: isActive ? 800 : 600,
+                  letterSpacing: '-0.01em',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {tab.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Toast / Copied notification */}
+        {copiedText && (
+          <div style={{
+            position: 'fixed',
+            bottom: 30,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            background: 'rgba(26, 26, 26, 0.92)',
+            color: '#ffffff',
+            padding: '10px 18px',
+            borderRadius: 20,
+            fontSize: 12.5,
+            fontWeight: 700,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
+          }}>
+            <i className="fas fa-check-circle" style={{ color: '#06c755' }} />
+            <span>{copiedText}</span>
+          </div>
+        )}
+
+        {/* BODY TABS CONTENT */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: 60, color: INK_3 }}>
             <i className="fas fa-spinner fa-spin" style={{ fontSize: 24 }} />
           </div>
         ) : (
-          <>
-            
-            {/* ── Achievements (First item is website theme) ── */}
-            {myAchievements.length > 0 && (
-              <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
+          <div style={{ marginTop: 18 }}>
+
+            {/* ══════════════════════════════════════════════════════════
+                TAB 1: ประวัติการลงคดี & บิลย้อนหลัง (Play History & Bills)
+               ══════════════════════════════════════════════════════════ */}
+            {activeTab === 'history' && (
+              <div>
+                {/* Stats Summary Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, marginBottom: 16 }}>
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: 16,
+                    padding: '16px 18px',
+                    border: `1px solid ${BORDER}`,
+                    boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: INK_3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <i className="fas fa-scroll" style={{ color: C }} />
+                      <span>คดีที่บันทึกแล้ว</span>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: INK, marginTop: 4 }}>
+                      {history.length} <span style={{ fontSize: 13, fontWeight: 700, color: INK_3 }}>คดี</span>
+                    </div>
+                  </div>
+
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: 16,
+                    padding: '16px 18px',
+                    border: `1px solid ${BORDER}`,
+                    boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: INK_3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <i className="fas fa-receipt" style={{ color: C }} />
+                      <span>ยอดใช้จ่ายรวม</span>
+                    </div>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: INK, marginTop: 4 }}>
+                      ฿{totalSpent.toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 900, color: INK }}>
+                    <i className="fas fa-history" style={{ color: C }} />
+                    <span>ประวัติการลงคดี & บิลย้อนหลัง</span>
+                  </div>
+                  {history.length > 0 && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      padding: '3px 10px',
+                      borderRadius: 12,
+                      background: `${C}10`,
+                      color: C,
+                      border: `1px solid ${C}28`
+                    }}>
+                      {history.length} รายการ
+                    </span>
+                  )}
+                </div>
+
+                {/* Search & Month Filter */}
+                {history.length > 0 && (
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                    <div style={{
+                      flex: 1,
+                      minWidth: 180,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      background: '#ffffff',
+                      border: `1px solid ${BORDER_2}`,
+                      borderRadius: 12,
+                      padding: '8px 12px'
+                    }}>
+                      <i className="fas fa-search" style={{ color: INK_3, fontSize: 12 }} />
+                      <input
+                        type="text"
+                        placeholder="ค้นหาชื่อเกมหรือคดี..."
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        style={{
+                          border: 'none',
+                          background: 'none',
+                          outline: 'none',
+                          fontSize: 13,
+                          color: INK,
+                          width: '100%',
+                          fontFamily: 'inherit'
+                        }}
+                      />
+                      {search && (
+                        <button
+                          onClick={() => setSearch('')}
+                          style={{ background: 'none', border: 'none', color: INK_3, cursor: 'pointer', padding: 0 }}
+                        >
+                          <i className="fas fa-times" />
+                        </button>
+                      )}
+                    </div>
+
+                    {monthOptions.length > 1 && (
+                      <select
+                        value={filterMonth}
+                        onChange={e => setFilterMonth(e.target.value)}
+                        style={{
+                          border: `1px solid ${BORDER_2}`,
+                          borderRadius: 12,
+                          padding: '8px 14px',
+                          fontSize: 12.5,
+                          color: INK,
+                          background: '#ffffff',
+                          outline: 'none',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <option value="">ทุกเดือน</option>
+                        {monthOptions.map(m => (
+                          <option key={m.key} value={m.key}>{m.label}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                )}
+
+                {/* History Items List */}
+                {filtered.length === 0 ? (
+                  <div style={{
+                    textAlign: 'center',
+                    padding: '40px 16px',
+                    borderRadius: 20,
+                    background: '#ffffff',
+                    border: `1px dashed ${BORDER_2}`,
+                    color: INK_3,
+                    fontSize: 13.5
+                  }}>
+                    <i className="fas fa-scroll" style={{ fontSize: 28, marginBottom: 10, opacity: 0.45, display: 'block', color: INK_3 }} />
+                    {history.length === 0 ? 'ยังไม่มีประวัติการเล่นคดี' : 'ไม่พบคดีที่ตรงกับคำค้นหา'}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {filtered.map(h => {
+                      const me = h.members?.find(m => m.uid === lineUser.uid)
+                      const myBill = h.memberBills?.find(m => m.uid === lineUser.uid)
+                      const allMembers = h.members || []
+                      const paidAt = h.paidAt?.toDate?.()
+                      const expanded = !!expandedMap[h.id]
+                      const myTotal = myBill?.total ?? h.grandTotal ?? 0
+                      const hasFood = (myBill?.foodItems?.length > 0 || (h.foodItems?.length > 0))
+                      const discAmt = h.discount?.applied || 0
+                      const gameCover = getGameCover(h)
+
+                      return (
+                        <div key={h.id} className="profile-history-card">
+                          <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                            {/* Game Poster Thumbnail */}
+                            <div style={{
+                              width: 60,
+                              height: 80,
+                              borderRadius: 10,
+                              overflow: 'hidden',
+                              background: PAPER,
+                              flexShrink: 0,
+                              border: `1px solid ${BORDER}`
+                            }}>
+                              {gameCover ? (
+                                <img
+                                  src={gameCover}
+                                  alt=""
+                                  loading="lazy"
+                                  decoding="async"
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                  onError={e => e.currentTarget.style.display = 'none'}
+                                />
+                              ) : (
+                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: INK_3 }}>
+                                  <i className="fas fa-mask" style={{ fontSize: 22 }} />
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Info Body */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                                <div style={{ fontSize: 14.5, fontWeight: 900, color: INK, lineHeight: 1.3 }}>
+                                  {h.scriptTitle || 'คดีไม่ระบุชื่อ'}
+                                </div>
+                                <div style={{ fontSize: 11, color: INK_3, whiteSpace: 'nowrap' }}>
+                                  {paidAt ? paidAt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : ''}
+                                </div>
+                              </div>
+
+                              {/* Metadata Tag Row */}
+                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+                                {me?.character && (
+                                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: `${C}12`, color: C }}>
+                                    <i className="fas fa-user-secret" style={{ marginRight: 4 }} />{me.character}
+                                  </span>
+                                )}
+                                {h.room && (
+                                  <span style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: PAPER, color: INK_2, border: `1px solid ${BORDER}` }}>
+                                    <i className="fas fa-door-open" style={{ marginRight: 4 }} />{h.room}
+                                  </span>
+                                )}
+                                {h.dm && (
+                                  <span style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 8px', borderRadius: 6, background: PAPER, color: INK_2, border: `1px solid ${BORDER}` }}>
+                                    <i className="fas fa-crown" style={{ marginRight: 4 }} />GM: {h.dm}
+                                  </span>
+                                )}
+                                {h.ending && (
+                                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.12)', color: '#d97706' }}>
+                                    <i className="fas fa-flag-checkered" style={{ marginRight: 4 }} />{h.ending}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Avatars of party */}
+                              {allMembers.length > 0 && (
+                                <div style={{ display: 'flex', gap: 3, marginTop: 8, alignItems: 'center' }}>
+                                  {allMembers.slice(0, 7).map((m, idx) => (
+                                    m.avatar ? (
+                                      <img
+                                        key={idx}
+                                        src={m.avatar}
+                                        alt={m.name}
+                                        title={m.name}
+                                        style={{
+                                          width: 22,
+                                          height: 22,
+                                          borderRadius: '50%',
+                                          objectFit: 'cover',
+                                          border: m.uid === lineUser.uid ? `2px solid ${C}` : '1.5px solid #ffffff'
+                                        }}
+                                        onError={e => e.currentTarget.style.display = 'none'}
+                                      />
+                                    ) : (
+                                      <div
+                                        key={idx}
+                                        style={{
+                                          width: 22,
+                                          height: 22,
+                                          borderRadius: '50%',
+                                          background: m.uid === lineUser.uid ? C : '#d1d5db',
+                                          color: '#ffffff',
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'center',
+                                          fontSize: 9,
+                                          fontWeight: 700
+                                        }}
+                                        title={m.name}
+                                      >
+                                        {(m.name || '?')[0]}
+                                      </div>
+                                    )
+                                  ))}
+                                  {allMembers.length > 7 && (
+                                    <span style={{ fontSize: 10, color: INK_3, fontWeight: 700, marginLeft: 2 }}>
+                                      +{allMembers.length - 7}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Bottom Action / Price Bar */}
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginTop: 12,
+                            paddingTop: 10,
+                            borderTop: `1px solid ${BORDER}`
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: INK_2 }}>
+                              <i className="fas fa-receipt" style={{ color: C }} />
+                              <span>ยอดของคุณ:</span>
+                              <strong style={{ fontSize: 14.5, color: INK }}>฿{myTotal.toLocaleString()}</strong>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <button
+                                onClick={() => toggleExpanded(h.id)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: '5px 11px',
+                                  borderRadius: 8,
+                                  border: `1px solid ${BORDER_2}`,
+                                  background: PAPER,
+                                  color: INK_2,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} />
+                                <span>{expanded ? 'ซ่อน' : 'ดูบิล'}</span>
+                              </button>
+
+                              <button
+                                onClick={() => printBill(h, lineUser.uid)}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 4,
+                                  fontSize: 11,
+                                  fontWeight: 700,
+                                  padding: '5px 11px',
+                                  borderRadius: 8,
+                                  border: `1px solid ${C}28`,
+                                  background: `${C}0c`,
+                                  color: C,
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <i className="fas fa-print" />
+                                <span>พิมพ์ใบเสร็จ</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expanded Detail Panel */}
+                          {expanded && (
+                            <div style={{
+                              marginTop: 10,
+                              paddingTop: 10,
+                              borderTop: `1px dashed ${BORDER_2}`,
+                              fontSize: 12,
+                              color: INK_2
+                            }}>
+                              {(h.gameUnitPrice > 0 || h.gameTotal > 0) && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
+                                  <span>ค่าเล่นเกม {h.gameUnitPrice > 0 ? `(฿${h.gameUnitPrice}/คน)` : ''}</span>
+                                  <span>฿{(h.gameTotal || 0).toLocaleString()}</span>
+                                </div>
+                              )}
+
+                              {hasFood && (
+                                <div style={{ marginTop: 6, marginBottom: 6 }}>
+                                  <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, textTransform: 'uppercase' }}>
+                                    อาหาร & เครื่องดื่ม
+                                  </div>
+                                  {(myBill?.foodItems || h.foodItems || []).map((f, fi) => (
+                                    <div key={fi} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                      <span>{f.name} × {f.qty}</span>
+                                      <span>฿{((f.price || 0) * f.qty).toLocaleString()}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {discAmt > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
+                                  <span>ส่วนลดพิเศษ</span>
+                                  <span>-฿{discAmt.toLocaleString()}</span>
+                                </div>
+                              )}
+
+                              <div style={{
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                paddingTop: 8,
+                                marginTop: 6,
+                                borderTop: `1px solid ${BORDER}`,
+                                fontWeight: 800,
+                                fontSize: 13,
+                                color: INK
+                              }}>
+                                <span>ยอดรวมสุทธิ</span>
+                                <span>฿{myTotal.toLocaleString()}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════
+                TAB 2: ความสำเร็จ (Achievements)
+               ══════════════════════════════════════════════════════════ */}
+            {activeTab === 'achievements' && (
+              <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
                 {sectionLabel(
                   <><i className="fas fa-award" style={{ marginRight: 6, color: C }} />Achievements</>,
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -520,13 +1205,13 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
                                   </button>
                                 )}
                                 <button
-                                  type="button"
-                                  onClick={() => togglePin(id)}
-                                  title="ยกเลิกการเลือก"
-                                  style={{ background: 'none', border: 'none', color: isFirst ? '#ffffff' : INK_3, cursor: 'pointer', padding: '0 2px', marginLeft: 2 }}
-                                >
-                                  <i className="fas fa-times" style={{ fontSize: 10 }} />
-                                </button>
+                                    type="button"
+                                    onClick={() => togglePin(id)}
+                                    title="ยกเลิกการเลือก"
+                                    style={{ background: 'none', border: 'none', color: isFirst ? '#ffffff' : INK_3, cursor: 'pointer', padding: '0 2px', marginLeft: 2 }}
+                                  >
+                                    <i className="fas fa-times" style={{ fontSize: 10 }} />
+                                  </button>
                               </div>
                             )
                           })}
@@ -634,189 +1319,251 @@ export default function ProfilePage({ lineUser, onLogout, showPage }) {
               </div>
             )}
 
-            {/* ── Personal info ── */}
-            <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
-              {sectionLabel(
-                <><i className="fas fa-user" style={{ marginRight: 6, color: C }} />ข้อมูลส่วนตัว</>,
-                !editing && (
-                  <button
-                    onClick={startEdit}
-                    className="pp-btn-ghost"
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '6px 12px', borderRadius: 999,
-                      background: `${C}0c`, color: C,
-                      border: `1px solid ${C}2c`, cursor: 'pointer',
-                      fontSize: 12, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
-                      transition: 'all 0.18s',
-                    }}
-                  >
-                    <i className="fas fa-pen" style={{ fontSize: 10 }} />แก้ไข
-                  </button>
-                )
-              )}
-
-              {!editing ? (
-                /* ── VIEW MODE ── */
-                <div style={{ display: 'flex', flexDirection: 'column' }}>
-                  {[
-                    { icon: 'fa-id-card',       label: 'ชื่อ-นามสกุล', value: [form.firstname, form.lastname].filter(Boolean).join(' ') },
-                    { icon: 'fa-smile',         label: 'ชื่อเล่น',      value: form.nickname },
-                    { icon: 'fa-phone',         label: 'เบอร์โทรศัพท์',  value: form.tel_no },
-                    { icon: 'fa-envelope',      label: 'อีเมล',         value: form.email, mono: true },
-                    { icon: 'fa-cake-candles',  label: 'วันเกิด',       value: form.birthday ? new Date(form.birthday).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '' },
-                    { icon: 'fa-venus-mars',    label: 'เพศ',           value: form.gender },
-                  ].map((row, i, arr) => (
-                    <div key={i} style={{
-                      display: 'flex', alignItems: 'center', gap: 14,
-                      padding: '14px 2px',
-                      borderBottom: i < arr.length - 1 ? `1px solid ${BORDER}` : 'none',
-                    }}>
-                      <div style={{ width: 36, height: 36, borderRadius: 10, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                        <i className={`fas ${row.icon}`} style={{ color: C, fontSize: 13 }} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, letterSpacing: '0.04em' }}>{row.label}</div>
-                        <div style={{
-                          marginTop: 2, fontSize: 14,
-                          fontWeight: row.value ? 700 : 500,
-                          color: row.value ? INK : INK_3,
-                          fontFamily: row.mono ? "'JetBrains Mono', monospace" : "'Sarabun', sans-serif",
-                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                        }}>
-                          {row.value || 'ยังไม่ระบุ'}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                /* ── EDIT MODE ── */
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={labelStyle}>ชื่อจริง</label>
-                      <input className="pp-input" style={inputStyle} value={form.firstname} onChange={e => set('firstname', e.target.value)} placeholder="ชื่อจริง" />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>นามสกุล</label>
-                      <input className="pp-input" style={inputStyle} value={form.lastname} onChange={e => set('lastname', e.target.value)} placeholder="นามสกุล" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>ชื่อเล่น</label>
-                    <input className="pp-input" style={inputStyle} value={form.nickname} onChange={e => set('nickname', e.target.value)} placeholder="ชื่อเล่น" />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>เบอร์โทรศัพท์</label>
-                    <input className="pp-input" style={inputStyle} type="tel" value={form.tel_no} onChange={e => set('tel_no', e.target.value)} placeholder="08x-xxx-xxxx" />
-                  </div>
-
-                  <div>
-                    <label style={labelStyle}>อีเมล</label>
-                    <input className="pp-input" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="example@email.com" />
-                  </div>
-
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                    <div>
-                      <label style={labelStyle}>วันเกิด</label>
-                      <input className="pp-input" style={{ ...inputStyle, colorScheme: 'light' }} type="date" value={form.birthday} onChange={e => set('birthday', e.target.value)} />
-                    </div>
-                    <div>
-                      <label style={labelStyle}>เพศ</label>
-                      <select className="pp-select" style={{ ...inputStyle, cursor: 'pointer' }} value={form.gender} onChange={e => set('gender', e.target.value)}>
-                        <option value="">— เลือก —</option>
-                        <option value="ชาย">ชาย</option>
-                        <option value="หญิง">หญิง</option>
-                        <option value="อื่นๆ">อื่นๆ</option>
-                      </select>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+            {/* ══════════════════════════════════════════════════════════
+                TAB 3: ข้อมูลส่วนตัว (Personal Info)
+               ══════════════════════════════════════════════════════════ */}
+            {activeTab === 'info' && (
+              <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
+                {sectionLabel(
+                  <><i className="fas fa-user" style={{ marginRight: 6, color: C }} />ข้อมูลส่วนตัว</>,
+                  !editing && (
                     <button
-                      onClick={cancelEdit}
-                      disabled={saving}
+                      onClick={startEdit}
                       className="pp-btn-ghost"
                       style={{
-                        flex: 1, height: 52, borderRadius: 12,
-                        background: '#fff', color: INK_2,
-                        border: `1px solid ${BORDER_2}`, cursor: saving ? 'not-allowed' : 'pointer',
-                        fontSize: 14, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '6px 12px', borderRadius: 999,
+                        background: `${C}0c`, color: C,
+                        border: `1px solid ${C}2c`, cursor: 'pointer',
+                        fontSize: 12, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
                         transition: 'all 0.18s',
                       }}
                     >
-                      ยกเลิก
+                      <i className="fas fa-pen" style={{ fontSize: 10 }} />แก้ไข
                     </button>
+                  )
+                )}
+
+                {!editing ? (
+                  /* ── VIEW MODE ── */
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {[
+                      { icon: 'fa-id-card',       label: 'ชื่อ-นามสกุล', value: [form.firstname, form.lastname].filter(Boolean).join(' ') },
+                      { icon: 'fa-smile',         label: 'ชื่อเล่น',      value: form.nickname },
+                      { icon: 'fa-phone',         label: 'เบอร์โทรศัพท์',  value: form.tel_no },
+                      { icon: 'fa-envelope',      label: 'อีเมล',         value: form.email, mono: true },
+                      { icon: 'fa-cake-candles',  label: 'วันเกิด',       value: form.birthday ? new Date(form.birthday).toLocaleDateString('th-TH', { day: 'numeric', month: 'long', year: 'numeric' }) : '' },
+                      { icon: 'fa-venus-mars',    label: 'เพศ',           value: form.gender },
+                    ].map((row, i, arr) => (
+                      <div key={i} style={{
+                        display: 'flex', alignItems: 'center', gap: 14,
+                        padding: '14px 2px',
+                        borderBottom: i < arr.length - 1 ? `1px solid ${BORDER}` : 'none',
+                      }}>
+                        <div style={{ width: 36, height: 36, borderRadius: 10, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          <i className={`fas ${row.icon}`} style={{ color: C, fontSize: 13 }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, letterSpacing: '0.04em' }}>{row.label}</div>
+                          <div style={{
+                            marginTop: 2, fontSize: 14,
+                            fontWeight: row.value ? 700 : 500,
+                            color: row.value ? INK : INK_3,
+                            fontFamily: row.mono ? "'JetBrains Mono', monospace" : "'Sarabun', sans-serif",
+                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                          }}>
+                            {row.value || 'ยังไม่ระบุ'}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  /* ── EDIT MODE ── */
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div>
+                        <label style={labelStyle}>ชื่อจริง</label>
+                        <input className="pp-input" style={inputStyle} value={form.firstname} onChange={e => set('firstname', e.target.value)} placeholder="ชื่อจริง" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>นามสกุล</label>
+                        <input className="pp-input" style={inputStyle} value={form.lastname} onChange={e => set('lastname', e.target.value)} placeholder="นามสกุล" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>ชื่อเล่น</label>
+                      <input className="pp-input" style={inputStyle} value={form.nickname} onChange={e => set('nickname', e.target.value)} placeholder="ชื่อเล่น" />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>เบอร์โทรศัพท์</label>
+                      <input className="pp-input" style={inputStyle} type="tel" value={form.tel_no} onChange={e => set('tel_no', e.target.value)} placeholder="08x-xxx-xxxx" />
+                    </div>
+
+                    <div>
+                      <label style={labelStyle}>อีเมล</label>
+                      <input className="pp-input" style={inputStyle} type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="example@email.com" />
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                      <div>
+                        <label style={labelStyle}>วันเกิด</label>
+                        <input className="pp-input" style={{ ...inputStyle, colorScheme: 'light' }} type="date" value={form.birthday} onChange={e => set('birthday', e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>เพศ</label>
+                        <select className="pp-select" style={{ ...inputStyle, cursor: 'pointer' }} value={form.gender} onChange={e => set('gender', e.target.value)}>
+                          <option value="">— เลือก —</option>
+                          <option value="ชาย">ชาย</option>
+                          <option value="หญิง">หญิง</option>
+                          <option value="อื่นๆ">อื่นๆ</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
+                      <button
+                        onClick={cancelEdit}
+                        disabled={saving}
+                        className="pp-btn-ghost"
+                        style={{
+                          flex: 1, height: 52, borderRadius: 12,
+                          background: '#fff', color: INK_2,
+                          border: `1px solid ${BORDER_2}`, cursor: saving ? 'not-allowed' : 'pointer',
+                          fontSize: 14, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
+                          transition: 'all 0.18s',
+                        }}
+                      >
+                        ยกเลิก
+                      </button>
+                      <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="pp-btn-primary"
+                        style={{
+                          flex: 2, height: 52, borderRadius: 12,
+                          background: C, color: '#fff', border: 'none',
+                          cursor: saving ? 'wait' : 'pointer',
+                          fontSize: 14.5, fontWeight: 800, fontFamily: "'Sarabun', sans-serif",
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          boxShadow: `0 6px 20px ${C}35`, transition: 'all 0.18s',
+                        }}
+                      >
+                        {saving ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                          : <><i className="fas fa-check" /> บันทึกการแก้ไข</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {saved && !editing && (
+                  <div style={{
+                    marginTop: 14, padding: '10px 14px', borderRadius: 10,
+                    background: 'rgba(6,199,85,0.1)', border: '1px solid rgba(6,199,85,0.3)',
+                    color: '#06c755', fontSize: 13, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}>
+                    <i className="fas fa-check-circle" />บันทึกข้อมูลเรียบร้อยแล้ว
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════
+                TAB 4: บัญชีและการตั้งค่า (Account & Settings)
+               ══════════════════════════════════════════════════════════ */}
+            {activeTab === 'account' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {/* LINE Account Link Card */}
+                <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
+                  {sectionLabel(<><i className="fas fa-link" style={{ marginRight: 6, color: C }} />บัญชีที่เชื่อมต่อ</>)}
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: PAPER, borderRadius: 14 }}>
+                    <div style={{ width: 44, height: 44, borderRadius: 12, background: '#06c755', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <i className="fab fa-line" style={{ color: '#fff', fontSize: 20 }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, letterSpacing: '0.08em', textTransform: 'uppercase' }}>LINE Account</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lineUser.name}</div>
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#06c755', padding: '4px 10px', borderRadius: 999, background: 'rgba(6,199,85,0.1)', border: '1px solid rgba(6,199,85,0.3)', flexShrink: 0 }}>
+                      <i className="fas fa-check" style={{ marginRight: 4, fontSize: 9 }} />เชื่อมต่อแล้ว
+                    </span>
+                  </div>
+
+                  {/* Member ID Tag with Copy */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, padding: '12px 16px', background: PAPER, borderRadius: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Member ID</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: INK, fontFamily: 'monospace', marginTop: 2 }}>{memberIdTag}</div>
+                    </div>
                     <button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="pp-btn-primary"
+                      onClick={() => handleCopy(memberIdTag, 'คัดลอกรหัสสมาชิกแล้ว')}
                       style={{
-                        flex: 2, height: 52, borderRadius: 12,
-                        background: C, color: '#fff', border: 'none',
-                        cursor: saving ? 'wait' : 'pointer',
-                        fontSize: 14.5, fontWeight: 800, fontFamily: "'Sarabun', sans-serif",
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        boxShadow: `0 6px 20px ${C}35`, transition: 'all 0.18s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        background: '#ffffff',
+                        border: `1px solid ${BORDER_2}`,
+                        color: INK,
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer'
                       }}
                     >
-                      {saving ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-                        : <><i className="fas fa-check" /> บันทึกการแก้ไข</>}
+                      <i className="fas fa-copy" style={{ color: C }} />
+                      <span>คัดลอก</span>
                     </button>
                   </div>
-                </div>
-              )}
 
-              {saved && !editing && (
-                <div style={{
-                  marginTop: 14, padding: '10px 14px', borderRadius: 10,
-                  background: 'rgba(6,199,85,0.1)', border: '1px solid rgba(6,199,85,0.3)',
-                  color: '#06c755', fontSize: 13, fontWeight: 700,
-                  display: 'flex', alignItems: 'center', gap: 8,
-                }}>
-                  <i className="fas fa-check-circle" />บันทึกข้อมูลเรียบร้อยแล้ว
+                  {/* User Role */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, padding: '12px 16px', background: PAPER, borderRadius: 14 }}>
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, letterSpacing: '0.08em', textTransform: 'uppercase' }}>สถานะสมาชิก</div>
+                      <div style={{ fontSize: 14, fontWeight: 800, color: INK, marginTop: 2 }}>
+                        {lineUser.role === 'admin' ? 'ผู้ดูแลระบบ (Admin)' : 'สมาชิกสโมสรนักสืบ (Member)'}
+                      </div>
+                    </div>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 800,
+                      color: lineUser.role === 'admin' ? C : INK_2,
+                      padding: '4px 10px',
+                      borderRadius: 999,
+                      background: lineUser.role === 'admin' ? `${C}12` : 'rgba(0,0,0,0.06)',
+                      border: lineUser.role === 'admin' ? `1px solid ${C}2c` : `1px solid ${BORDER}`
+                    }}>
+                      {lineUser.role === 'admin' ? 'ADMIN' : 'MEMBER'}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* ── Account ── */}
-            <div style={{ background: '#fff', borderRadius: 20, padding: '24px 20px', marginTop: 20, border: `1px solid ${BORDER}`, boxShadow: '0 1px 4px rgba(26,26,26,0.04)' }}>
-              {sectionLabel(<><i className="fas fa-link" style={{ marginRight: 6, color: C }} />บัญชี</>)}
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: PAPER, borderRadius: 14 }}>
-                <div style={{ width: 44, height: 44, borderRadius: 12, background: '#06c755', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <i className="fab fa-line" style={{ color: '#fff', fontSize: 20 }} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, letterSpacing: '0.08em', textTransform: 'uppercase' }}>LINE Account</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: INK, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lineUser.name}</div>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: '#06c755', padding: '4px 10px', borderRadius: 999, background: 'rgba(6,199,85,0.1)', border: '1px solid rgba(6,199,85,0.3)', flexShrink: 0 }}>
-                  <i className="fas fa-check" style={{ marginRight: 4, fontSize: 9 }} />เชื่อมต่อแล้ว
-                </span>
+                {/* Logout Button */}
+                <button
+                  onClick={onLogout}
+                  className="pp-btn-ghost"
+                  style={{
+                    width: '100%', height: 50, borderRadius: 14,
+                    background: '#fff', color: C,
+                    border: `1.5px solid ${C}30`, cursor: 'pointer',
+                    fontSize: 14, fontWeight: 800, fontFamily: "'Sarabun', sans-serif",
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'all 0.18s',
+                  }}
+                >
+                  <i className="fas fa-sign-out-alt" /> ออกจากระบบ
+                </button>
               </div>
-            </div>
+            )}
 
-            {/* ── Logout ── */}
-            <button
-              onClick={onLogout}
-              className="pp-btn-ghost"
-              style={{
-                marginTop: 20, width: '100%', height: 48, borderRadius: 12,
-                background: '#fff', color: INK_2,
-                border: `1px solid ${BORDER_2}`, cursor: 'pointer',
-                fontSize: 13.5, fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                transition: 'all 0.18s',
-              }}
-            >
-              <i className="fas fa-sign-out-alt" /> ออกจากระบบ
-            </button>
-          </>
+          </div>
         )}
+
       </div>
     </div>
   )

@@ -8,86 +8,6 @@ import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'f
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import { convertImageUrl } from '../utils/imageUrl'
 
-const p2 = n => String(Math.round(n)).padStart(2, '0')
-const fmtDT = d => {
-  if (!d) return ''
-  const dt = d instanceof Date ? d : new Date(d)
-  return `${dt.getFullYear()}-${p2(dt.getMonth()+1)}-${p2(dt.getDate())} ${p2(dt.getHours())}:${p2(dt.getMinutes())}`
-}
-
-function buildReceiptHTML(h, meUid) {
-  const myBill = h.memberBills?.find(m => m.uid === meUid)
-  const me = h.members?.find(m => m.uid === meUid)
-  const paidAt = h.paidAt?.toDate?.()
-  const serial = h.serial ? String(h.serial).padStart(10, '0') : '-'
-  const discAmt = h.discount?.applied || 0
-  const myTotal = myBill?.total ?? h.grandTotal ?? 0
-  const tax = myTotal * 7 / 107
-  const subtotal = myTotal - tax
-
-  const itemRows = []
-  if ((h.gameUnitPrice || 0) > 0) {
-    itemRows.push(`<tr><td>${h.scriptTitle || 'เกม'} ×${h.members?.length || 1}</td><td class="r">${(h.gameTotal||0).toFixed(2)}</td></tr>`)
-  }
-  ;(myBill?.foodItems || h.foodItems || []).forEach(fi => {
-    const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name||a).join(',')})` : ''
-    itemRows.push(`<tr><td>${fi.name}${addStr} ×${fi.qty}</td><td class="r">${((fi.price||0)*fi.qty).toFixed(2)}</td></tr>`)
-  })
-
-  return `<!DOCTYPE html><html lang="th"><head>
-<meta charset="utf-8"><title>Receipt #${serial}</title>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Courier New',monospace;font-size:12px;color:#000;background:#fff;width:302px;margin:0 auto;padding:10px 8px}
-.c{text-align:center}.b{font-weight:bold}.big{font-size:15px}
-.sep{border:none;border-top:1px dashed #000;margin:5px 0}
-table{width:100%;border-collapse:collapse}
-td{padding:2px 0;vertical-align:top}
-td.r{text-align:right;white-space:nowrap;padding-left:6px}
-.foot{font-size:10px;text-align:center}
-@media print{@page{margin:0;size:80mm auto}body{width:80mm}}
-</style></head><body>
-<div class="c b big">Sofun Club Co., Ltd.</div>
-<div class="c">บริษัท โซฟัน จำกัด</div>
-<div class="c">สาขาอาร์ซีเอ (RCA)</div>
-<div>Serial: ${serial}</div>
-<div>Date: ${fmtDT(paidAt)}</div>
-<hr class="sep">
-<div class="c">ROOM: ${h.room || '-'} | ${h.members?.length || 1} คน</div>
-${me?.character ? `<div class="c">บทบาท: ${me.character}</div>` : ''}
-<hr class="sep">
-<div class="c b">รายการ</div>
-<table>${itemRows.join('')}${discAmt > 0 ? `<tr><td>Discount</td><td class="r">-${discAmt.toFixed(2)}</td></tr>` : ''}</table>
-<hr class="sep">
-<table>
-<tr><td>Subtotal:</td><td class="r">${subtotal.toFixed(2)}</td></tr>
-<tr><td>Tax (7%):</td><td class="r">${tax.toFixed(2)}</td></tr>
-<tr class="b"><td>ยอดของคุณ:</td><td class="r">${myTotal.toFixed(2)}</td></tr>
-</table>
-<hr class="sep">
-<div>[PAID]</div>
-${h.ending ? `<div>ผลเกม: ${h.ending}</div>` : ''}
-<br>
-<div class="foot">
-<div>21/81 ซอยศูนย์วิจัย แขวงบางกะปิ เขตห้วยขวาง</div>
-<div>กรุงเทพ 10310</div>
-<div>Tax ID No.0105565117207</div>
-<div>www.sofunclub.com</div>
-<div>Tel +66 0814661166</div>
-<div>Thank you very much!</div>
-</div>
-</body></html>`
-}
-
-function printBill(h, meUid) {
-  const html = buildReceiptHTML(h, meUid)
-  const w = window.open('', '_blank', 'width=440,height=720')
-  if (!w) return
-  w.document.write(html)
-  w.document.close()
-  w.focus()
-  setTimeout(() => w.print(), 400)
-}
 
 // ── Achievement Theme Profiles ───────────────────────────────────────────────
 const THEME_PROFILES = {
@@ -299,9 +219,6 @@ const THEME_PROFILES = {
 
 export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false, showPage }) {
   const [history, setHistory]         = useState([])
-  const [expandedMap, setExpandedMap] = useState({})
-  const [search, setSearch]           = useState('')
-  const [filterMonth, setFilterMonth] = useState('')
   const [copiedText, setCopiedText]   = useState('')
   const [fullscreenQr, setFullscreenQr] = useState(false)
 
@@ -347,8 +264,6 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
     })
   }, [lineUser?.uid])
 
-  const toggleExpanded = id => setExpandedMap(prev => ({ ...prev, [id]: !prev[id] }))
-
   // Load play history for member
   useEffect(() => {
     if (!lineUser?.uid) return
@@ -371,35 +286,6 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
     return unsub
   }, [lineUser?.uid])
 
-  // Extract month filter options
-  const monthOptions = useMemo(() => {
-    const seen = new Set()
-    const opts = []
-    history.forEach(h => {
-      const d = h.paidAt?.toDate?.()
-      if (!d) return
-      const key = `${d.getFullYear()}-${p2(d.getMonth()+1)}`
-      if (!seen.has(key)) {
-        seen.add(key)
-        opts.push({ key, label: d.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) })
-      }
-    })
-    return opts
-  }, [history])
-
-  // Filter history
-  const filtered = useMemo(() => history.filter(h => {
-    if (search) {
-      if (!(h.scriptTitle || '').toLowerCase().includes(search.toLowerCase())) return false
-    }
-    if (filterMonth) {
-      const d = h.paidAt?.toDate?.()
-      if (!d) return false
-      if (`${d.getFullYear()}-${p2(d.getMonth()+1)}` !== filterMonth) return false
-    }
-    return true
-  }), [history, search, filterMonth])
-
   // Resolve active theme profile
   const theme = THEME_PROFILES[activeTheme] || THEME_PROFILES.default
 
@@ -415,22 +301,6 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
     navigator.clipboard.writeText(text)
     setCopiedText(label)
     setTimeout(() => setCopiedText(''), 2000)
-  }
-
-  // Resolve game poster image helper
-  const getGameCover = (h) => {
-    if (h.scriptImage || h.gameImage) return convertImageUrl(h.scriptImage || h.gameImage, 200)
-    if (allGames?.length > 0) {
-      const matched = allGames.find(g =>
-        (h.scriptId && g.id === h.scriptId) ||
-        (h.scriptTitle && g.title === h.scriptTitle) ||
-        (h.scriptTitle && g.name === h.scriptTitle)
-      )
-      if (matched?.image || matched?.coverUrl) {
-        return convertImageUrl(matched.image || matched.coverUrl, 200)
-      }
-    }
-    return null
   }
 
   if (!lineUser) {
@@ -769,355 +639,49 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
           </div>
         </div>
 
-        {/* ── Play History Timeline Section ── */}
-        <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 16, fontWeight: 900, color: 'var(--text-primary)' }}>
-              <i className="fas fa-history" style={{ color: theme.accent }} />
-              <span>ประวัติการลงคดี & บิลย้อนหลัง</span>
-            </div>
-            {history.length > 0 && (
-              <span style={{
-                fontSize: 11,
-                fontWeight: 800,
-                padding: '3px 9px',
-                borderRadius: 12,
-                background: `rgba(${theme.accentRgb}, 0.12)`,
-                color: theme.accent,
-                border: `1px solid rgba(${theme.accentRgb}, 0.25)`
-              }}>
-                {history.length} รายการ
-              </span>
-            )}
-          </div>
-
-          {/* Search & Month Filter */}
-          {history.length > 0 && (
-            <div style={{ display: 'flex', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
-              <div style={{
-                flex: 1,
-                minWidth: 180,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 8,
-                background: 'var(--surface-card, #f8f8fc)',
-                border: '1px solid var(--border-default, #e5e7eb)',
-                borderRadius: 10,
-                padding: '7px 12px'
-              }}>
-                <i className="fas fa-search" style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: 12 }} />
-                <input
-                  type="text"
-                  placeholder="ค้นหาชื่อเกม..."
-                  value={search}
-                  onChange={e => setSearch(e.target.value)}
-                  style={{
-                    border: 'none',
-                    background: 'none',
-                    outline: 'none',
-                    fontSize: 12,
-                    color: 'var(--text-primary)',
-                    width: '100%',
-                    fontFamily: 'inherit'
-                  }}
-                />
-                {search && (
-                  <button
-                    onClick={() => setSearch('')}
-                    style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', padding: 0 }}
-                  >
-                    <i className="fas fa-times" />
-                  </button>
-                )}
-              </div>
-
-              {monthOptions.length > 1 && (
-                <select
-                  value={filterMonth}
-                  onChange={e => setFilterMonth(e.target.value)}
-                  style={{
-                    border: '1px solid var(--border-default, #e5e7eb)',
-                    borderRadius: 10,
-                    padding: '7px 12px',
-                    fontSize: 12,
-                    color: 'var(--text-primary)',
-                    background: 'var(--surface-card, #f8f8fc)',
-                    outline: 'none',
-                    fontWeight: 700
-                  }}
-                >
-                  <option value="">ทุกเดือน</option>
-                  {monthOptions.map(m => (
-                    <option key={m.key} value={m.key}>{m.label}</option>
-                  ))}
-                </select>
-              )}
-            </div>
-          )}
-
-          {/* History Items List */}
-          {filtered.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '36px 16px',
-              borderRadius: 16,
-              background: 'var(--surface-card, #f8f8fc)',
-              border: '1px dashed var(--border-default, #e5e7eb)',
-              color: 'var(--text-tertiary, #9ca3af)',
+        {/* Shortcut to Profile Play History & Bills */}
+        <button
+          onClick={() => showPage?.('profile')}
+          style={{
+            width: '100%',
+            marginTop: 14,
+            padding: '12px 16px',
+            borderRadius: 14,
+            background: 'var(--surface-card, #f8f8fc)',
+            border: '1px solid var(--border-default, #e5e7eb)',
+            color: 'var(--text-primary)',
+            fontSize: 13,
+            fontWeight: 800,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+            transition: 'all 0.18s'
+          }}
+        >
+          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{
+              width: 30,
+              height: 30,
+              borderRadius: 8,
+              background: `rgba(${theme.accentRgb}, 0.12)`,
+              color: theme.accent,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               fontSize: 13
             }}>
-              <i className="fas fa-scroll" style={{ fontSize: 24, marginBottom: 8, opacity: 0.5, display: 'block' }} />
-              {history.length === 0 ? 'ยังไม่มีประวัติการเล่นคดี' : 'ไม่พบคดีที่ตรงกับคำค้นหา'}
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {filtered.map(h => {
-                const me       = h.members?.find(m => m.uid === lineUser.uid)
-                const myBill   = h.memberBills?.find(m => m.uid === lineUser.uid)
-                const allMembers = h.members || []
-                const paidAt   = h.paidAt?.toDate?.()
-                const expanded = !!expandedMap[h.id]
-                const myTotal  = myBill?.total ?? h.grandTotal ?? 0
-                const hasFood  = (myBill?.foodItems?.length > 0 || (h.foodItems?.length > 0))
-                const discAmt  = h.discount?.applied || 0
-                const gameCover = getGameCover(h)
-
-                return (
-                  <div key={h.id} className="qr-game-item">
-                    <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-                      {/* Game Poster Thumbnail */}
-                      <div style={{
-                        width: 58,
-                        height: 76,
-                        borderRadius: 8,
-                        overflow: 'hidden',
-                        background: '#f3f4f6',
-                        flexShrink: 0,
-                        border: '1px solid rgba(0,0,0,0.06)'
-                      }}>
-                        {gameCover ? (
-                          <img
-                            src={gameCover}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                            onError={e => e.currentTarget.style.display = 'none'}
-                          />
-                        ) : (
-                          <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af' }}>
-                            <i className="fas fa-mask" style={{ fontSize: 20 }} />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Info Body */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
-                          <div style={{ fontSize: 14, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.3 }}>
-                            {h.scriptTitle || 'คดีไม่ระบุชื่อ'}
-                          </div>
-                          <div style={{ fontSize: 11, color: 'var(--text-tertiary)', whiteSpace: 'nowrap' }}>
-                            {paidAt ? paidAt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : ''}
-                          </div>
-                        </div>
-
-                        {/* Metadata Tag Row */}
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
-                          {me?.character && (
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: `rgba(${theme.accentRgb}, 0.12)`, color: theme.accent }}>
-                              <i className="fas fa-user-secret" style={{ marginRight: 3 }} /> {me.character}
-                            </span>
-                          )}
-                          {h.room && (
-                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'var(--surface-sunken, #f3f4f6)', color: 'var(--text-secondary)' }}>
-                              <i className="fas fa-door-open" style={{ marginRight: 3 }} /> {h.room}
-                            </span>
-                          )}
-                          {h.dm && (
-                            <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 6, background: 'var(--surface-sunken, #f3f4f6)', color: 'var(--text-secondary)' }}>
-                              <i className="fas fa-crown" style={{ marginRight: 3 }} /> GM: {h.dm}
-                            </span>
-                          )}
-                          {h.ending && (
-                            <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, background: 'rgba(245, 158, 11, 0.12)', color: '#d97706' }}>
-                              <i className="fas fa-flag-checkered" style={{ marginRight: 3 }} /> {h.ending}
-                            </span>
-                          )}
-                        </div>
-
-                        {/* Avatars of party */}
-                        {allMembers.length > 0 && (
-                          <div style={{ display: 'flex', gap: 3, marginTop: 8, alignItems: 'center' }}>
-                            {allMembers.slice(0, 7).map((m, idx) => (
-                              m.avatar ? (
-                                <img
-                                  key={idx}
-                                  src={m.avatar}
-                                  alt={m.name}
-                                  title={m.name}
-                                  style={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: '50%',
-                                    objectFit: 'cover',
-                                    border: m.uid === lineUser.uid ? `2px solid ${theme.accent}` : '1.5px solid #ffffff'
-                                  }}
-                                  onError={e => e.currentTarget.style.display = 'none'}
-                                />
-                              ) : (
-                                <div
-                                  key={idx}
-                                  style={{
-                                    width: 22,
-                                    height: 22,
-                                    borderRadius: '50%',
-                                    background: m.uid === lineUser.uid ? theme.accent : '#d1d5db',
-                                    color: '#ffffff',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontSize: 9,
-                                    fontWeight: 700
-                                  }}
-                                  title={m.name}
-                                >
-                                  {(m.name || '?')[0]}
-                                </div>
-                              )
-                            ))}
-                            {allMembers.length > 7 && (
-                              <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700, marginLeft: 2 }}>
-                                +{allMembers.length - 7}
-                              </span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Bottom Action / Price Bar */}
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      marginTop: 12,
-                      paddingTop: 10,
-                      borderTop: '1px solid var(--border-default, #f3f4f6)'
-                    }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--text-secondary)' }}>
-                        <i className="fas fa-receipt" style={{ color: theme.accent }} />
-                        <span>ยอดของคุณ:</span>
-                        <strong style={{ fontSize: 14, color: 'var(--text-primary)' }}>฿{myTotal.toLocaleString()}</strong>
-                      </div>
-
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        <button
-                          onClick={() => toggleExpanded(h.id)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: '4px 10px',
-                            borderRadius: 6,
-                            border: '1px solid var(--border-default, #e5e7eb)',
-                            background: 'var(--surface-sunken, #f9fafb)',
-                            color: 'var(--text-secondary)',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} />
-                          <span>{expanded ? 'ซ่อน' : 'ดูบิล'}</span>
-                        </button>
-
-                        <button
-                          onClick={() => printBill(h, lineUser.uid)}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 4,
-                            fontSize: 11,
-                            fontWeight: 700,
-                            padding: '4px 10px',
-                            borderRadius: 6,
-                            border: `1px solid rgba(${theme.accentRgb}, 0.3)`,
-                            background: `rgba(${theme.accentRgb}, 0.1)`,
-                            color: theme.accent,
-                            cursor: 'pointer'
-                          }}
-                        >
-                          <i className="fas fa-print" />
-                          <span>พิมพ์ใบเสร็จ</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Expanded Detail Panel */}
-                    {expanded && (
-                      <div style={{
-                        marginTop: 10,
-                        paddingTop: 10,
-                        borderTop: '1px dashed var(--border-default, #e5e7eb)',
-                        fontSize: 12,
-                        color: 'var(--text-secondary)'
-                      }}>
-                        {/* Game cost */}
-                        {(h.gameUnitPrice > 0 || h.gameTotal > 0) && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                            <span>ค่าเล่นเกม {h.gameUnitPrice > 0 ? `(฿${h.gameUnitPrice}/คน)` : ''}</span>
-                            <span>฿{(h.gameTotal || 0).toLocaleString()}</span>
-                          </div>
-                        )}
-
-                        {/* Food items */}
-                        {hasFood && (
-                          <div style={{ marginTop: 6, marginBottom: 6 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
-                              อาหาร & เครื่องดื่ม
-                            </div>
-                            {(myBill?.foodItems || h.foodItems || []).map((f, fi) => (
-                              <div key={fi} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
-                                <span>{f.name} × {f.qty}</span>
-                                <span>฿{((f.price || 0) * f.qty).toLocaleString()}</span>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                        {/* Discount */}
-                        {discAmt > 0 && (
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
-                            <span>ส่วนลดพิเศษ</span>
-                            <span>-฿{discAmt.toLocaleString()}</span>
-                          </div>
-                        )}
-
-                        {/* Total */}
-                        <div style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          paddingTop: 8,
-                          marginTop: 6,
-                          borderTop: '1px solid var(--border-default, #f3f4f6)',
-                          fontWeight: 800,
-                          fontSize: 13,
-                          color: 'var(--text-primary)'
-                        }}>
-                          <span>ยอดรวมสุทธิ</span>
-                          <span>฿{myTotal.toLocaleString()}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-      </div>
+              <i className="fas fa-history" />
+            </span>
+            <span>ดูประวัติการลงคดี & บิลย้อนหลัง</span>
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-tertiary)', fontSize: 12 }}>
+            {history.length > 0 && <span>{history.length} รายการ</span>}
+            <i className="fas fa-chevron-right" style={{ fontSize: 11 }} />
+          </span>
+        </button>
+</div>
 
       {/* ── Fullscreen QR Zoom Modal ── */}
       {fullscreenQr && (
