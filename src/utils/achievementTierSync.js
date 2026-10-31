@@ -88,6 +88,8 @@ export function isSpecialEventGame(g) {
   return (
     title.includes('special event') ||
     title.includes('secial event') ||
+    title === 'event' ||
+    title.includes('clocktower') ||
     id === 'vqpyqhfwsbq3niklsqtc' ||
     (Array.isArray(g.tags) && g.tags.some(t => String(t).toLowerCase().includes('special event')))
   )
@@ -101,9 +103,16 @@ export function isSpecialEventHistory(h) {
   return (
     title.includes('special event') ||
     title.includes('secial event') ||
+    title === 'event' ||
+    title.includes('clocktower') ||
     sid === 'vqpyqhfwsbq3niklsqtc' ||
     room.includes('special')
   )
+}
+
+export function isSpecialEventId(id) {
+  if (!id) return false
+  return String(id).toLowerCase() === 'vqpyqhfwsbq3niklsqtc'
 }
 
 /**

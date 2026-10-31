@@ -3,7 +3,7 @@ import { db } from '../firebase'
 import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import { convertImageUrl } from '../utils/imageUrl'
-import { isSpecialEventGame, isSpecialEventHistory } from '../utils/achievementTierSync'
+import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId } from '../utils/achievementTierSync'
 
 const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
@@ -276,29 +276,94 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
     return allGames.filter(g => !g.isDeleted && !g.archived && !isSpecialEventGame(g)).length
   }, [allGames])
 
+  // Combined & deduplicated played sessions across playHistory and payments (excluding Special Event)
+  const allPlayedRecords = useMemo(() => {
+    const records = []
+
+    const isDuplicate = (gameId, pDate, sessionKey) => {
+      return records.some(r => {
+        if (r.gameId !== gameId) return false
+        if (r.playedAt && pDate) {
+          const diffHours = Math.abs(r.playedAt.getTime() - pDate.getTime()) / (1000 * 60 * 60)
+          if (diffHours < 16) return true
+        }
+        return r.sessionKey === sessionKey
+      })
+    }
+
+    // 1. Process playHistory records (primary source for played games)
+    playHistory.forEach(ph => {
+      if (isSpecialEventHistory(ph)) return
+      const sid = ph.scriptId ? String(ph.scriptId) : null
+      const rawTitle = ph.scriptTitle ? ph.scriptTitle.trim().toLowerCase() : ''
+      const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : ''
+      const g = (sid && gameMap.get(sid)) ||
+                (rawTitle && gameMap.get(rawTitle)) ||
+                (normTitle && gameMap.get(normTitle))
+      if (g && isSpecialEventGame(g)) return
+
+      const gameId = g ? String(g.id || g._id) : (sid || rawTitle)
+      if (!gameId || isSpecialEventId(gameId)) return
+
+      const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : null)
+      const dateKey = pDate ? (pDate.toLocaleDateString ? pDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : pDate.toISOString().slice(0, 10)) : ph.id
+      const sessionKey = `${gameId}_${dateKey}`
+
+      if (!isDuplicate(gameId, pDate, sessionKey)) {
+        records.push({
+          id: ph.id,
+          gameId,
+          sessionKey,
+          title: g?.title || ph.scriptTitle,
+          playedAt: pDate,
+          source: 'playHistory'
+        })
+      }
+    })
+
+    // 2. Process payments history (fills in sessions not present in playHistory)
+    history.forEach(pm => {
+      if (isSpecialEventHistory(pm)) return
+      const sid = pm.scriptId ? String(pm.scriptId) : null
+      const rawTitle = pm.scriptTitle ? pm.scriptTitle.trim().toLowerCase() : ''
+      const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : ''
+      const g = (sid && gameMap.get(sid)) ||
+                (rawTitle && gameMap.get(rawTitle)) ||
+                (normTitle && gameMap.get(normTitle))
+      if (g && isSpecialEventGame(g)) return
+
+      const gameId = g ? String(g.id || g._id) : (sid || rawTitle)
+      if (!gameId || isSpecialEventId(gameId)) return
+
+      const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : null)
+      const dateKey = pDate ? (pDate.toLocaleDateString ? pDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : pDate.toISOString().slice(0, 10)) : pm.id
+      const sessionKey = `${gameId}_${dateKey}`
+
+      if (!isDuplicate(gameId, pDate, sessionKey)) {
+        records.push({
+          id: `pay_${pm.id}`,
+          gameId,
+          sessionKey,
+          title: g?.title || pm.scriptTitle,
+          playedAt: pDate,
+          source: 'payment'
+        })
+      }
+    })
+
+    return records
+  }, [playHistory, history, gameMap])
+
   // Unique played games calculation (combining playHistory and payments history, excluding Special Event)
   const uniquePlayedGames = useMemo(() => {
     const set = new Set()
-    playHistory.forEach(p => {
-      if (isSpecialEventHistory(p)) return
-      const sid = p.scriptId ? String(p.scriptId) : null
-      const title = p.scriptTitle ? p.scriptTitle.trim().toLowerCase() : null
-      const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
-      if (g && isSpecialEventGame(g)) return
-      const id = g ? String(g.id || g._id) : (sid || title)
-      if (id && id.toLowerCase() !== 'vqpyqhfwsbq3niklsqtc') set.add(id)
-    })
-    history.forEach(h => {
-      if (isSpecialEventHistory(h)) return
-      const sid = h.scriptId ? String(h.scriptId) : null
-      const title = h.scriptTitle ? h.scriptTitle.trim().toLowerCase() : null
-      const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
-      if (g && isSpecialEventGame(g)) return
-      const id = g ? String(g.id || g._id) : (sid || title)
-      if (id && id.toLowerCase() !== 'vqpyqhfwsbq3niklsqtc') set.add(id)
+    allPlayedRecords.forEach(r => {
+      if (r.gameId) set.add(r.gameId)
     })
     return set
-  }, [playHistory, history, gameMap])
+  }, [allPlayedRecords])
+
+  const totalPlayedRounds = allPlayedRecords.length
 
   const storePlayedPercentage = useMemo(() => {
     if (totalStoreGames === 0) return 0
@@ -1074,7 +1139,7 @@ const PROFILE_GENRE_MAP = {
                       {uniquePlayedGames.size} <span style={{ fontSize: 13, fontWeight: 700, color: INK_3 }}>คดี</span>
                     </div>
                     <div style={{ fontSize: 11, color: INK_3, marginTop: 2 }}>
-                      รวม {history.length + playHistory.length} รอบเล่นสะสม
+                      รวม {totalPlayedRounds} รอบเล่นสะสม
                     </div>
                   </div>
 
