@@ -81,15 +81,40 @@ export function calculateDrinkStats(paymentDocs = [], uid) {
   return { liveGamesCount, drinkGamesCount, drinkPercentage, qualifies }
 }
 
+export function isSpecialEventGame(g) {
+  if (!g) return false
+  const title = (g.title || '').trim().toLowerCase()
+  const id = String(g.id || g._id || '').toLowerCase()
+  return (
+    title.includes('special event') ||
+    title.includes('secial event') ||
+    id === 'vqpyqhfwsbq3niklsqtc' ||
+    (Array.isArray(g.tags) && g.tags.some(t => String(t).toLowerCase().includes('special event')))
+  )
+}
+
+export function isSpecialEventHistory(h) {
+  if (!h) return false
+  const title = (h.scriptTitle || h.title || '').trim().toLowerCase()
+  const sid = String(h.scriptId || h.id || '').toLowerCase()
+  const room = (h.room || '').trim().toLowerCase()
+  return (
+    title.includes('special event') ||
+    title.includes('secial event') ||
+    sid === 'vqpyqhfwsbq3niklsqtc' ||
+    room.includes('special')
+  )
+}
+
 /**
- * Calculates played games statistics for a user.
+ * Calculates played games statistics for a user (excluding Special Event).
  * @param {Array} playHistoryDocs Array of playHistory document snapshots or data objects
  * @param {Array} allGames Array of all script objects from Firestore
  * @returns {{ playedCount: number, totalGames: number, percentage: number, playedGameIds: Set<string> }}
  */
 export function calculatePlayedStats(playHistoryDocs, allGames) {
   const validGames = Array.isArray(allGames)
-    ? allGames.filter(g => !g.isDeleted && !g.archived)
+    ? allGames.filter(g => !g.isDeleted && !g.archived && !isSpecialEventGame(g))
     : []
   const totalGames = validGames.length
   if (totalGames === 0) {
@@ -108,7 +133,7 @@ export function calculatePlayedStats(playHistoryDocs, allGames) {
   if (Array.isArray(playHistoryDocs)) {
     playHistoryDocs.forEach(d => {
       const data = typeof d.data === 'function' ? d.data() : d
-      if (!data) return
+      if (!data || isSpecialEventHistory(data)) return
       const sid = data.scriptId ? String(data.scriptId) : null
       const title = data.scriptTitle ? data.scriptTitle.trim().toLowerCase() : null
 
@@ -116,7 +141,7 @@ export function calculatePlayedStats(playHistoryDocs, allGames) {
         playedGameIds.add(sid)
       } else if (title && gameTitleMap.has(title)) {
         playedGameIds.add(gameTitleMap.get(title))
-      } else if (sid) {
+      } else if (sid && sid.toLowerCase() !== 'vqpyqhfwsbq3niklsqtc') {
         playedGameIds.add(sid)
       }
     })

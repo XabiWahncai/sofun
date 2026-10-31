@@ -3,6 +3,7 @@ import { db } from '../firebase'
 import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, orderBy, onSnapshot } from 'firebase/firestore'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import { convertImageUrl } from '../utils/imageUrl'
+import { isSpecialEventGame, isSpecialEventHistory } from '../utils/achievementTierSync'
 
 const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
@@ -270,27 +271,31 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
     return map
   }, [allGames])
 
-  // Total valid store games
+  // Total valid store games (excluding Special Event)
   const totalStoreGames = useMemo(() => {
-    return allGames.filter(g => !g.isDeleted && !g.archived).length
+    return allGames.filter(g => !g.isDeleted && !g.archived && !isSpecialEventGame(g)).length
   }, [allGames])
 
-  // Unique played games calculation (combining playHistory and payments history)
+  // Unique played games calculation (combining playHistory and payments history, excluding Special Event)
   const uniquePlayedGames = useMemo(() => {
     const set = new Set()
     playHistory.forEach(p => {
+      if (isSpecialEventHistory(p)) return
       const sid = p.scriptId ? String(p.scriptId) : null
       const title = p.scriptTitle ? p.scriptTitle.trim().toLowerCase() : null
       const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
+      if (g && isSpecialEventGame(g)) return
       const id = g ? String(g.id || g._id) : (sid || title)
-      if (id) set.add(id)
+      if (id && id.toLowerCase() !== 'vqpyqhfwsbq3niklsqtc') set.add(id)
     })
     history.forEach(h => {
+      if (isSpecialEventHistory(h)) return
       const sid = h.scriptId ? String(h.scriptId) : null
       const title = h.scriptTitle ? h.scriptTitle.trim().toLowerCase() : null
       const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
+      if (g && isSpecialEventGame(g)) return
       const id = g ? String(g.id || g._id) : (sid || title)
-      if (id) set.add(id)
+      if (id && id.toLowerCase() !== 'vqpyqhfwsbq3niklsqtc') set.add(id)
     })
     return set
   }, [playHistory, history, gameMap])
@@ -482,14 +487,16 @@ const PROFILE_GENRE_MAP = {
     ]
 
     allPlayed.forEach(item => {
+      if (isSpecialEventHistory(item)) return
       const sid = item.scriptId ? String(item.scriptId) : null
       const rawTitle = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : null
       const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : null
       const g = (sid && gameMap.get(sid)) ||
                 (rawTitle && gameMap.get(rawTitle)) ||
                 (normTitle && gameMap.get(normTitle))
+      if (g && isSpecialEventGame(g)) return
       const gid = g ? String(g.id || g._id) : (sid || rawTitle)
-      if (!gid || countedGameIds.has(gid)) return
+      if (!gid || gid.toLowerCase() === 'vqpyqhfwsbq3niklsqtc' || countedGameIds.has(gid)) return
       countedGameIds.add(gid)
 
       // Collect raw genre tags from game record
