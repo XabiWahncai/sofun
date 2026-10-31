@@ -671,7 +671,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                 }}>
                   <p style={{
                     fontSize: 15.5, lineHeight: 1.95, color: TEXT_MUTED,
-                    whiteSpace: 'pre-line', maxWidth: '85ch',
+                    whiteSpace: 'pre-line', width: '100%',
                   }}>
                     {game.synopsis || game.description}
                   </p>
