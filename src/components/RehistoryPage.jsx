@@ -7,8 +7,7 @@ import {
   deleteDoc,
   doc,
   addDoc,
-  serverTimestamp,
-  Timestamp
+  serverTimestamp
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { convertImageUrl } from '../utils/imageUrl'
@@ -37,29 +36,43 @@ export default function RehistoryPage({
   showPage,
   handleLineLogin
 }) {
-  const [activeTab, setActiveTab] = useState('saved') // 'saved' | 'record'
+  const [activeTab, setActiveTab] = useState('record') // 'record' | 'saved'
   const [savedHistory, setSavedHistory] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
 
-  // Record tab state
-  const [search, setSearch] = useState('')
-  const [selectedGamesMap, setSelectedGamesMap] = useState({}) // { [gameId]: { game, character, customChar, playedDate, characterImage } }
+  // Character selection modal state
+  const [activeModalGame, setActiveModalGame] = useState(null)
+  const [selectedChar, setSelectedChar] = useState(null)
   const [saving, setSaving] = useState(false)
-  const [globalPlayedDate, setGlobalPlayedDate] = useState(() => {
-    const today = new Date()
-    return today.toISOString().split('T')[0]
-  })
 
-  // Map games by ID and Title for fast cover lookup
+  // Search filter
+  const [search, setSearch] = useState('')
+
+  // Map games by ID and Title for rapid lookup
   const gameMap = useMemo(() => {
     const map = new Map()
     allGames.forEach(g => {
-      if (g.id) map.set(g.id, g)
+      if (g.id) map.set(String(g.id), g)
+      if (g._id) map.set(String(g._id), g)
       if (g.title) map.set(g.title.trim().toLowerCase(), g)
     })
     return map
   }, [allGames])
+
+  // Helper: Extract valid game cover
+  const getGameCover = (game) => {
+    if (!game) return '/Logo.png'
+    const raw = game.image || game.coverImage || game.cover || game.thumbnail || ''
+    return raw ? convertImageUrl(raw, 400) : '/Logo.png'
+  }
+
+  // Helper: Extract valid character portrait
+  const getCharImage = (char) => {
+    if (!char) return null
+    const raw = char.image || char.imageDriveUrl || char.imagePreview || ''
+    return raw ? convertImageUrl(raw, 340) : null
+  }
 
   // Real-time listener for user play history
   useEffect(() => {
@@ -102,10 +115,28 @@ export default function RehistoryPage({
     return () => unsub()
   }, [lineUser?.uid])
 
+  // Map of played characters per game to highlight in UI
+  const playedCharsByGame = useMemo(() => {
+    const map = new Map()
+    savedHistory.forEach(item => {
+      const sid = item.scriptId ? String(item.scriptId) : null
+      const title = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : null
+      const keys = [sid, title].filter(Boolean)
+      keys.forEach(k => {
+        if (!map.has(k)) map.set(k, [])
+        if (item.character && item.character !== '—') {
+          map.get(k).push(item.character)
+        }
+      })
+    })
+    return map
+  }, [savedHistory])
+
   // Handle single record deletion
   const handleDelete = async (item) => {
     const title = item.scriptTitle || 'คดีนี้'
-    if (!window.confirm(`ยืนยันการลบประวัติย้อนหลัง "${title}" หรือไม่?`)) return
+    const charName = item.character ? ` (ตัวละคร: ${item.character})` : ''
+    if (!window.confirm(`ยืนยันการลบประวัติย้อนหลัง "${title}${charName}" หรือไม่?`)) return
 
     setDeletingId(item.id)
     try {
@@ -120,64 +151,34 @@ export default function RehistoryPage({
     }
   }
 
-  // Filter games for record selection
+  // Filter games for selection
   const filteredGames = useMemo(() => {
-    if (!search.trim()) return allGames
+    const active = allGames.filter(g => !g.isDeleted && !g.archived)
+    if (!search.trim()) return active
     const q = search.trim().toLowerCase()
-    return allGames.filter(g =>
+    return active.filter(g =>
       (g.title && g.title.toLowerCase().includes(q)) ||
-      (g.category && g.category.toLowerCase().includes(q))
+      (g.category && g.category.toLowerCase().includes(q)) ||
+      (Array.isArray(g.tags) && g.tags.some(t => t.toLowerCase().includes(q)))
     )
   }, [allGames, search])
 
-  // Toggle game selection
-  const toggleSelectGame = (game) => {
-    setSelectedGamesMap(prev => {
-      const next = { ...prev }
-      if (next[game.id]) {
-        delete next[game.id]
-      } else {
-        next[game.id] = {
-          game,
-          character: '',
-          customChar: '',
-          playedDate: globalPlayedDate,
-          characterImage: ''
-        }
-      }
-      return next
-    })
+  // Open character pop-up modal for a game
+  const handleOpenGameModal = (game) => {
+    setActiveModalGame(game)
+    setSelectedChar(null)
   }
 
-  // Update selected game character
-  const updateGameField = (gameId, field, value) => {
-    setSelectedGamesMap(prev => {
-      if (!prev[gameId]) return prev
-      const entry = { ...prev[gameId], [field]: value }
-
-      // If character was selected from character list, resolve characterImage
-      if (field === 'character') {
-        const game = entry.game
-        if (Array.isArray(game.characters)) {
-          const charObj = game.characters.find(c => c.name === value)
-          if (charObj) {
-            entry.characterImage = charObj.imageDriveUrl || charObj.imagePreview || charObj.image || ''
-          }
-        }
-      }
-
-      return {
-        ...prev,
-        [gameId]: entry
-      }
-    })
+  // Close modal
+  const handleCloseModal = () => {
+    if (saving) return
+    setActiveModalGame(null)
+    setSelectedChar(null)
   }
 
-  const selectedList = useMemo(() => Object.values(selectedGamesMap), [selectedGamesMap])
-
-  // Submit retroactive play records
-  const handleBatchSave = async () => {
-    if (selectedList.length === 0) return
+  // Save selected character record
+  const handleConfirmSave = async () => {
+    if (!activeModalGame || !selectedChar) return
     if (!lineUser?.uid) {
       if (showToast) showToast('กรุณาเข้าสู่ระบบ LINE ก่อนบันทึก', 'error')
       return
@@ -185,42 +186,46 @@ export default function RehistoryPage({
 
     setSaving(true)
     try {
-      const writes = selectedList.map(item => {
-        const g = item.game
-        const finalChar = item.character === '__custom__'
-          ? (item.customChar || '—')
-          : (item.character || item.customChar || '—')
+      const charImg = selectedChar.image || selectedChar.imageDriveUrl || selectedChar.imagePreview || ''
 
-        const playedDateObj = item.playedDate ? new Date(item.playedDate) : new Date()
-
-        return addDoc(collection(db, 'playHistory'), {
-          userId: lineUser.uid,
-          userName: lineUser.name || 'สมาชิก',
-          userAvatar: lineUser.avatar || '',
-          scriptId: g.id,
-          scriptTitle: g.title,
-          character: finalChar,
-          characterImage: item.characterImage || '',
-          isRetroactive: true,
-          source: 'rehistory',
-          recordedBy: 'rehistory',
-          excludeFromWheel: true,
-          playedAt: Timestamp.fromDate(playedDateObj),
-          createdAt: serverTimestamp()
-        })
+      await addDoc(collection(db, 'playHistory'), {
+        userId: lineUser.uid,
+        userName: lineUser.name || 'สมาชิก',
+        userAvatar: lineUser.avatar || '',
+        scriptId: activeModalGame.id,
+        scriptTitle: activeModalGame.title,
+        character: selectedChar.name,
+        characterImage: charImg,
+        isRetroactive: true,
+        source: 'rehistory',
+        recordedBy: 'rehistory',
+        excludeFromWheel: true,
+        playedAt: serverTimestamp(),
+        createdAt: serverTimestamp()
       })
 
-      await Promise.all(writes)
-      if (showToast) showToast(`บันทึกประวัติการเล่นย้อนหลังสำเร็จ ${selectedList.length} รายการ`, 'success')
-      setSelectedGamesMap({})
-      setActiveTab('saved')
+      if (showToast) {
+        showToast(`บันทึกประวัติ "${activeModalGame.title}" ตัวละคร "${selectedChar.name}" สำเร็จ`, 'success')
+      }
+      handleCloseModal()
     } catch (err) {
-      console.error('Batch save error:', err)
+      console.error('Save character error:', err)
       if (showToast) showToast(`บันทึกล้มเหลว: ${err?.message || 'เกิดข้อผิดพลาด'}`, 'error')
     } finally {
       setSaving(false)
     }
   }
+
+  // Escape key to close modal
+  useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && activeModalGame && !saving) {
+        handleCloseModal()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [activeModalGame, saving])
 
   // Not logged in view
   if (!lineUser) {
@@ -233,7 +238,7 @@ export default function RehistoryPage({
               <h1 className="rehistory-title">บันทึกประวัติการเล่นย้อนหลัง</h1>
             </div>
             <p className="rehistory-subtitle">
-              เลือกคดีและตัวละครที่คุณเคยเล่นที่ร้าน เพื่อสะสมสถิติในโปรไฟล์ของคุณ (สามารถเลือกเพิ่มได้หลายเกมพร้อมกัน)
+              เลือกคดีและตัวละครที่คุณเคยเล่นที่ร้าน เพื่อสะสมสถิติในโปรไฟล์ของคุณ (1 เกมบันทึกได้หลายรอบเมื่อเล่นตัวละครใหม่)
             </p>
           </div>
         </div>
@@ -262,7 +267,7 @@ export default function RehistoryPage({
             <h1 className="rehistory-title">บันทึกประวัติการเล่นย้อนหลัง</h1>
           </div>
           <p className="rehistory-subtitle">
-            เลือกคดีและตัวละครที่คุณเคยเล่นที่ร้าน เพื่อสะสมสถิติในโปรไฟล์ของคุณ (สามารถเลือกเพิ่มได้หลายเกมพร้อมกัน)
+            แตะที่คดีเพื่อเปิดเลือกตัวละครที่เคยรับบท ไม่ต้องกรอกวันที่เล่น และสามารถบันทึกเกมเดิมซ้ำได้เมื่อเล่นตัวละครใหม่
           </p>
         </div>
 
@@ -288,7 +293,7 @@ export default function RehistoryPage({
       <div className="rehistory-notice-box">
         <i className="fas fa-circle-info rehistory-notice-icon" />
         <span className="rehistory-notice-text">
-          ข้อกำหนดระบบ: ประวัติการเล่นย้อนหลังนี้มีไว้สำหรับสะสมสถิติคดีและบันทึกตัวละครในโปรไฟล์ของคุณ โดยจะไม่ถูกนำไปรวมกับระบบสิทธิ์สุ่มวงล้อรางวัล
+          ข้อกำหนดระบบ: ประวัติย้อนหลังนี้ใช้สำหรับสะสมสถิติคดีและฉากจบในโปรไฟล์ของคุณ โดยจะไม่นำไปนับสิทธิ์การหมุนวงล้อรางวัล
         </span>
       </div>
 
@@ -301,9 +306,6 @@ export default function RehistoryPage({
         >
           <i className="fas fa-plus-circle" />
           <span>เลือกเกมเพื่อบันทึก</span>
-          {selectedList.length > 0 && (
-            <span className="rehistory-selected-count">{selectedList.length}</span>
-          )}
         </button>
 
         <button
@@ -312,11 +314,98 @@ export default function RehistoryPage({
           onClick={() => setActiveTab('saved')}
         >
           <i className="fas fa-list-check" />
-          <span>ประวัติที่บันทึกไว้แล้ว ({savedHistory.length})</span>
+          <span>ประวัติที่บันทึกแล้ว ({savedHistory.length})</span>
         </button>
       </div>
 
-      {/* Tab: Saved History List */}
+      {/* ════════════ TAB 1: RECORD GAMES ════════════ */}
+      {activeTab === 'record' && (
+        <div className="rehistory-record-section">
+          {/* Search toolbar */}
+          <div className="rehistory-record-toolbar">
+            <div className="rehistory-search-box">
+              <i className="fas fa-search" />
+              <input
+                type="text"
+                placeholder="ค้นหาชื่อคดี หรือหมวดหมู่..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+              {search && (
+                <button
+                  type="button"
+                  className="rehistory-search-clear"
+                  onClick={() => setSearch('')}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Games list for selection */}
+          <div className="rehistory-games-select-grid">
+            {filteredGames.map(game => {
+              const coverUrl = getGameCover(game)
+              const charList = Array.isArray(game.characters) ? game.characters.filter(c => c && c.name) : []
+              const playedList = playedCharsByGame.get(String(game.id)) ||
+                (game.title ? playedCharsByGame.get(game.title.trim().toLowerCase()) : null) || []
+              const playedCount = playedList.length
+
+              return (
+                <div
+                  key={game.id}
+                  className={`rehistory-select-game-card ${playedCount > 0 ? 'has-played' : ''}`}
+                  onClick={() => handleOpenGameModal(game)}
+                  role="button"
+                  tabIndex={0}
+                >
+                  <div className="rehistory-select-poster-wrap">
+                    <img
+                      src={coverUrl}
+                      alt={game.title}
+                      className="rehistory-select-poster"
+                      loading="lazy"
+                      onError={(e) => { e.currentTarget.src = '/Logo.png' }}
+                    />
+                    {playedCount > 0 && (
+                      <span className="rehistory-played-pill">
+                        <i className="fas fa-check" /> เล่นแล้ว {playedCount} รอบ
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rehistory-select-info">
+                    <div className="rehistory-select-title" title={game.title}>
+                      {game.title}
+                    </div>
+
+                    <div className="rehistory-select-meta">
+                      {game.players && (
+                        <span><i className="fas fa-users" /> {game.players} คน</span>
+                      )}
+                      <span><i className="fas fa-masks-theater" /> {charList.length} ตัวละคร</span>
+                    </div>
+
+                    {playedCount > 0 && (
+                      <div className="rehistory-played-char-names">
+                        เคยเล่น: {playedList.join(', ')}
+                      </div>
+                    )}
+
+                    <div className="rehistory-tap-action-btn">
+                      <i className="fas fa-user-plus" />
+                      <span>แตะเพื่อเลือกตัวละคร</span>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════ TAB 2: SAVED HISTORY LIST ════════════ */}
       {activeTab === 'saved' && (
         <div className="rehistory-saved-section">
           {loadingHistory ? (
@@ -344,8 +433,8 @@ export default function RehistoryPage({
                 const matchingGame = gameMap.get(item.scriptId) ||
                   (item.scriptTitle ? gameMap.get(item.scriptTitle.trim().toLowerCase()) : null)
 
-                const rawCover = matchingGame?.coverImage || matchingGame?.cover || matchingGame?.thumbnail || item.characterImage || ''
-                const coverUrl = rawCover ? convertImageUrl(rawCover, 'thumbnail') : '/Logo.png'
+                const coverUrl = getGameCover(matchingGame)
+                const charImg = item.characterImage ? convertImageUrl(item.characterImage, 140) : null
 
                 return (
                   <div key={item.id} className="rehistory-card">
@@ -362,7 +451,16 @@ export default function RehistoryPage({
                       </div>
 
                       <div className="rehistory-card-row character-row">
-                        <i className="fas fa-mask rehistory-card-icon mask-icon" />
+                        {charImg ? (
+                          <img
+                            src={charImg}
+                            alt=""
+                            className="rehistory-char-inline-avatar"
+                            onError={(e) => { e.currentTarget.style.display = 'none' }}
+                          />
+                        ) : (
+                          <i className="fas fa-mask rehistory-card-icon mask-icon" />
+                        )}
                         <span className="character-label">ตัวละคร:</span>
                         <span className="character-name">
                           {item.character && item.character !== '—' ? item.character : '—'}
@@ -404,185 +502,136 @@ export default function RehistoryPage({
         </div>
       )}
 
-      {/* Tab: Record Games */}
-      {activeTab === 'record' && (
-        <div className="rehistory-record-section">
-          {/* Global date picker and search */}
-          <div className="rehistory-record-toolbar">
-            <div className="rehistory-search-box">
-              <i className="fas fa-search" />
-              <input
-                type="text"
-                placeholder="ค้นหาชื่อคดี..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              {search && (
-                <button
-                  type="button"
-                  className="rehistory-search-clear"
-                  onClick={() => setSearch('')}
-                >
-                  <i className="fas fa-times" />
-                </button>
+      {/* ════════════ POPUP MODAL: CHARACTER SELECTION ════════════ */}
+      {activeModalGame && (
+        <div className="rehistory-modal-overlay" onClick={handleCloseModal}>
+          <div
+            className="rehistory-modal-content"
+            onClick={e => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+          >
+            {/* Modal Header */}
+            <div className="rehistory-modal-header">
+              <div className="rehistory-modal-game-info">
+                <img
+                  src={getGameCover(activeModalGame)}
+                  alt={activeModalGame.title}
+                  className="rehistory-modal-game-poster"
+                  onError={(e) => { e.currentTarget.src = '/Logo.png' }}
+                />
+                <div>
+                  <h2 className="rehistory-modal-title">{activeModalGame.title}</h2>
+                  <div className="rehistory-modal-subtitle">
+                    เลือกตัวละครที่คุณเคยเล่นในคดีนี้ (ห้ามระบุเอง)
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="rehistory-modal-close-btn"
+                onClick={handleCloseModal}
+                disabled={saving}
+                aria-label="Close"
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            {/* Modal Body: Characters Grid */}
+            <div className="rehistory-modal-body">
+              {Array.isArray(activeModalGame.characters) && activeModalGame.characters.length > 0 ? (
+                <div className="rehistory-modal-chars-grid">
+                  {activeModalGame.characters.filter(c => c && c.name).map((char, idx) => {
+                    const isSelected = selectedChar?.name === char.name
+                    const charImg = getCharImage(char)
+                    const playedList = playedCharsByGame.get(String(activeModalGame.id)) ||
+                      (activeModalGame.title ? playedCharsByGame.get(activeModalGame.title.trim().toLowerCase()) : null) || []
+                    const wasPlayed = playedList.includes(char.name)
+
+                    return (
+                      <div
+                        key={idx}
+                        className={`rehistory-modal-char-card ${isSelected ? 'selected' : ''}`}
+                        onClick={() => setSelectedChar(char)}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        <div className="rehistory-modal-char-photo-wrap">
+                          {charImg ? (
+                            <img
+                              src={charImg}
+                              alt={char.name}
+                              className="rehistory-modal-char-photo"
+                              loading="lazy"
+                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                            />
+                          ) : (
+                            <div className="rehistory-modal-char-ph">
+                              <i className="fas fa-user" />
+                            </div>
+                          )}
+                          <div className="rehistory-modal-char-gradient" />
+
+                          {/* Selected Checkmark Badge */}
+                          {isSelected && (
+                            <span className="rehistory-char-selected-check">
+                              <i className="fas fa-check" />
+                            </span>
+                          )}
+
+                          {/* Previously played tag */}
+                          {wasPlayed && !isSelected && (
+                            <span className="rehistory-char-history-badge">
+                              <i className="fas fa-check-double" /> เคยเล่นแล้ว
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="rehistory-modal-char-info">
+                          <div className="rehistory-modal-char-name">{char.name}</div>
+                          {char.role && (
+                            <div className="rehistory-modal-char-role">{char.role}</div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="rehistory-modal-no-chars">
+                  <i className="fas fa-circle-exclamation" />
+                  <span>ยังไม่มีข้อมูลตัวละครในระบบสำหรับคดีนี้</span>
+                </div>
               )}
             </div>
 
-            <div className="rehistory-date-picker-box">
-              <label>
-                <i className="fas fa-calendar" /> วันที่เล่น:
-              </label>
-              <input
-                type="date"
-                value={globalPlayedDate}
-                onChange={e => {
-                  const val = e.target.value
-                  setGlobalPlayedDate(val)
-                  // Also update already selected items
-                  setSelectedGamesMap(prev => {
-                    const next = { ...prev }
-                    Object.keys(next).forEach(k => {
-                      next[k] = { ...next[k], playedDate: val }
-                    })
-                    return next
-                  })
-                }}
-              />
+            {/* Modal Footer Actions */}
+            <div className="rehistory-modal-footer">
+              <button
+                type="button"
+                className="rehistory-modal-btn-cancel"
+                onClick={handleCloseModal}
+                disabled={saving}
+              >
+                ยกเลิก
+              </button>
+
+              <button
+                type="button"
+                className="rehistory-modal-btn-confirm"
+                disabled={!selectedChar || saving}
+                onClick={handleConfirmSave}
+              >
+                {saving ? (
+                  <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                ) : selectedChar ? (
+                  <><i className="fas fa-check" /> ยืนยันบันทึก: {selectedChar.name}</>
+                ) : (
+                  'แตะเลือกตัวละครด้านบน'
+                )}
+              </button>
             </div>
-          </div>
-
-          {/* Selected games floating/pinned counter bar */}
-          {selectedList.length > 0 && (
-            <div className="rehistory-selection-bar">
-              <div className="rehistory-selection-summary">
-                <i className="fas fa-check-circle" style={{ color: '#16a34a' }} />
-                <span>เลือกแล้ว <strong>{selectedList.length}</strong> คดี</span>
-              </div>
-              <div className="rehistory-selection-actions">
-                <button
-                  type="button"
-                  className="rehistory-btn-clear"
-                  onClick={() => setSelectedGamesMap({})}
-                >
-                  ล้างที่เลือก
-                </button>
-                <button
-                  type="button"
-                  className="rehistory-btn-submit"
-                  disabled={saving}
-                  onClick={handleBatchSave}
-                >
-                  {saving ? (
-                    <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-                  ) : (
-                    <><i className="fas fa-save" /> บันทึกประวัติการเล่น ({selectedList.length})</>
-                  )}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Games list for selection */}
-          <div className="rehistory-games-select-grid">
-            {filteredGames.map(game => {
-              const isSelected = !!selectedGamesMap[game.id]
-              const currentEntry = selectedGamesMap[game.id]
-              const rawCover = game.coverImage || game.cover || game.thumbnail || ''
-              const coverUrl = rawCover ? convertImageUrl(rawCover, 'thumbnail') : '/Logo.png'
-              const charList = Array.isArray(game.characters) ? game.characters.filter(c => c && c.name) : []
-
-              return (
-                <div
-                  key={game.id}
-                  className={`rehistory-select-game-card ${isSelected ? 'selected' : ''}`}
-                  onClick={() => toggleSelectGame(game)}
-                >
-                  <div className="rehistory-select-game-top">
-                    <img
-                      src={coverUrl}
-                      alt={game.title}
-                      className="rehistory-select-poster"
-                      onError={(e) => { e.currentTarget.src = '/Logo.png' }}
-                    />
-                    <div className="rehistory-select-info">
-                      <div className="rehistory-select-title">{game.title}</div>
-                      <div className="rehistory-select-meta">
-                        {game.players && (
-                          <span><i className="fas fa-users" /> {game.players} คน</span>
-                        )}
-                        {charList.length > 0 && (
-                          <span><i className="fas fa-masks-theater" /> {charList.length} ตัวละคร</span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="rehistory-checkbox-icon">
-                      {isSelected ? (
-                        <i className="fas fa-check-circle check-on" />
-                      ) : (
-                        <i className="far fa-circle check-off" />
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Character selection details when selected */}
-                  {isSelected && (
-                    <div
-                      className="rehistory-char-config-box"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <label className="rehistory-char-label">
-                        <i className="fas fa-mask" style={{ color: '#dc2626' }} /> ตัวละครที่รับบท:
-                      </label>
-
-                      {charList.length > 0 ? (
-                        <>
-                          <select
-                            className="rehistory-char-select"
-                            value={currentEntry.character}
-                            onChange={(e) => updateGameField(game.id, 'character', e.target.value)}
-                          >
-                            <option value="">— เลือกตัวละคร —</option>
-                            {charList.map((c, idx) => (
-                              <option key={idx} value={c.name}>{c.name}</option>
-                            ))}
-                            <option value="__custom__">+ ระบุตัวละครเอง...</option>
-                          </select>
-
-                          {currentEntry.character === '__custom__' && (
-                            <input
-                              type="text"
-                              className="rehistory-char-custom-input"
-                              placeholder="พิมพ์ชื่อตัวละคร..."
-                              value={currentEntry.customChar}
-                              onChange={(e) => updateGameField(game.id, 'customChar', e.target.value)}
-                            />
-                          )}
-                        </>
-                      ) : (
-                        <input
-                          type="text"
-                          className="rehistory-char-custom-input"
-                          placeholder="พิมพ์ชื่อตัวละครที่เล่น (หรือเว้นว่างได้)..."
-                          value={currentEntry.customChar}
-                          onChange={(e) => updateGameField(game.id, 'customChar', e.target.value)}
-                        />
-                      )}
-
-                      <div className="rehistory-char-date-row">
-                        <label>
-                          <i className="fas fa-calendar-day" /> วันที่เล่น:
-                        </label>
-                        <input
-                          type="date"
-                          value={currentEntry.playedDate || globalPlayedDate}
-                          onChange={(e) => updateGameField(game.id, 'playedDate', e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
           </div>
         </div>
       )}
@@ -736,16 +785,170 @@ export default function RehistoryPage({
           box-shadow: 0 2px 6px rgba(185, 28, 28, 0.25);
         }
 
-        .rehistory-selected-count {
-          background: #ffffff;
-          color: #b91c1c;
-          padding: 1px 7px;
-          border-radius: 9999px;
-          font-size: 11px;
-          font-weight: 800;
+        /* ── Games Select Grid ── */
+        .rehistory-record-toolbar {
+          margin-bottom: 20px;
         }
 
-        /* Saved Cards Grid */
+        .rehistory-search-box {
+          position: relative;
+          max-width: 480px;
+        }
+
+        .rehistory-search-box i.fa-search {
+          position: absolute;
+          left: 14px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: #9ca3af;
+          font-size: 13px;
+        }
+
+        .rehistory-search-box input {
+          width: 100%;
+          padding: 10px 36px 10px 38px;
+          border-radius: 12px;
+          border: 1px solid var(--border-default, #e5e7eb);
+          background: var(--surface-card, #ffffff);
+          color: var(--text-primary, #111827);
+          font-size: 13.5px;
+          outline: none;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+        }
+
+        .rehistory-search-box input:focus {
+          border-color: #dc2626;
+        }
+
+        .rehistory-search-clear {
+          position: absolute;
+          right: 12px;
+          top: 50%;
+          transform: translateY(-50%);
+          background: none;
+          border: none;
+          color: #9ca3af;
+          cursor: pointer;
+        }
+
+        .rehistory-games-select-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          gap: 16px;
+        }
+
+        .rehistory-select-game-card {
+          display: flex;
+          gap: 14px;
+          background: var(--surface-card, #ffffff);
+          border: 1.5px solid var(--border-default, #e5e7eb);
+          border-radius: 14px;
+          padding: 12px;
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+          position: relative;
+        }
+
+        .rehistory-select-game-card:hover {
+          transform: translateY(-2px);
+          border-color: #dc2626;
+          box-shadow: 0 6px 18px rgba(0,0,0,0.06);
+        }
+
+        .rehistory-select-game-card.has-played {
+          border-color: rgba(220, 38, 38, 0.4);
+          background: #fffcfc;
+        }
+
+        .rehistory-select-poster-wrap {
+          position: relative;
+          width: 76px;
+          height: 104px;
+          flex-shrink: 0;
+          border-radius: 10px;
+          overflow: hidden;
+          background: #1f2937;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+        }
+
+        .rehistory-select-poster {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .rehistory-played-pill {
+          position: absolute;
+          bottom: 4px;
+          left: 4px;
+          right: 4px;
+          background: rgba(22, 163, 74, 0.95);
+          color: #ffffff;
+          font-size: 9.5px;
+          font-weight: 800;
+          padding: 2px 4px;
+          border-radius: 6px;
+          text-align: center;
+          backdrop-filter: blur(4px);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .rehistory-select-info {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+
+        .rehistory-select-title {
+          font-size: 14.5px;
+          font-weight: 800;
+          color: var(--text-primary, #111827);
+          line-height: 1.35;
+          margin-bottom: 4px;
+          display: -webkit-box;
+          -webkit-line-clamp: 2;
+          -webkit-box-orient: vertical;
+          overflow: hidden;
+        }
+
+        .rehistory-select-meta {
+          display: flex;
+          gap: 10px;
+          font-size: 11.5px;
+          color: var(--text-tertiary, #6b7280);
+          font-weight: 600;
+          margin-bottom: 6px;
+        }
+
+        .rehistory-played-char-names {
+          font-size: 11px;
+          color: #16a34a;
+          font-weight: 700;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          margin-bottom: 6px;
+        }
+
+        .rehistory-tap-action-btn {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11.5px;
+          font-weight: 800;
+          color: #dc2626;
+          background: rgba(220, 38, 38, 0.08);
+          padding: 4px 10px;
+          border-radius: 8px;
+          width: fit-content;
+        }
+
+        /* ── Saved History Tab ── */
         .rehistory-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -762,16 +965,11 @@ export default function RehistoryPage({
           box-shadow: 0 1px 4px rgba(0,0,0,0.03);
           gap: 12px;
           position: relative;
-          transition: transform 0.12s ease, box-shadow 0.12s ease;
-        }
-
-        .rehistory-card:hover {
-          box-shadow: 0 4px 12px rgba(0,0,0,0.06);
         }
 
         .rehistory-card-poster {
-          width: 52px;
-          height: 68px;
+          width: 58px;
+          height: 78px;
           border-radius: 8px;
           object-fit: cover;
           flex-shrink: 0;
@@ -805,7 +1003,15 @@ export default function RehistoryPage({
         .character-row {
           color: #dc2626;
           font-weight: 700;
-          margin-bottom: 3px;
+          margin-bottom: 4px;
+        }
+
+        .rehistory-char-inline-avatar {
+          width: 20px;
+          height: 20px;
+          border-radius: 50%;
+          object-fit: cover;
+          border: 1px solid #e5e7eb;
         }
 
         .mask-icon {
@@ -818,7 +1024,7 @@ export default function RehistoryPage({
 
         .character-name {
           color: var(--text-primary, #374151);
-          font-weight: 600;
+          font-weight: 700;
         }
 
         .meta-row {
@@ -868,7 +1074,7 @@ export default function RehistoryPage({
           cursor: not-allowed;
         }
 
-        /* Empty State */
+        /* ── Empty State ── */
         .rehistory-empty-card {
           text-align: center;
           padding: 60px 20px;
@@ -920,259 +1126,294 @@ export default function RehistoryPage({
           font-size: 13px;
         }
 
-        /* Record Tab Styles */
-        .rehistory-record-toolbar {
+        /* ── Character Selection Modal ── */
+        .rehistory-modal-overlay {
+          position: fixed;
+          inset: 0;
+          z-index: 9999;
+          background: rgba(0, 0, 0, 0.75);
+          backdrop-filter: blur(6px);
           display: flex;
-          justify-content: space-between;
           align-items: center;
-          gap: 12px;
-          flex-wrap: wrap;
-          margin-bottom: 18px;
+          justify-content: center;
+          padding: 16px;
+          animation: rehistory-fade-in 0.2s ease-out;
         }
 
-        .rehistory-search-box {
-          position: relative;
-          flex: 1;
-          min-width: 240px;
+        @keyframes rehistory-fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
 
-        .rehistory-search-box i.fa-search {
-          position: absolute;
-          left: 14px;
-          top: 50%;
-          transform: translateY(-50%);
-          color: #9ca3af;
-          font-size: 13px;
-        }
-
-        .rehistory-search-box input {
+        .rehistory-modal-content {
+          background: #ffffff;
           width: 100%;
-          padding: 9px 36px 9px 36px;
-          border-radius: 10px;
-          border: 1px solid var(--border-default, #e5e7eb);
-          background: var(--surface-card, #ffffff);
-          color: var(--text-primary, #111827);
-          font-size: 13.5px;
-          outline: none;
-        }
-
-        .rehistory-search-box input:focus {
-          border-color: #b91c1c;
-        }
-
-        .rehistory-search-clear {
-          position: absolute;
-          right: 12px;
-          top: 50%;
-          transform: translateY(-50%);
-          background: none;
-          border: none;
-          color: #9ca3af;
-          cursor: pointer;
-        }
-
-        .rehistory-date-picker-box {
+          max-width: 680px;
+          max-height: 90vh;
+          border-radius: 20px;
           display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 13px;
-          font-weight: 700;
-          color: var(--text-primary, #374151);
+          flex-direction: column;
+          overflow: hidden;
+          box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+          animation: rehistory-scale-in 0.2s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .rehistory-date-picker-box input {
-          padding: 7px 12px;
-          border-radius: 8px;
-          border: 1px solid var(--border-default, #e5e7eb);
-          background: var(--surface-card, #ffffff);
-          color: var(--text-primary, #111827);
-          font-size: 13px;
-          outline: none;
+        @keyframes rehistory-scale-in {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
 
-        .rehistory-selection-bar {
-          position: sticky;
-          top: 70px;
-          z-index: 20;
+        .rehistory-modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          background: #111827;
-          color: #ffffff;
-          padding: 12px 18px;
-          border-radius: 12px;
-          box-shadow: 0 4px 16px rgba(0,0,0,0.25);
-          margin-bottom: 20px;
-          gap: 12px;
-          flex-wrap: wrap;
-        }
-
-        .rehistory-selection-summary {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-size: 13.5px;
-        }
-
-        .rehistory-selection-actions {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .rehistory-btn-clear {
-          background: rgba(255, 255, 255, 0.15);
-          border: none;
-          color: #ffffff;
-          padding: 6px 14px;
-          border-radius: 8px;
-          font-size: 12px;
-          cursor: pointer;
-        }
-
-        .rehistory-btn-submit {
-          display: flex;
-          align-items: center;
-          gap: 6px;
-          background: #dc2626;
-          border: none;
-          color: #ffffff;
-          padding: 8px 18px;
-          border-radius: 8px;
-          font-size: 13px;
-          font-weight: 800;
-          cursor: pointer;
-        }
-
-        .rehistory-btn-submit:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .rehistory-games-select-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+          padding: 18px 20px;
+          border-bottom: 1px solid #f1f5f9;
+          background: #ffffff;
           gap: 14px;
         }
 
-        .rehistory-select-game-card {
-          background: var(--surface-card, #ffffff);
-          border: 1.5px solid var(--border-default, #e5e7eb);
-          border-radius: 14px;
-          padding: 12px;
-          cursor: pointer;
-          transition: all 0.15s ease;
-        }
-
-        .rehistory-select-game-card:hover {
-          border-color: #cbd5e1;
-        }
-
-        .rehistory-select-game-card.selected {
-          border-color: #dc2626;
-          background: #fffafa;
-          box-shadow: 0 2px 8px rgba(220, 38, 38, 0.12);
-        }
-
-        .rehistory-select-game-top {
+        .rehistory-modal-game-info {
           display: flex;
           align-items: center;
-          gap: 12px;
-        }
-
-        .rehistory-select-poster {
-          width: 48px;
-          height: 64px;
-          border-radius: 6px;
-          object-fit: cover;
-          flex-shrink: 0;
-          background: #1f2937;
-        }
-
-        .rehistory-select-info {
-          flex: 1;
+          gap: 14px;
           min-width: 0;
         }
 
-        .rehistory-select-title {
-          font-size: 14px;
-          font-weight: 800;
-          color: var(--text-primary, #111827);
+        .rehistory-modal-game-poster {
+          width: 48px;
+          height: 64px;
+          border-radius: 8px;
+          object-fit: cover;
+          flex-shrink: 0;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+        }
+
+        .rehistory-modal-title {
+          font-size: 17px;
+          font-weight: 900;
+          color: #0f172a;
+          margin: 0 0 2px 0;
+          line-height: 1.3;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
-          margin-bottom: 4px;
         }
 
-        .rehistory-select-meta {
+        .rehistory-modal-subtitle {
+          font-size: 12px;
+          color: #64748b;
+          font-weight: 600;
+        }
+
+        .rehistory-modal-close-btn {
+          width: 36px;
+          height: 36px;
+          border-radius: 50%;
+          border: 1px solid #e2e8f0;
+          background: #f8fafc;
+          color: #64748b;
           display: flex;
-          gap: 10px;
-          font-size: 11.5px;
-          color: var(--text-tertiary, #6b7280);
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          flex-shrink: 0;
+          transition: all 0.15s ease;
         }
 
-        .rehistory-checkbox-icon {
-          font-size: 20px;
-          padding: 4px;
-        }
-
-        .check-on {
+        .rehistory-modal-close-btn:hover {
+          background: #fee2e2;
           color: #dc2626;
+          border-color: #fca5a5;
         }
 
-        .check-off {
-          color: #cbd5e1;
+        .rehistory-modal-body {
+          padding: 20px;
+          overflow-y: auto;
+          flex: 1;
+          background: #f8fafc;
         }
 
-        .rehistory-char-config-box {
-          margin-top: 12px;
-          padding-top: 12px;
-          border-top: 1px dashed #fca5a5;
+        .rehistory-modal-chars-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(135px, 1fr));
+          gap: 14px;
+        }
+
+        .rehistory-modal-char-card {
+          background: #ffffff;
+          border: 2px solid #e2e8f0;
+          border-radius: 14px;
+          overflow: hidden;
+          cursor: pointer;
+          transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
           display: flex;
           flex-direction: column;
-          gap: 8px;
+          user-select: none;
         }
 
-        .rehistory-char-label {
-          font-size: 12px;
-          font-weight: 700;
-          color: var(--text-primary, #374151);
-          display: flex;
-          align-items: center;
-          gap: 6px;
+        .rehistory-modal-char-card:hover {
+          transform: translateY(-3px);
+          border-color: #cbd5e1;
+          box-shadow: 0 6px 16px rgba(0,0,0,0.06);
         }
 
-        .rehistory-char-select,
-        .rehistory-char-custom-input {
-          width: 100%;
-          padding: 7px 10px;
-          border-radius: 8px;
-          border: 1px solid var(--border-default, #e5e7eb);
-          background: #ffffff;
-          font-size: 12.5px;
-          outline: none;
-        }
-
-        .rehistory-char-select:focus,
-        .rehistory-char-custom-input:focus {
+        .rehistory-modal-char-card.selected {
           border-color: #dc2626;
+          box-shadow: 0 0 0 2px rgba(220, 38, 38, 0.25), 0 8px 20px rgba(220, 38, 38, 0.15);
+          transform: translateY(-3px);
         }
 
-        .rehistory-char-date-row {
+        .rehistory-modal-char-photo-wrap {
+          position: relative;
+          aspect-ratio: 3 / 4;
+          width: 100%;
+          background: #0f172a;
+          overflow: hidden;
+        }
+
+        .rehistory-modal-char-photo {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          display: block;
+        }
+
+        .rehistory-modal-char-ph {
+          width: 100%;
+          height: 100%;
           display: flex;
           align-items: center;
-          justify-content: space-between;
-          font-size: 11.5px;
-          color: var(--text-secondary, #6b7280);
+          justify-content: center;
+          color: #475569;
+          font-size: 32px;
         }
 
-        .rehistory-char-date-row input {
-          padding: 4px 8px;
+        .rehistory-modal-char-gradient {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, transparent 60%);
+          pointer-events: none;
+        }
+
+        .rehistory-char-selected-check {
+          position: absolute;
+          top: 8px;
+          right: 8px;
+          width: 26px;
+          height: 26px;
+          border-radius: 50%;
+          background: #dc2626;
+          color: #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          border: 2px solid #ffffff;
+        }
+
+        .rehistory-char-history-badge {
+          position: absolute;
+          bottom: 6px;
+          left: 6px;
+          right: 6px;
+          background: rgba(22, 163, 74, 0.92);
+          color: #ffffff;
+          font-size: 9.5px;
+          font-weight: 800;
+          padding: 2px 6px;
           border-radius: 6px;
-          border: 1px solid var(--border-default, #e5e7eb);
-          font-size: 11.5px;
+          text-align: center;
+          backdrop-filter: blur(4px);
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
         }
 
+        .rehistory-modal-char-info {
+          padding: 10px 8px;
+          text-align: center;
+          background: #ffffff;
+        }
+
+        .rehistory-modal-char-name {
+          font-size: 13px;
+          font-weight: 800;
+          color: #0f172a;
+          line-height: 1.3;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .rehistory-modal-char-role {
+          font-size: 11px;
+          color: #64748b;
+          font-weight: 600;
+          margin-top: 2px;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .rehistory-modal-no-chars {
+          text-align: center;
+          padding: 40px 20px;
+          color: #94a3b8;
+          font-size: 13px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+        }
+
+        .rehistory-modal-footer {
+          padding: 14px 20px;
+          border-top: 1px solid #f1f5f9;
+          background: #ffffff;
+          display: flex;
+          justify-content: flex-end;
+          gap: 10px;
+        }
+
+        .rehistory-modal-btn-cancel {
+          padding: 10px 18px;
+          border-radius: 10px;
+          border: 1px solid #e2e8f0;
+          background: #ffffff;
+          color: #475569;
+          font-weight: 700;
+          font-size: 13.5px;
+          cursor: pointer;
+        }
+
+        .rehistory-modal-btn-confirm {
+          padding: 10px 22px;
+          border-radius: 10px;
+          border: none;
+          background: #dc2626;
+          color: #ffffff;
+          font-weight: 800;
+          font-size: 13.5px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          transition: background 0.15s ease;
+        }
+
+        .rehistory-modal-btn-confirm:hover:not(:disabled) {
+          background: #b91c1c;
+        }
+
+        .rehistory-modal-btn-confirm:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          background: #94a3b8;
+        }
+
+        /* ── Auth Prompt ── */
         .rehistory-auth-prompt {
           text-align: center;
           padding: 60px 20px;
@@ -1230,13 +1471,17 @@ export default function RehistoryPage({
           .rehistory-games-select-grid {
             grid-template-columns: 1fr;
           }
-          .rehistory-selection-bar {
-            top: 60px;
-            flex-direction: column;
-            align-items: stretch;
+          .rehistory-modal-chars-grid {
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
           }
-          .rehistory-selection-actions {
-            justify-content: flex-end;
+          .rehistory-modal-footer {
+            flex-direction: column;
+          }
+          .rehistory-modal-btn-confirm,
+          .rehistory-modal-btn-cancel {
+            width: 100%;
+            justify-content: center;
           }
         }
       `}</style>
