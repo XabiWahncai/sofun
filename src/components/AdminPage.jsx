@@ -1921,11 +1921,15 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
   const [syncingTiers, setSyncingTiers]     = useState(false)
 
   const handleBatchSyncTierAchievements = async () => {
-    if (!window.confirm('ยืนยันคำนวณและอัปเดต Bronze (>30%), Silver (>50%), Gold (>80%) ให้สมาชิกทุกคนตามประวัติการเล่นจริงหรือไม่?')) return
+    if (!window.confirm('ยืนยันคำนวณและอัปเดต Bronze (>30%), Silver (>50%), Gold (>80%), Water Man (>=80% เครื่องดื่ม) ให้สมาชิกทุกคนตามประวัติการเล่นจริงหรือไม่?')) return
     setSyncingTiers(true)
     try {
-      const phSnap = await getDocs(collection(db, 'playHistory'))
+      const [phSnap, paySnap] = await Promise.all([
+        getDocs(collection(db, 'playHistory')),
+        getDocs(collection(db, 'payments'))
+      ])
       const phDocs = phSnap.docs
+      const payDocs = paySnap.docs
 
       const phByUser = new Map()
       phDocs.forEach(d => {
@@ -1936,14 +1940,29 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
         }
       })
 
+      const payByUser = new Map()
+      payDocs.forEach(d => {
+        const data = d.data()
+        const uids = new Set(data.memberUids || [])
+        if (Array.isArray(data.members)) {
+          data.members.forEach(m => { if (m.uid) uids.add(m.uid) })
+        }
+        if (data.userId) uids.add(data.userId)
+        uids.forEach(uid => {
+          if (!payByUser.has(uid)) payByUser.set(uid, [])
+          payByUser.get(uid).push(d)
+        })
+      })
+
       let updatedCount = 0
       for (const m of members) {
         const userPh = phByUser.get(m.id) || []
-        const res = await syncMemberTierAchievements(db, m.id, userPh, allGames, m)
+        const userPay = payByUser.get(m.id) || []
+        const res = await syncMemberTierAchievements(db, m.id, userPh, allGames, m, userPay)
         if (res?.changed) updatedCount++
       }
 
-      if (showToast) showToast(`ซิงค์สำเร็จ: อัปเดตสถานะ Bronze/Silver/Gold สมาชิกไป ${updatedCount} คน`, 'success')
+      if (showToast) showToast(`ซิงค์สำเร็จ: อัปเดตสถานะความสำเร็จอัตโนมัติสมาชิกไป ${updatedCount} คน`, 'success')
     } catch (err) {
       console.error('Batch sync tiers error:', err)
       if (showToast) showToast(`เกิดข้อผิดพลาดในการซิงค์: ${err.message}`, 'error')

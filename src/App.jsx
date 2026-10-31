@@ -389,16 +389,37 @@ export default function App() {
     })
   }, [lineUser?.uid])
 
-  // ── Auto-evaluate & sync Tier Achievements (Bronze > 30%, Silver > 50%, Golden > 80%) ───
+  // ── Auto-evaluate & sync Tier Achievements (Bronze > 30%, Silver > 50%, Golden > 80%, Water Man >= 80% drinks) ───
   useEffect(() => {
     const uid = lineUser?.uid
     if (!uid || !allGames.length) return
-    const q = query(collection(db, 'playHistory'), where('userId', '==', uid))
-    return onSnapshot(q, snap => {
-      syncMemberTierAchievements(db, uid, snap.docs, allGames, lineUser).catch(err => {
+
+    let playDocs = []
+    let payDocs = []
+
+    const triggerSync = () => {
+      syncMemberTierAchievements(db, uid, playDocs, allGames, lineUser, payDocs).catch(err => {
         console.warn('Auto achievement tier sync error:', err.message)
       })
-    })
+    }
+
+    const qPlay = query(collection(db, 'playHistory'), where('userId', '==', uid))
+    const qPay = query(collection(db, 'payments'), where('memberUids', 'array-contains', uid))
+
+    const unsubPlay = onSnapshot(qPlay, snap => {
+      playDocs = snap.docs
+      triggerSync()
+    }, err => console.warn('playHistory sync listener error:', err.message))
+
+    const unsubPay = onSnapshot(qPay, snap => {
+      payDocs = snap.docs
+      triggerSync()
+    }, err => console.warn('payments sync listener error:', err.message))
+
+    return () => {
+      unsubPlay()
+      unsubPay()
+    }
   }, [lineUser?.uid, allGames])
 
   // ── Scripts ────────────────────────────────────────────────────────

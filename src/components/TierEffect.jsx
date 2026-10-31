@@ -568,6 +568,90 @@ function ManagerEffect() {
   )
 }
 
+// ── Bespoke WaterEffect (Water Man / กำเนิดจากน้ำ) ──────────────────────────
+function WaterEffect() {
+  const [drops, setDrops] = useState([])
+
+  useEffect(() => {
+    const items = Array.from({ length: 22 }, (_, i) => ({
+      id: i,
+      left: Math.random() * 94 + 3,
+      delay: Math.random() * 6,
+      duration: 5 + Math.random() * 5,
+      size: 14 + Math.random() * 16,
+      drift: (Math.random() - 0.5) * 80,
+      opacity: 0.35 + Math.random() * 0.45,
+      type: i % 2 === 0 ? 'bubble' : 'droplet'
+    }))
+    setDrops(items)
+  }, [])
+
+  return (
+    <div className="water-effect-overlay" aria-hidden="true" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
+      <style>{`
+        .water-particle {
+          position: absolute;
+          bottom: -40px;
+          animation: water-float-up ease-in-out infinite;
+          filter: drop-shadow(0 2px 8px rgba(14, 165, 233, 0.35));
+        }
+        @keyframes water-float-up {
+          0% {
+            transform: translateY(0) translateX(0) scale(0.85);
+            opacity: 0;
+          }
+          15% {
+            opacity: var(--op);
+          }
+          85% {
+            opacity: var(--op);
+          }
+          100% {
+            transform: translateY(-112vh) translateX(var(--drift)) scale(1.1);
+            opacity: 0;
+          }
+        }
+      `}</style>
+      {drops.map(d => (
+        <div
+          key={d.id}
+          className="water-particle"
+          style={{
+            left: `${d.left}%`,
+            animationDelay: `${d.delay}s`,
+            animationDuration: `${d.duration}s`,
+            '--drift': `${d.drift}px`,
+            '--op': d.opacity
+          }}
+        >
+          {d.type === 'bubble' ? (
+            <svg width={d.size} height={d.size} viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="10" stroke="#38bdf8" strokeWidth="1.5" fill="rgba(56, 189, 248, 0.12)" />
+              <circle cx="8" cy="8" r="2.5" fill="rgba(255, 255, 255, 0.7)" />
+            </svg>
+          ) : (
+            <svg width={d.size * 0.9} height={d.size * 1.2} viewBox="0 0 24 32" fill="none">
+              <path
+                d="M12 2 C12 2, 3 14, 3 21 C3 26 7 30 12 30 C17 30 21 26 21 21 C21 14, 12 2, 12 2 Z"
+                fill="url(#water-grad)"
+                stroke="#38bdf8"
+                strokeWidth="1.2"
+              />
+              <ellipse cx="8.5" cy="19" rx="2" ry="4" fill="rgba(255,255,255,0.6)" transform="rotate(-20 8.5 19)" />
+              <defs>
+                <linearGradient id="water-grad" x1="12" y1="2" x2="12" y2="30" gradientUnits="userSpaceOnUse">
+                  <stop stopColor="#38bdf8" stopOpacity="0.45" />
+                  <stop offset="1" stopColor="#0ea5e9" stopOpacity="0.75" />
+                </linearGradient>
+              </defs>
+            </svg>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ── Global Color Fallback ───────────────────────────────────────────────────
 const TIER_COLOR = {
   golden:     '#D4AF37',
@@ -578,6 +662,8 @@ const TIER_COLOR = {
   hunger:     '#F97316',
   food_garden:'#EA580C',
   monkey:     '#EAB308',
+  water_man:  '#0EA5E9',
+  warter_man: '#0EA5E9',
   charity:    '#BE185D',
   veteran:    '#7C3AED',
   explorer:   '#059669',
@@ -736,6 +822,7 @@ export default function TierEffect({ tier }) {
       {tier === 'sadness' && <RainEffect />}
       {(tier === 'hunger' || tier === 'food_garden') && <FoodEffect />}
       {tier === 'monkey' && <BananaEffect />}
+      {(tier === 'water_man' || tier === 'warter_man') && <WaterEffect />}
       {tier === 'charity' && <CharityEffect />}
       {tier === 'veteran' && <VeteranEffect />}
       {tier === 'explorer' && <ExplorerEffect />}

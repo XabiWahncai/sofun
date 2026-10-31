@@ -1,8 +1,85 @@
-// Automated Achievement Tier Sync Engine (Bronze > 30%, Silver > 50%, Golden > 80%)
-// Evaluates all played games (including retroactive history) against total active scripts.
+// Automated Achievement Tier Sync Engine (Bronze > 30%, Silver > 50%, Golden > 80%, Water Man >= 80% drinks)
+// Evaluates all played games and drink orders against store criteria.
 // Zero emojis rule strictly applied.
 
-import { doc, updateDoc } from 'firebase/firestore'
+import { doc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore'
+
+// Drink categories and keywords for Water Man automated achievement
+export const DRINK_CATEGORIES = new Set([
+  'เครื่องดื่มแช่เย็น',
+  'เครื่องดื่มชง',
+  'กาแฟ',
+  'ม็อกเทล',
+  'แอลกอฮอล์',
+  'เครื่องดื่ม',
+  'drink',
+  'drinks',
+  'beverage',
+  'beverages'
+])
+
+export function isDrinkItem(item) {
+  if (!item) return false
+  const cat = (item.category || '').trim().toLowerCase()
+  if (DRINK_CATEGORIES.has(cat)) return true
+
+  const name = (item.name || '').trim().toLowerCase()
+  if (name.includes('น้ำมันหอย') || name.includes('น้ำตก') || name.includes('น้ำพริก') || name.includes('น้ำปลา')) {
+    return false
+  }
+  const drinkKeywords = [
+    'น้ำเปล่า', 'น้ำแข็ง', 'โค้ก', 'coke', 'pepsi', 'fanta', 'แฟนต้า',
+    'สไปร์ท', 'sprite', 'ชาเขียว', 'ชามะนาว', 'ชาพีช', 'ชาลิ้นจี่', 'ชาเย็น', 'ชา',
+    'กาแฟ', 'coffee', 'ลาเต้', 'latte', 'อเมริกาโน่', 'americano', 'คาปูชิโน่', 'cappuccino',
+    'มอคค่า', 'mocha', 'เอสเปรสโซ่', 'espresso', 'โกโก้', 'cocoa', 'โซดา', 'soda',
+    'เบียร์', 'beer', 'โซจู', 'soju', 'ม็อกเทล', 'mocktail', 'ชเวปส์', 'schweppes',
+    'มอนสเตอร์', 'monster', 'hoegaarden', 'budweiser', 'singha', 'chang', 'heineken',
+    'เปิดขวด', 'mystery drink', 'dream night', 'sour bomb', 'น้ำส้ม', 'น้ำแดง', 'น้ำเขียว', 'น้ำองุ่น'
+  ]
+  return drinkKeywords.some(kw => name.includes(kw))
+}
+
+/**
+ * Calculates drink ordering statistics for a user from payments (live play history, excluding retroactive).
+ * @param {Array} paymentDocs Array of payment records / documents
+ * @param {string} uid User ID
+ * @returns {{ liveGamesCount: number, drinkGamesCount: number, drinkPercentage: number, qualifies: boolean }}
+ */
+export function calculateDrinkStats(paymentDocs = [], uid) {
+  if (!uid || !Array.isArray(paymentDocs)) {
+    return { liveGamesCount: 0, drinkGamesCount: 0, drinkPercentage: 0, qualifies: false }
+  }
+
+  let liveGamesCount = 0
+  let drinkGamesCount = 0
+
+  paymentDocs.forEach(d => {
+    const p = typeof d.data === 'function' ? d.data() : d
+    if (!p) return
+    const isMember = (p.memberUids && p.memberUids.includes(uid)) ||
+      (Array.isArray(p.members) && p.members.some(m => m.uid === uid)) ||
+      p.userId === uid
+
+    if (!isMember) return
+
+    liveGamesCount++
+
+    let hasDrink = false
+    const myBill = Array.isArray(p.memberBills) ? p.memberBills.find(b => b.uid === uid) : null
+    if (myBill && Array.isArray(myBill.foodItems)) {
+      hasDrink = myBill.foodItems.some(isDrinkItem)
+    } else if (Array.isArray(p.foodItems)) {
+      hasDrink = p.foodItems.some(isDrinkItem)
+    }
+
+    if (hasDrink) drinkGamesCount++
+  })
+
+  const drinkPercentage = liveGamesCount > 0 ? (drinkGamesCount / liveGamesCount) * 100 : 0
+  const qualifies = liveGamesCount > 0 && drinkPercentage >= 80
+
+  return { liveGamesCount, drinkGamesCount, drinkPercentage, qualifies }
+}
 
 /**
  * Calculates played games statistics for a user.
@@ -51,18 +128,21 @@ export function calculatePlayedStats(playHistoryDocs, allGames) {
 }
 
 /**
- * Determines which tier achievements a player qualifies for based on percentage of store games played.
+ * Determines which tier achievements a player qualifies for based on store games and drink stats.
  * - Bronze Player: > 30%
  * - Silver Player: > 50%
  * - Golden Player: > 80%
+ * - Water Man: >= 80% of live games have drinks ordered
  * @param {number} percentage
- * @returns {{ bronze: boolean, silver: boolean, golden: boolean }}
+ * @param {boolean} drinkQualifies
+ * @returns {{ bronze: boolean, silver: boolean, golden: boolean, water_man: boolean }}
  */
-export function evaluateTierAchievements(percentage) {
+export function evaluateTierAchievements(percentage, drinkQualifies = false) {
   return {
     bronze: percentage > 30,
     silver: percentage > 50,
     golden: percentage > 80,
+    water_man: !!drinkQualifies,
   }
 }
 
@@ -71,7 +151,7 @@ export function evaluateTierAchievements(percentage) {
  * Automatically adds qualified tiers and removes revoked tiers.
  * Leaves all other achievements intact.
  * @param {Array<string>} currentAchievements
- * @param {{ bronze: boolean, silver: boolean, golden: boolean }} shouldHaveTiers
+ * @param {{ bronze: boolean, silver: boolean, golden: boolean, water_man: boolean }} shouldHaveTiers
  * @returns {{ achievements: string[], changed: boolean, added: string[], removed: string[] }}
  */
 export function reconcileAchievements(currentAchievements = [], shouldHaveTiers = {}) {
@@ -80,16 +160,17 @@ export function reconcileAchievements(currentAchievements = [], shouldHaveTiers 
   const added = []
   const removed = []
 
-  const TIER_KEYS = ['bronze', 'silver', 'golden']
+  const TIER_KEYS = ['bronze', 'silver', 'golden', 'water_man']
   TIER_KEYS.forEach(key => {
     const shouldHave = !!shouldHaveTiers[key]
-    const currentlyHas = set.has(key)
+    const currentlyHas = set.has(key) || (key === 'water_man' && set.has('warter_man'))
 
     if (shouldHave && !currentlyHas) {
       set.add(key)
       added.push(key)
     } else if (!shouldHave && currentlyHas) {
       set.delete(key)
+      if (key === 'water_man') set.delete('warter_man')
       removed.push(key)
     }
   })
@@ -107,11 +188,26 @@ export function reconcileAchievements(currentAchievements = [], shouldHaveTiers 
  * Synchronizes tier achievements for a member into Firestore if needed.
  * Cleans up pinnedAchievements and activeAchievement if an achievement was revoked.
  */
-export async function syncMemberTierAchievements(db, uid, playHistoryDocs, allGames, currentMemberData) {
+export async function syncMemberTierAchievements(db, uid, playHistoryDocs, allGames, currentMemberData, paymentDocs = null) {
   if (!uid || !db) return null
 
+  let payments = paymentDocs
+  if (!payments && db && uid) {
+    try {
+      const q = query(
+        collection(db, 'payments'),
+        where('memberUids', 'array-contains', uid)
+      )
+      const snap = await getDocs(q)
+      payments = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    } catch {
+      payments = []
+    }
+  }
+
   const stats = calculatePlayedStats(playHistoryDocs, allGames)
-  const shouldHave = evaluateTierAchievements(stats.percentage)
+  const drinkStats = calculateDrinkStats(payments || [], uid)
+  const shouldHave = evaluateTierAchievements(stats.percentage, drinkStats.qualifies)
 
   const currentAchs = Array.isArray(currentMemberData?.achievements)
     ? currentMemberData.achievements
@@ -123,6 +219,7 @@ export async function syncMemberTierAchievements(db, uid, playHistoryDocs, allGa
     return {
       changed: false,
       ...stats,
+      drinkStats,
       achievements: newAchs,
       shouldHave,
     }
@@ -132,11 +229,11 @@ export async function syncMemberTierAchievements(db, uid, playHistoryDocs, allGa
   const currentPinned = Array.isArray(currentMemberData?.pinnedAchievements)
     ? currentMemberData.pinnedAchievements
     : []
-  const newPinned = currentPinned.filter(id => newAchs.includes(id))
+  const newPinned = currentPinned.filter(id => newAchs.includes(id) || (id === 'warter_man' && newAchs.includes('water_man')))
 
   // Clean up activeAchievement if revoked
   let newActive = currentMemberData?.activeAchievement || null
-  if (newActive && !newAchs.includes(newActive)) {
+  if (newActive && !newAchs.includes(newActive) && !(newActive === 'warter_man' && newAchs.includes('water_man'))) {
     newActive = newPinned.length > 0 ? newPinned[0] : null
   }
 
@@ -157,6 +254,7 @@ export async function syncMemberTierAchievements(db, uid, playHistoryDocs, allGa
   return {
     changed: true,
     ...stats,
+    drinkStats,
     achievements: newAchs,
     pinnedAchievements: newPinned,
     activeAchievement: newActive,

@@ -190,10 +190,23 @@ const THEME_PROFILES = {
     borderGlow: 'rgba(234, 179, 8, 0.65)',
     cardBorder: 'rgba(234, 179, 8, 0.50)',
     watermarkIcon: 'fa-paw'
+  },
+  water_man: {
+    id: 'water_man',
+    name: 'Warter Man',
+    title: 'WATER MAN PASS',
+    subtitle: 'กำเนิดจากน้ำ สิ่งมีชีวิตวอร์เตอร์เบส',
+    accent: '#0EA5E9',
+    accentRgb: '14, 165, 233',
+    cardBg: 'linear-gradient(145deg, #031c2e 0%, #07385c 55%, #02121e 100%)',
+    borderGlow: 'rgba(14, 165, 233, 0.65)',
+    cardBorder: 'rgba(14, 165, 233, 0.50)',
+    watermarkIcon: 'fa-droplet'
   }
 }
 
 THEME_PROFILES.first_party = THEME_PROFILES.new_era;
+THEME_PROFILES.warter_man = THEME_PROFILES.water_man;
 
 export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false, showPage }) {
   const [history, setHistory]         = useState([])

@@ -636,3 +636,31 @@
   --focus-ring: #EAB308;
   --focus-ring-glow: rgba(234, 179, 8, 0.12);
 }
+:root[data-achievement="water_man"],
+:root[data-achievement="warter_man"] {
+  --curtain-crimson: #0EA5E9;
+  --curtain-crimson-light: #38BDF8;
+  --curtain-crimson-deep: #0284C7;
+  --curtain-crimson-rgb: 14, 165, 233;
+  --red: #0EA5E9;
+  --red-light: #38BDF8;
+  --red-dark: #0284C7;
+  --red-glow: rgba(14, 165, 233, 0.20);
+  --n-border-red: rgba(14, 165, 233, 0.25);
+  --ed-red: #0EA5E9;
+  --ed-red-bg: rgba(14, 165, 233, 0.08);
+  --ed-border-red: rgba(14, 165, 233, 0.25);
+  --crimson-300: #BAE6FD;
+  --crimson-400: #38BDF8;
+  --crimson-500: #0EA5E9;
+  --crimson-500-rgb: 14, 165, 233;
+  --crimson-600: #0284C7;
+  --crimson-700: #0369A1;
+  --action-primary: #0EA5E9;
+  --action-primary-hover: #0284C7;
+  --text-link: #0EA5E9;
+  --text-link-hover: #0284C7;
+  --border-focus: #0EA5E9;
+  --focus-ring: #0EA5E9;
+  --focus-ring-glow: rgba(14, 165, 233, 0.12);
+}

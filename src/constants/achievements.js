@@ -176,12 +176,25 @@ export const ACHIEVEMENTS = {
     bg: 'rgba(234,179,8,0.14)',
     border: 'rgba(234,179,8,0.35)',
   },
+  water_man: {
+    id: 'water_man',
+    rarity: 'common',
+    icon: 'fa-droplet',
+    label: 'Warter Man',
+    labelTH: 'กำเนิดจากน้ำ',
+    desc: 'Humans are carbon-based lifeforms that rely on water, but you are a true water-based entity who would surely wither away without it.',
+    descTH: 'มนุษย์คือสิ่งมีชีวิตคาร์บอนเบสที่ใช้น้ำดำรงชีวิต ที่คุณคือมนุษย์ที่เป็นวอร์เตอร์เบสขาดน้ำไปตายแน่นอน',
+    color: '#0ea5e9',
+    bg: 'rgba(14,165,233,0.14)',
+    border: 'rgba(14,165,233,0.35)',
+  },
 }
 
 const RARITY_ORDER = ['staff', 'event', 'legendary', 'epic', 'rare', 'common']
 
 // Alias for backwards/forward compatibility
 ACHIEVEMENTS.first_party = ACHIEVEMENTS.new_era
+ACHIEVEMENTS.warter_man = ACHIEVEMENTS.water_man
 
 export const ACHIEVEMENT_LIST = Array.from(new Set(Object.values(ACHIEVEMENTS))).sort(
   (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
