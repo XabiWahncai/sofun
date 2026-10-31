@@ -567,7 +567,6 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                         boxShadow: '0 2px 6px rgba(236,72,153,0.35)',
                       }}
                     >
-                      <i className="fas fa-crown" style={{ fontSize: 9.5 }} />
                       DM แนะนำ: {dmRecs.map(r => r.dmName).join(', ')}
                     </span>
                   )}
@@ -684,8 +683,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
               <section style={{ marginBottom: 44 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                   <div style={{ width: 4, height: 18, background: '#ec4899', borderRadius: 2 }} />
-                  <h2 style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#ffffff', display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <i className="fas fa-crown" style={{ color: '#ec4899', fontSize: 16 }} />
+                  <h2 style={{ fontSize: 18, fontWeight: 900, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#ffffff' }}>
                     เกมที่ DM ที่ร้านแนะนำ
                   </h2>
                 </div>
@@ -716,11 +714,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                             boxShadow: '0 2px 6px rgba(236,72,153,0.35)',
                           }}
                         >
-                          <i className="fas fa-crown" style={{ fontSize: 11 }} />
                           แนะนำโดย: {rec.dmName}
-                        </span>
-                        <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
-                          Game Master ประจำร้าน Sofun Club
                         </span>
                       </div>
                       <div
