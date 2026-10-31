@@ -622,64 +622,6 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
           <div className="qr-pass-shimmer" />
           <i className={`fas ${theme.watermarkIcon} qr-pass-watermark`} />
 
-          {/* Pass Top Bar */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, position: 'relative', zIndex: 2 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div
-                onClick={() => {
-                  window.dispatchEvent(new Event('sofun-replay-effect'))
-                  setCopiedText('เริ่มเล่นเอฟเฟกต์ธีม (10 วินาที)')
-                  setTimeout(() => setCopiedText(''), 2000)
-                }}
-                title="แตะเพื่อเล่นเอฟเฟกต์บรรยากาศอีกครั้ง (10 วินาที)"
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 8,
-                  background: `rgba(${theme.accentRgb}, 0.22)`,
-                  color: theme.accent,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 14,
-                  border: `1px solid rgba(${theme.accentRgb}, 0.4)`,
-                  cursor: 'pointer'
-                }}
-              >
-                <i className={`fas ${theme.watermarkIcon}`} />
-              </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 900, letterSpacing: '0.08em', color: theme.accent }}>
-                  {theme.title}
-                </div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)' }}>
-                  SOFUN CLUB THAILAND
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => handleCopy(memberIdTag, 'คัดลอกรหัสสมาชิกแล้ว')}
-              title="คัดลอกรหัสสมาชิก"
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 5,
-                padding: '4px 9px',
-                borderRadius: 14,
-                background: 'rgba(255, 255, 255, 0.12)',
-                border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: '#ffffff',
-                fontSize: 11,
-                fontWeight: 800,
-                cursor: 'pointer',
-                fontFamily: 'monospace'
-              }}
-            >
-              <span>{memberIdTag}</span>
-              <i className="fas fa-copy" style={{ fontSize: 10, opacity: 0.8 }} />
-            </button>
-          </div>
 
           {/* Member Avatar & Details */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20, position: 'relative', zIndex: 2 }}>
@@ -746,18 +688,6 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
               />
             </div>
 
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginTop: 14,
-              fontSize: 12,
-              color: 'rgba(255,255,255,0.85)',
-              textAlign: 'center'
-            }}>
-              <i className="fas fa-qrcode" style={{ color: theme.accent }} />
-              <span>แสดงให้ Game Master หรือเคาน์เตอร์สแกนเพื่อสะสมแต้ม</span>
-            </div>
 
             {/* Quick Action Buttons */}
             <div style={{ display: 'flex', gap: 10, marginTop: 14, width: '100%' }}>
