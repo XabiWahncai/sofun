@@ -162,49 +162,118 @@ function FoodEffect() {
   )
 }
 
-// ── 4. Money Effect (The Billionaire) ────────────────────────────────────────
-const MONEY_ICONS = [
-  { icon: 'fa-money-bill-wave', color: '#22c55e' },
-  { icon: 'fa-coins', color: '#eab308' },
-  { icon: 'fa-sack-dollar', color: '#16a34a' },
-  { icon: 'fa-money-bill-1', color: '#4ade80' },
-  { icon: 'fa-gem', color: '#60a5fa' },
-]
+// ── 4. Banana Effect (Monkey Achievement) ────────────────────────────────────
+function BananaItem({ size = 26, spin = 0 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{
+        transform: `rotate(${spin}deg)`,
+        filter: 'drop-shadow(0 2px 4px rgba(161, 98, 7, 0.45))',
+        display: 'block'
+      }}
+    >
+      <path
+        d="M 8 10 C 13 9 24 12 30 21 C 35 28 34 34 29 36 C 24 38 22 32 18 25 C 14 18 10 13 7 11 Z"
+        fill="#FACC15"
+        stroke="#CA8A04"
+        strokeWidth="1.2"
+      />
+      <path
+        d="M 11 11 C 16 11 25 15 28 23 C 30 27 29 31 27 33"
+        stroke="#FEF08A"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <circle cx="30" cy="35" r="1.8" fill="#713F12" />
+      <path
+        d="M 8 10 L 6 7 C 5.5 6.2 6.2 5.8 6.8 6.2 L 8.5 8.5"
+        stroke="#582C0E"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
 
-function MoneyEffect() {
-  const bills = useMemo(() => (
-    Array.from({ length: 24 }, (_, i) => ({
+function PeeledBananaItem({ size = 28, spin = 0 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 40 40"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      style={{
+        transform: `rotate(${spin}deg)`,
+        filter: 'drop-shadow(0 2px 4px rgba(161, 98, 7, 0.45))',
+        display: 'block'
+      }}
+    >
+      <path
+        d="M 14 10 C 18 9 25 14 27 22 C 29 28 26 33 22 34 C 18 35 16 30 14 24 C 12 18 12 13 14 10 Z"
+        fill="#FEF9C3"
+        stroke="#EAB308"
+        strokeWidth="1"
+      />
+      <path
+        d="M 15 20 C 11 20 6 22 5 28 C 7 28 12 25 15 23 Z"
+        fill="#FACC15"
+        stroke="#CA8A04"
+        strokeWidth="1"
+      />
+      <path
+        d="M 23 22 C 28 23 34 26 35 32 C 33 32 28 28 24 25 Z"
+        fill="#FACC15"
+        stroke="#CA8A04"
+        strokeWidth="1"
+      />
+      <path
+        d="M 19 32 C 20 35 21 38 20 40 C 19 39 18 35 19 32 Z"
+        fill="#CA8A04"
+      />
+    </svg>
+  )
+}
+
+function BananaEffect() {
+  const items = useMemo(() => (
+    Array.from({ length: 26 }, (_, i) => ({
       id: i,
-      x: rand(2, 95),
-      size: rand(18, 30),
-      duration: rand(4, 8),
-      delay: rand(0, 7),
-      sway: rand(-40, 40),
-      spin: rand(-60, 60),
-      item: MONEY_ICONS[i % MONEY_ICONS.length],
+      x: rand(2, 96),
+      size: rand(24, 38),
+      duration: rand(5, 9.5),
+      delay: rand(0, 8),
+      wobble: rand(-40, 40),
+      spin: rand(-45, 45),
+      isPeeled: i % 3 === 0,
     }))
   ), [])
 
   return (
     <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
-      {bills.map(b => (
+      {items.map(b => (
         <span
           key={b.id}
-          className="money-bill"
+          className="banana-item"
           style={{
             position: 'absolute',
             left: `${b.x}%`,
-            fontSize: b.size,
-            color: b.item.color,
             animationDuration: `${b.duration}s`,
             animationDelay: `-${b.delay}s`,
-            '--sway': `${b.sway}px`,
-            '--spin': `${b.spin}deg`,
+            '--wobble': `${b.wobble}px`,
             pointerEvents: 'none',
-            opacity: 0.85,
           }}
         >
-          <i className={`fas ${b.item.icon}`} />
+          {b.isPeeled ? (
+            <PeeledBananaItem size={b.size} spin={b.spin} />
+          ) : (
+            <BananaItem size={b.size} spin={b.spin} />
+          )}
         </span>
       ))}
     </div>
@@ -259,211 +328,7 @@ function CharityEffect() {
   )
 }
 
-// ── 6. Godfather Effect (Crimson Noir Embers & Rose Petals) ───────────────────
-const GODFATHER_ICONS = [
-  { icon: 'fa-crown', color: '#c62419' },
-  { icon: 'fa-fire', color: '#e11d48' },
-  { icon: 'fa-crosshairs', color: '#991b1b' },
-  { icon: 'fa-wine-glass', color: '#b91c1c' },
-  { icon: 'fa-shield-halved', color: '#881337' },
-  { icon: 'fa-fan', color: '#dc2626' },
-]
-
-function GodfatherEffect() {
-  const items = useMemo(() => (
-    Array.from({ length: 22 }, (_, i) => ({
-      id: i,
-      x: rand(2, 96),
-      size: rand(14, 26),
-      duration: rand(6, 11),
-      delay: rand(0, 8),
-      drift: rand(-45, 45),
-      rot: rand(-90, 90),
-      item: GODFATHER_ICONS[i % GODFATHER_ICONS.length],
-    }))
-  ), [])
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
-      <div style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'radial-gradient(circle at 50% 50%, transparent 60%, rgba(139, 0, 0, 0.08) 100%)',
-        pointerEvents: 'none',
-        zIndex: 10
-      }} />
-      {items.map(item => (
-        <span
-          key={item.id}
-          className="tier-godfather-ember"
-          style={{
-            position: 'absolute',
-            left: `${item.x}%`,
-            fontSize: item.size,
-            color: item.item.color,
-            animationDuration: `${item.duration}s`,
-            animationDelay: `-${item.delay}s`,
-            '--drift': `${item.drift}px`,
-            '--rot': `${item.rot}deg`,
-            filter: `drop-shadow(0 0 8px ${item.item.color})`,
-            pointerEvents: 'none',
-          }}
-        >
-          <i className={`fas ${item.item.icon}`} />
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// ── 7. Champion Effect (Victory Trophy & Golden Confetti) ─────────────────────
-const CHAMPION_ICONS = [
-  { icon: 'fa-trophy', color: '#F59E0B' },
-  { icon: 'fa-medal', color: '#FBBF24' },
-  { icon: 'fa-crown', color: '#D97706' },
-  { icon: 'fa-star', color: '#FEF08A' },
-  { icon: 'fa-award', color: '#F59E0B' },
-  { icon: 'fa-certificate', color: '#FBBF24' },
-]
-
-function ChampionEffect() {
-  const items = useMemo(() => (
-    Array.from({ length: 26 }, (_, i) => ({
-      id: i,
-      x: rand(2, 96),
-      size: rand(16, 28),
-      duration: rand(4.5, 8.5),
-      delay: rand(0, 7),
-      drift: rand(-50, 50),
-      rot: rand(-180, 180),
-      item: CHAMPION_ICONS[i % CHAMPION_ICONS.length],
-    }))
-  ), [])
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
-      {items.map(item => (
-        <span
-          key={item.id}
-          className="tier-champion-confetti"
-          style={{
-            position: 'absolute',
-            left: `${item.x}%`,
-            fontSize: item.size,
-            color: item.item.color,
-            animationDuration: `${item.duration}s`,
-            animationDelay: `-${item.delay}s`,
-            '--drift': `${item.drift}px`,
-            '--rot': `${item.rot}deg`,
-            filter: `drop-shadow(0 2px 6px rgba(245,158,11,0.5))`,
-            pointerEvents: 'none',
-          }}
-        >
-          <i className={`fas ${item.item.icon}`} />
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// ── 8. Detective Effect (Mystery Clues & Deduction Aura) ─────────────────────
-const DETECTIVE_ICONS = [
-  { icon: 'fa-magnifying-glass', color: '#3B82F6' },
-  { icon: 'fa-fingerprint', color: '#60A5FA' },
-  { icon: 'fa-shoe-prints', color: '#2563EB' },
-  { icon: 'fa-file-lines', color: '#93C5FD' },
-  { icon: 'fa-question', color: '#60A5FA' },
-  { icon: 'fa-compass', color: '#1D4ED8' },
-]
-
-function DetectiveEffect() {
-  const items = useMemo(() => (
-    Array.from({ length: 22 }, (_, i) => ({
-      id: i,
-      x: rand(2, 95),
-      size: rand(15, 26),
-      duration: rand(6, 11),
-      delay: rand(0, 8),
-      drift: rand(-35, 35),
-      item: DETECTIVE_ICONS[i % DETECTIVE_ICONS.length],
-    }))
-  ), [])
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
-      {items.map(item => (
-        <span
-          key={item.id}
-          className="tier-detective-clue"
-          style={{
-            position: 'absolute',
-            left: `${item.x}%`,
-            fontSize: item.size,
-            color: item.item.color,
-            animationDuration: `${item.duration}s`,
-            animationDelay: `-${item.delay}s`,
-            '--drift': `${item.drift}px`,
-            filter: `drop-shadow(0 0 8px rgba(59,130,246,0.6))`,
-            pointerEvents: 'none',
-          }}
-        >
-          <i className={`fas ${item.item.icon}`} />
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// ── 9. Villain Effect (Phantom Masks & Neon Glitch Danger) ───────────────────
-const VILLAIN_ICONS = [
-  { icon: 'fa-mask', color: '#EC4899' },
-  { icon: 'fa-user-secret', color: '#DB2777' },
-  { icon: 'fa-crosshairs', color: '#F472B6' },
-  { icon: 'fa-skull', color: '#BE185D' },
-  { icon: 'fa-bolt', color: '#F43F5E' },
-]
-
-function VillainEffect() {
-  const items = useMemo(() => (
-    Array.from({ length: 22 }, (_, i) => ({
-      id: i,
-      x: rand(2, 95),
-      size: rand(16, 28),
-      duration: rand(5, 9),
-      delay: rand(0, 7),
-      drift: rand(-40, 40),
-      rot: rand(-60, 60),
-      item: VILLAIN_ICONS[i % VILLAIN_ICONS.length],
-    }))
-  ), [])
-
-  return (
-    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
-      {items.map(item => (
-        <span
-          key={item.id}
-          className="tier-villain-glitch"
-          style={{
-            position: 'absolute',
-            left: `${item.x}%`,
-            fontSize: item.size,
-            color: item.item.color,
-            animationDuration: `${item.duration}s`,
-            animationDelay: `-${item.delay}s`,
-            '--drift': `${item.drift}px`,
-            '--rot': `${item.rot}deg`,
-            filter: `drop-shadow(0 0 10px rgba(219,39,119,0.7))`,
-            pointerEvents: 'none',
-          }}
-        >
-          <i className={`fas ${item.item.icon}`} />
-        </span>
-      ))}
-    </div>
-  )
-}
-
-// ── 10. Veteran Effect (Royal Violet Sleuth Medals & Wisdom) ─────────────────
+// ── 6. Veteran Effect (Royal Violet Sleuth Medals & Wisdom) ─────────────────
 const VETERAN_ICONS = [
   { icon: 'fa-medal', color: '#8B5CF6' },
   { icon: 'fa-hourglass-half', color: '#A78BFA' },
@@ -712,12 +577,8 @@ const TIER_COLOR = {
   sadness:    '#64748B',
   hunger:     '#F97316',
   food_garden:'#EA580C',
-  billionaire:'#16A34A',
+  monkey:     '#EAB308',
   charity:    '#BE185D',
-  godfather:  '#8B0000',
-  champion:   '#D97706',
-  detective:  '#2563EB',
-  villain:    '#DB2777',
   veteran:    '#7C3AED',
   explorer:   '#059669',
   potterhead: '#E11D48',
@@ -778,66 +639,20 @@ export default function TierEffect({ tier }) {
       }}
     >
       <style>{`
-        /* Godfather embers floating up */
-        .tier-godfather-ember {
-          position: absolute;
-          bottom: -50px;
-          user-select: none;
-          line-height: 1;
-          animation: godfather-float linear infinite;
-        }
-        @keyframes godfather-float {
-          0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
-          12%  { opacity: 0.95; }
-          85%  { opacity: 0.85; }
-          100% { transform: translateY(-115vh) translateX(var(--drift)) rotate(var(--rot)); opacity: 0; }
-        }
-
-        /* Champion confetti falling down */
-        .tier-champion-confetti {
+        /* Monkey banana drift */
+        .banana-item {
           position: absolute;
           top: -50px;
           user-select: none;
           line-height: 1;
-          animation: champion-fall linear infinite;
+          animation: banana-fall ease-in-out infinite;
         }
-        @keyframes champion-fall {
-          0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
-          10%  { opacity: 1; }
+        @keyframes banana-fall {
+          0%   { transform: translateY(0) translateX(0); opacity: 0; }
+          10%  { opacity: 0.95; }
+          50%  { transform: translateY(55vh) translateX(var(--wobble)); }
           85%  { opacity: 0.9; }
-          100% { transform: translateY(115vh) translateX(var(--drift)) rotate(var(--rot)); opacity: 0; }
-        }
-
-        /* Detective clue drifting */
-        .tier-detective-clue {
-          position: absolute;
-          bottom: -50px;
-          user-select: none;
-          line-height: 1;
-          animation: detective-drift ease-in-out infinite;
-        }
-        @keyframes detective-drift {
-          0%   { transform: translateY(0) translateX(0) scale(0.9); opacity: 0; }
-          15%  { opacity: 0.85; transform: translateY(-20vh) scale(1); }
-          50%  { transform: translateY(-60vh) translateX(var(--drift)) scale(1.05); }
-          85%  { opacity: 0.85; }
-          100% { transform: translateY(-115vh) translateX(calc(var(--drift) * 1.5)) scale(0.9); opacity: 0; }
-        }
-
-        /* Villain glitch drift */
-        .tier-villain-glitch {
-          position: absolute;
-          top: -50px;
-          user-select: none;
-          line-height: 1;
-          animation: villain-glitch linear infinite;
-        }
-        @keyframes villain-glitch {
-          0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
-          12%  { opacity: 0.95; }
-          50%  { transform: translateY(55vh) translateX(var(--drift)) rotate(var(--rot)); }
-          88%  { opacity: 0.85; }
-          100% { transform: translateY(115vh) translateX(calc(var(--drift) * 0.5)) rotate(calc(var(--rot) * 2)); opacity: 0; }
+          100% { transform: translateY(115vh) translateX(calc(var(--wobble) * -0.5)); opacity: 0; }
         }
 
         /* Veteran medal rise */
@@ -920,12 +735,8 @@ export default function TierEffect({ tier }) {
       {/* Render bespoke effect based on tier */}
       {tier === 'sadness' && <RainEffect />}
       {(tier === 'hunger' || tier === 'food_garden') && <FoodEffect />}
-      {tier === 'billionaire' && <MoneyEffect />}
+      {tier === 'monkey' && <BananaEffect />}
       {tier === 'charity' && <CharityEffect />}
-      {tier === 'godfather' && <GodfatherEffect />}
-      {tier === 'champion' && <ChampionEffect />}
-      {tier === 'detective' && <DetectiveEffect />}
-      {tier === 'villain' && <VillainEffect />}
       {tier === 'veteran' && <VeteranEffect />}
       {tier === 'explorer' && <ExplorerEffect />}
       {tier === 'potterhead' && <PotterEffect />}

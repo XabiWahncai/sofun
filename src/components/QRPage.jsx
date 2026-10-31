@@ -83,54 +83,6 @@ const THEME_PROFILES = {
     cardBorder: 'rgba(148, 163, 184, 0.45)',
     watermarkIcon: 'fa-cloud-rain'
   },
-  godfather: {
-    id: 'godfather',
-    name: 'Godfather',
-    title: 'GODFATHER EXECUTIVE PASS',
-    subtitle: 'เจ้าพ่อแห่งค่ำคืน ผู้คุมทุกคดีในเงามืด',
-    accent: '#8B0000',
-    accentRgb: '139, 0, 0',
-    cardBg: 'linear-gradient(145deg, #170404 0%, #320707 55%, #0f0202 100%)',
-    borderGlow: 'rgba(139, 0, 0, 0.65)',
-    cardBorder: 'rgba(139, 0, 0, 0.55)',
-    watermarkIcon: 'fa-crown'
-  },
-  champion: {
-    id: 'champion',
-    name: 'Champion',
-    title: 'CHAMPION TROPHY PASS',
-    subtitle: 'ผู้ยืนหยัดเป็นผู้ชนะเหนือทุกคดีฆาตกรรม',
-    accent: '#D97706',
-    accentRgb: '217, 119, 6',
-    cardBg: 'linear-gradient(145deg, #1b1206 0%, #382405 55%, #130c02 100%)',
-    borderGlow: 'rgba(217, 119, 6, 0.65)',
-    cardBorder: 'rgba(217, 119, 6, 0.55)',
-    watermarkIcon: 'fa-trophy'
-  },
-  detective: {
-    id: 'detective',
-    name: 'Master Detective',
-    title: 'MASTER DETECTIVE PASS',
-    subtitle: 'สมองอันเฉียบแหลมที่มองทะลุทุกคำโกหก',
-    accent: '#2563EB',
-    accentRgb: '37, 99, 235',
-    cardBg: 'linear-gradient(145deg, #061129 0%, #0d2250 55%, #040919 100%)',
-    borderGlow: 'rgba(37, 99, 235, 0.65)',
-    cardBorder: 'rgba(37, 99, 235, 0.55)',
-    watermarkIcon: 'fa-magnifying-glass'
-  },
-  villain: {
-    id: 'villain',
-    name: 'Phantom Villain',
-    title: 'PHANTOM VILLAIN PASS',
-    subtitle: 'สวมหน้ากากฆาตกร หลอกล่อทุกคนอย่างไร้ร่องรอย',
-    accent: '#DB2777',
-    accentRgb: '219, 39, 119',
-    cardBg: 'linear-gradient(145deg, #1d0615 0%, #390d28 55%, #13030c 100%)',
-    borderGlow: 'rgba(219, 39, 119, 0.65)',
-    cardBorder: 'rgba(219, 39, 119, 0.55)',
-    watermarkIcon: 'fa-user-secret'
-  },
   veteran: {
     id: 'veteran',
     name: 'Veteran Sleuth',
@@ -142,18 +94,6 @@ const THEME_PROFILES = {
     borderGlow: 'rgba(124, 58, 237, 0.65)',
     cardBorder: 'rgba(124, 58, 237, 0.55)',
     watermarkIcon: 'fa-medal'
-  },
-  billionaire: {
-    id: 'billionaire',
-    name: 'The Billionaire',
-    title: 'BILLIONAIRE PASS',
-    subtitle: 'มหาเศรษฐีใจถึง ผู้ขับเคลื่อนทุกค่ำคืนด้วยความมั่งคั่ง',
-    accent: '#16A34A',
-    accentRgb: '22, 163, 74',
-    cardBg: 'linear-gradient(145deg, #08190d 0%, #0e321a 55%, #041008 100%)',
-    borderGlow: 'rgba(22, 163, 74, 0.65)',
-    cardBorder: 'rgba(22, 163, 74, 0.55)',
-    watermarkIcon: 'fa-money-bill-wave'
   },
   explorer: {
     id: 'explorer',
@@ -238,6 +178,18 @@ const THEME_PROFILES = {
     borderGlow: 'rgba(190, 24, 93, 0.65)',
     cardBorder: 'rgba(190, 24, 93, 0.55)',
     watermarkIcon: 'fa-heart'
+  },
+  monkey: {
+    id: 'monkey',
+    name: 'Monkey',
+    title: 'MONKEY PASS',
+    subtitle: 'อุ๊กๆ อ๊าๆ ผู้เล่นลิงสายป่วนประจำโต๊ะ',
+    accent: '#EAB308',
+    accentRgb: '234, 179, 8',
+    cardBg: 'linear-gradient(145deg, #1f1a05 0%, #3e330a 55%, #141103 100%)',
+    borderGlow: 'rgba(234, 179, 8, 0.65)',
+    cardBorder: 'rgba(234, 179, 8, 0.50)',
+    watermarkIcon: 'fa-paw'
   }
 }
 
