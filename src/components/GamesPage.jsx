@@ -315,45 +315,25 @@ const RESPONSIVE_CSS = `
 
   /* Billboard Cinematic Ken Burns Effect */
   .netflix-billboard-backdrop {
-    animation: netflixKenBurns 22s cubic-bezier(0.25, 1, 0.5, 1) infinite alternate, netflixFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation: netflixKenBurns 22s cubic-bezier(0.25, 1, 0.5, 1) infinite alternate;
+    opacity: 0.82;
     transform-origin: 75% 25%;
-    will-change: transform, opacity;
+    will-change: transform;
   }
   @keyframes netflixKenBurns {
     0% { transform: scale(1) translate(0, 0); }
     50% { transform: scale(1.05) translate(-1%, -0.5%); }
     100% { transform: scale(1.02) translate(0.5%, 0.5%); }
   }
-  @keyframes netflixFadeIn {
-    from { opacity: 0; }
-    to { opacity: 0.82; }
-  }
 
-  /* Billboard Staggered Entrance */
-  .netflix-billboard-tag {
-    animation: netflixMotionSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  .netflix-billboard-title {
-    animation: netflixMotionSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
-  }
-  .netflix-billboard-specs {
-    animation: netflixMotionSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
-  }
-  .netflix-billboard-synopsis {
-    animation: netflixMotionSlideUp 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
-  }
+  /* Billboard Elements */
+  .netflix-billboard-tag,
+  .netflix-billboard-title,
+  .netflix-billboard-specs,
+  .netflix-billboard-synopsis,
   .netflix-billboard-actions {
-    animation: netflixMotionSlideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
-  }
-  @keyframes netflixMotionSlideUp {
-    from {
-      opacity: 0;
-      transform: translateY(16px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    opacity: 1;
+    transform: none;
   }
 
   /* Billboard Buttons Micro-Interactions */
@@ -442,17 +422,8 @@ const RESPONSIVE_CSS = `
 
   /* Swimlane Row Reveal & Interactive Indicators */
   .netflix-row-wrapper {
-    animation: netflixRowSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-  @keyframes netflixRowSlideUp {
-    from {
-      opacity: 0;
-      transform: translateY(18px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    opacity: 1;
+    transform: none;
   }
 
   .netflix-row-indicator {
@@ -1045,7 +1016,22 @@ function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings,
     return () => clearInterval(timer)
   }, [spotlightGames.length, isPaused])
 
-  if (!currentGame) return null
+  if (!currentGame) {
+    return (
+      <div
+        className="netflix-billboard"
+        style={{
+          position: 'relative',
+          width: '100%',
+          minHeight: 520,
+          height: '68vh',
+          maxHeight: 640,
+          background: '#f8fafc',
+          borderBottom: `1px solid ${BORDER_SUBTLE}`,
+        }}
+      />
+    )
+  }
 
   const customCover = promoSettings?.customCovers?.[currentGame.id]
   const backdropImg = getCleanImgUrl(customCover || currentGame.image, 1400)
@@ -1896,31 +1882,64 @@ function NetflixFilterDrawer({
 /* ── Main GamesPage Component (White Theme) ────────────────────────── */
 export default function GamesPage({ allGames = [], showDetail, showPage, lineUser, bookingEnabled = false, showToast = null }) {
   // 1. Played IDs from playHistory & Top Played Games (90 Days)
-  const [playedIds, setPlayedIds] = useState(() => new Set())
-  const [promoSettings, setPromoSettings] = useState(null)
+  const [playedIds, setPlayedIds] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_played_ids')
+      if (cached) {
+        const arr = JSON.parse(cached)
+        if (Array.isArray(arr)) return new Set(arr)
+      }
+    } catch {}
+    return new Set()
+  })
+
+  const [promoSettings, setPromoSettings] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_promo_settings')
+      if (cached) return JSON.parse(cached)
+    } catch {}
+    return null
+  })
+
   const { topGames: topPlayedGames } = useTopPlayedGames90d(allGames)
 
   // Load Promotion & Spotlight Settings
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'promotion'), snap => {
       if (snap.exists()) {
-        setPromoSettings(snap.data())
+        const data = snap.data()
+        setPromoSettings(data)
+        try { localStorage.setItem('sofun_cached_promo_settings', JSON.stringify(data)) } catch {}
       }
     })
     return () => unsub()
   }, [])
 
   // Load DM Recommendations
-  const [dmRecommendations, setDmRecommendations] = useState([])
+  const [dmRecommendations, setDmRecommendations] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_dm_recs')
+      if (cached) {
+        const arr = JSON.parse(cached)
+        if (Array.isArray(arr) && arr.length > 0) return arr
+      }
+    } catch {}
+    return []
+  })
+
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'dm_recommendations'), snap => {
       if (snap.exists()) {
         const d = snap.data()
-        setDmRecommendations(Array.isArray(d.recommendations) ? d.recommendations : [])
+        const recs = Array.isArray(d.recommendations) ? d.recommendations : []
+        setDmRecommendations(recs)
+        try { localStorage.setItem('sofun_cached_dm_recs', JSON.stringify(recs)) } catch {}
       } else {
         getDoc(doc(db, 'settings', 'promotion')).then(pSnap => {
           if (pSnap.exists() && Array.isArray(pSnap.data().dmRecommendations)) {
-            setDmRecommendations(pSnap.data().dmRecommendations)
+            const recs = pSnap.data().dmRecommendations
+            setDmRecommendations(recs)
+            try { localStorage.setItem('sofun_cached_dm_recs', JSON.stringify(recs)) } catch {}
           }
         }).catch(() => {})
       }
@@ -1961,6 +1980,7 @@ export default function GamesPage({ allGames = [], showDetail, showPage, lineUse
       const ids = new Set()
       snap.docs.forEach(d => { const sid = d.data().scriptId; if (sid) ids.add(sid) })
       setPlayedIds(ids)
+      try { localStorage.setItem('sofun_cached_played_ids', JSON.stringify([...ids])) } catch {}
     }, () => {})
   }, [lineUser?.uid])
 

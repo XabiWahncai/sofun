@@ -55,30 +55,37 @@ export default function App() {
   const [currentPage, setCurrentPage] = useState(() => parseUrl(window.location.pathname).page)
   const [prevPage, setPrevPage] = useState('home')
   const [highlightPartyId, setHighlightPartyId] = useState(null)
-  const [allGames, setAllGames] = useState([])
+  const [allGames, setAllGames] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_all_games')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch {}
+    return []
+  })
   const [allParties, setAllParties] = useState([])
   const [detailId, setDetailId] = useState(() => parseUrl(window.location.pathname).detailId)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [bookingGameId, setBookingGameId] = useState("")
-  const [bookingEnabled, setBookingEnabled] = useState(() => {
-    try {
-      const cached = localStorage.getItem('sofun_booking_enabled')
-      if (cached !== null) return cached === 'true'
-    } catch {}
-    return false
-  })
+  const [bookingEnabled, setBookingEnabled] = useState(false)
 
   useEffect(() => {
+    // Clean up any stale true value from past sessions
+    try {
+      const cached = localStorage.getItem('sofun_booking_enabled')
+      if (cached === 'true') localStorage.removeItem('sofun_booking_enabled')
+    } catch {}
+
     const unsub = onSnapshot(doc(db, 'settings', 'booking'), snap => {
-      if (snap.exists()) {
-        const isEnabled = snap.data().enabled === true
-        setBookingEnabled(isEnabled)
-        try { localStorage.setItem('sofun_booking_enabled', String(isEnabled)) } catch {}
-      } else {
-        setBookingEnabled(false)
-        try { localStorage.setItem('sofun_booking_enabled', 'false') } catch {}
-      }
+      const isEnabled = snap.exists() && snap.data().enabled === true
+      setBookingEnabled(isEnabled)
+      try {
+        if (isEnabled) localStorage.setItem('sofun_booking_enabled', 'true')
+        else localStorage.removeItem('sofun_booking_enabled')
+      } catch {}
     }, err => {
       console.warn('Failed to listen to settings/booking in App:', err)
     })
@@ -111,7 +118,13 @@ export default function App() {
   const [posActiveId, setPosActiveId] = useState(() => {
     try { return localStorage.getItem('sofun_pos_active_id') || null } catch { return null }
   })
-  const [activeMemberOrder, setActiveMemberOrder] = useState(null)
+  const [activeMemberOrder, setActiveMemberOrder] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_active_member_order')
+      if (cached) return JSON.parse(cached)
+    } catch {}
+    return null
+  })
   const liffInitialized = useRef(false)
   const posWriteTimerRef = useRef(null)
   const posLoadedRef = useRef(false)
@@ -378,7 +391,9 @@ export default function App() {
   // ── Scripts ────────────────────────────────────────────────────────
   useEffect(() => {
     return onSnapshot(collection(db, 'scripts'), snap => {
-      setAllGames(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      setAllGames(list)
+      try { localStorage.setItem('sofun_cached_all_games', JSON.stringify(list)) } catch {}
     })
   }, [])
 
@@ -494,6 +509,14 @@ export default function App() {
 
   // ── Auto-sync between QR and Order page based on active order ─────────────
   useEffect(() => {
+    try {
+      if (activeMemberOrder) {
+        localStorage.setItem('sofun_active_member_order', JSON.stringify(activeMemberOrder))
+      } else {
+        localStorage.removeItem('sofun_active_member_order')
+      }
+    } catch {}
+
     if (currentPage === 'qr' && activeMemberOrder) {
       setCurrentPage('order')
       window.history.replaceState({ page: 'order' }, '', '/order')

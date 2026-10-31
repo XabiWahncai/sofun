@@ -3,7 +3,16 @@ import { collection, query, orderBy, limit, onSnapshot } from 'firebase/firestor
 import { db } from '../firebase'
 
 export function useTopPlayedGames90d(allGames = []) {
-  const [playCounts, setPlayCounts] = useState({})
+  const [playCounts, setPlayCounts] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_top_play_counts')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (parsed && typeof parsed === 'object') return parsed
+      }
+    } catch {}
+    return {}
+  })
 
   useEffect(() => {
     let ordersList = []
@@ -55,6 +64,9 @@ export function useTopPlayedGames90d(allGames = []) {
       })
 
       setPlayCounts(counts)
+      try {
+        localStorage.setItem('sofun_cached_top_play_counts', JSON.stringify(counts))
+      } catch {}
     }
 
     const qOrders = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(250))
