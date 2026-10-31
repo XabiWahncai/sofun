@@ -96,8 +96,9 @@ function printBill(h, meUid) {
 }
 
 export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [] }) {
-  // Tab menu bar state (default to 'history')
-  const [activeTab, setActiveTab] = useState('history')
+  // Tab menu bar state (default to 'dashboard')
+  const [activeTab, setActiveTab] = useState('dashboard')
+  const [playHistory, setPlayHistory] = useState([])
 
   // Form states
   const [form, setForm] = useState({
@@ -205,6 +206,18 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
     return unsub
   }, [lineUser?.uid])
 
+  // Load playHistory for member (live sessions & retroactive records)
+  useEffect(() => {
+    if (!lineUser?.uid) return
+    const q = query(
+      collection(db, 'playHistory'),
+      where('userId', '==', lineUser.uid)
+    )
+    return onSnapshot(q, snap => {
+      setPlayHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    }, err => console.warn('playHistory listener error:', err.message))
+  }, [lineUser?.uid])
+
   // Extract month filter options
   const monthOptions = useMemo(() => {
     const seen = new Set()
@@ -240,6 +253,210 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
       const myBill = h.memberBills?.find(m => m.uid === lineUser?.uid)
       return acc + (myBill?.total ?? h.grandTotal ?? 0)
     }, 0)
+  }, [history, lineUser?.uid])
+
+  // Game map lookup for rapid cross-referencing
+  const gameMap = useMemo(() => {
+    const map = new Map()
+    allGames.forEach(g => {
+      if (g.id) map.set(String(g.id), g)
+      if (g._id) map.set(String(g._id), g)
+      if (g.title) map.set(g.title.trim().toLowerCase(), g)
+    })
+    return map
+  }, [allGames])
+
+  // Total valid store games
+  const totalStoreGames = useMemo(() => {
+    return allGames.filter(g => !g.isDeleted && !g.archived).length
+  }, [allGames])
+
+  // Unique played games calculation (combining playHistory and payments history)
+  const uniquePlayedGames = useMemo(() => {
+    const set = new Set()
+    playHistory.forEach(p => {
+      const sid = p.scriptId ? String(p.scriptId) : null
+      const title = p.scriptTitle ? p.scriptTitle.trim().toLowerCase() : null
+      const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
+      const id = g ? String(g.id || g._id) : (sid || title)
+      if (id) set.add(id)
+    })
+    history.forEach(h => {
+      const sid = h.scriptId ? String(h.scriptId) : null
+      const title = h.scriptTitle ? h.scriptTitle.trim().toLowerCase() : null
+      const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
+      const id = g ? String(g.id || g._id) : (sid || title)
+      if (id) set.add(id)
+    })
+    return set
+  }, [playHistory, history, gameMap])
+
+  const storePlayedPercentage = useMemo(() => {
+    if (totalStoreGames === 0) return 0
+    return Math.min(100, Number(((uniquePlayedGames.size / totalStoreGames) * 100).toFixed(1)))
+  }, [uniquePlayedGames.size, totalStoreGames])
+
+  // 1. Ending Statistics Breakdown
+  const endingStats = useMemo(() => {
+    const counts = {}
+    let total = 0
+    history.forEach(h => {
+      if (!h.ending) return
+      const raw = String(h.ending).trim().toLowerCase()
+      let label = h.ending
+      let color = '#d97706'
+      let icon = 'fa-flag-checkered'
+      let bg = 'rgba(245, 158, 11, 0.12)'
+
+      if (raw.includes('true')) {
+        label = 'True Ending (สมบูรณ์)'
+        color = '#10b981'
+        icon = 'fa-circle-check'
+        bg = 'rgba(16, 185, 129, 0.12)'
+      } else if (raw.includes('bad')) {
+        label = 'Bad Ending (หายนะ)'
+        color = '#ef4444'
+        icon = 'fa-circle-xmark'
+        bg = 'rgba(239, 68, 68, 0.12)'
+      } else if (raw.includes('normal')) {
+        label = 'Normal Ending (ปกติ)'
+        color = '#6366f1'
+        icon = 'fa-circle-half-stroke'
+        bg = 'rgba(99, 102, 241, 0.12)'
+      } else if (raw.includes('win') || raw.includes('ชนะ')) {
+        label = 'ชนะคดี'
+        color = '#059669'
+        icon = 'fa-trophy'
+        bg = 'rgba(5, 150, 105, 0.12)'
+      } else if (raw.includes('lose') || raw.includes('แพ้')) {
+        label = 'แพ้คดี'
+        color = '#dc2626'
+        icon = 'fa-skull'
+        bg = 'rgba(220, 38, 38, 0.12)'
+      }
+
+      if (!counts[label]) {
+        counts[label] = { label, count: 0, color, icon, bg }
+      }
+      counts[label].count++
+      total++
+    })
+
+    const list = Object.values(counts).map(item => ({
+      ...item,
+      percentage: total > 0 ? ((item.count / total) * 100).toFixed(1) : '0'
+    })).sort((a, b) => b.count - a.count)
+
+    return { list, total }
+  }, [history])
+
+  // 2. Genre / Category Statistics Breakdown
+  const categoryStats = useMemo(() => {
+    const counts = {}
+    let total = 0
+    const countedGameIds = new Set()
+
+    const allPlayed = [
+      ...playHistory.map(p => ({ scriptId: p.scriptId, scriptTitle: p.scriptTitle })),
+      ...history.map(h => ({ scriptId: h.scriptId, scriptTitle: h.scriptTitle }))
+    ]
+
+    allPlayed.forEach(item => {
+      const sid = item.scriptId ? String(item.scriptId) : null
+      const title = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : null
+      const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
+      const gid = g ? String(g.id || g._id) : (sid || title)
+      if (!gid || countedGameIds.has(gid)) return
+      countedGameIds.add(gid)
+
+      const cat = (g?.category && g.category.trim()) || 'สืบสวนทั่วไป'
+      if (!counts[cat]) {
+        counts[cat] = { category: cat, count: 0 }
+      }
+      counts[cat].count++
+      total++
+    })
+
+    const PALETTE = [
+      '#7c3aed', '#2563eb', '#059669', '#d97706', '#db2777', '#0891b2', '#ea580c', '#6366f1'
+    ]
+
+    const list = Object.values(counts).map((item, idx) => ({
+      ...item,
+      color: PALETTE[idx % PALETTE.length],
+      percentage: total > 0 ? ((item.count / total) * 100).toFixed(1) : '0'
+    })).sort((a, b) => b.count - a.count)
+
+    return { list, total }
+  }, [playHistory, history, gameMap])
+
+  // 3. Top Co-Players / Party Mates Leaderboard
+  const topFriends = useMemo(() => {
+    const map = new Map()
+    history.forEach(h => {
+      const members = h.members || []
+      members.forEach(m => {
+        if (!m.uid || m.uid === lineUser?.uid) return
+        if (!map.has(m.uid)) {
+          map.set(m.uid, {
+            uid: m.uid,
+            name: m.name || 'สหายนักสืบ',
+            avatar: m.avatar || '',
+            count: 0,
+            recentGames: []
+          })
+        }
+        const f = map.get(m.uid)
+        f.count++
+        if (h.scriptTitle && !f.recentGames.includes(h.scriptTitle)) {
+          f.recentGames.push(h.scriptTitle)
+        }
+      })
+    })
+
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
+  }, [history, lineUser?.uid])
+
+  // 4. Top Food & Drink Orders Leaderboard
+  const topFoodItems = useMemo(() => {
+    const map = new Map()
+    history.forEach(h => {
+      const myBill = h.memberBills?.find(b => b.uid === lineUser?.uid)
+      let itemsToCount = []
+
+      if (myBill?.foodItems && myBill.foodItems.length > 0) {
+        itemsToCount = myBill.foodItems
+      } else if (h.foodItems && h.foodItems.length > 0 && (!h.members || h.members.length === 1)) {
+        itemsToCount = h.foodItems
+      }
+
+      itemsToCount.forEach(item => {
+        const rawName = item.name || item.title
+        if (!rawName) return
+        const name = rawName.trim()
+        if (name.includes('มัดจำ') || name.includes('ส่วนลด') || name.includes('Discount')) return
+
+        const qty = Number(item.qty || item.quantity || 1)
+        const price = Number(item.price || item.unitPrice || 0)
+
+        if (!map.has(name)) {
+          map.set(name, {
+            name,
+            count: 0,
+            totalSpent: 0
+          })
+        }
+        const f = map.get(name)
+        f.count += qty
+        f.totalSpent += (price * qty)
+      })
+    })
+
+    return Array.from(map.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8)
   }, [history, lineUser?.uid])
 
   // Resolve game poster image helper
@@ -392,6 +609,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
   const labelStyle = { display: 'block', fontSize: 12, fontWeight: 700, color: INK_2, marginBottom: 6 }
 
   const TABS = [
+    { id: 'dashboard',    label: 'Dashboard',   icon: 'fa-chart-pie' },
     { id: 'history',      label: 'คดี & บิล',   icon: 'fa-history',   badge: history.length > 0 ? history.length : null },
     { id: 'achievements', label: 'ความสำเร็จ', icon: 'fa-award',     badge: myAchievements.length > 0 ? myAchievements.length : null },
     { id: 'info',         label: 'ข้อมูลส่วนตัว', icon: 'fa-user' },
@@ -505,8 +723,8 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
           border: `1px solid ${BORDER}`,
           boxShadow: '0 2px 8px rgba(26,26,26,0.04)',
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, 1fr)',
-          gap: 6
+          gridTemplateColumns: 'repeat(5, 1fr)',
+          gap: 4
         }}>
           {TABS.map(tab => {
             const isActive = activeTab === tab.id
@@ -548,7 +766,7 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
                   )}
                 </div>
                 <span style={{
-                  fontSize: 12,
+                  fontSize: 'clamp(10px, 2.4vw, 12px)',
                   fontWeight: isActive ? 800 : 600,
                   letterSpacing: '-0.01em',
                   whiteSpace: 'nowrap'
@@ -591,6 +809,483 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
           </div>
         ) : (
           <div style={{ marginTop: 18 }}>
+
+            {/* ══════════════════════════════════════════════════════════
+                TAB 0: DASHBOARD (สถิติบทสรุปผู้เล่น & ภาพรวมนักสืบ)
+               ══════════════════════════════════════════════════════════ */}
+            {activeTab === 'dashboard' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+
+                {/* ── 1. STATS OVERVIEW CARDS ── */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  {/* Total Unique Games */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: 16,
+                    padding: '16px 18px',
+                    border: `1px solid ${BORDER}`,
+                    boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: INK_3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <i className="fas fa-scroll" style={{ color: C }} />
+                      <span>คดีที่สืบแล้ว</span>
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: INK, marginTop: 4 }}>
+                      {uniquePlayedGames.size} <span style={{ fontSize: 13, fontWeight: 700, color: INK_3 }}>คดี</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: INK_3, marginTop: 2 }}>
+                      รวม {history.length + playHistory.length} รอบเล่นสะสม
+                    </div>
+                  </div>
+
+                  {/* Total Spent */}
+                  <div style={{
+                    background: '#ffffff',
+                    borderRadius: 16,
+                    padding: '16px 18px',
+                    border: `1px solid ${BORDER}`,
+                    boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, color: INK_3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      <i className="fas fa-receipt" style={{ color: '#0284c7' }} />
+                      <span>ยอดใช้จ่ายรวม</span>
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: INK, marginTop: 4 }}>
+                      ฿{totalSpent.toLocaleString()}
+                    </div>
+                    <div style={{ fontSize: 11, color: INK_3, marginTop: 2 }}>
+                      ค่ารอบเกมและอาหาร
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── 2. STORE GAMES PROGRESS MILESTONE CARD ── */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  padding: '18px 20px',
+                  border: `1px solid ${BORDER}`,
+                  boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10, flexWrap: 'wrap', gap: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, fontWeight: 800, color: INK }}>
+                      <i className="fas fa-trophy" style={{ color: '#d97706' }} />
+                      <span>ความคืบหน้าการเล่นคดีทั้งร้าน</span>
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: C }}>
+                      {storePlayedPercentage}% <span style={{ fontSize: 11, fontWeight: 700, color: INK_3 }}>({uniquePlayedGames.size}/{totalStoreGames} คดี)</span>
+                    </div>
+                  </div>
+
+                  {/* Progress Track */}
+                  <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    height: 12,
+                    borderRadius: 8,
+                    background: '#f1f5f9',
+                    overflow: 'hidden',
+                    border: '1px solid #e2e8f0',
+                    marginBottom: 8
+                  }}>
+                    <div style={{
+                      width: `${storePlayedPercentage}%`,
+                      height: '100%',
+                      background: 'linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #fbbf24 100%)',
+                      borderRadius: 8,
+                      transition: 'width 0.4s ease'
+                    }} />
+                  </div>
+
+                  {/* Milestones markers */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10.5, color: INK_3, fontWeight: 700 }}>
+                    <span style={{ color: storePlayedPercentage >= 30 ? '#2563eb' : INK_3 }}>
+                      <i className="fas fa-award" style={{ marginRight: 3 }} />30% Bronze
+                    </span>
+                    <span style={{ color: storePlayedPercentage >= 50 ? '#7c3aed' : INK_3 }}>
+                      <i className="fas fa-star-half-stroke" style={{ marginRight: 3 }} />50% Silver
+                    </span>
+                    <span style={{ color: storePlayedPercentage >= 80 ? '#d97706' : INK_3 }}>
+                      <i className="fas fa-crown" style={{ marginRight: 3 }} />80% Golden
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── 3. ENDING BREAKDOWN ── */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  padding: '20px',
+                  border: `1px solid ${BORDER}`,
+                  boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 900, color: INK }}>
+                      <i className="fas fa-flag-checkered" style={{ color: '#d97706' }} />
+                      <span>สัดส่วนฉากจบของคดี (Ending Breakdown)</span>
+                    </div>
+                    {endingStats.total > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: INK_3, background: PAPER, padding: '2px 8px', borderRadius: 12 }}>
+                        {endingStats.total} รอบที่บันทึกผล
+                      </span>
+                    )}
+                  </div>
+
+                  {endingStats.total > 0 ? (
+                    <>
+                      {/* Stacked Multi-Segment Bar */}
+                      <div style={{
+                        display: 'flex',
+                        width: '100%',
+                        height: 12,
+                        borderRadius: 8,
+                        overflow: 'hidden',
+                        marginBottom: 16,
+                        background: '#f1f5f9',
+                        border: '1px solid #e2e8f0'
+                      }}>
+                        {endingStats.list.map((item, idx) => (
+                          <div
+                            key={idx}
+                            title={`${item.label}: ${item.percentage}% (${item.count} รอบ)`}
+                            style={{
+                              width: `${item.percentage}%`,
+                              height: '100%',
+                              background: item.color,
+                              transition: 'width 0.3s ease'
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      {/* Ending Cards Grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 10 }}>
+                        {endingStats.list.map((item, idx) => (
+                          <div
+                            key={idx}
+                            style={{
+                              padding: '12px',
+                              borderRadius: 12,
+                              background: item.bg,
+                              border: `1px solid ${item.color}30`,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 4
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 700, color: item.color }}>
+                              <i className={`fas ${item.icon}`} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                            </div>
+                            <div style={{ fontSize: 20, fontWeight: 900, color: INK }}>
+                              {item.percentage}%
+                            </div>
+                            <div style={{ fontSize: 10.5, color: INK_3, fontWeight: 600 }}>
+                              {item.count} ครั้ง
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', color: INK_3, fontSize: 12.5, background: PAPER, borderRadius: 12 }}>
+                      <i className="fas fa-flag-checkered" style={{ fontSize: 22, opacity: 0.4, display: 'block', marginBottom: 8 }} />
+                      ยังไม่มีข้อมูลฉากจบที่บันทึกไว้ — เมื่อเล่นจบและเช็คบิลที่ร้าน GM จะบันทึกฉากจบลงในประวัติของคุณโดยอัตโนมัติ
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 4. CATEGORY / GENRE BREAKDOWN ── */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  padding: '20px',
+                  border: `1px solid ${BORDER}`,
+                  boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 900, color: INK }}>
+                      <i className="fas fa-masks-theater" style={{ color: '#7c3aed' }} />
+                      <span>สัดส่วนแนวเกมที่เล่น (Genre Breakdown)</span>
+                    </div>
+                    {categoryStats.total > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: INK_3, background: PAPER, padding: '2px 8px', borderRadius: 12 }}>
+                        {categoryStats.list.length} หมวดหมู่
+                      </span>
+                    )}
+                  </div>
+
+                  {categoryStats.total > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {categoryStats.list.map((item, idx) => (
+                        <div key={idx}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 5 }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color }} />
+                              <span>{item.category}</span>
+                              {idx === 0 && (
+                                <span style={{ fontSize: 9.5, fontWeight: 800, color: item.color, background: `${item.color}14`, padding: '1px 6px', borderRadius: 6 }}>
+                                  เล่นบ่อยที่สุด
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                              <span style={{ fontSize: 11, color: INK_3 }}>{item.count} คดี</span>
+                              <span style={{ fontSize: 13, fontWeight: 900, color: INK }}>{item.percentage}%</span>
+                            </div>
+                          </div>
+                          <div style={{ width: '100%', height: 8, borderRadius: 6, background: '#f1f5f9', overflow: 'hidden' }}>
+                            <div style={{ width: `${item.percentage}%`, height: '100%', background: item.color, borderRadius: 6, transition: 'width 0.3s ease' }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', color: INK_3, fontSize: 12.5, background: PAPER, borderRadius: 12 }}>
+                      <i className="fas fa-masks-theater" style={{ fontSize: 22, opacity: 0.4, display: 'block', marginBottom: 8 }} />
+                      ยังไม่มีสถิติแนวเกม — ร่วมเล่นคดีที่ร้านหรือบันทึกประวัติย้อนหลังเพื่อดูสัดส่วนแนวเกมโปรดของคุณ
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 5. TOP CO-PLAYERS / PARTY MATES ── */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  padding: '20px',
+                  border: `1px solid ${BORDER}`,
+                  boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 900, color: INK }}>
+                      <i className="fas fa-user-group" style={{ color: '#2563eb' }} />
+                      <span>อันดับเพื่อนที่ร่วมสืบคดีบ่อยที่สุด</span>
+                    </div>
+                    {topFriends.length > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: INK_3, background: PAPER, padding: '2px 8px', borderRadius: 12 }}>
+                        Top {topFriends.length} เพื่อนสนิท
+                      </span>
+                    )}
+                  </div>
+
+                  {topFriends.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {topFriends.map((f, idx) => {
+                        const rank = idx + 1
+                        const rankColor = rank === 1 ? '#d97706' : rank === 2 ? '#64748b' : rank === 3 ? '#b45309' : INK_3
+                        const rankBg = rank === 1 ? 'rgba(245, 158, 11, 0.12)' : rank === 2 ? '#f1f5f9' : rank === 3 ? 'rgba(180, 83, 9, 0.08)' : 'transparent'
+                        const synergy = rank === 1 ? 'คู่หูรู้ใจ' : rank === 2 ? 'สหายร่วมทีม' : rank === 3 ? 'เพื่อนร่วมตี้' : null
+
+                        return (
+                          <div
+                            key={f.uid || idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              borderRadius: 12,
+                              background: rank === 1 ? 'rgba(245, 158, 11, 0.04)' : '#ffffff',
+                              border: `1px solid ${rank === 1 ? 'rgba(245, 158, 11, 0.25)' : '#e2e8f0'}`,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                              <div style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                background: rankBg,
+                                color: rankColor,
+                                fontSize: 11,
+                                fontWeight: 900,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                {rank === 1 ? <i className="fas fa-crown" style={{ fontSize: 10 }} /> : rank}
+                              </div>
+
+                              {f.avatar ? (
+                                <img
+                                  src={f.avatar}
+                                  alt=""
+                                  style={{ width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #e2e8f0' }}
+                                />
+                              ) : (
+                                <div style={{ width: 34, height: 34, borderRadius: '50%', background: '#f1f5f9', color: INK_2, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+                                  {f.name ? f.name[0] : '?'}
+                                </div>
+                              )}
+
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {f.name}
+                                  </span>
+                                  {synergy && (
+                                    <span style={{ fontSize: 9.5, fontWeight: 700, color: rankColor, background: rankBg, padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                                      {synergy}
+                                    </span>
+                                  )}
+                                </div>
+                                {f.recentGames?.length > 0 && (
+                                  <div style={{ fontSize: 10.5, color: INK_3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    เคยเล่น: {f.recentGames.slice(0, 2).join(', ')}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: 8 }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '4px 10px',
+                                borderRadius: 14,
+                                background: rank === 1 ? 'rgba(245, 158, 11, 0.15)' : '#f8fafc',
+                                color: rank === 1 ? '#b45309' : INK,
+                                fontSize: 11.5,
+                                fontWeight: 800,
+                                border: '1px solid rgba(0,0,0,0.06)'
+                              }}>
+                                {f.count} คดี
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', color: INK_3, fontSize: 12.5, background: PAPER, borderRadius: 12 }}>
+                      <i className="fas fa-user-group" style={{ fontSize: 22, opacity: 0.4, display: 'block', marginBottom: 8 }} />
+                      ยังไม่มีข้อมูลเพื่อนร่วมโต๊ะ — ชวนเพื่อนมาเล่นที่ร้านและสแกนเข้าโต๊ะพร้อมกันเพื่อบันทึกสถิติความสนิท
+                    </div>
+                  )}
+                </div>
+
+                {/* ── 6. TOP FOOD & DRINKS ORDERED ── */}
+                <div style={{
+                  background: '#ffffff',
+                  borderRadius: 16,
+                  padding: '20px',
+                  border: `1px solid ${BORDER}`,
+                  boxShadow: '0 1px 4px rgba(26,26,26,0.04)'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 15, fontWeight: 900, color: INK }}>
+                      <i className="fas fa-utensils" style={{ color: '#ea580c' }} />
+                      <span>อันดับเมนูอาหาร &amp; เครื่องดื่มที่สั่งบ่อย</span>
+                    </div>
+                    {topFoodItems.length > 0 && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: INK_3, background: PAPER, padding: '2px 8px', borderRadius: 12 }}>
+                        Top {topFoodItems.length} เมนูโปรด
+                      </span>
+                    )}
+                  </div>
+
+                  {topFoodItems.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      {topFoodItems.map((item, idx) => {
+                        const rank = idx + 1
+                        const rankColor = rank === 1 ? '#ea580c' : rank === 2 ? '#d97706' : rank === 3 ? '#b45309' : INK_3
+                        const rankBg = rank === 1 ? 'rgba(234, 88, 12, 0.1)' : rank === 2 ? 'rgba(245, 158, 11, 0.1)' : rank === 3 ? '#f1f5f9' : 'transparent'
+
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '10px 12px',
+                              borderRadius: 12,
+                              background: rank === 1 ? 'rgba(234, 88, 12, 0.03)' : '#ffffff',
+                              border: `1px solid ${rank === 1 ? 'rgba(234, 88, 12, 0.22)' : '#e2e8f0'}`,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                              <div style={{
+                                width: 24,
+                                height: 24,
+                                borderRadius: '50%',
+                                background: rankBg,
+                                color: rankColor,
+                                fontSize: 11,
+                                fontWeight: 900,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                flexShrink: 0
+                              }}>
+                                {rank}
+                              </div>
+
+                              <div style={{
+                                width: 32,
+                                height: 32,
+                                borderRadius: 8,
+                                background: '#f8fafc',
+                                color: rankColor,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 14,
+                                flexShrink: 0
+                              }}>
+                                <i className="fas fa-bowl-food" />
+                              </div>
+
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span style={{ fontSize: 13, fontWeight: 800, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {item.name}
+                                  </span>
+                                  {rank === 1 && (
+                                    <span style={{ fontSize: 9.5, fontWeight: 700, color: '#ea580c', background: 'rgba(234, 88, 12, 0.12)', padding: '1px 6px', borderRadius: 6, whiteSpace: 'nowrap' }}>
+                                      เมนูโปรดประจำตัว
+                                    </span>
+                                  )}
+                                </div>
+                                {item.totalSpent > 0 && (
+                                  <div style={{ fontSize: 11, color: INK_3 }}>
+                                    รวม ฿{item.totalSpent.toLocaleString()}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ textAlign: 'right', flexShrink: 0, paddingLeft: 8 }}>
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                padding: '4px 10px',
+                                borderRadius: 14,
+                                background: rank === 1 ? 'rgba(234, 88, 12, 0.12)' : '#f8fafc',
+                                color: rank === 1 ? '#c2410c' : INK,
+                                fontSize: 11.5,
+                                fontWeight: 800,
+                                border: '1px solid rgba(0,0,0,0.06)'
+                              }}>
+                                {item.count} ที่
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ textAlign: 'center', padding: '24px 16px', color: INK_3, fontSize: 12.5, background: PAPER, borderRadius: 12 }}>
+                      <i className="fas fa-utensils" style={{ fontSize: 22, opacity: 0.4, display: 'block', marginBottom: 8 }} />
+                      ยังไม่มีข้อมูลการสั่งอาหาร — สั่งของว่างและเครื่องดื่มระหว่างเล่นคดีเพื่อบันทึกเมนูโปรดของคุณ
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
 
             {/* ══════════════════════════════════════════════════════════
                 TAB 1: ประวัติการลงคดี & บิลย้อนหลัง (Play History & Bills)
