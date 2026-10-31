@@ -29,6 +29,7 @@ import AllOfUsWillDiePage from './components/AllOfUsWillDiePage'
 import RehistoryPage from './components/RehistoryPage'
 import TierEffect from './components/TierEffect'
 import { ACHIEVEMENT_LIST } from './constants/achievements'
+import { syncMemberTierAchievements } from './utils/achievementTierSync'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 
@@ -387,6 +388,18 @@ export default function App() {
       })
     })
   }, [lineUser?.uid])
+
+  // ── Auto-evaluate & sync Tier Achievements (Bronze > 30%, Silver > 50%, Golden > 80%) ───
+  useEffect(() => {
+    const uid = lineUser?.uid
+    if (!uid || !allGames.length) return
+    const q = query(collection(db, 'playHistory'), where('userId', '==', uid))
+    return onSnapshot(q, snap => {
+      syncMemberTierAchievements(db, uid, snap.docs, allGames, lineUser).catch(err => {
+        console.warn('Auto achievement tier sync error:', err.message)
+      })
+    })
+  }, [lineUser?.uid, allGames])
 
   // ── Scripts ────────────────────────────────────────────────────────
   useEffect(() => {

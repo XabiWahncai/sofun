@@ -1,4 +1,5 @@
 export const RARITY = {
+  staff:     { id: 'staff',     label: 'Staff',     color: '#10b981', glow: 'rgba(16,185,129,0.45)' },
   event:     { id: 'event',     label: 'Event',     color: '#e11d48', glow: 'rgba(225,29,72,0.45)' },
   legendary: { id: 'legendary', label: 'Legendary', color: '#fbbf24', glow: 'rgba(251,191,36,0.45)' },
   epic:      { id: 'epic',      label: 'Epic',      color: '#a78bfa', glow: 'rgba(167,139,250,0.40)' },
@@ -93,7 +94,7 @@ export const ACHIEVEMENTS = {
   },
   manager: {
     id: 'manager',
-    rarity: 'epic',
+    rarity: 'staff',
     icon: 'fa-user-tie',
     label: 'Manager',
     labelTH: 'คุณผู้จัดการร้าน',
@@ -105,15 +106,15 @@ export const ACHIEVEMENTS = {
   },
   golden: {
     id: 'golden',
-    rarity: 'rare',
+    rarity: 'legendary',
     icon: 'fa-star',
     label: 'Golden Player',
     labelTH: 'ผู้เล่นระดับ Gold',
-    desc: 'A top-tier regular — reliably brilliant, every single session.',
-    descTH: 'สมาชิกระดับสูงที่มาสม่ำเสมอ เก่งทุกครั้งไม่เคยพลาด',
-    color: '#C9A227',
-    bg: 'rgba(201,162,39,0.12)',
-    border: 'rgba(201,162,39,0.30)',
+    desc: 'Has solved over 80% of all scripts at the club. Where did they get all this time and money?',
+    descTH: 'ผู้เล่นคนนี้ ได้สืบคดีจากร้านไปมากกว่า 80% แล้ว ไปเอาเวลาและเงินมาจากไหนเนี่ย',
+    color: '#fbbf24',
+    bg: 'rgba(251,191,36,0.14)',
+    border: 'rgba(251,191,36,0.35)',
   },
   explorer: {
     id: 'explorer',
@@ -153,27 +154,27 @@ export const ACHIEVEMENTS = {
   },
   silver: {
     id: 'silver',
-    rarity: 'common',
+    rarity: 'epic',
     icon: 'fa-star-half-stroke',
     label: 'Silver Player',
     labelTH: 'ผู้เล่นระดับ Silver',
-    desc: 'Steady and dependable. The backbone of every good party.',
-    descTH: 'มั่นคงและน่าเชื่อถือ กระดูกสันหลังของทุกปาร์ตี้',
-    color: '#A8A9AD',
-    bg: 'rgba(168,169,173,0.12)',
-    border: 'rgba(168,169,173,0.35)',
+    desc: 'Has solved over 50% of all scripts at the club. Halfway there, keep going!',
+    descTH: 'ผู้เล่นคนนี้ ได้สืบคดีจากร้านไปมากกว่า 50% แล้ว มาถึงครึ่งทางแล้ว ลุยกันต่อ!',
+    color: '#a78bfa',
+    bg: 'rgba(167,139,250,0.12)',
+    border: 'rgba(167,139,250,0.30)',
   },
   bronze: {
     id: 'bronze',
-    rarity: 'common',
+    rarity: 'rare',
     icon: 'fa-award',
     label: 'Bronze Player',
     labelTH: 'ผู้เล่นระดับ Bronze',
-    desc: 'Just getting started, but already showing real promise.',
-    descTH: 'เพิ่งเริ่มต้นแต่มีแววที่ดีอยู่แล้ว',
-    color: '#CD7F32',
-    bg: 'rgba(205,127,50,0.12)',
-    border: 'rgba(205,127,50,0.30)',
+    desc: 'Has solved over 30% of all scripts at the club. The journey ahead is long and full of mysteries!',
+    descTH: 'ผู้เล่นคนนี้ ได้สืบคดีจากร้านไปมากกว่า 30% แล้ว อนาคตยังอีกไกลมีคดีมากมายรอคุณอยู่',
+    color: '#60a5fa',
+    bg: 'rgba(96,165,250,0.12)',
+    border: 'rgba(96,165,250,0.30)',
   },
   sadness: {
     id: 'sadness',
@@ -201,7 +202,7 @@ export const ACHIEVEMENTS = {
   },
 }
 
-const RARITY_ORDER = ['event', 'legendary', 'epic', 'rare', 'common']
+const RARITY_ORDER = ['staff', 'event', 'legendary', 'epic', 'rare', 'common']
 
 // Alias for backwards/forward compatibility
 ACHIEVEMENTS.first_party = ACHIEVEMENTS.new_era

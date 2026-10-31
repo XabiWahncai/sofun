@@ -18,6 +18,7 @@ import SecurityTab from './SecurityTab'
 import DmRecommendationsTab from './DmRecommendationsTab'
 import { toOptimizedUrl as convertImg, convertImageUrl } from '../utils/imageUrl'
 import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSecurityEvent } from '../utils/security'
+import { syncMemberTierAchievements } from '../utils/achievementTierSync'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
@@ -1917,6 +1918,39 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
   const [receiptSettings, setReceiptSettings] = useState(DEFAULT_RECEIPT_SETTINGS)
   const [slipModalPayment, setSlipModalPayment] = useState(null)
   const [editingPayment, setEditingPayment] = useState(null)
+  const [syncingTiers, setSyncingTiers]     = useState(false)
+
+  const handleBatchSyncTierAchievements = async () => {
+    if (!window.confirm('ยืนยันคำนวณและอัปเดต Bronze (>30%), Silver (>50%), Gold (>80%) ให้สมาชิกทุกคนตามประวัติการเล่นจริงหรือไม่?')) return
+    setSyncingTiers(true)
+    try {
+      const phSnap = await getDocs(collection(db, 'playHistory'))
+      const phDocs = phSnap.docs
+
+      const phByUser = new Map()
+      phDocs.forEach(d => {
+        const uid = d.data().userId
+        if (uid) {
+          if (!phByUser.has(uid)) phByUser.set(uid, [])
+          phByUser.get(uid).push(d)
+        }
+      })
+
+      let updatedCount = 0
+      for (const m of members) {
+        const userPh = phByUser.get(m.id) || []
+        const res = await syncMemberTierAchievements(db, m.id, userPh, allGames, m)
+        if (res?.changed) updatedCount++
+      }
+
+      if (showToast) showToast(`ซิงค์สำเร็จ: อัปเดตสถานะ Bronze/Silver/Gold สมาชิกไป ${updatedCount} คน`, 'success')
+    } catch (err) {
+      console.error('Batch sync tiers error:', err)
+      if (showToast) showToast(`เกิดข้อผิดพลาดในการซิงค์: ${err.message}`, 'error')
+    } finally {
+      setSyncingTiers(false)
+    }
+  }
 
   useEffect(() => {
     const unsub = onSnapshot(query(collection(db, 'payments'), orderBy('paidAt', 'desc')), snap => {
@@ -2071,6 +2105,28 @@ function MembersTab({ members, allGames = [], showToast, onViewMemberHistory }) 
             }}>
               <i className="fas fa-user-group" /> สมาชิก {regularTotal}
             </span>
+            <button
+              type="button"
+              disabled={syncingTiers}
+              onClick={handleBatchSyncTierAchievements}
+              style={{
+                background: '#f8fafc',
+                color: '#0284c7',
+                border: '1px solid #bae6fd',
+                padding: '3px 12px',
+                borderRadius: 20,
+                fontSize: 11,
+                fontWeight: 700,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                cursor: syncingTiers ? 'wait' : 'pointer',
+              }}
+              title="คำนวณและอัปเดต Bronze (>30%), Silver (>50%), Gold (>80%) ให้สมาชิกทุกคนโดยอัตโนมัติ"
+            >
+              <i className={syncingTiers ? 'fas fa-spinner fa-spin' : 'fas fa-arrows-rotate'} />
+              <span>{syncingTiers ? 'กำลังคำนวณ...' : 'ซิงค์ Bronze / Silver / Gold'}</span>
+            </button>
           </div>
         </div>
 
