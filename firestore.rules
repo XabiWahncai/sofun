@@ -61,10 +61,22 @@ service cloud.firestore {
       allow update, delete: if request.auth != null;
     }
 
-    // Play history — admin writes, public read
+    // Play history — public read, admin write, retroactive records creatable and deletable by players
     match /playHistory/{id} {
       allow read: if true;
-      allow write: if request.auth != null;
+      allow create: if request.auth != null || (
+        request.resource.data.isRetroactive == true ||
+        request.resource.data.source == 'rehistory' ||
+        request.resource.data.recordedBy == 'rehistory'
+      );
+      allow update: if request.auth != null || (
+        resource.data.isRetroactive == true && request.resource.data.isRetroactive == true
+      );
+      allow delete: if request.auth != null || (
+        resource.data.isRetroactive == true ||
+        resource.data.source == 'rehistory' ||
+        resource.data.recordedBy == 'rehistory'
+      );
     }
 
     // Security logs — public create for audit trail/threat detection, admin read/update/delete

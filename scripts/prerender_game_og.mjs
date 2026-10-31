@@ -253,12 +253,16 @@ async function main() {
       const aliasId = 'cELtBG9IJdB6qK5t1aMa'
       const aliasDir = path.join(gamesOutDir, aliasId)
       if (!fs.existsSync(aliasDir)) fs.mkdirSync(aliasDir, { recursive: true })
-      fs.writeFileSync(path.join(aliasDir, 'index.html'), html, 'utf8')
-      fs.writeFileSync(path.join(gamesOutDir, `${aliasId}.html`), html, 'utf8')
-      // Also alias the cover image
-      const srcCover = path.join(rootDir, 'dist', 'covers', `${id}.jpg`)
-      const dstCover = path.join(rootDir, 'dist', 'covers', `${aliasId}.jpg`)
-      if (fs.existsSync(srcCover)) fs.copyFileSync(srcCover, dstCover)
+      const aliasHtml = html.split(id).join(aliasId)
+      fs.writeFileSync(path.join(aliasDir, 'index.html'), aliasHtml, 'utf8')
+      fs.writeFileSync(path.join(gamesOutDir, `${aliasId}.html`), aliasHtml, 'utf8')
+      // Also alias the cover image in both public and dist
+      const srcCoverDist = path.join(rootDir, 'dist', 'covers', `${id}.jpg`)
+      const dstCoverDist = path.join(rootDir, 'dist', 'covers', `${aliasId}.jpg`)
+      if (fs.existsSync(srcCoverDist)) fs.copyFileSync(srcCoverDist, dstCoverDist)
+      const srcCoverPub = path.join(rootDir, 'public', 'covers', `${id}.jpg`)
+      const dstCoverPub = path.join(rootDir, 'public', 'covers', `${aliasId}.jpg`)
+      if (fs.existsSync(srcCoverPub)) fs.copyFileSync(srcCoverPub, dstCoverPub)
     }
 
     generatedCount++
