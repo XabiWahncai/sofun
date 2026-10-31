@@ -36,7 +36,8 @@ const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory']
 
 function parseUrl(pathname) {
-  const parts = pathname.replace(/^\//, '').split('/')
+  const cleanPath = (pathname || '').split('?')[0].split('#')[0]
+  const parts = cleanPath.replace(/^\//, '').split('/')
   const first = parts[0] || ''
   if (first.toLowerCase() === 'allofuswilldie') return { page: 'allofuswilldie', detailId: null }
   if (first === 'games' && parts[1]) return { page: 'detail', detailId: parts[1] }
@@ -223,6 +224,22 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePop)
   }, [])
 
+  // ── Restore saved page after LINE Login redirect ───────────────────
+  const restoreReturnUrl = useCallback(() => {
+    try {
+      const returnUrl = sessionStorage.getItem('sofun_auth_return_url')
+      if (returnUrl) {
+        sessionStorage.removeItem('sofun_auth_return_url')
+        const { page, detailId: did } = parseUrl(returnUrl)
+        setCurrentPage(page)
+        if (did) setDetailId(did)
+        window.history.replaceState({ page, detailId: did }, '', returnUrl)
+      }
+    } catch (e) {
+      console.warn('Restore return URL failed:', e)
+    }
+  }, [])
+
   // ── LIFF init on mount ──────────────────────────────────────────
   useEffect(() => {
     if (liffInitialized.current) return
@@ -235,6 +252,7 @@ export default function App() {
         try {
           const profile = await liff.getProfile()
           await handleProfileCheck(profile)
+          restoreReturnUrl()
         } catch (e) {
           console.warn('Profile check failed:', e.message)
         }
@@ -243,7 +261,7 @@ export default function App() {
         console.warn('LIFF init failed:', err.message)
         setLiffReady(true)
       })
-  }, [])
+  }, [restoreReturnUrl])
 
   // ── ตรวจสอบ member ใน Firestore ────────────────────────────────
   const handleProfileCheck = async (profile) => {
@@ -303,19 +321,30 @@ export default function App() {
     setLiffLoading(true)
     try {
       if (!liff.isLoggedIn()) {
-        // redirect กลับมาหน้าเดิม
-        liff.login({ redirectUri: window.location.href })
+        // บันทึก path ปัจจุบัน เพื่อพากลับมาหน้าเดิมหลังล็อกอิน
+        try {
+          const currentPath = window.location.pathname + window.location.search + window.location.hash
+          if (currentPath && currentPath !== '/') {
+            sessionStorage.setItem('sofun_auth_return_url', currentPath)
+          }
+        } catch {}
+
+        // redirectUri ต้องเป็น Root URL (เช่น https://sofunclub.co/ หรือ https://sonfun0linel.web.app/)
+        // เพื่อให้ตรงกับ Callback URL whitelist ใน LINE Developers Console เสมอ (ป้องกัน 400 Bad Request)
+        const cleanOrigin = window.location.origin.replace(/\/+$/, '') + '/'
+        liff.login({ redirectUri: cleanOrigin })
         return
       }
       const profile = await liff.getProfile()
       await handleProfileCheck(profile)
+      restoreReturnUrl()
     } catch (err) {
       console.error('Login error:', err)
       showToast('เกิดข้อผิดพลาด กรุณาลองใหม่', 'error')
     } finally {
       setLiffLoading(false)
     }
-  }, [liffReady])
+  }, [liffReady, restoreReturnUrl])
 
   // ── Logout ────────────────────────────────────────────────────────
   const handleLogout = useCallback(() => {
@@ -730,7 +759,7 @@ export default function App() {
       {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
-      {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} showToast={showToast} />}
+      {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} onLogin={handleLineLogin} showToast={showToast} />}
       {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} allGames={allGames} />}
       {currentPage === 'qr' && <QRPage lineUser={lineUser} allGames={allGames} hasActiveOrder={!!activeMemberOrder} showPage={showPage} />}
       {currentPage === 'order' && activeMemberOrder && (
@@ -877,6 +906,7 @@ export default function App() {
             saveUser(user)
             setShowRegister(false)
             setLiffProfile(null)
+            restoreReturnUrl()
           }}
           onClose={() => {
             setShowRegister(false)
