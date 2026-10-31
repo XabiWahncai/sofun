@@ -548,7 +548,7 @@ const RESPONSIVE_CSS = `
 `
 
 /* ── Netflix Poster Card Component (White Theme) ───────────────────── */
-function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = true, showToast = null, dmRec = null }) {
+function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = false, showToast = null, dmRec = null }) {
   const [hovered, setHovered] = useState(false)
   const posterImg = getCleanImgUrl(game.image, 400)
   const diff = getDifficultyBadge(game.difficulty)
@@ -811,7 +811,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
 }
 
 /* ── Netflix Horizontal Swimlane Row (White Theme) ─────────────────── */
-function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = true, showToast = null, dmRecsMap = null, isDmPicks = false }) {
+function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = false, showToast = null, dmRecsMap = null, isDmPicks = false }) {
   const scrollRef = useRef(null)
   const [canScrollLeft, setCanScrollLeft] = useState(false)
   const [canScrollRight, setCanScrollRight] = useState(true)
@@ -978,7 +978,7 @@ function NetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage,
 }
 
 /* ── Hero Billboard Spotlight Component (White Theme) ──────────────── */
-function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings, bookingEnabled = true, showToast = null }) {
+function NetflixHeroBillboard({ games = [], showDetail, showPage, promoSettings, bookingEnabled = false, showToast = null }) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isPaused, setIsPaused] = useState(false)
 
@@ -1894,7 +1894,7 @@ function NetflixFilterDrawer({
 }
 
 /* ── Main GamesPage Component (White Theme) ────────────────────────── */
-export default function GamesPage({ allGames = [], showDetail, showPage, lineUser, bookingEnabled = true, showToast = null }) {
+export default function GamesPage({ allGames = [], showDetail, showPage, lineUser, bookingEnabled = false, showToast = null }) {
   // 1. Played IDs from playHistory & Top Played Games (90 Days)
   const [playedIds, setPlayedIds] = useState(() => new Set())
   const [promoSettings, setPromoSettings] = useState(null)

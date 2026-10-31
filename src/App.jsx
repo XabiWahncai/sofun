@@ -60,15 +60,23 @@ export default function App() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingGame, setEditingGame] = useState(null)
   const [bookingGameId, setBookingGameId] = useState("")
-  const [bookingEnabled, setBookingEnabled] = useState(true)
+  const [bookingEnabled, setBookingEnabled] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_booking_enabled')
+      if (cached !== null) return cached === 'true'
+    } catch {}
+    return false
+  })
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'booking'), snap => {
       if (snap.exists()) {
-        const isEnabled = snap.data().enabled !== false
+        const isEnabled = snap.data().enabled === true
         setBookingEnabled(isEnabled)
+        try { localStorage.setItem('sofun_booking_enabled', String(isEnabled)) } catch {}
       } else {
-        setBookingEnabled(true)
+        setBookingEnabled(false)
+        try { localStorage.setItem('sofun_booking_enabled', 'false') } catch {}
       }
     }, err => {
       console.warn('Failed to listen to settings/booking in App:', err)

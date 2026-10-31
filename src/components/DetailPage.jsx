@@ -208,7 +208,7 @@ function RelatedCard({ game, showDetail }) {
 }
 
 /* ── Main DetailPage Component ─────────────────────────────────────── */
-export default function DetailPage({ id, showPage, showDetail, allGames = [], lineUser = null, bookingEnabled = true, showToast = null }) {
+export default function DetailPage({ id, showPage, showDetail, allGames = [], lineUser = null, bookingEnabled = false, showToast = null }) {
   const [game, setGame] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)

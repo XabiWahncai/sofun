@@ -14,7 +14,7 @@ export default function Nav({
   pendingOrdersCount = 0,
   soundMuted = false,
   onToggleSound,
-  bookingEnabled = true,
+  bookingEnabled = false,
 }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const { lang, toggle, t } = useLang()
@@ -200,9 +200,11 @@ export default function Nav({
                   <button className="nav-user-menu-item" onClick={() => handleNav('profile')}>
                     <i className="fas fa-id-card" /> {lang === 'th' ? 'โปรไฟล์ของฉัน' : lang === 'zh' ? '我的资料' : 'My Profile'}
                   </button>
-                  <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
-                    <i className="fas fa-users" /> {t('nav', 'myParty')}
-                  </button>
+                  {bookingEnabled && (
+                    <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
+                      <i className="fas fa-users" /> {t('nav', 'myParty')}
+                    </button>
+                  )}
                   <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
                     <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
                   </button>

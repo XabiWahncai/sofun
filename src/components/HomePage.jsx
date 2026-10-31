@@ -72,7 +72,7 @@ function getGamePlayerCount(g) {
 }
 
 /* Netflix Poster Card */
-function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = true, showToast = null }) {
+function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = false, showToast = null }) {
   const [hovered, setHovered] = useState(false);
   const posterImg = convertImageUrl(game.image || game.coverUrl, 400);
   const players = getGamePlayerCount(game);
@@ -270,7 +270,7 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEn
 }
 
 /* Netflix Swimlane Row */
-function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = true, showToast = null }) {
+function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = false, showToast = null }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -430,7 +430,7 @@ const PLACEHOLDER = Array.from({ length: 12 }, (_, i) => ({
   price: [0,299,399,499,0,349,399,299,0,349,399,0][i],
 }));
 
-export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser, bookingEnabled = true, showToast = null }) {
+export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser, bookingEnabled = false, showToast = null }) {
   const { t } = useLang();
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
