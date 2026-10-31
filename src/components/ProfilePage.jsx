@@ -261,7 +261,11 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
     allGames.forEach(g => {
       if (g.id) map.set(String(g.id), g)
       if (g._id) map.set(String(g._id), g)
-      if (g.title) map.set(g.title.trim().toLowerCase(), g)
+      if (g.title) {
+        const raw = g.title.trim().toLowerCase()
+        map.set(raw, g)
+        map.set(raw.replace(/\s+/g, ''), g)
+      }
     })
     return map
   }, [allGames])
@@ -350,10 +354,126 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
     return { list, total }
   }, [history])
 
+// Genre definitions and mapping for player dashboard breakdown
+const PROFILE_GENRE_DEFINITIONS = {
+  detective: {
+    id: 'detective',
+    labelTh: 'สืบสวน',
+    labelEn: 'Detective',
+    display: 'สืบสวน (Detective)',
+    color: '#2563eb',
+    icon: 'fa-magnifying-glass'
+  },
+  drama: {
+    id: 'drama',
+    labelTh: 'ดราม่า',
+    labelEn: 'Drama',
+    display: 'ดราม่า (Drama)',
+    color: '#e11d48',
+    icon: 'fa-masks-theater'
+  },
+  comedy: {
+    id: 'comedy',
+    labelTh: 'คอมเมดี้',
+    labelEn: 'Comedy',
+    display: 'คอมเมดี้ (Comedy)',
+    color: '#d97706',
+    icon: 'fa-face-laugh-beam'
+  },
+  horror: {
+    id: 'horror',
+    labelTh: 'สยองขวัญ',
+    labelEn: 'Horror',
+    display: 'สยองขวัญ (Horror)',
+    color: '#991b1b',
+    icon: 'fa-ghost'
+  },
+  fantasy: {
+    id: 'fantasy',
+    labelTh: 'แฟนตาซี',
+    labelEn: 'Fantasy',
+    display: 'แฟนตาซี (Fantasy)',
+    color: '#7c3aed',
+    icon: 'fa-wand-magic-sparkles'
+  },
+  romance: {
+    id: 'romance',
+    labelTh: 'โรแมนติก',
+    labelEn: 'Romance',
+    display: 'โรแมนติก (Romance)',
+    color: '#db2777',
+    icon: 'fa-heart'
+  },
+  scifi: {
+    id: 'scifi',
+    labelTh: 'ไซไฟ',
+    labelEn: 'Sci-Fi',
+    display: 'ไซไฟ (Sci-Fi)',
+    color: '#0891b2',
+    icon: 'fa-rocket'
+  },
+  thriller: {
+    id: 'thriller',
+    labelTh: 'ระทึกขวัญ',
+    labelEn: 'Thriller',
+    display: 'ระทึกขวัญ (Thriller)',
+    color: '#475569',
+    icon: 'fa-bolt'
+  },
+  action: {
+    id: 'action',
+    labelTh: 'แอ็กชัน',
+    labelEn: 'Action',
+    display: 'แอ็กชัน (Action)',
+    color: '#ea580c',
+    icon: 'fa-fire'
+  },
+  history: {
+    id: 'history',
+    labelTh: 'ย้อนยุค',
+    labelEn: 'History',
+    display: 'ย้อนยุค (History)',
+    color: '#854d0e',
+    icon: 'fa-landmark'
+  }
+}
+
+const PROFILE_GENRE_MAP = {
+  detective: 'detective',
+  สืบสวน: 'detective',
+  สืบสวนสอบสวน: 'detective',
+  drama: 'drama',
+  ดราม่า: 'drama',
+  draman: 'drama',
+  comedy: 'comedy',
+  คอมเมดี้: 'comedy',
+  ตลก: 'comedy',
+  commady: 'comedy',
+  horror: 'horror',
+  สยองขวัญ: 'horror',
+  ผี: 'horror',
+  fantasy: 'fantasy',
+  แฟนตาซี: 'fantasy',
+  romance: 'romance',
+  โรแมนติก: 'romance',
+  ความรัก: 'romance',
+  'sci-fi': 'scifi',
+  scifi: 'scifi',
+  ไซไฟ: 'scifi',
+  thriller: 'thriller',
+  ระทึกขวัญ: 'thriller',
+  action: 'action',
+  แอ็กชัน: 'action',
+  แอ็คชั่น: 'action',
+  history: 'history',
+  ย้อนยุค: 'history',
+  ประวัติศาสตร์: 'history'
+}
+
   // 2. Genre / Category Statistics Breakdown
   const categoryStats = useMemo(() => {
     const counts = {}
-    let total = 0
+    let totalTagsCount = 0
     const countedGameIds = new Set()
 
     const allPlayed = [
@@ -363,31 +483,74 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
 
     allPlayed.forEach(item => {
       const sid = item.scriptId ? String(item.scriptId) : null
-      const title = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : null
-      const g = (sid && gameMap.get(sid)) || (title && gameMap.get(title))
-      const gid = g ? String(g.id || g._id) : (sid || title)
+      const rawTitle = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : null
+      const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : null
+      const g = (sid && gameMap.get(sid)) ||
+                (rawTitle && gameMap.get(rawTitle)) ||
+                (normTitle && gameMap.get(normTitle))
+      const gid = g ? String(g.id || g._id) : (sid || rawTitle)
       if (!gid || countedGameIds.has(gid)) return
       countedGameIds.add(gid)
 
-      const cat = (g?.category && g.category.trim()) || 'สืบสวนทั่วไป'
-      if (!counts[cat]) {
-        counts[cat] = { category: cat, count: 0 }
+      // Collect raw genre tags from game record
+      let rawTags = []
+      if (Array.isArray(g?.tags) && g.tags.length > 0) {
+        rawTags = g.tags
+      } else if (Array.isArray(g?.genres) && g.genres.length > 0) {
+        rawTags = g.genres
+      } else if (g?.category && typeof g.category === 'string') {
+        rawTags = [g.category]
+      } else if (g?.genre && typeof g.genre === 'string') {
+        rawTags = [g.genre]
       }
-      counts[cat].count++
-      total++
+
+      // Map into normalized genre IDs (deduplicating genres for the same game)
+      const gameGenreIds = new Set()
+      rawTags.forEach(t => {
+        const key = String(t).trim().toLowerCase()
+        const gId = PROFILE_GENRE_MAP[key]
+        if (gId) gameGenreIds.add(gId)
+      })
+
+      // Fallback: if game has no recognizable genre tags, default to detective
+      if (gameGenreIds.size === 0) {
+        gameGenreIds.add('detective')
+      }
+
+      gameGenreIds.forEach(gId => {
+        if (!counts[gId]) {
+          const def = PROFILE_GENRE_DEFINITIONS[gId] || {
+            id: gId,
+            labelTh: gId,
+            labelEn: gId,
+            display: gId,
+            color: '#7c3aed',
+            icon: 'fa-masks-theater'
+          }
+          counts[gId] = {
+            id: gId,
+            category: def.display,
+            labelTh: def.labelTh,
+            labelEn: def.labelEn,
+            color: def.color,
+            icon: def.icon,
+            count: 0
+          }
+        }
+        counts[gId].count++
+        totalTagsCount++
+      })
     })
 
-    const PALETTE = [
-      '#7c3aed', '#2563eb', '#059669', '#d97706', '#db2777', '#0891b2', '#ea580c', '#6366f1'
-    ]
+    const uniqueGamesCount = countedGameIds.size
 
-    const list = Object.values(counts).map((item, idx) => ({
+    const list = Object.values(counts).map(item => ({
       ...item,
-      color: PALETTE[idx % PALETTE.length],
-      percentage: total > 0 ? ((item.count / total) * 100).toFixed(1) : '0'
+      percentage: totalTagsCount > 0 ? ((item.count / totalTagsCount) * 100).toFixed(1) : '0',
+      gamePercentage: uniqueGamesCount > 0 ? ((item.count / uniqueGamesCount) * 100).toFixed(1) : '0'
     })).sort((a, b) => b.count - a.count)
 
-    return { list, total }
+    return { list, total: totalTagsCount, uniqueGamesCount }
   }, [playHistory, history, gameMap])
 
   // 3. Top Co-Players / Party Mates Leaderboard
@@ -1016,29 +1179,58 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
                   </div>
 
                   {categoryStats.total > 0 ? (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {categoryStats.list.map((item, idx) => (
-                        <div key={idx}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 5 }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color }} />
-                              <span>{item.category}</span>
-                              {idx === 0 && (
-                                <span style={{ fontSize: 9.5, fontWeight: 800, color: item.color, background: `${item.color}14`, padding: '1px 6px', borderRadius: 6 }}>
-                                  เล่นบ่อยที่สุด
-                                </span>
-                              )}
+                    <div>
+                      {/* Overview multi-segment bar */}
+                      <div
+                        style={{
+                          width: '100%',
+                          height: 10,
+                          borderRadius: 6,
+                          background: '#f1f5f9',
+                          overflow: 'hidden',
+                          display: 'flex',
+                          marginBottom: 16
+                        }}
+                      >
+                        {categoryStats.list.map((item, idx) => (
+                          <div
+                            key={idx}
+                            title={`${item.category}: ${item.count} คดี (${item.percentage}%)`}
+                            style={{
+                              width: `${item.percentage}%`,
+                              height: '100%',
+                              background: item.color,
+                              borderRight: idx < categoryStats.list.length - 1 ? '1.5px solid #ffffff' : 'none'
+                            }}
+                          />
+                        ))}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                        {categoryStats.list.map((item, idx) => (
+                          <div key={idx}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 5 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: item.color }} />
+                                <i className={`fas ${item.icon}`} style={{ fontSize: 11, color: item.color, width: 14, textAlign: 'center' }} />
+                                <span>{item.category}</span>
+                                {idx === 0 && (
+                                  <span style={{ fontSize: 9.5, fontWeight: 800, color: item.color, background: `${item.color}14`, padding: '1px 6px', borderRadius: 6 }}>
+                                    เล่นบ่อยที่สุด
+                                  </span>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                                <span style={{ fontSize: 11, color: INK_3 }}>{item.count} คดี</span>
+                                <span style={{ fontSize: 13, fontWeight: 900, color: INK }}>{item.percentage}%</span>
+                              </div>
                             </div>
-                            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                              <span style={{ fontSize: 11, color: INK_3 }}>{item.count} คดี</span>
-                              <span style={{ fontSize: 13, fontWeight: 900, color: INK }}>{item.percentage}%</span>
+                            <div style={{ width: '100%', height: 8, borderRadius: 6, background: '#f1f5f9', overflow: 'hidden' }}>
+                              <div style={{ width: `${item.percentage}%`, height: '100%', background: item.color, borderRadius: 6, transition: 'width 0.3s ease' }} />
                             </div>
                           </div>
-                          <div style={{ width: '100%', height: 8, borderRadius: 6, background: '#f1f5f9', overflow: 'hidden' }}>
-                            <div style={{ width: `${item.percentage}%`, height: '100%', background: item.color, borderRadius: 6, transition: 'width 0.3s ease' }} />
-                          </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '24px 16px', color: INK_3, fontSize: 12.5, background: PAPER, borderRadius: 12 }}>
