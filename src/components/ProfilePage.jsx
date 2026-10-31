@@ -772,11 +772,11 @@ const PROFILE_GENRE_MAP = {
   const labelStyle = { display: 'block', fontSize: 12, fontWeight: 700, color: INK_2, marginBottom: 6 }
 
   const TABS = [
-    { id: 'dashboard',    label: 'Dashboard',   icon: 'fa-chart-pie' },
-    { id: 'history',      label: 'คดี & บิล',   icon: 'fa-history',   badge: history.length > 0 ? history.length : null },
-    { id: 'achievements', label: 'ความสำเร็จ', icon: 'fa-award',     badge: myAchievements.length > 0 ? myAchievements.length : null },
-    { id: 'info',         label: 'ข้อมูลส่วนตัว', icon: 'fa-user' },
-    { id: 'account',      label: 'บัญชี',       icon: 'fa-shield-halved' }
+    { id: 'dashboard',    label: 'Dashboard',   shortLabel: 'Dashboard', icon: 'fa-chart-pie' },
+    { id: 'history',      label: 'คดี & บิล',   shortLabel: 'คดี & บิล', icon: 'fa-history',   badge: history.length > 0 ? history.length : null },
+    { id: 'achievements', label: 'ความสำเร็จ', shortLabel: 'ความสำเร็จ', icon: 'fa-award',     badge: myAchievements.length > 0 ? myAchievements.length : null },
+    { id: 'info',         label: 'ข้อมูลส่วนตัว', shortLabel: 'ข้อมูล',    icon: 'fa-user' },
+    { id: 'account',      label: 'บัญชี',       shortLabel: 'บัญชี',    icon: 'fa-shield-halved' }
   ]
 
   return (
@@ -800,6 +800,29 @@ const PROFILE_GENRE_MAP = {
           border-color: ${C}30;
           box-shadow: 0 4px 16px rgba(26,26,26,0.08);
         }
+        .profile-main-wrap {
+          max-width: 720px;
+          margin: 0 auto;
+          padding: 0 16px;
+        }
+        @media (max-width: 480px) {
+          .profile-main-wrap {
+            padding: 0 10px;
+          }
+        }
+        .pp-tabs-container {
+          margin-top: 18px;
+          background: #ffffff;
+          border-radius: 16px;
+          padding: 5px;
+          border: 1px solid ${BORDER};
+          box-shadow: 0 2px 8px rgba(26,26,26,0.04);
+          display: grid;
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 4px;
+          width: 100%;
+          box-sizing: border-box;
+        }
         .pp-tab-btn {
           position: relative;
           display: flex;
@@ -813,10 +836,66 @@ const PROFILE_GENRE_MAP = {
           font-family: 'Sarabun', sans-serif;
           transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
           outline: none;
+          min-width: 0;
+          width: 100%;
+          box-sizing: border-box;
+        }
+        .pp-tab-icon-wrap {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+        }
+        .pp-tab-label-full {
+          display: inline;
+        }
+        .pp-tab-label-short {
+          display: none;
+        }
+        @media (max-width: 600px) {
+          .pp-tabs-container {
+            padding: 4px;
+            gap: 2px;
+            border-radius: 14px;
+          }
+          .pp-tab-btn {
+            flex-direction: column;
+            gap: 3px;
+            padding: 7px 2px;
+            border-radius: 10px;
+          }
+          .pp-tab-btn i {
+            font-size: 13.5px !important;
+          }
+          .pp-tab-label-full {
+            display: none;
+          }
+          .pp-tab-label-short {
+            display: inline;
+          }
+          .pp-tab-btn .pp-tab-text {
+            font-size: 10px !important;
+            font-weight: 700 !important;
+            letter-spacing: -0.02em !important;
+            max-width: 100%;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            line-height: 1.1;
+          }
+          .pp-tab-badge {
+            top: -5px !important;
+            right: -8px !important;
+            min-width: 13px !important;
+            height: 13px !important;
+            font-size: 8px !important;
+            padding: 0 2px !important;
+          }
         }
       `}</style>
 
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+      <div className="profile-main-wrap">
 
         {/* HERO CARD */}
         <div style={{ background: '#fff', borderRadius: 24, padding: '32px 24px 28px', textAlign: 'center', marginTop: 24, boxShadow: '0 2px 12px rgba(26,26,26,0.05)', border: `1px solid ${BORDER}`, position: 'relative', overflow: 'hidden' }}>
@@ -878,17 +957,7 @@ const PROFILE_GENRE_MAP = {
         </div>
 
         {/* ── MENU BAR / SEGMENTED TABS ── */}
-        <div style={{
-          marginTop: 18,
-          background: '#ffffff',
-          borderRadius: 16,
-          padding: 5,
-          border: `1px solid ${BORDER}`,
-          boxShadow: '0 2px 8px rgba(26,26,26,0.04)',
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: 4
-        }}>
+        <div className="pp-tabs-container">
           {TABS.map(tab => {
             const isActive = activeTab === tab.id
             return (
@@ -903,10 +972,10 @@ const PROFILE_GENRE_MAP = {
                   boxShadow: isActive ? `0 4px 14px ${C}35` : 'none',
                 }}
               >
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div className="pp-tab-icon-wrap">
                   <i className={`fas ${tab.icon}`} style={{ fontSize: 14, color: isActive ? '#ffffff' : INK_3 }} />
                   {tab.badge !== null && tab.badge !== undefined && (
-                    <span style={{
+                    <span className="pp-tab-badge" style={{
                       position: 'absolute',
                       top: -6,
                       right: -11,
@@ -928,13 +997,14 @@ const PROFILE_GENRE_MAP = {
                     </span>
                   )}
                 </div>
-                <span style={{
+                <span className="pp-tab-text" style={{
                   fontSize: 'clamp(10px, 2.4vw, 12px)',
                   fontWeight: isActive ? 800 : 600,
                   letterSpacing: '-0.01em',
                   whiteSpace: 'nowrap'
                 }}>
-                  {tab.label}
+                  <span className="pp-tab-label-full">{tab.label}</span>
+                  <span className="pp-tab-label-short">{tab.shortLabel || tab.label}</span>
                 </span>
               </button>
             )
