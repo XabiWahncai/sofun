@@ -716,6 +716,7 @@ const TIER_COLOR = {
   explorer:   '#059669',
   potterhead: '#E11D48',
   new_era:    '#06B6D4',
+  first_party: '#06B6D4',
   manager:    '#10B981',
 }
 
@@ -922,7 +923,7 @@ export default function TierEffect({ tier }) {
       {tier === 'veteran' && <VeteranEffect />}
       {tier === 'explorer' && <ExplorerEffect />}
       {tier === 'potterhead' && <PotterEffect />}
-      {tier === 'new_era' && <NewEraEffect />}
+      {(tier === 'new_era' || tier === 'first_party') && <NewEraEffect />}
       {tier === 'manager' && <ManagerEffect />}
       {SPARKLE_CONFIG[tier] && <SparkleEffect tier={tier} />}
 

@@ -47,10 +47,10 @@ export const ACHIEVEMENTS = {
     id: 'new_era',
     rarity: 'legendary',
     icon: 'fa-bolt',
-    label: 'New Era',
-    labelTH: 'ยุคใหม่',
-    desc: 'Pioneered the dawn of a new generation. Stepping into uncharted history.',
-    descTH: 'ผู้เปิดศักราชใหม่ ก้าวสู่หน้าประวัติศาสตร์ที่ไม่เคยมีใครทำได้',
+    label: 'First Party',
+    labelTH: 'กลุ่มผู้บุกเบิก',
+    desc: 'The very first party of players to use this website.',
+    descTH: 'กลุ่มผู้เล่นกลุ่มแรกที่ได้ใช้งานเว็บไซต์นี้',
     color: '#06b6d4',
     bg: 'rgba(6,182,212,0.14)',
     border: 'rgba(6,182,212,0.35)',
@@ -203,7 +203,10 @@ export const ACHIEVEMENTS = {
 
 const RARITY_ORDER = ['event', 'legendary', 'epic', 'rare', 'common']
 
-export const ACHIEVEMENT_LIST = Object.values(ACHIEVEMENTS).sort(
+// Alias for backwards/forward compatibility
+ACHIEVEMENTS.first_party = ACHIEVEMENTS.new_era
+
+export const ACHIEVEMENT_LIST = Array.from(new Set(Object.values(ACHIEVEMENTS))).sort(
   (a, b) => RARITY_ORDER.indexOf(a.rarity) - RARITY_ORDER.indexOf(b.rarity)
 )
 

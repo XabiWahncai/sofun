@@ -157,9 +157,9 @@ const THEME_PROFILES = {
   },
   new_era: {
     id: 'new_era',
-    name: 'New Era',
-    title: 'NEW ERA GENESIS PASS',
-    subtitle: 'ผู้เปิดศักราชใหม่ ก้าวสู่หน้าประวัติศาสตร์ที่ไม่เคยมีใครทำได้',
+    name: 'First Party',
+    title: 'FIRST PARTY PASS',
+    subtitle: 'กลุ่มผู้เล่นกลุ่มแรกที่ได้ใช้งานเว็บไซต์นี้',
     accent: '#06B6D4',
     accentRgb: '6, 182, 212',
     cardBg: 'linear-gradient(145deg, #04161c 0%, #082d3a 55%, #020f14 100%)',
@@ -216,6 +216,8 @@ const THEME_PROFILES = {
     watermarkIcon: 'fa-heart'
   }
 }
+
+THEME_PROFILES.first_party = THEME_PROFILES.new_era;
 
 export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false, showPage }) {
   const [history, setHistory]         = useState([])

@@ -7254,7 +7254,8 @@ nav {
   --focus-ring: #D97706;
   --focus-ring-glow: rgba(217, 119, 6, 0.12);
 }
-:root[data-achievement="new_era"] {
+:root[data-achievement="new_era"],
+:root[data-achievement="first_party"] {
   --curtain-crimson: #06B6D4;
   --curtain-crimson-light: #22D3EE;
   --curtain-crimson-deep: #0891B2;
