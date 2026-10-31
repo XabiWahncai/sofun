@@ -3,13 +3,11 @@ import { useLang } from '../LangContext';
 import { db } from '../firebase';
 import { doc, updateDoc, arrayUnion, onSnapshot, collection, query, where, orderBy, limit } from 'firebase/firestore';
 import Footer from './Footer';
-import { handleDirectLineBooking } from '../utils/bookingHelper';
-import { useTopPlayedGames90d } from '../utils/playStats';
 
 /* Design tokens - Netflix White Theme */
 const C          = 'var(--crimson-500)';
 const C_DEEP     = 'var(--crimson-700)';
-const NETFLIX_RED = 'var(--red, #e50914)';
+const NETFLIX_RED = '#e50914';
 const BG_PAGE    = '#ffffff';
 const BG_SURFACE = '#f8fafc';
 const CARD_BG    = '#ffffff';
@@ -18,7 +16,25 @@ const TEXT_MUTED = '#4b5563';
 const TEXT_LIGHT = '#9ca3af';
 const BORDER_CLR = 'rgba(0, 0, 0, 0.08)';
 
-import { convertImageUrl, extractDriveId, toOptimizedUrl } from '../utils/imageUrl';
+const toWsrv = (id, w = 900) =>
+  `https://wsrv.nl/?url=https://drive.usercontent.google.com/download?id=${id}%26export%3Dview&w=${w}&output=webp`;
+
+const extractDriveId = (url) => {
+  if (!url) return null;
+  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^=?/]+)/);
+  if (lh3) return lh3[1];
+  const m1 = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
+  if (m1) return m1[1];
+  const m2 = url.match(/[?&]id=([^&]+)/);
+  if (m2) return m2[1];
+  return null;
+};
+
+const convertImageUrl = (url, w = 900) => {
+  if (!url) return url;
+  const id = extractDriveId(url);
+  return id ? toWsrv(id, w) : url;
+};
 
 /* Difficulty Badge */
 function DiffBadge({ d }) {
@@ -26,8 +42,9 @@ function DiffBadge({ d }) {
   const l = String(d).toLowerCase();
   let bg = '#6b7280';
   let fg = '#ffffff';
+  let label = d;
 
-  if (l === 'beginner' || l === 'ง่าย' || l === 'มือใหม่') {
+  if (l === 'beginner' || l === 'ง่าย') {
     bg = '#10b981';
     fg = '#ffffff';
   } else if (l === 'normal' || l === 'ปานกลาง') {
@@ -44,6 +61,10 @@ function DiffBadge({ d }) {
   return (
     <span
       style={{
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        zIndex: 2,
         fontSize: 10,
         fontWeight: 800,
         color: fg,
@@ -53,7 +74,7 @@ function DiffBadge({ d }) {
         boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
       }}
     >
-      {d}
+      {label}
     </span>
   );
 }
@@ -72,19 +93,15 @@ function getGamePlayerCount(g) {
 }
 
 /* Netflix Poster Card */
-function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnabled = false, showToast = null }) {
+function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed }) {
   const [hovered, setHovered] = useState(false);
   const posterImg = convertImageUrl(game.image || game.coverUrl, 400);
   const players = getGamePlayerCount(game);
 
   const handleBook = (e) => {
     e.stopPropagation();
-    if (!bookingEnabled) {
-      handleDirectLineBooking(game, showToast);
-      return;
-    }
     if (typeof showPage === 'function') {
-      showPage('booking', { gameId: game.id, game });
+      showPage('booking', { gameId: game.id });
     } else {
       window.location.href = `/booking?gameId=${game.id}`;
     }
@@ -110,7 +127,7 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEn
         overflow: 'hidden',
         background: CARD_BG,
         cursor: 'pointer',
-        border: `1.5px solid ${hovered ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.35)' : BORDER_CLR}`,
+        border: `1.5px solid ${hovered ? 'rgba(229,9,20,0.35)' : BORDER_CLR}`,
         boxShadow: hovered
           ? '0 16px 36px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.06)'
           : '0 2px 8px rgba(0,0,0,0.05)',
@@ -270,7 +287,7 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEn
 }
 
 /* Netflix Swimlane Row */
-function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playedIds, onSeeAll, bookingEnabled = false, showToast = null }) {
+function HomeNetflixSwimlaneRow({ title, subtitle, games = [], showDetail, showPage, playedIds, onSeeAll }) {
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
@@ -303,12 +320,17 @@ function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playe
   return (
     <div style={{ position: 'relative', marginBottom: 38 }}>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: 10, textAlign: 'left' }}>
-          <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2, flexShrink: 0 }} />
-          <h3 style={{ margin: 0, fontSize: 'clamp(16px, 2.2vw, 20px)', fontWeight: 900, color: TEXT_MAIN, letterSpacing: '-0.01em', textAlign: 'left' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 4, height: 18, background: NETFLIX_RED, borderRadius: 2 }} />
+          <h3 style={{ margin: 0, fontSize: 'clamp(16px, 2.2vw, 20px)', fontWeight: 900, color: TEXT_MAIN, letterSpacing: '-0.01em' }}>
             {title}
           </h3>
+          {subtitle && (
+            <span style={{ fontSize: 12, color: TEXT_MUTED, fontWeight: 500, marginLeft: 4 }}>
+              {subtitle}
+            </span>
+          )}
         </div>
 
         {onSeeAll && (
@@ -377,15 +399,13 @@ function HomeNetflixSwimlaneRow({ title, games = [], showDetail, showPage, playe
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          {games.slice(0, 16).map(game => (
+          {games.map(game => (
             <HomeNetflixPosterCard
               key={game.id}
               game={game}
               showDetail={showDetail}
               showPage={showPage}
               isPlayed={playedIds.has(game.id)}
-              bookingEnabled={bookingEnabled}
-              showToast={showToast}
             />
           ))}
         </div>
@@ -430,16 +450,14 @@ const PLACEHOLDER = Array.from({ length: 12 }, (_, i) => ({
   price: [0,299,399,499,0,349,399,299,0,349,399,0][i],
 }));
 
-export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser, bookingEnabled = false, showToast = null }) {
+export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser }) {
   const { t } = useLang();
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
   const [promoSettings, setPromoSettings] = useState(null);
+  const [recentPlayedIds, setRecentPlayedIds] = useState([]);
   const [playedIds, setPlayedIds] = useState(() => new Set());
   const revealRoot = useRef(null);
-
-  /* Top Played Games in Past 90 Days */
-  const { topGames: topPlayedGames } = useTopPlayedGames90d(allGames);
 
   /* Load Promotion Settings */
   useEffect(() => {
@@ -448,6 +466,24 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         setPromoSettings(snap.data());
       }
     });
+    return () => unsub();
+  }, []);
+
+  /* Load Recent Store Plays from Orders */
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'), limit(100));
+    const unsub = onSnapshot(q, snap => {
+      const seen = new Set();
+      const list = [];
+      snap.docs.forEach(d => {
+        const sid = d.data().scriptId;
+        if (sid && !seen.has(sid)) {
+          seen.add(sid);
+          list.push(sid);
+        }
+      });
+      setRecentPlayedIds(list);
+    }, () => {});
     return () => unsub();
   }, []);
 
@@ -477,47 +513,48 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     });
   }, [allGames]);
 
-  /* New Games to display in Hero Card (up to 5) */
+  /* 3 New Games to display in Hero Card */
   const newGames = useMemo(() => {
     if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds) && promoSettings.newGameIds.length > 0) {
       const mapped = promoSettings.newGameIds
         .map(id => allGames.find(g => g.id === id))
         .filter(Boolean);
-      if (mapped.length > 0) return mapped.slice(0, 5);
+      if (mapped.length > 0) return mapped.slice(0, 3);
     }
     const source = sortedNewestGames.length > 0 ? sortedNewestGames : (allGames.length > 0 ? allGames : PLACEHOLDER);
-    return source.slice(0, 5);
+    return source.slice(0, 3);
   }, [promoSettings?.newGameIds, allGames, sortedNewestGames]);
 
   /* Hero Featured Games */
   const heroFeaturedGames = useMemo(() => {
     if (newGames && newGames.length > 0) return newGames;
-    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 5);
+    return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 3);
   }, [newGames, allGames]);
 
   /* Swimlanes Data */
+  const trendingGames = useMemo(() => {
+    const recentMap = new Map();
+    recentPlayedIds.forEach((id, idx) => { recentMap.set(id, idx); });
+    return [...allGames].sort((a, b) => {
+      const idxA = recentMap.has(a.id) ? recentMap.get(a.id) : 9999;
+      const idxB = recentMap.has(b.id) ? recentMap.get(b.id) : 9999;
+      return idxA - idxB;
+    });
+  }, [allGames, recentPlayedIds]);
+
   const beginnerGames = useMemo(() => {
     return allGames
       .filter(g => {
-        const det = Number(g.detective) || 0;
-        const rp = Number(g.roleplay) || 0;
-        const diff = (g.difficulty || '').toLowerCase();
-        if (diff === 'expert' || diff === 'hard' || diff === 'ยาก' || diff === 'ยากมาก') return false;
+        const det = g.detective || 0;
+        const rp = g.roleplay || 0;
         if (det >= 4 || rp >= 4) return false;
-        return diff === 'beginner' || diff === 'ง่าย' || diff === 'มือใหม่' || (det + rp <= 5);
+        return (g.difficulty || '').toLowerCase() === 'beginner' || (g.difficulty || '') === 'ง่าย' || (det + rp <= 5);
       })
       .sort((a, b) => {
-        const detA = Number(a.detective) || 0;
-        const rpA  = Number(a.roleplay) || 0;
-        const detB = Number(b.detective) || 0;
-        const rpB  = Number(b.roleplay) || 0;
-        const sumA = detA + rpA;
-        const sumB = detB + rpB;
+        const sumA = (a.detective || 0) + (a.roleplay || 0);
+        const sumB = (b.detective || 0) + (b.roleplay || 0);
         if (sumA !== sumB) return sumA - sumB;
-        const maxA = Math.max(detA, rpA);
-        const maxB = Math.max(detB, rpB);
-        if (maxA !== maxB) return maxA - maxB;
-        return detA - detB;
+        return (a.detective || 0) - (b.detective || 0);
       });
   }, [allGames]);
 
@@ -650,12 +687,12 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
         .mm-d5{transition-delay:.28s!important}.mm-d6{transition-delay:.34s!important}
 
         .mm-btn-pri{transition:background .25s ease,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s cubic-bezier(.16,1,.3,1)!important}
-        .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px) scale(1.015)!important;box-shadow:0 18px 48px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.55),0 0 24px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.3)!important}
+        .mm-btn-pri:hover{background:${C_DEEP}!important;transform:translateY(-3px) scale(1.015)!important;box-shadow:0 18px 48px rgba(198,36,25,.55),0 0 24px rgba(198,36,25,.3)!important}
         .mm-btn-pri:active{transform:translateY(0) scale(0.98)!important}
         .mm-btn-pri:hover i.fa-arrow-right{transform:translateX(4px);transition:transform .22s ease}
 
         .mm-btn-gho{transition:border-color .25s,color .25s,transform .25s cubic-bezier(.16,1,.3,1),box-shadow .25s!important}
-        .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.14)!important}
+        .mm-btn-gho:hover{border-color:${C}!important;color:${C}!important;transform:translateY(-2px)!important;box-shadow:0 8px 24px rgba(198,36,25,.14)!important}
         .mm-btn-gho:active{transform:scale(0.98)!important}
 
         .mm-step-card{transition:transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s ease!important;border-radius:14px;background:#ffffff}
@@ -678,7 +715,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           animation:mmMainFloat 7.5s ease-in-out infinite;
           transform-origin:center bottom;
         }
-        .mm-cover-main:hover{box-shadow:0 64px 120px rgba(0,0,0,.42),0 0 50px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.3)!important;filter:brightness(1.07)!important;animation-play-state:paused!important}
+        .mm-cover-main:hover{box-shadow:0 64px 120px rgba(0,0,0,.42),0 0 50px rgba(198,36,25,.3)!important;filter:brightness(1.07)!important;animation-play-state:paused!important}
         .mm-hero-pill{animation:mmPillFloat 4.6s ease-in-out infinite}
 
         .mm-fa{animation:mmFloatA 5.2s ease-in-out infinite}
@@ -692,53 +729,44 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
         .mm-hero-text{width:min(52%,700px);padding:clamp(56px,7vw,96px) clamp(36px,5vw,80px) clamp(64px,8vw,96px)}
 
-        /* Modern Minimal Promotion Showcase */
+        /* Modern Promotion Showcase Banner (Minimal Image Only) */
         .sofun-promo-card {
-          display: flex;
-          flex-direction: column;
+          position: relative;
           background: #ffffff;
           border: 1px solid rgba(0, 0, 0, 0.08);
           border-radius: 24px;
           overflow: hidden;
-          box-shadow: 0 16px 44px rgba(0, 0, 0, 0.04);
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.04);
+          transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease;
+          cursor: pointer;
+          display: block;
+          width: 100%;
         }
         .sofun-promo-card:hover {
           transform: translateY(-4px);
-          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.08);
-        }
-        .sofun-promo-content {
-          padding: clamp(28px, 4vw, 44px);
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          flex: 1;
+          box-shadow: 0 20px 50px rgba(0, 0, 0, 0.09);
         }
         .sofun-promo-banner-wrap {
-          flex: 1.15;
+          width: 100%;
           position: relative;
-          min-height: 260px;
-          background: #f9fafb;
           overflow: hidden;
+          background: #f8fafc;
+          display: block;
         }
         .sofun-promo-banner-img {
           width: 100%;
-          height: 100%;
-          object-fit: cover;
+          height: auto;
           display: block;
+          object-fit: cover;
+          transition: transform 0.5s ease;
+        }
+        .sofun-promo-card:hover .sofun-promo-banner-img {
+          transform: scale(1.012);
         }
 
         @media(max-width: 899px) {
-          .sofun-promo-card { flex-direction: column; }
-          .sofun-promo-banner-wrap { order: 1; min-height: 200px; aspect-ratio: 16 / 9; }
-          .sofun-promo-content { order: 2; padding: 24px 20px; }
+          .sofun-promo-card { border-radius: 16px; }
           .mm-scatter-r,.mm-hero-main,.mm-hero-pill,.mm-hero-dots{display:none!important}
-        }
-
-        @media(min-width: 900px) {
-          .sofun-promo-card { flex-direction: row; align-items: stretch; }
-          .sofun-promo-content { order: 1; flex: 0 0 460px; max-width: 480px; }
-          .sofun-promo-banner-wrap { order: 2; flex: 1; min-height: 380px; }
         }
 
         @media(min-width:640px) and (max-width:899px){
@@ -762,38 +790,14 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
             width: 145px !important;
             min-width: 145px !important;
             height: 220px !important;
-            border-radius: 10px !important;
-          }
-          .netflix-home-card h4 {
-            font-size: 12px !important;
-            -webkit-line-clamp: 1 !important;
           }
           .netflix-home-card-actions {
             opacity: 1 !important;
             max-height: 36px !important;
             transform: none !important;
-            margin-top: 4px !important;
           }
           .netflix-home-scroll-arrow {
             display: none !important;
-          }
-        }
-        @media(max-width: 480px) {
-          .netflix-home-card {
-            width: 130px !important;
-            min-width: 130px !important;
-            height: 195px !important;
-          }
-        }
-        @media (hover: none) {
-          .netflix-home-card:hover {
-            transform: none !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
-          }
-          .netflix-home-card-actions {
-            opacity: 1 !important;
-            max-height: 36px !important;
-            transform: none !important;
           }
         }
       `}</style>
@@ -804,7 +808,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       <section style={{ background: '#fff', position: 'relative', overflow: 'hidden', minHeight: '100vh', display: 'flex', alignItems: 'center' }}>
 
         {/* ── dot grid ── */}
-        <div aria-hidden style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(circle, rgba(var(--curtain-crimson-rgb, 198, 36, 25),.055) 1px, transparent 1px)`, backgroundSize:'24px 24px', zIndex:0, pointerEvents:'none' }} />
+        <div aria-hidden style={{ position:'absolute', inset:0, backgroundImage:`radial-gradient(circle, rgba(198,36,25,.055) 1px, transparent 1px)`, backgroundSize:'24px 24px', zIndex:0, pointerEvents:'none' }} />
 
         {/* ── MOBILE-ONLY scatter covers — hidden on ≥640px ── */}
         {scatterCovers.length > 0 && [
@@ -961,7 +965,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                     {heroGame?.title || 'Script Murder'}
                   </div>
                 </div>
-                <div style={{ position:'absolute', top:14, right:14, background:C, color:'#fff', borderRadius:6, padding:'5px 10px', fontSize:9.5, fontWeight:800, letterSpacing:'0.12em', textTransform:'uppercase', boxShadow:'0 4px 14px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.55)' }}>
+                <div style={{ position:'absolute', top:14, right:14, background:C, color:'#fff', borderRadius:6, padding:'5px 10px', fontSize:9.5, fontWeight:800, letterSpacing:'0.12em', textTransform:'uppercase', boxShadow:'0 4px 14px rgba(198,36,25,.55)' }}>
                   FEATURED
                 </div>
               </div>
@@ -974,7 +978,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           position:'absolute', top:'50%', left:'71%',
           transform:'translate(calc(-50% + clamp(120px,13vw,200px)), calc(-50% + clamp(160px,20vw,280px)))',
           background:C, color:'#fff', padding:'11px 18px', borderRadius:10,
-          boxShadow:'0 16px 40px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.45)', zIndex:6, textAlign:'center'
+          boxShadow:'0 16px 40px rgba(198,36,25,.45)', zIndex:6, textAlign:'center'
         }}>
           <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize:26, lineHeight:1, letterSpacing:'0.06em' }}>NEW</div>
           <div style={{ fontFamily:"'Sarabun',sans-serif", fontSize:9, fontWeight:800, letterSpacing:'0.16em', textTransform:'uppercase', opacity:.9, marginTop:3 }}>เกมใหม่</div>
@@ -1037,7 +1041,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 background: C, color: '#fff', border: 'none', cursor: 'pointer',
                 fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
                 fontFamily: "'Sarabun',sans-serif", padding: '16px 44px', borderRadius: 6,
-                boxShadow: '0 8px 36px rgba(var(--curtain-crimson-rgb, 198, 36, 25),.38)',
+                boxShadow: '0 8px 36px rgba(198,36,25,.38)',
               }}>
                 {t('home','viewScripts')}
               </button>
@@ -1099,151 +1103,177 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </div>
 
       {/* ══════════════════════════════════════════
-          3. PROMOTION SHOWCASE (MINIMAL MODERN)
+          3. NETFLIX SWIMLANES CATALOG (WHITE THEME)
       ══════════════════════════════════════════ */}
-      <section style={{
-        background: BG_SURFACE,
-        color: TEXT_MAIN,
-        position: 'relative',
-        overflow: 'hidden',
-        borderTop: `1px solid ${BORDER_CLR}`,
-        borderBottom: `1px solid ${BORDER_CLR}`,
-        padding: 'clamp(48px, 6vw, 84px) clamp(16px, 4vw, 48px)',
-      }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          <div className="sofun-promo-card mm-reveal">
-            {/* Promo Info */}
-            <div className="sofun-promo-content">
-              <h2 style={{
-                fontSize: 'clamp(24px, 2.4vw, 34px)',
-                fontWeight: 900,
-                lineHeight: 1.3,
-                color: TEXT_MAIN,
-                margin: '0 0 14px 0',
-                letterSpacing: '-0.02em',
-              }}>
-                {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
-              </h2>
+      <section style={{ background: BG_PAGE, padding: 'clamp(56px,7vw,84px) 0 40px' }}>
+        <div style={{ maxWidth: 1320, margin: '0 auto' }}>
 
-              <p style={{
-                fontSize: 'clamp(14px, 1.05vw, 15px)',
-                color: TEXT_MUTED,
-                lineHeight: 1.75,
-                margin: '0 0 22px 0',
-              }}>
-                {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
-              </p>
-
-              {promoSettings?.discountAmount && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'baseline',
-                  gap: 10,
-                  padding: '8px 16px',
-                  borderRadius: 12,
-                  background: 'rgba(229, 9, 20, 0.05)',
-                  border: '1px solid rgba(229, 9, 20, 0.15)',
-                  marginBottom: 26,
-                  alignSelf: 'flex-start',
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: NETFLIX_RED }}>
-                    {promoSettings.discountType === 'person' ? 'ส่วนลดต่อคน' : 'ส่วนลดทั้งปาร์ตี้'}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: NETFLIX_RED }}>฿</span>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1, color: TEXT_MAIN }}>
-                      {promoSettings.discountAmount}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const targetLink = promoSettings?.buttonLink || 'booking';
-                    if ((targetLink === 'booking' || targetLink === 'party') && !bookingEnabled) {
-                      handleDirectLineBooking(null, showToast);
-                      return;
-                    }
-                    showPage(targetLink);
-                  }}
-                  style={{
-                    background: NETFLIX_RED,
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 13.5,
-                    fontWeight: 800,
-                    letterSpacing: '0.04em',
-                    padding: '13px 26px',
-                    borderRadius: 12,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.25)',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  <span>{String(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย').replace(/->/g, '').trim()}</span>
-                  <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
-                </button>
+          {/* Section Header */}
+          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 28, flexWrap: 'wrap', gap: 14 }}>
+            <div className="mm-reveal-l">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <span style={{ background: NETFLIX_RED, color: '#fff', fontSize: 9.5, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', padding: '2px 8px', borderRadius: 4 }}>
+                  NETFLIX SELECTION
+                </span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: TEXT_MUTED }}>
+                  คัดสรรเรื่องราวยอดนิยมประจำสัปดาห์
+                </span>
               </div>
+              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(38px,5.5vw,68px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
+                {t('home','catalogHeading')}
+              </h2>
             </div>
+            <div className="mm-reveal-r">
+              <button
+                className="mm-btn-gho"
+                onClick={() => showPage('games')}
+                style={{
+                  background: 'transparent',
+                  color: TEXT_MAIN,
+                  border: `1.5px solid ${BORDER_CLR}`,
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                  fontWeight: 800,
+                  letterSpacing: '0.12em',
+                  textTransform: 'uppercase',
+                  padding: '12px 24px',
+                  borderRadius: 8,
+                }}
+              >
+                ดูสคริปต์ทั้งหมด {scriptCount}+ เรื่อง &gt;
+              </button>
+            </div>
+          </div>
 
-            {/* Promo Banner */}
-            <div className="sofun-promo-banner-wrap">
-              {promoSettings?.bannerUrl ? (
-                <img
-                  src={convertImageUrl(promoSettings.bannerUrl, 1200)}
-                  alt={promoSettings?.heading || 'โปรโมชั่น'}
-                  className="sofun-promo-banner-img"
-                />
-              ) : (
-                <div style={{
-                  width: '100%',
-                  height: '100%',
-                  background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  padding: 32,
-                  textAlign: 'center',
-                }}>
-                  <div style={{
-                    width: 56,
-                    height: 56,
-                    borderRadius: 16,
-                    background: 'rgba(229, 9, 20, 0.08)',
-                    border: '1px solid rgba(229, 9, 20, 0.2)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: NETFLIX_RED,
-                    fontSize: 22,
-                    marginBottom: 12,
-                  }}>
-                    <i className="fas fa-bullhorn" />
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: TEXT_MAIN }}>
-                    {promoSettings?.heading || 'SOFUN SPECIAL PROMOTION'}
-                  </div>
-                </div>
-              )}
-            </div>
+          {/* Swimlane 1: Trending Now */}
+          <HomeNetflixSwimlaneRow
+            title="กำลังมาแรงติดเทรนด์"
+            subtitle="สคริปต์ที่มีการเล่นล่าสุดที่หน้าร้าน"
+            games={trendingGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 2: New Releases */}
+          <HomeNetflixSwimlaneRow
+            title="เกมเข้าใหม่ล่าสุด"
+            subtitle="สคริปต์พรีเมียมลิขสิทธิ์เรื่องใหม่"
+            games={sortedNewestGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 3: Beginner Friendly */}
+          <HomeNetflixSwimlaneRow
+            title="เหมาะสำหรับมือใหม่"
+            subtitle="สืบสวนและสวมบทบาทเริ่มต้น เล่นง่าย ไม่กดดัน"
+            games={beginnerGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 4: Detective & Hardcore Mystery */}
+          <HomeNetflixSwimlaneRow
+            title="สืบสวนเข้มข้น ปริศนาท้าทาย"
+            subtitle="เกมระดับสืบหลายดาว ปริศนาซับซ้อนหักมุม"
+            games={detectiveGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Swimlane 5: Roleplay & Drama */}
+          <HomeNetflixSwimlaneRow
+            title="สวมบทบาท ดราม่าอารมณ์"
+            subtitle="สคริปต์แนวละครดราม่าเข้มข้น"
+            games={dramaGames}
+            showDetail={showDetail}
+            showPage={showPage}
+            playedIds={playedIds}
+            onSeeAll={() => showPage('games')}
+          />
+
+          {/* Catalog Footer Link */}
+          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>
+            <button
+              className="mm-btn-pri"
+              onClick={() => showPage('games')}
+              style={{
+                background: NETFLIX_RED,
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 12,
+                fontWeight: 800,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                padding: '16px 48px',
+                borderRadius: 8,
+                boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
+              }}
+            >
+              เปิดดูคลังสคริปต์ทั้งหมด {scriptCount}+ เรื่อง
+            </button>
           </div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════
-          4. HOW TO PLAY (WHITE THEME)
+          4. STATS BAR (WHITE THEME)
+      ══════════════════════════════════════════ */}
+      <section style={{ background: BG_SURFACE, color: TEXT_MAIN, padding: 'clamp(56px,7vw,88px) clamp(20px,5vw,60px)', borderTop: `1px solid ${BORDER_CLR}`, borderBottom: `1px solid ${BORDER_CLR}` }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+            {[
+              { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
+              { num: '200+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
+              { num: 'B499',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
+              { num: '5',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
+            ].map((s, i) => (
+              <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
+                padding: 'clamp(24px,3vw,40px) clamp(16px,2vw,28px)',
+                background: '#ffffff',
+                borderRadius: 12,
+                border: `1px solid ${BORDER_CLR}`,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}>
+                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,76px)', color: TEXT_MAIN, lineHeight: 0.9 }}>
+                  {s.num}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: NETFLIX_RED, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>
+                  {s.unit}
+                </div>
+                <div style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 4 }}>
+                  {s.sub}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mm-reveal" style={{ marginTop: 40, textAlign: 'center' }}>
+            <p style={{ fontSize: 'clamp(13px,1.4vw,16px)', fontWeight: 600, color: TEXT_MUTED, maxWidth: '64ch', margin: '0 auto', lineHeight: 1.7 }}>
+              <strong>Sofun Club Thailand</strong> ผู้บุกเบิกและสตูดิโอเกม <strong>Script Murder</strong> คุณภาพพรีเมียมแห่งแรกใจกลาง RCA พร้อม Game Master มืออาชีพดูแลห้องสืบคดีทุกรอบ
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          5. HOW TO PLAY (WHITE THEME)
       ══════════════════════════════════════════ */}
       <section style={{ background: BG_PAGE, color: TEXT_MAIN, padding: 'clamp(64px,8vw,104px) clamp(20px,5vw,60px)' }}>
         <div style={{ maxWidth: 1280, margin: '0 auto' }}>
           <div className="mm-reveal" style={{ marginBottom: 48, textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED, padding: '4px 12px', borderRadius: 20, fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 10 }}>
+              HOW TO PLAY
+            </div>
             <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(40px,6vw,80px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
               {t('home','howStartHeading')}
             </h2>
@@ -1279,7 +1309,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               background: NETFLIX_RED, color: '#fff', border: 'none', cursor: 'pointer',
               fontSize: 12, fontWeight: 800, letterSpacing: '0.18em', textTransform: 'uppercase',
               fontFamily: "'Sarabun',sans-serif", padding: '16px 52px', borderRadius: 8,
-              boxShadow: '0 8px 32px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)',
+              boxShadow: '0 8px 32px rgba(229,9,20,0.3)',
             }}>
               {t('home','startPlaying')}
             </button>
@@ -1288,119 +1318,78 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </section>
 
       {/* ══════════════════════════════════════════
-          5. NETFLIX SWIMLANES CATALOG (WHITE THEME)
+          6. PROMOTION SHOWCASE BANNER (IMAGE ONLY)
       ══════════════════════════════════════════ */}
-      <section style={{ background: BG_PAGE, padding: 'clamp(56px,7vw,84px) 0 40px' }}>
-        <div style={{ maxWidth: 1320, margin: '0 auto' }}>
-
-          {/* Section Header */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 clamp(16px, 4vw, 40px)', marginBottom: 28, flexWrap: 'wrap', gap: 14 }}>
-            <div className="mm-reveal-l">
-              <h2 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 'clamp(38px,5.5vw,68px)', lineHeight: 0.9, textTransform: 'uppercase', color: TEXT_MAIN, margin: 0 }}>
-                {t('home','catalogHeading')}
-              </h2>
-            </div>
-            <div className="mm-reveal-r">
-              <button
-                className="mm-btn-gho"
-                onClick={() => showPage('games')}
-                style={{
-                  background: 'transparent',
-                  color: TEXT_MAIN,
-                  border: `1.5px solid ${BORDER_CLR}`,
-                  cursor: 'pointer',
-                  fontSize: 11.5,
-                  fontWeight: 800,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  padding: '12px 24px',
-                  borderRadius: 8,
-                }}
-              >
-                ดูสคริปต์ทั้งหมด {scriptCount}+ เรื่อง &gt;
-              </button>
-            </div>
-          </div>
-
-
-          {/* Swimlane: Top Played in Past 90 Days */}
-          {topPlayedGames.length > 0 && (
-            <HomeNetflixSwimlaneRow
-              title="รอบการเล่นสูงสุด (90 วันล่าสุด)"
-              games={topPlayedGames}
-              showDetail={showDetail}
-              showPage={showPage}
-              playedIds={playedIds}
-              onSeeAll={() => showPage('games')}
-              bookingEnabled={bookingEnabled}
-              showToast={showToast}
-            />
-          )}
-
-          {/* Catalog Footer Link */}
-          <div className="mm-reveal" style={{ textAlign: 'center', marginTop: 32, padding: '0 20px' }}>
-            <button
-              className="mm-btn-pri"
-              onClick={() => showPage('games')}
-              style={{
-                background: NETFLIX_RED,
-                color: '#fff',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: 12,
-                fontWeight: 800,
-                letterSpacing: '0.16em',
-                textTransform: 'uppercase',
-                padding: '16px 48px',
-                borderRadius: 8,
-                boxShadow: '0 8px 32px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.3)',
+      {(promoSettings?.bannerUrl || promoSettings?.heading) && (
+        <section style={{
+          background: BG_SURFACE,
+          color: TEXT_MAIN,
+          position: 'relative',
+          overflow: 'hidden',
+          borderTop: `1px solid ${BORDER_CLR}`,
+          borderBottom: `1px solid ${BORDER_CLR}`,
+          padding: 'clamp(32px, 5vw, 64px) clamp(16px, 4vw, 48px)',
+        }}>
+          <div style={{ maxWidth: 1200, margin: '0 auto', position: 'relative', zIndex: 1 }}>
+            <div
+              className="sofun-promo-card mm-reveal"
+              onClick={() => {
+                const targetLink = promoSettings?.buttonLink || 'booking';
+                if ((targetLink === 'booking' || targetLink === 'party') && !bookingEnabled) {
+                  handleDirectLineBooking(null, showToast);
+                  return;
+                }
+                showPage(targetLink);
               }}
+              role="button"
+              tabIndex={0}
+              title={promoSettings?.heading || 'โปรโมชั่น'}
             >
-              เปิดดูคลังสคริปต์ทั้งหมด {scriptCount}+ เรื่อง
-            </button>
-          </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          6. STATS BAR (WHITE THEME)
-      ══════════════════════════════════════════ */}
-      <section style={{ background: BG_SURFACE, color: TEXT_MAIN, padding: 'clamp(56px,7vw,88px) clamp(20px,5vw,60px)', borderTop: `1px solid ${BORDER_CLR}`, borderBottom: `1px solid ${BORDER_CLR}` }}>
-        <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
-            {[
-              { num: scriptCount + '+', unit: t('home','statScriptLabel'),  sub: t('home','statReadySub'),  border: true },
-              { num: '699+',            unit: t('home','statDetective'),     sub: t('home','statActiveSub'), border: true },
-              { num: '599฿',            unit: t('home','statStarting'),      sub: t('home','statPriceSub'),  border: true },
-              { num: '3',               unit: t('home','statYears'),          sub: t('home','statExpSub'),    border: false },
-            ].map((s, i) => (
-              <div key={i} className={`mm-reveal mm-d${i + 1} mm-stat-box`} style={{
-                padding: 'clamp(24px,3vw,40px) clamp(16px,2vw,28px)',
-                background: '#ffffff',
-                borderRadius: 12,
-                border: `1px solid ${BORDER_CLR}`,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-              }}>
-                <div style={{ fontFamily:"'Bebas Neue',sans-serif", fontSize: 'clamp(44px,6vw,76px)', color: TEXT_MAIN, lineHeight: 0.9 }}>
-                  {s.num}
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: NETFLIX_RED, textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: 6 }}>
-                  {s.unit}
-                </div>
-                <div style={{ fontSize: 11.5, color: TEXT_MUTED, marginTop: 4 }}>
-                  {s.sub}
-                </div>
+              <div className="sofun-promo-banner-wrap">
+                {promoSettings?.bannerUrl ? (
+                  <img
+                    src={convertImageUrl(promoSettings.bannerUrl, 1600)}
+                    alt={promoSettings?.heading || 'โปรโมชั่น'}
+                    className="sofun-promo-banner-img"
+                    loading="lazy"
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    minHeight: 280,
+                    background: 'linear-gradient(135deg, #f8fafc 0%, #edf2f7 100%)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: 32,
+                    textAlign: 'center',
+                  }}>
+                    <div style={{
+                      width: 56,
+                      height: 56,
+                      borderRadius: 16,
+                      background: 'rgba(229, 9, 20, 0.08)',
+                      border: '1px solid rgba(229, 9, 20, 0.2)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: NETFLIX_RED,
+                      fontSize: 22,
+                      marginBottom: 12,
+                    }}>
+                      <i className="fas fa-bullhorn" />
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 800, color: TEXT_MAIN }}>
+                      {promoSettings?.heading || 'SOFUN SPECIAL PROMOTION'}
+                    </div>
+                  </div>
+                )}
               </div>
-            ))}
+            </div>
           </div>
-
-          <div className="mm-reveal" style={{ marginTop: 40, textAlign: 'center' }}>
-            <p style={{ fontSize: 'clamp(13px,1.4vw,16px)', fontWeight: 600, color: TEXT_MUTED, maxWidth: '64ch', margin: '0 auto', lineHeight: 1.7 }}>
-              <strong>Sofun Club Thailand</strong> ผู้บุกเบิกและสตูดิโอเกม <strong>Script Murder</strong> คุณภาพพรีเมียมแห่งแรกใจกลาง RCA พร้อม Game Master มืออาชีพดูแลห้องสืบคดีทุกรอบ
-            </p>
-          </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* ══════════════════════════════════════════
           7. OPEN PARTIES (WHITE THEME - CONDITIONAL)
@@ -1419,7 +1408,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: NETFLIX_RED, animation: 'mmPulse 2s ease-in-out infinite' }} />
                   <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: NETFLIX_RED, animation: 'mmPing 2s ease-out infinite' }} />
                 </span>
-                <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),.08)', color: NETFLIX_RED }}>
+                <span style={{ fontSize: 12, fontWeight: 700, padding: '5px 14px', borderRadius: 20, background: 'rgba(229,9,20,.08)', color: NETFLIX_RED }}>
                   {openParties.length} {t('home','partiesOpen')}
                 </span>
               </div>
@@ -1432,7 +1421,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                   border: `1px solid ${BORDER_CLR}`, gap: 14,
                 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),.08)', color: NETFLIX_RED, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
+                    <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'rgba(229,9,20,.08)', color: NETFLIX_RED, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, flexShrink: 0 }}>
                       {(party.ownerName || '?')[0]}
                     </div>
                     <div>
@@ -1509,7 +1498,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
               }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: 12,
-                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.08)', color: NETFLIX_RED,
+                  background: 'rgba(229,9,20,0.08)', color: NETFLIX_RED,
                   display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18,
                 }}>
                   <i className={item.icon} />
