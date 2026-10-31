@@ -279,19 +279,9 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
   // Combined & deduplicated played sessions across playHistory and payments (excluding Special Event)
   const allPlayedRecords = useMemo(() => {
     const records = []
+    const phSessionMatches = []
 
-    const isDuplicate = (gameId, pDate, sessionKey) => {
-      return records.some(r => {
-        if (r.gameId !== gameId) return false
-        if (r.playedAt && pDate) {
-          const diffHours = Math.abs(r.playedAt.getTime() - pDate.getTime()) / (1000 * 60 * 60)
-          if (diffHours < 16) return true
-        }
-        return r.sessionKey === sessionKey
-      })
-    }
-
-    // 1. Process playHistory records (primary source for played games)
+    // 1. Process all playHistory records (all legitimate play sessions; repeat games are preserved)
     playHistory.forEach(ph => {
       if (isSpecialEventHistory(ph)) return
       const sid = ph.scriptId ? String(ph.scriptId) : null
@@ -306,22 +296,20 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
       if (!gameId || isSpecialEventId(gameId)) return
 
       const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : null)
-      const dateKey = pDate ? (pDate.toLocaleDateString ? pDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : pDate.toISOString().slice(0, 10)) : ph.id
-      const sessionKey = `${gameId}_${dateKey}`
-
-      if (!isDuplicate(gameId, pDate, sessionKey)) {
-        records.push({
-          id: ph.id,
-          gameId,
-          sessionKey,
-          title: g?.title || ph.scriptTitle,
-          playedAt: pDate,
-          source: 'playHistory'
-        })
+      if (pDate && !isNaN(pDate.getTime())) {
+        phSessionMatches.push({ gameId, time: pDate.getTime(), id: ph.id })
       }
+
+      records.push({
+        id: ph.id,
+        gameId,
+        title: g?.title || ph.scriptTitle,
+        playedAt: pDate,
+        source: 'playHistory'
+      })
     })
 
-    // 2. Process payments history (fills in sessions not present in playHistory)
+    // 2. Process payments history (adds past/legacy sessions not recorded in playHistory)
     history.forEach(pm => {
       if (isSpecialEventHistory(pm)) return
       const sid = pm.scriptId ? String(pm.scriptId) : null
@@ -336,14 +324,18 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
       if (!gameId || isSpecialEventId(gameId)) return
 
       const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : null)
-      const dateKey = pDate ? (pDate.toLocaleDateString ? pDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) : pDate.toISOString().slice(0, 10)) : pm.id
-      const sessionKey = `${gameId}_${dateKey}`
 
-      if (!isDuplicate(gameId, pDate, sessionKey)) {
+      // Deduplicate against playHistory: if same gameId and within 16 hours of a playHistory session, skip
+      const isAlreadyInPH = pDate && !isNaN(pDate.getTime()) && phSessionMatches.some(s => {
+        if (s.gameId !== gameId) return false
+        const diffHours = Math.abs(s.time - pDate.getTime()) / (1000 * 60 * 60)
+        return diffHours < 16
+      })
+
+      if (!isAlreadyInPH) {
         records.push({
           id: `pay_${pm.id}`,
           gameId,
-          sessionKey,
           title: g?.title || pm.scriptTitle,
           playedAt: pDate,
           source: 'payment'
