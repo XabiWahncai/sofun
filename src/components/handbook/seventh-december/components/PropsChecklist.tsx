@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { PROPS_LIST } from '../data/handbookData';
-import { CheckCircle2, Circle, RotateCcw, PackageCheck, Box } from 'lucide-react';
+import { CheckCircle2, Circle, RotateCcw, PackageCheck } from 'lucide-react';
 
 export const PropsChecklist = () => {
   const [checkedIds, setCheckedIds] = useState<string[]>(() => {
@@ -53,142 +53,115 @@ export const PropsChecklist = () => {
   ];
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0d0f12] text-zinc-100 p-4 sm:p-6 shadow-2xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 pb-4 border-b border-zinc-800">
+    <div className="rounded-2xl border border-zinc-900 bg-black text-zinc-100 p-4 sm:p-5">
+      {/* Header & Controls */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-zinc-900">
         <div>
           <div className="flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-emerald-950/80 text-emerald-400 border border-emerald-900/60">
+            <span className="p-1 rounded-md bg-zinc-900 text-emerald-400 border border-zinc-800">
               <PackageCheck size={16} />
             </span>
-            <h3 className="font-semibold text-base sm:text-lg text-white">
-              อุปกรณ์ภายในเกม (Preparation Checklist)
+            <h3 className="font-bold text-sm sm:text-base text-white">
+              อุปกรณ์และการจัดเตรียม (16 รายการ)
             </h3>
           </div>
-          <p className="text-xs text-zinc-400 mt-1">
-            ตรวจเช็ก 16 รายการก่อนเริ่มเซสชัน (แตะเพื่อติ๊กถูก)
+          <p className="text-xs text-zinc-400 mt-0.5">
+            แตะรายการเพื่อติ๊กเครื่องหมายว่าจัดเตรียมเรียบร้อยแล้ว
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2">
           <button
             onClick={checkAll}
-            className="px-3 py-1.5 text-xs rounded-xl font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition-colors"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 border border-zinc-850 text-zinc-300 hover:text-white active:scale-95 transition-all"
           >
             เลือกทั้งหมด
           </button>
           <button
             onClick={resetAll}
-            className="p-1.5 text-xs rounded-xl border border-zinc-800 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 transition-colors"
-            title="รีเซ็ตทั้งหมด"
+            className="px-2.5 py-1.5 rounded-lg text-xs font-medium bg-zinc-900 border border-zinc-850 text-zinc-400 hover:text-rose-400 active:scale-95 transition-all flex items-center gap-1"
+            title="ล้างทั้งหมด"
           >
-            <RotateCcw size={15} />
+            <RotateCcw size={12} />
+            <span>รีเซ็ต</span>
           </button>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="mb-5 p-3.5 rounded-xl bg-zinc-900/50 border border-zinc-800">
-        <div className="flex items-center justify-between text-xs mb-2">
-          <span className="font-medium text-zinc-300">
-            ความพร้อมอุปกรณ์: {checkedIds.length} / {PROPS_LIST.length} ชิ้น
-          </span>
+      <div className="mb-4 p-3 rounded-xl bg-zinc-950 border border-zinc-850">
+        <div className="flex items-center justify-between text-xs mb-1.5">
+          <span className="text-zinc-400">ความพร้อมของอุปกรณ์ในห้อง:</span>
           <span className="font-mono font-bold text-emerald-400">
-            {progress}%
+            {checkedIds.length} / {PROPS_LIST.length} ชิ้น ({progress}%)
           </span>
         </div>
-        <div className="w-full bg-zinc-800 h-2 rounded-full overflow-hidden">
+        <div className="w-full h-2 rounded-full bg-zinc-900 overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-300"
+            className="h-full bg-emerald-500 rounded-full transition-all duration-300"
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
 
-      {/* Category Pills - Scrollable on mobile */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-4 no-scrollbar -mx-1 px-1">
-        {categories.map((c) => (
+      {/* Category Filter Pills */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-3 no-scrollbar">
+        {categories.map((cat) => (
           <button
-            key={c.key}
-            onClick={() => setActiveCategory(c.key)}
-            className={`px-3 py-1.5 text-xs rounded-xl whitespace-nowrap transition-all font-medium ${
-              activeCategory === c.key
-                ? 'bg-sky-500 text-black font-bold shadow-md shadow-sky-500/20'
-                : 'bg-zinc-900/80 border border-zinc-800 text-zinc-400 hover:text-white'
+            key={cat.key}
+            onClick={() => setActiveCategory(cat.key)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
+              activeCategory === cat.key
+                ? 'bg-zinc-800 text-white font-bold border border-zinc-700'
+                : 'bg-zinc-950 text-zinc-400 border border-zinc-900 hover:text-white'
             }`}
           >
-            {c.label}
+            {cat.label}
           </button>
         ))}
       </div>
 
-      {/* Items List */}
-      <div className="space-y-2 mb-6">
-        {filteredProps.map((item) => {
-          const isChecked = checkedIds.includes(item.id);
+      {/* Checklist Grid */}
+      <div className="space-y-1.5">
+        {filteredProps.map((prop) => {
+          const isDone = checkedIds.includes(prop.id);
           return (
             <div
-              key={item.id}
-              onClick={() => toggleCheck(item.id)}
-              className={`p-3.5 rounded-xl border flex items-start gap-3 cursor-pointer transition-all active:scale-[0.99] ${
-                isChecked
-                  ? 'bg-emerald-950/20 border-emerald-900/40 text-zinc-400'
-                  : 'bg-zinc-900/40 border-zinc-800/80 text-zinc-200 hover:border-zinc-700'
+              key={prop.id}
+              onClick={() => toggleCheck(prop.id)}
+              className={`p-3 rounded-xl border transition-all cursor-pointer flex items-start gap-3 select-none active:scale-[0.99] ${
+                isDone
+                  ? 'bg-zinc-950 border-emerald-950/70 text-zinc-400'
+                  : 'bg-black border-zinc-900 hover:border-zinc-800 text-zinc-200'
               }`}
             >
-              <button className="mt-0.5 shrink-0 text-emerald-400">
-                {isChecked ? (
-                  <CheckCircle2 size={19} className="text-emerald-400" />
-                ) : (
-                  <Circle size={19} className="text-zinc-600" />
-                )}
-              </button>
+              <div className="pt-0.5 shrink-0 text-emerald-400">
+                {isDone ? <CheckCircle2 size={18} /> : <Circle size={18} className="text-zinc-600" />}
+              </div>
+
               <div className="flex-1 min-w-0">
-                <div className="flex items-baseline justify-between gap-2">
+                <div className="flex items-center justify-between gap-2 mb-0.5">
                   <span
-                    className={`text-xs sm:text-sm font-medium ${
-                      isChecked ? 'line-through text-zinc-500' : 'text-zinc-100'
+                    className={`text-xs sm:text-sm font-semibold truncate ${
+                      isDone ? 'line-through text-zinc-500' : 'text-white'
                     }`}
                   >
-                    {item.name}
+                    {prop.name}
                   </span>
-                  <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded font-mono bg-zinc-800 text-zinc-300 shrink-0">
-                    {item.amount}
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-zinc-900 text-zinc-400 shrink-0">
+                    {prop.amount}
                   </span>
                 </div>
-                {item.note && (
-                  <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
-                    {item.note}
+
+                {prop.note && (
+                  <p className="text-[11px] text-zinc-500 leading-snug">
+                    {prop.note}
                   </p>
                 )}
               </div>
             </div>
           );
         })}
-      </div>
-
-      {/* Setup Box Instructions */}
-      <div className="p-4 rounded-xl border border-amber-900/50 bg-amber-950/20 text-zinc-300">
-        <div className="flex items-center gap-1.5 mb-2 font-bold text-xs uppercase tracking-wide text-amber-400">
-          <Box size={14} />
-          <span>ขั้นตอนการบรรจุกล่องเตรียมการ:</span>
-        </div>
-        <ol className="text-xs space-y-1.5 list-decimal pl-4 leading-relaxed text-zinc-400">
-          <li>
-            นำ <strong className="text-white">สคริปต์ความทรงจำ 2 เล่ม</strong> ใส่ในกล่องเล็ก/แฟ้ม แล้วตั้งรหัสล็อกตัวเลข 3 หลัก (<span className="font-mono font-bold text-amber-400">9 4 5</span>)
-          </li>
-          <li>
-            นำตัวต่อจิ๊กซอว์ทั้ง 5 ชุด ใส่ในกล่องเล็กสำหรับใส่จิ๊กซอว์
-          </li>
-          <li>
-            นำ <strong className="text-white">การ์ดไดอารี่ 13 แผ่น</strong> + <strong className="text-white">เบาะแสคดี 7/12 & ชันสูตร 5 แผ่น</strong> + กล่องจิ๊กซอว์ ใส่รวมลงในกล่องเล็ก
-          </li>
-          <li>
-            นำกล่องเล็กทั้งหมดใส่ใน <strong className="text-white">กล่องใหญ่ (ไม่มีตัวล็อก)</strong>
-          </li>
-          <li>
-            เตรียมกระดาษและปากกา 2 ชุด สำหรับให้ผู้เล่นจด
-          </li>
-        </ol>
       </div>
     </div>
   );

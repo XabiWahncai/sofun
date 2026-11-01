@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Play, Pause, RotateCcw, Volume2, VolumeX, Minus, Bell } from 'lucide-react';
+import { Play, Pause, RotateCcw, Volume2, VolumeX, Plus, Minus, Timer } from 'lucide-react';
 
 interface DMTimerProps {
   onTimeUpdate?: (secondsLeft: number, isRunning: boolean) => void;
@@ -8,7 +8,6 @@ interface DMTimerProps {
 
 export const DMTimer = ({ onTimeUpdate, compact = false }: DMTimerProps) => {
   const [secondsLeft, setSecondsLeft] = useState<number>(30 * 60);
-  const [initialSeconds, setInitialSeconds] = useState<number>(30 * 60);
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
   const timerRef = useRef<number | null>(null);
@@ -60,131 +59,94 @@ export const DMTimer = ({ onTimeUpdate, compact = false }: DMTimerProps) => {
     }
   }, [secondsLeft, isRunning, onTimeUpdate]);
 
-  const setPreset = (minutes: number) => {
+  const toggleRun = () => setIsRunning(!isRunning);
+
+  const resetTo = (sec: number) => {
     setIsRunning(false);
-    setInitialSeconds(minutes * 60);
-    setSecondsLeft(minutes * 60);
+    setSecondsLeft(sec);
   };
 
-  const adjustMinutes = (delta: number) => {
-    setSecondsLeft((prev) => Math.max(0, prev + delta * 60));
+  const addMinutes = (mins: number) => {
+    setSecondsLeft((prev) => Math.max(0, prev + mins * 60));
   };
 
-  const resetTimer = () => {
-    setIsRunning(false);
-    setSecondsLeft(initialSeconds);
-  };
-
-  const mins = Math.floor(secondsLeft / 60);
-  const secs = secondsLeft % 60;
-  const progress = initialSeconds > 0 ? ((initialSeconds - secondsLeft) / initialSeconds) * 100 : 0;
-
-  if (compact) {
-    return (
-      <div className="flex items-center gap-2 bg-zinc-900/90 border border-zinc-800 px-3 py-1.5 rounded-full">
-        <span className={`w-2 h-2 rounded-full ${isRunning ? 'bg-emerald-400 animate-pulse' : 'bg-zinc-600'}`} />
-        <span className="font-mono text-xs font-bold text-white tracking-wider">
-          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-        </span>
-        <button
-          onClick={() => setIsRunning(!isRunning)}
-          className="p-1 rounded-full text-zinc-300 hover:text-white transition-colors"
-        >
-          {isRunning ? <Pause size={12} /> : <Play size={12} />}
-        </button>
-      </div>
-    );
-  }
+  const minutes = Math.floor(secondsLeft / 60);
+  const seconds = secondsLeft % 60;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0d0f12] text-zinc-100 p-4 sm:p-5 shadow-2xl relative overflow-hidden">
-      {/* Background glow when running */}
-      {isRunning && (
-        <div className="absolute top-0 right-0 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
-      )}
-
-      <div className="flex items-center justify-between mb-3">
+    <div className="rounded-2xl border border-zinc-900 bg-zinc-950 text-zinc-100 p-4">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3 pb-2.5 border-b border-zinc-900">
         <div className="flex items-center gap-2">
-          <span className={`w-2.5 h-2.5 rounded-full ${isRunning ? 'bg-sky-400 animate-ping' : 'bg-zinc-600'}`} />
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-sky-400 flex items-center gap-1.5">
-            <Bell size={13} />
-            <span>DM Stage Timer</span>
+          <span className="p-1 rounded-md bg-zinc-900 text-rose-400 border border-zinc-800">
+            <Timer size={14} />
+          </span>
+          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+            ตัวจับเวลาคุมโต๊ะ (DM Countdown)
           </h4>
         </div>
         <button
           onClick={() => setSoundEnabled(!soundEnabled)}
-          className="p-1.5 rounded-lg text-xs hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-          title={soundEnabled ? 'ปิดเสียงแจ้งเตือน' : 'เปิดเสียงแจ้งเตือน'}
+          className={`p-1.5 rounded-lg text-xs transition-colors ${
+            soundEnabled ? 'text-zinc-400 hover:text-white' : 'text-zinc-600'
+          }`}
+          title={soundEnabled ? 'ปิดเสียงเตือน' : 'เปิดเสียงเตือน'}
         >
-          {soundEnabled ? <Volume2 size={15} className="text-emerald-400" /> : <VolumeX size={15} />}
+          {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
         </button>
       </div>
 
-      {/* Digits Display */}
-      <div className="text-center my-3">
-        <div className="font-mono text-4xl sm:text-5xl font-light tracking-wider text-white drop-shadow-[0_0_12px_rgba(56,189,248,0.25)]">
-          {String(mins).padStart(2, '0')}:{String(secs).padStart(2, '0')}
-        </div>
-        <div className="w-full bg-zinc-800/80 h-1.5 rounded-full mt-3 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-sky-500 via-indigo-500 to-amber-400 transition-all duration-500"
-            style={{ width: `${progress}%` }}
-          />
+      {/* Big Digital Countdown */}
+      <div className="flex items-center justify-center my-3">
+        <div className="font-mono text-4xl sm:text-5xl font-black tracking-widest text-white px-5 py-2 rounded-2xl bg-black border border-zinc-900 shadow-inner">
+          {String(minutes).padStart(2, '0')}:{String(seconds).padStart(2, '0')}
         </div>
       </div>
 
-      {/* Main Touch Controls */}
-      <div className="grid grid-cols-4 gap-2 my-4">
-        <button
-          onClick={() => adjustMinutes(-1)}
-          className="h-11 rounded-xl border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 active:scale-95 text-zinc-300 flex items-center justify-center transition-all"
-          title="-1 นาที"
-        >
-          <Minus size={16} />
-        </button>
+      {/* Preset Pills */}
+      <div className="grid grid-cols-5 gap-1.5 mb-3">
+        {[
+          { label: '30 นาที', sec: 30 * 60 },
+          { label: '20 นาที', sec: 20 * 60 },
+          { label: '10 นาที', sec: 10 * 60 },
+          { label: '+5 นาที', add: 5 },
+          { label: '-5 นาที', add: -5 },
+        ].map((btn, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              if (btn.sec !== undefined) resetTo(btn.sec);
+              if (btn.add !== undefined) addMinutes(btn.add);
+            }}
+            className="py-1.5 rounded-lg text-[11px] font-mono font-medium bg-zinc-900 border border-zinc-850 text-zinc-300 hover:text-white hover:border-zinc-700 active:scale-95 transition-all text-center"
+          >
+            {btn.label}
+          </button>
+        ))}
+      </div>
 
+      {/* Controls */}
+      <div className="flex items-center gap-2">
         <button
-          onClick={() => setIsRunning(!isRunning)}
-          className={`col-span-2 h-11 rounded-xl font-semibold text-xs flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg ${
+          onClick={toggleRun}
+          className={`flex-1 h-10 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all ${
             isRunning
-              ? 'bg-amber-500 hover:bg-amber-600 text-black font-bold shadow-amber-500/20'
-              : 'bg-sky-500 hover:bg-sky-600 text-black font-bold shadow-sky-500/20'
+              ? 'bg-amber-500 text-black hover:bg-amber-400'
+              : 'bg-white text-black hover:bg-zinc-200'
           }`}
         >
-          {isRunning ? <Pause size={16} /> : <Play size={16} />}
+          {isRunning ? <Pause size={14} /> : <Play size={14} />}
           <span>{isRunning ? 'หยุดชั่วคราว' : 'เริ่มจับเวลา'}</span>
         </button>
 
         <button
-          onClick={resetTimer}
-          className="h-11 rounded-xl border border-zinc-800 bg-zinc-900/80 hover:bg-zinc-800 active:scale-95 text-zinc-300 flex items-center justify-center transition-all"
-          title="รีเซ็ต"
+          onClick={() => resetTo(30 * 60)}
+          className="h-10 px-3 rounded-xl text-xs bg-zinc-900 border border-zinc-850 text-zinc-400 hover:text-white active:scale-95 transition-all flex items-center gap-1"
+          title="รีเซ็ตกลับ 30 นาที"
         >
-          <RotateCcw size={16} />
+          <RotateCcw size={14} />
+          <span>รีเซ็ต</span>
         </button>
-      </div>
-
-      {/* Quick Presets Grid (Mobile Touch Friendly) */}
-      <div className="grid grid-cols-4 gap-1.5 pt-3 border-t border-zinc-800/80">
-        {[
-          { label: '30 นาที', m: 30, desc: 'ฉาก 1' },
-          { label: '20 นาที', m: 20, desc: 'ฉาก 2' },
-          { label: '20 นาที', m: 20, desc: 'ฉาก 3' },
-          { label: '10 นาที', m: 10, desc: 'ฉาก 4' },
-        ].map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => setPreset(item.m)}
-            className={`py-2 px-1 rounded-xl text-center transition-all active:scale-95 border ${
-              initialSeconds === item.m * 60
-                ? 'bg-sky-950/80 border-sky-600 text-sky-300 font-semibold shadow-inner'
-                : 'bg-zinc-900/60 border-zinc-800/80 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
-            }`}
-          >
-            <div className="text-xs font-mono font-medium">{item.label}</div>
-            <div className="text-[10px] text-zinc-500">{item.desc}</div>
-          </button>
-        ))}
       </div>
     </div>
   );

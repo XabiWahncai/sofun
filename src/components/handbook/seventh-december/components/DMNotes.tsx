@@ -15,7 +15,7 @@ export const DMNotes = () => {
     try {
       localStorage.setItem('dm_quick_notes', noteText);
       setSavedStatus(true);
-      const timer = setTimeout(() => setSavedStatus(false), 1500);
+      const timer = setTimeout(() => setSavedStatus(false), 1200);
       return () => clearTimeout(timer);
     } catch {
       // ignore
@@ -23,13 +23,13 @@ export const DMNotes = () => {
   }, [noteText]);
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-[#0d0f12] text-zinc-100 p-4 shadow-xl">
-      <div className="flex items-center justify-between mb-2.5">
+    <div className="rounded-2xl border border-zinc-900 bg-zinc-950 text-zinc-100 p-4">
+      <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-zinc-900">
         <div className="flex items-center gap-2">
-          <span className="p-1 rounded-md bg-amber-950/80 text-amber-400 border border-amber-900/60">
+          <span className="p-1 rounded-md bg-zinc-900 text-amber-400 border border-zinc-800">
             <StickyNote size={14} />
           </span>
-          <h4 className="text-xs font-semibold uppercase tracking-wider text-zinc-300">
+          <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-300">
             สมุดจดบันทึกโต๊ะ DM (Quick Notes)
           </h4>
         </div>
@@ -41,10 +41,10 @@ export const DMNotes = () => {
           )}
           <button
             onClick={() => setNoteText('')}
-            className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-lg text-zinc-500 hover:text-rose-400 hover:bg-zinc-900 transition-colors"
             title="ล้างข้อความ"
           >
-            <Trash2 size={14} />
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
@@ -52,9 +52,9 @@ export const DMNotes = () => {
       <textarea
         value={noteText}
         onChange={(e) => setNoteText(e.target.value)}
-        placeholder="จดบันทึกชื่อผู้เล่น, ทฤษฎีของผู้เล่น, รหัส หรือคำตอบระหว่างคุมโต๊ะ..."
+        placeholder="จดบันทึกชื่อผู้เล่น, ทฤษฎีของผู้เล่น, ตัวเลขทด หรือคำตอบระหว่างคุมโต๊ะ..."
         rows={4}
-        className="w-full p-3 rounded-xl text-xs font-mono resize-y border border-zinc-800 bg-black/70 text-zinc-200 placeholder-zinc-600 outline-none focus:border-sky-500 transition-colors"
+        className="w-full p-3 rounded-xl text-xs font-mono resize-y border border-zinc-850 bg-black text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-700 transition-colors"
       />
     </div>
   );
