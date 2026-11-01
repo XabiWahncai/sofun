@@ -597,7 +597,6 @@ export default function POSPage({
               members: mo.members || [],
               scriptId: mo.scriptId || '',
               eventName: '',
-              customPrice: '',
               dm: mo.dm || '',
               npc: mo.npc || '',
               room: mo.room || '',
@@ -605,6 +604,9 @@ export default function POSPage({
               confirmedOrderId: mo.id,
               promoName: mo.promoName || '',
               discount: mo.discount || 0,
+              discountMode: mo.discountMode || 'perPerson',
+              discountMemberIds: Array.isArray(mo.discountMemberIds) ? mo.discountMemberIds : [],
+              customPrice: mo.customPrice ?? '',
             }
             if (list.length === 1 && !list[0].confirmedOrderId && (!list[0].members || list[0].members.length === 0) && (!list[0].order || list[0].order.length === 0) && !list[0].scriptId) {
               list[0] = newTab
@@ -638,6 +640,11 @@ export default function POSPage({
             scriptId: orderData.scriptId || session.scriptId,
             dm: orderData.dm || session.dm,
             room: orderData.room || session.room,
+            promoName: orderData.promoName || session.promoName || '',
+            discount: orderData.discount !== undefined ? orderData.discount : (session.discount || 0),
+            discountMode: orderData.discountMode || session.discountMode || 'perPerson',
+            discountMemberIds: Array.isArray(orderData.discountMemberIds) ? orderData.discountMemberIds : (session.discountMemberIds || []),
+            customPrice: orderData.customPrice ?? session.customPrice ?? '',
           })
         }
       }).catch(() => {})
@@ -702,6 +709,12 @@ export default function POSPage({
           memberUids: newMembers.map(m => m.uid),
           gameTotal: newGamePrice,
           grandTotal: newGrandTotal,
+          discount: dRaw,
+          discountMode: dMode,
+          discountMemberIds: dSelIds,
+          promoName: session.promoName || '',
+          customPrice: session.customPrice ?? '',
+          gameUnitPrice: gUnitPay,
           updatedAt: serverTimestamp(),
         })
 
@@ -1014,6 +1027,94 @@ export default function POSPage({
   const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
   const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
 
+  // ── Auto-sync active confirmed order to Firestore so customer device is ALWAYS in real-time sync ──
+  const lastSyncedOrderRef = useRef('')
+  const syncOrderTimerRef = useRef(null)
+
+  useEffect(() => {
+    const orderId = activeSession?.confirmedOrderId
+    if (!orderId) return
+
+    clearTimeout(syncOrderTimerRef.current)
+    syncOrderTimerRef.current = setTimeout(async () => {
+      try {
+        const membersPayload = (activeSession.members || []).map(m => ({
+          uid: m.uid,
+          name: m.name,
+          character: m.character || '',
+          avatar: m.avatar || '',
+          scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+        }))
+
+        const payloadKey = JSON.stringify({
+          orderId,
+          scriptId: activeSession.scriptId || '',
+          room: activeSession.room || '',
+          dm: activeSession.dm || '',
+          npc: activeSession.npc || '',
+          customPrice: activeSession.customPrice ?? '',
+          gameUnitPrice: gameUnitPay,
+          gameTotal: gamePrice,
+          foodTotal,
+          discount: discountRaw,
+          discountMode,
+          discountMemberIds: discountMemberIdsRaw,
+          promoName: activeSession.promoName || '',
+          grandTotal,
+          members: membersPayload.map(m => ({ uid: m.uid, pd: m.personalDiscount, pdn: m.personalDiscountNote, ud: m.unpaidDeposit, ch: m.character })),
+        })
+
+        if (lastSyncedOrderRef.current === payloadKey) return
+        lastSyncedOrderRef.current = payloadKey
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          discount: discountRaw,
+          discountMode,
+          discountMemberIds: discountMemberIdsRaw,
+          promoName: activeSession.promoName || '',
+          customPrice: activeSession.customPrice ?? '',
+          gameUnitPrice: gameUnitPay,
+          gameTotal: gamePrice,
+          foodTotal,
+          grandTotal,
+          members: membersPayload,
+          memberUids: membersPayload.map(m => m.uid),
+          scriptId: activeSession.scriptId || '',
+          scriptTitle: selectedGame?.title || '',
+          dm: activeSession.dm || '',
+          npc: activeSession.npc || '',
+          room: activeSession.room || '',
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Auto-sync order to Firestore failed:', err)
+      }
+    }, 250)
+
+    return () => clearTimeout(syncOrderTimerRef.current)
+  }, [
+    activeId,
+    activeSession?.confirmedOrderId,
+    discountRaw,
+    discountMode,
+    discountMemberIdsRaw,
+    activeSession?.promoName,
+    activeSession?.members,
+    activeSession?.customPrice,
+    activeSession?.scriptId,
+    activeSession?.room,
+    activeSession?.dm,
+    activeSession?.npc,
+    selectedGame?.title,
+    gamePrice,
+    foodTotal,
+    grandTotal,
+    gameUnitPay,
+  ])
+
   // Accept all queued items into in-memory order and sync Firestore immediately
   const acceptQueue = async () => {
     const orderId = activeSession?.confirmedOrderId
@@ -1138,6 +1239,10 @@ export default function POSPage({
             personalDiscountNote: m.personalDiscountNote || '',
             unpaidDeposit: Boolean(m.unpaidDeposit),
           })),
+          discount: discountRaw,
+          discountMode,
+          discountMemberIds: discountMemberIdsRaw,
+          promoName: activeSession.promoName || '',
           updatedAt: serverTimestamp(),
         })
       } catch (err) {
@@ -1146,11 +1251,51 @@ export default function POSPage({
     }
   }
 
-  const setPersonalDiscount = (uid, val) =>
-    updateActive({ members: activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscount: Number(val) || 0 } : m) })
+  const setPersonalDiscount = (uid, val) => {
+    const updated = activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscount: Number(val) || 0 } : m)
+    updateActive({ members: updated })
+    if (activeSession.confirmedOrderId) {
+      const membersPayload = updated.map(m => ({
+        uid: m.uid, name: m.name, character: m.character || '',
+        avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        unpaidDeposit: Boolean(m.unpaidDeposit),
+      }))
+      const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
+      updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+        members: membersPayload,
+        discount: discountRaw,
+        discountMode,
+        discountMemberIds: discountMemberIdsRaw,
+        promoName: activeSession.promoName || '',
+        grandTotal: Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDisc),
+        updatedAt: serverTimestamp(),
+      }).catch(err => console.warn('Failed to sync personal discount to orders:', err))
+    }
+  }
 
-  const setPersonalDiscountNote = (uid, val) =>
-    updateActive({ members: activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscountNote: val } : m) })
+  const setPersonalDiscountNote = (uid, val) => {
+    const updated = activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscountNote: val } : m)
+    updateActive({ members: updated })
+    if (activeSession.confirmedOrderId) {
+      const membersPayload = updated.map(m => ({
+        uid: m.uid, name: m.name, character: m.character || '',
+        avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        unpaidDeposit: Boolean(m.unpaidDeposit),
+      }))
+      updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+        members: membersPayload,
+        discount: discountRaw,
+        discountMode,
+        discountMemberIds: discountMemberIdsRaw,
+        promoName: activeSession.promoName || '',
+        updatedAt: serverTimestamp(),
+      }).catch(err => console.warn('Failed to sync personal discount note to orders:', err))
+    }
+  }
 
   const toggleUnpaidDeposit = async (uid) => {
     const updatedMembers = activeSession.members.map(m =>
@@ -1186,7 +1331,12 @@ export default function POSPage({
         await updateDoc(doc(db, 'orders', orderId), {
           members: membersPayload,
           gameTotal: newGamePrice,
+          discount: rawD,
+          discountMode: dMode,
+          discountMemberIds: selIds,
+          promoName: activeSession.promoName || '',
           grandTotal: Math.max(0, foodTotal + newGamePrice - totD - totalPersonal),
+          updatedAt: serverTimestamp(),
         })
       } catch (err) {
         console.warn('Failed to sync order on unpaidDeposit toggle:', err)
@@ -1251,6 +1401,10 @@ export default function POSPage({
           memberUids: newMembers.map(m => m.uid),
           gameTotal: newGamePrice,
           grandTotal: newGrandTotal,
+          discount: dRaw,
+          discountMode: dMode,
+          discountMemberIds: dSelIds,
+          promoName: activeSession.promoName || '',
           updatedAt: serverTimestamp(),
         })
       } catch (err) {
@@ -1688,7 +1842,7 @@ export default function POSPage({
         members: order.members || [],
         scriptId: order.scriptId || '',
         eventName: '',
-        customPrice: '',
+        customPrice: order.customPrice ?? '',
         dm: order.dm || '',
         npc: order.npc || '',
         room: order.room || '',
@@ -1696,6 +1850,8 @@ export default function POSPage({
         confirmedOrderId: order.id,
         promoName: order.promoName || '',
         discount: order.discount || 0,
+        discountMode: order.discountMode || 'perPerson',
+        discountMemberIds: Array.isArray(order.discountMemberIds) ? order.discountMemberIds : [],
       }
 
       setActiveId(newS.id)
@@ -1754,6 +1910,17 @@ export default function POSPage({
             qty: x.qty || 1,
           }))
           const mBillTotal = getMemberBill(m)
+          const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
+          let mDisc = 0
+          if (isMemberDiscounted) {
+            if (discountMode === 'split' && nDiscounted > 0) {
+              const baseDisc = Math.floor((discountRaw / nDiscounted) * 100) / 100
+              const remainder = Math.round((discountRaw - baseDisc * nDiscounted) * 100) / 100
+              mDisc = (m.uid === discountEffectiveIds[0]) ? baseDisc + remainder : baseDisc
+            } else {
+              mDisc = discountRaw
+            }
+          }
           return {
             uid: m.uid,
             name: m.name,
@@ -1761,8 +1928,11 @@ export default function POSPage({
             avatar: m.avatar || '',
             gamePrice: m.unpaidDeposit ? gameFullPrice : gameUnitPay,
             foodItems: [...mFood, ...mSharedFood],
-            total: mBillTotal,
+            discount: mDisc,
+            promoName: activeSession.promoName || '',
             personalDiscount: Number(m.personalDiscount) || 0,
+            personalDiscountNote: m.personalDiscountNote || '',
+            total: mBillTotal,
           }
         })
 
@@ -1785,6 +1955,7 @@ export default function POSPage({
           foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
           foodTotal,
           discount: { type: 'amount', value: totalDiscount, applied: totalDiscount },
+          promoName: activeSession.promoName || '',
           grandTotal: finalGrandTotal,
           memberPayments,
           serial,

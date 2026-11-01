@@ -879,24 +879,25 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const rawD = Number(activeOrder?.discount) || 0
   const selIds = Array.isArray(activeOrder?.discountMemberIds) ? activeOrder.discountMemberIds : []
   const effIds = selIds.length > 0
-    ? selIds.filter(uid => orderMembers.some(mm => mm.uid === uid))
-    : orderMembers.map(mm => mm.uid)
+    ? selIds.filter(uid => orderMembers.some(mm => (mm.uid || mm.id) === uid))
+    : orderMembers.map(mm => mm.uid || mm.id)
   const nDisc = effIds.length
 
   // Unassigned food items shared equally across table members
   const unassignedFoodTotal = (activeOrder?.foodItems || activeOrder?.memberFoodHistory || [])
-    .filter(f => !f.orderedBy?.uid)
+    .filter(f => !(f.orderedBy?.uid || f.orderedBy?.id))
     .reduce((s, f) => s + (f.totalPrice || f.price || 0) * (f.qty || 1), 0)
   const sharedFoodPerMember = numMembers > 0 ? (unassignedFoodTotal / numMembers) : 0
 
   const getMemberDiscount = (m) => {
     if (!m) return 0
-    const isDisc = effIds.includes(m.uid)
+    const mUid = m.uid || m.id
+    const isDisc = effIds.includes(mUid)
     if (!isDisc) return 0
     if (dMode === 'split' && nDisc > 0) {
       const baseDisc = Math.floor((rawD / nDisc) * 100) / 100
       const remainder = Math.round((rawD - baseDisc * nDisc) * 100) / 100
-      return (m.uid === effIds[0]) ? baseDisc + remainder : baseDisc
+      return (mUid === effIds[0]) ? baseDisc + remainder : baseDisc
     }
     return rawD
   }
@@ -908,8 +909,9 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
   const myTotal = Math.round(Math.max(0, myHistoryTotal + myPendingTotal + myGameFee + sharedFoodPerMember - myDiscount - myPersonalDiscount) * 100) / 100
 
   const getGroupMemberBill = (m) => {
+    const mUid = m?.uid || m?.id
     const food = (activeOrder.memberFoodHistory || [])
-      .filter(f => f.orderedBy?.uid === m.uid)
+      .filter(f => (f.orderedBy?.uid || f.orderedBy?.id) === mUid)
       .reduce((s, f) => s + (f.totalPrice || 0) * (f.qty || 1), 0)
     const gameFee = getMemberGameFee(m)
     const disc = getMemberDiscount(m)

@@ -249,6 +249,8 @@ export default function PaymentModal({
         status: 'paid',
         paidAt: serverTimestamp(),
         paidTotal: calcGrandTotal,
+        discount: propTotalDiscount || 0,
+        promoName: session?.promoName || '',
         serial,
       }
 
@@ -288,6 +290,8 @@ export default function PaymentModal({
             qty: x.qty || 1,
           }))
           const mBillTotal = getMemberBill(m)
+          const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m.uid)
+          const mDisc = isMemberDiscounted ? (propDiscountPerDiscounted || 0) : 0
           return {
             uid: m.uid,
             name: m.name,
@@ -295,8 +299,11 @@ export default function PaymentModal({
             avatar: m.avatar || '',
             gamePrice: m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit),
             foodItems: [...mFood, ...mSharedFood],
-            total: mBillTotal,
+            discount: mDisc,
+            promoName: session.promoName || '',
             personalDiscount: Number(m.personalDiscount) || 0,
+            personalDiscountNote: m.personalDiscountNote || '',
+            total: mBillTotal,
           }
         }),
         gameUnitPrice: propGameUnitPay ?? gameUnit,
@@ -304,6 +311,7 @@ export default function PaymentModal({
         foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
         foodTotal: rawFoodTotal,
         discount: { applied: propTotalDiscount || 0 },
+        promoName: session?.promoName || '',
         alreadyPaid,
         fullTotal: calcGrandTotal,
         grandTotal: calcGrandTotal,

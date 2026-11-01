@@ -27,19 +27,27 @@ function buildReceiptHTML(h, meUid) {
   const me = h.members?.find(m => m.uid === meUid)
   const paidAt = h.paidAt?.toDate?.()
   const serial = h.serial ? String(h.serial).padStart(10, '0') : '-'
-  const discAmt = h.discount?.applied || 0
   const myTotal = myBill?.total ?? h.grandTotal ?? 0
+  const myGamePrice = myBill?.gamePrice ?? (h.gameUnitPrice > 0 ? h.gameUnitPrice : (h.gameTotal || 0))
+  const myDisc = myBill?.discount ?? (h.discount?.applied && (!h.memberBills || h.memberBills.length <= 1) ? h.discount.applied : 0)
+  const myPersonalDisc = Number(myBill?.personalDiscount || 0)
   const tax = myTotal * 7 / 107
   const subtotal = myTotal - tax
 
   const itemRows = []
-  if ((h.gameUnitPrice || 0) > 0) {
-    itemRows.push(`<tr><td>${h.scriptTitle || 'เกม'} ×${h.members?.length || 1}</td><td class="r">${(h.gameTotal||0).toFixed(2)}</td></tr>`)
+  if (myGamePrice > 0) {
+    itemRows.push(`<tr><td>${h.scriptTitle || 'เกม'}</td><td class="r">${myGamePrice.toFixed(2)}</td></tr>`)
   }
   ;(myBill?.foodItems || h.foodItems || []).forEach(fi => {
     const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name||a).join(',')})` : ''
     itemRows.push(`<tr><td>${fi.name}${addStr} ×${fi.qty}</td><td class="r">${((fi.price||0)*fi.qty).toFixed(2)}</td></tr>`)
   })
+  if (myDisc > 0) {
+    itemRows.push(`<tr><td>Discount (${myBill?.promoName || h.promoName || 'ส่วนลด'})</td><td class="r">-${myDisc.toFixed(2)}</td></tr>`)
+  }
+  if (myPersonalDisc > 0) {
+    itemRows.push(`<tr><td>Personal Discount (${myBill?.personalDiscountNote || 'ส่วนลดบุคคล'})</td><td class="r">-${myPersonalDisc.toFixed(2)}</td></tr>`)
+  }
 
   return `<!DOCTYPE html><html lang="th"><head>
 <meta charset="utf-8"><title>Receipt #${serial}</title>
@@ -64,7 +72,7 @@ td.r{text-align:right;white-space:nowrap;padding-left:6px}
 ${me?.character ? `<div class="c">บทบาท: ${me.character}</div>` : ''}
 <hr class="sep">
 <div class="c b">รายการ</div>
-<table>${itemRows.join('')}${discAmt > 0 ? `<tr><td>Discount</td><td class="r">-${discAmt.toFixed(2)}</td></tr>` : ''}</table>
+<table>${itemRows.join('')}</table>
 <hr class="sep">
 <table>
 <tr><td>Subtotal:</td><td class="r">${subtotal.toFixed(2)}</td></tr>
@@ -1970,10 +1978,10 @@ const PROFILE_GENRE_MAP = {
                               fontSize: 12,
                               color: INK_2
                             }}>
-                              {(h.gameUnitPrice > 0 || h.gameTotal > 0) && (
+                              {(myBill?.gamePrice !== undefined || h.gameUnitPrice > 0 || (h.gameTotal || 0) > 0) && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
-                                  <span>ค่าเล่นเกม {h.gameUnitPrice > 0 ? `(฿${h.gameUnitPrice}/คน)` : ''}</span>
-                                  <span>฿{(h.gameTotal || 0).toLocaleString()}</span>
+                                  <span>ค่าเล่นเกม</span>
+                                  <span>฿{(myBill?.gamePrice ?? h.gameUnitPrice ?? (h.gameTotal || 0)).toLocaleString()}</span>
                                 </div>
                               )}
 
@@ -1991,10 +1999,17 @@ const PROFILE_GENRE_MAP = {
                                 </div>
                               )}
 
-                              {discAmt > 0 && (
+                              {((myBill?.discount || 0) > 0 || (discAmt > 0 && !myBill)) && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
-                                  <span>ส่วนลดพิเศษ</span>
-                                  <span>-฿{discAmt.toLocaleString()}</span>
+                                  <span>ส่วนลด{myBill?.promoName || h.promoName ? ` (${myBill?.promoName || h.promoName})` : 'พิเศษ'}</span>
+                                  <span>-฿{(myBill?.discount ?? discAmt).toLocaleString()}</span>
+                                </div>
+                              )}
+
+                              {(myBill?.personalDiscount || 0) > 0 && (
+                                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0', color: '#16a34a', fontWeight: 700 }}>
+                                  <span>ส่วนลดเฉพาะบุคคล{myBill?.personalDiscountNote ? ` (${myBill.personalDiscountNote})` : ''}</span>
+                                  <span>-฿{Number(myBill.personalDiscount).toLocaleString()}</span>
                                 </div>
                               )}
 
