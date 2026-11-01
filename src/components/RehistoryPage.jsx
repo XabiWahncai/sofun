@@ -3,6 +3,7 @@ import {
   collection,
   query,
   where,
+  orderBy,
   onSnapshot,
   deleteDoc,
   doc,
@@ -11,6 +12,7 @@ import {
 } from 'firebase/firestore'
 import { db } from '../firebase'
 import { convertImageUrl } from '../utils/imageUrl'
+import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId } from '../utils/achievementTierSync'
 
 const fmtThaiDate = (v) => {
   if (!v) return '—'
@@ -37,7 +39,8 @@ export default function RehistoryPage({
   handleLineLogin
 }) {
   const [activeTab, setActiveTab] = useState('record') // 'record' | 'saved'
-  const [savedHistory, setSavedHistory] = useState([])
+  const [playHistory, setPlayHistory] = useState([])
+  const [payments, setPayments] = useState([])
   const [loadingHistory, setLoadingHistory] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
 
@@ -55,7 +58,11 @@ export default function RehistoryPage({
     allGames.forEach(g => {
       if (g.id) map.set(String(g.id), g)
       if (g._id) map.set(String(g._id), g)
-      if (g.title) map.set(g.title.trim().toLowerCase(), g)
+      if (g.title) {
+        const raw = g.title.trim().toLowerCase()
+        map.set(raw, g)
+        map.set(raw.replace(/\s+/g, ''), g)
+      }
     })
     return map
   }, [allGames])
@@ -74,11 +81,11 @@ export default function RehistoryPage({
     return raw ? convertImageUrl(raw, 340) : null
   }
 
-  // Real-time listener for user play history
+  // Real-time listener for user play history (playHistory collection)
   useEffect(() => {
     if (!lineUser?.uid) {
       setLoadingHistory(false)
-      setSavedHistory([])
+      setPlayHistory([])
       return
     }
 
@@ -95,15 +102,7 @@ export default function RehistoryPage({
           id: d.id,
           ...d.data()
         }))
-
-        // Sort descending by playedAt or createdAt
-        items.sort((a, b) => {
-          const tA = a.playedAt?.seconds || a.createdAt?.seconds || 0
-          const tB = b.playedAt?.seconds || b.createdAt?.seconds || 0
-          return tB - tA
-        })
-
-        setSavedHistory(items)
+        setPlayHistory(items)
         setLoadingHistory(false)
       },
       (err) => {
@@ -115,22 +114,181 @@ export default function RehistoryPage({
     return () => unsub()
   }, [lineUser?.uid])
 
-  // Map of played characters per game to highlight in UI
-  const playedCharsByGame = useMemo(() => {
-    const map = new Map()
-    savedHistory.forEach(item => {
-      const sid = item.scriptId ? String(item.scriptId) : null
-      const title = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : null
-      const keys = [sid, title].filter(Boolean)
-      keys.forEach(k => {
-        if (!map.has(k)) map.set(k, [])
-        if (item.character && item.character !== '—') {
-          map.get(k).push(item.character)
-        }
+  // Real-time listener for payments collection (live POS sessions)
+  useEffect(() => {
+    if (!lineUser?.uid) {
+      setPayments([])
+      return
+    }
+
+    const q = query(
+      collection(db, 'payments'),
+      where('memberUids', 'array-contains', lineUser.uid),
+      orderBy('paidAt', 'desc')
+    )
+
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      },
+      (err) => {
+        console.warn('Payments indexed query failed in RehistoryPage, using client filter fallback:', err.message)
+        const qFallback = query(collection(db, 'payments'), orderBy('paidAt', 'desc'))
+        onSnapshot(qFallback, (s) => {
+          setPayments(s.docs
+            .map(d => ({ id: d.id, ...d.data() }))
+            .filter(p => Array.isArray(p.memberUids) && p.memberUids.includes(lineUser.uid)))
+        }, () => {})
+      }
+    )
+
+    return () => unsub()
+  }, [lineUser?.uid])
+
+  // Combined & deduplicated played sessions across playHistory and payments (excluding Special Event)
+  const allHistoryRecords = useMemo(() => {
+    const records = []
+    const phSessionMatches = []
+
+    // 1. Process playHistory (retroactive records and live sessions created by POS)
+    playHistory.forEach(ph => {
+      if (isSpecialEventHistory(ph) || isSpecialEventId(ph.scriptId)) return
+      const sid = ph.scriptId ? String(ph.scriptId) : null
+      const rawTitle = ph.scriptTitle ? ph.scriptTitle.trim().toLowerCase() : ''
+      const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : ''
+      const g = (sid && gameMap.get(sid)) ||
+                (rawTitle && gameMap.get(rawTitle)) ||
+                (normTitle && gameMap.get(normTitle))
+      if (g && isSpecialEventGame(g)) return
+
+      const gameId = g ? String(g.id || g._id) : (sid || rawTitle)
+      if (!gameId || isSpecialEventId(gameId)) return
+
+      const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : (ph.createdAt?.toDate ? ph.createdAt.toDate() : null))
+      if (pDate && !isNaN(pDate.getTime())) {
+        phSessionMatches.push({ gameId, time: pDate.getTime(), id: ph.id })
+      }
+
+      const isRetro = ph.isRetroactive === true || ph.source === 'rehistory' || ph.recordedBy === 'rehistory'
+      const charName = ph.character && ph.character !== '—' ? ph.character.trim() : ''
+      const charObj = g?.characters?.find(c => c && c.name === charName)
+      const charImage = ph.characterImage || charObj?.image || charObj?.imageDriveUrl || charObj?.imagePreview || ''
+
+      records.push({
+        id: ph.id,
+        rawId: ph.id,
+        gameId,
+        scriptId: ph.scriptId || gameId,
+        scriptTitle: g?.title || ph.scriptTitle || 'คดี',
+        character: charName,
+        characterImage: charImage,
+        playedAt: pDate,
+        createdAt: ph.createdAt,
+        isRetroactive: isRetro,
+        source: ph.source || (isRetro ? 'rehistory' : 'live_pos'),
+        raw: ph
       })
     })
+
+    // 2. Process payments (live POS checkout sessions)
+    payments.forEach(pm => {
+      if (isSpecialEventHistory(pm) || isSpecialEventId(pm.scriptId)) return
+      const sid = pm.scriptId ? String(pm.scriptId) : null
+      const rawTitle = pm.scriptTitle ? pm.scriptTitle.trim().toLowerCase() : ''
+      const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : ''
+      const g = (sid && gameMap.get(sid)) ||
+                (rawTitle && gameMap.get(rawTitle)) ||
+                (normTitle && gameMap.get(normTitle))
+      if (g && isSpecialEventGame(g)) return
+
+      const gameId = g ? String(g.id || g._id) : (sid || rawTitle)
+      if (!gameId || isSpecialEventId(gameId)) return
+
+      const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : null)
+
+      // Deduplicate against playHistory: if same gameId and within 16 hours of a playHistory session, merge/skip
+      const matchingPh = pDate && !isNaN(pDate.getTime()) && phSessionMatches.find(s => {
+        if (s.gameId !== gameId) return false
+        const diffHours = Math.abs(s.time - pDate.getTime()) / (1000 * 60 * 60)
+        return diffHours < 16
+      })
+
+      if (matchingPh) {
+        // If playHistory record didn't have character, but payment does, backfill character
+        const myMember = (pm.members || []).find(m => m.uid === lineUser?.uid)
+        const pmChar = myMember?.character && myMember.character !== '—' ? myMember.character.trim() : ''
+        if (pmChar) {
+          const existing = records.find(r => r.id === matchingPh.id)
+          if (existing && !existing.character) {
+            existing.character = pmChar
+            const charObj = g?.characters?.find(c => c && c.name === pmChar)
+            existing.characterImage = charObj?.image || charObj?.imageDriveUrl || charObj?.imagePreview || ''
+          }
+        }
+      } else {
+        const myMember = (pm.members || []).find(m => m.uid === lineUser?.uid)
+        const charName = myMember?.character && myMember.character !== '—' ? myMember.character.trim() : ''
+        const charObj = g?.characters?.find(c => c && c.name === charName)
+        const charImage = charObj?.image || charObj?.imageDriveUrl || charObj?.imagePreview || ''
+
+        records.push({
+          id: `pay_${pm.id}`,
+          rawId: pm.id,
+          gameId,
+          scriptId: pm.scriptId || gameId,
+          scriptTitle: g?.title || pm.scriptTitle || 'คดี',
+          character: charName,
+          characterImage: charImage,
+          playedAt: pDate,
+          createdAt: pm.createdAt,
+          isRetroactive: false,
+          source: 'payment',
+          raw: pm
+        })
+      }
+    })
+
+    // Sort descending by playedAt
+    records.sort((a, b) => {
+      const tA = a.playedAt instanceof Date ? a.playedAt.getTime() : 0
+      const tB = b.playedAt instanceof Date ? b.playedAt.getTime() : 0
+      return tB - tA
+    })
+
+    return records
+  }, [playHistory, payments, gameMap, lineUser?.uid])
+
+  // Map of played rounds count and played characters per game
+  const playedStatsByGame = useMemo(() => {
+    const map = new Map()
+
+    const addRecord = (key, rec) => {
+      if (!key) return
+      if (!map.has(key)) {
+        map.set(key, { roundsCount: 0, characters: [], records: [] })
+      }
+      const entry = map.get(key)
+      entry.roundsCount += 1
+      if (rec.character && !entry.characters.includes(rec.character)) {
+        entry.characters.push(rec.character)
+      }
+      entry.records.push(rec)
+    }
+
+    allHistoryRecords.forEach(rec => {
+      const keys = new Set([
+        String(rec.gameId),
+        rec.scriptId ? String(rec.scriptId) : null,
+        rec.scriptTitle ? rec.scriptTitle.trim().toLowerCase() : null,
+        rec.scriptTitle ? rec.scriptTitle.trim().toLowerCase().replace(/\s+/g, '') : null
+      ].filter(Boolean))
+
+      keys.forEach(k => addRecord(k, rec))
+    })
+
     return map
-  }, [savedHistory])
+  }, [allHistoryRecords])
 
   // Handle single record deletion
   const handleDelete = async (item) => {
@@ -151,9 +309,9 @@ export default function RehistoryPage({
     }
   }
 
-  // Filter games for selection
+  // Filter games for selection (excluding Special Event)
   const filteredGames = useMemo(() => {
-    const active = allGames.filter(g => !g.isDeleted && !g.archived)
+    const active = allGames.filter(g => !g.isDeleted && !g.archived && !isSpecialEventGame(g))
     if (!search.trim()) return active
     const q = search.trim().toLowerCase()
     return active.filter(g =>
@@ -314,7 +472,7 @@ export default function RehistoryPage({
           onClick={() => setActiveTab('saved')}
         >
           <i className="fas fa-list-check" />
-          <span>ประวัติที่บันทึกแล้ว ({savedHistory.length})</span>
+          <span>ประวัติที่บันทึกแล้ว ({allHistoryRecords.length})</span>
         </button>
       </div>
 
@@ -348,9 +506,12 @@ export default function RehistoryPage({
             {filteredGames.map(game => {
               const coverUrl = getGameCover(game)
               const charList = Array.isArray(game.characters) ? game.characters.filter(c => c && c.name) : []
-              const playedList = playedCharsByGame.get(String(game.id)) ||
-                (game.title ? playedCharsByGame.get(game.title.trim().toLowerCase()) : null) || []
-              const playedCount = playedList.length
+              const stats = playedStatsByGame.get(String(game.id)) ||
+                (game.title ? playedStatsByGame.get(game.title.trim().toLowerCase()) : null) ||
+                (game.title ? playedStatsByGame.get(game.title.trim().toLowerCase().replace(/\s+/g, '')) : null) ||
+                { roundsCount: 0, characters: [] }
+              const playedCount = stats.roundsCount
+              const playedChars = stats.characters
 
               return (
                 <div
@@ -389,7 +550,7 @@ export default function RehistoryPage({
 
                     {playedCount > 0 && (
                       <div className="rehistory-played-char-names">
-                        เคยเล่น: {playedList.join(', ')}
+                        เคยเล่น: {playedChars.length > 0 ? playedChars.join(', ') : `${playedCount} รอบ`}
                       </div>
                     )}
 
@@ -413,7 +574,7 @@ export default function RehistoryPage({
               <div className="spinner" />
               <span>กำลังโหลดประวัติการเล่น...</span>
             </div>
-          ) : savedHistory.length === 0 ? (
+          ) : allHistoryRecords.length === 0 ? (
             <div className="rehistory-empty-card">
               <i className="fas fa-scroll rehistory-empty-icon" />
               <h3>ยังไม่มีประวัติการเล่นที่บันทึกไว้</h3>
@@ -428,7 +589,7 @@ export default function RehistoryPage({
             </div>
           ) : (
             <div className="rehistory-grid">
-              {savedHistory.map(item => {
+              {allHistoryRecords.map(item => {
                 const isRetro = item.isRetroactive === true || item.source === 'rehistory' || item.recordedBy === 'rehistory'
                 const matchingGame = gameMap.get(item.scriptId) ||
                   (item.scriptTitle ? gameMap.get(item.scriptTitle.trim().toLowerCase()) : null)
@@ -473,8 +634,10 @@ export default function RehistoryPage({
                           {fmtThaiDate(item.playedAt || item.createdAt)}
                         </span>
 
-                        {isRetro && (
+                        {isRetro ? (
                           <span className="rehistory-tag-retro">บันทึกย้อนหลัง</span>
+                        ) : (
+                          <span className="rehistory-tag-live">เล่นสดที่ร้าน</span>
                         )}
                       </div>
                     </div>
@@ -545,9 +708,11 @@ export default function RehistoryPage({
                   {activeModalGame.characters.filter(c => c && c.name).map((char, idx) => {
                     const isSelected = selectedChar?.name === char.name
                     const charImg = getCharImage(char)
-                    const playedList = playedCharsByGame.get(String(activeModalGame.id)) ||
-                      (activeModalGame.title ? playedCharsByGame.get(activeModalGame.title.trim().toLowerCase()) : null) || []
-                    const wasPlayed = playedList.includes(char.name)
+                    const stats = playedStatsByGame.get(String(activeModalGame.id)) ||
+                      (activeModalGame.title ? playedStatsByGame.get(activeModalGame.title.trim().toLowerCase()) : null) ||
+                      (activeModalGame.title ? playedStatsByGame.get(activeModalGame.title.trim().toLowerCase().replace(/\s+/g, '')) : null) ||
+                      { roundsCount: 0, characters: [] }
+                    const wasPlayed = stats.characters.includes(char.name)
 
                     return (
                       <div
@@ -1048,6 +1213,16 @@ export default function RehistoryPage({
           padding: 2px 7px;
           border-radius: 9999px;
           border: 1px solid #fde68a;
+        }
+
+        .rehistory-tag-live {
+          background: #dbeafe;
+          color: #1d4ed8;
+          font-size: 10px;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 9999px;
+          border: 1px solid #bfdbfe;
         }
 
         .rehistory-delete-btn {
