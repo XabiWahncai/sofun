@@ -3579,9 +3579,11 @@ export default function POSPage({
                   </div>
                 )}
                 {activeSession.npc && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>NPC</span>
-                    <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{activeSession.npc}</span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, gap: 8, minWidth: 0 }}>
+                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700, flexShrink: 0 }}>NPC</span>
+                    <span style={{ fontWeight: 700, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', minWidth: 0, flex: 1 }} title={activeSession.npc}>
+                      {activeSession.npc}
+                    </span>
                   </div>
                 )}
                 {activeSession.room && (
@@ -3594,16 +3596,21 @@ export default function POSPage({
             )) || null
           ) : (
             <>
-              <div className="form-row" style={{ marginTop: 4 }}>
-                <div className="form-group">
+              <div className="form-row" style={{ marginTop: 4, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12, minWidth: 0, width: '100%' }}>
+                <div className="form-group" style={{ minWidth: 0, width: '100%', marginBottom: 0 }}>
                   <label className="form-label">DM</label>
-                  <select className="form-select" value={activeSession.dmUid || ''} onChange={e => {
-                    const member = adminMembers.find(a => a.id === e.target.value)
-                    updateActive({
-                      dmUid: e.target.value || null,
-                      dm: member ? (member.nickname || member.firstname || '') : '',
-                    })
-                  }}>
+                  <select
+                    className="form-select"
+                    value={activeSession.dmUid || ''}
+                    onChange={e => {
+                      const member = adminMembers.find(a => a.id === e.target.value)
+                      updateActive({
+                        dmUid: e.target.value || null,
+                        dm: member ? (member.nickname || member.firstname || '') : '',
+                      })
+                    }}
+                    style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}
+                  >
                     <option value="">— เลือก DM —</option>
                     {adminMembers.map(a => (
                       <option key={a.id} value={a.id}>
@@ -3612,11 +3619,11 @@ export default function POSPage({
                     ))}
                   </select>
                 </div>
-                <div className="form-group" ref={npcDropRef} style={{ position: 'relative' }}>
+                <div className="form-group" ref={npcDropRef} style={{ position: 'relative', minWidth: 0, width: '100%', marginBottom: 0 }}>
                   <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span>NPC</span>
                     {selectedNpcCount > 0 && (
-                      <span style={{ fontSize: 10, fontWeight: 800, color: '#c62419' }}>
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#c62419', flexShrink: 0 }}>
                         {selectedNpcCount} คน
                       </span>
                     )}
@@ -3635,19 +3642,27 @@ export default function POSPage({
                       boxShadow: npcDropOpen ? '0 0 0 3px rgba(198,36,25,0.08)' : 'none',
                       minHeight: 38,
                       height: 38,
+                      width: '100%',
+                      maxWidth: '100%',
+                      minWidth: 0,
                       boxSizing: 'border-box',
-                      background: '#ffffff'
+                      background: '#ffffff',
+                      overflow: 'hidden'
                     }}
                   >
-                    <span style={{
-                      fontSize: 13,
-                      fontWeight: activeSession.npc ? 700 : 500,
-                      color: activeSession.npc ? '#1a1a1a' : 'rgba(26,26,26,0.4)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      flex: 1
-                    }}>
+                    <span
+                      title={activeSession.npc || ''}
+                      style={{
+                        fontSize: 13,
+                        fontWeight: activeSession.npc ? 700 : 500,
+                        color: activeSession.npc ? '#1a1a1a' : 'rgba(26,26,26,0.4)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        minWidth: 0,
+                        flex: '1 1 0%'
+                      }}
+                    >
                       {activeSession.npc || '— เลือก NPC —'}
                     </span>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
@@ -3694,6 +3709,8 @@ export default function POSPage({
                         top: '100%',
                         left: 0,
                         right: 0,
+                        width: '100%',
+                        boxSizing: 'border-box',
                         marginTop: 4,
                         background: '#ffffff',
                         border: '1px solid rgba(26,26,26,0.12)',
