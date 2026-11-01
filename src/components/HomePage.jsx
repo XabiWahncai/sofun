@@ -736,20 +736,21 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
         .mm-hero-text{width:min(52%,700px);padding:clamp(56px,7vw,96px) clamp(36px,5vw,80px) clamp(64px,8vw,96px)}
 
-        /* Modern Minimal Promotion Showcase */
+        /* ── Pro Minimal Promotion Showcase ── */
         .sofun-promo-card {
           display: flex;
           flex-direction: column;
           background: #ffffff;
           border: 1px solid rgba(0, 0, 0, 0.08);
-          border-radius: 24px;
+          border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 16px 44px rgba(0, 0, 0, 0.04);
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
+          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+          transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
         }
         .sofun-promo-card:hover {
-          transform: translateY(-4px);
-          box-shadow: 0 24px 60px rgba(0, 0, 0, 0.08);
+          transform: translateY(-2px);
+          border-color: rgba(0, 0, 0, 0.12);
+          box-shadow: 0 18px 42px -12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
         }
         .sofun-promo-content {
           padding: clamp(28px, 4vw, 44px);
@@ -757,6 +758,169 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           flex-direction: column;
           justify-content: center;
           flex: 1;
+        }
+        .sofun-promo-kicker {
+          display: inline-flex;
+          align-items: center;
+          gap: 7px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          background: rgba(229, 9, 20, 0.05);
+          border: 1px solid rgba(229, 9, 20, 0.12);
+          margin-bottom: 14px;
+          align-self: flex-start;
+        }
+        .sofun-promo-kicker-dot {
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          background: var(--red, #e50914);
+          box-shadow: 0 0 6px rgba(229, 9, 20, 0.4);
+        }
+        .sofun-promo-kicker-text {
+          font-size: 10.5px;
+          font-weight: 800;
+          letter-spacing: 0.14em;
+          text-transform: uppercase;
+          color: var(--red, #e50914);
+        }
+        .sofun-promo-title {
+          font-size: clamp(24px, 2.5vw, 34px);
+          font-weight: 800;
+          line-height: 1.25;
+          color: #111827;
+          margin: 0 0 12px 0;
+          letter-spacing: -0.025em;
+        }
+        .sofun-promo-desc {
+          font-size: clamp(14px, 1.05vw, 15px);
+          color: #4b5563;
+          line-height: 1.7;
+          margin: 0 0 22px 0;
+          max-width: 520px;
+        }
+        .sofun-promo-benefit {
+          display: inline-flex;
+          align-items: center;
+          gap: 14px;
+          padding: 10px 16px;
+          border-radius: 14px;
+          background: #fafafa;
+          border: 1px solid rgba(0, 0, 0, 0.07);
+          margin-bottom: 24px;
+          align-self: flex-start;
+          transition: background 0.2s ease, border-color 0.2s ease;
+        }
+        .sofun-promo-benefit:hover {
+          background: #ffffff;
+          border-color: rgba(229, 9, 20, 0.2);
+        }
+        .sofun-promo-benefit-tag {
+          width: 34px;
+          height: 34px;
+          border-radius: 10px;
+          background: rgba(229, 9, 20, 0.08);
+          color: var(--red, #e50914);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 13px;
+          flex-shrink: 0;
+        }
+        .sofun-promo-benefit-body {
+          display: flex;
+          flex-direction: column;
+          gap: 2px;
+        }
+        .sofun-promo-benefit-label {
+          font-size: 12.5px;
+          font-weight: 700;
+          color: #111827;
+          line-height: 1.2;
+        }
+        .sofun-promo-benefit-sub {
+          font-size: 10.5px;
+          font-weight: 500;
+          color: #6b7280;
+          letter-spacing: 0.01em;
+        }
+        .sofun-promo-benefit-divider {
+          width: 1px;
+          height: 24px;
+          background: rgba(0, 0, 0, 0.08);
+          flex-shrink: 0;
+        }
+        .sofun-promo-benefit-value {
+          display: flex;
+          align-items: baseline;
+          gap: 3px;
+          flex-shrink: 0;
+        }
+        .sofun-promo-benefit-currency {
+          font-size: 13px;
+          font-weight: 800;
+          color: var(--red, #e50914);
+        }
+        .sofun-promo-benefit-amount {
+          font-family: 'Bebas Neue', sans-serif;
+          font-size: 28px;
+          line-height: 1;
+          color: #111827;
+          letter-spacing: 0.02em;
+        }
+        .sofun-promo-benefit-suffix {
+          font-size: 10px;
+          font-weight: 800;
+          color: var(--red, #e50914);
+          letter-spacing: 0.06em;
+          margin-left: 2px;
+        }
+        .sofun-promo-action-row {
+          display: flex;
+          align-items: center;
+          flex-wrap: wrap;
+          gap: 14px;
+        }
+        .sofun-promo-btn {
+          background: var(--red, #e50914);
+          color: #ffffff;
+          border: 1px solid rgba(229, 9, 20, 0.2);
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 700;
+          letter-spacing: 0.03em;
+          padding: 11px 22px;
+          border-radius: 12px;
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          gap: 8px;
+          box-shadow: 0 4px 14px rgba(229, 9, 20, 0.2);
+          transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+        }
+        .sofun-promo-btn:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 6px 20px rgba(229, 9, 20, 0.3);
+          background: var(--crimson-700, #b80710);
+        }
+        .sofun-promo-btn:hover .sofun-promo-btn-arrow {
+          transform: translateX(3px);
+        }
+        .sofun-promo-btn-arrow {
+          font-size: 11px;
+          transition: transform 0.18s ease;
+        }
+        .sofun-promo-hint {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 11.5px;
+          font-weight: 500;
+          color: #6b7280;
+        }
+        .sofun-promo-hint i {
+          font-size: 10.5px;
+          color: #10b981;
         }
         .sofun-promo-banner-wrap {
           flex: 1.15;
@@ -770,12 +934,20 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           height: 100%;
           object-fit: cover;
           display: block;
+          transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .sofun-promo-card:hover .sofun-promo-banner-img {
+          transform: scale(1.02);
         }
 
         @media(max-width: 899px) {
           .sofun-promo-card { flex-direction: column; }
           .sofun-promo-banner-wrap { order: 1; min-height: 200px; aspect-ratio: 16 / 9; }
           .sofun-promo-content { order: 2; padding: 24px 20px; }
+          .sofun-promo-benefit { width: 100%; box-sizing: border-box; justify-content: space-between; }
+          .sofun-promo-action-row { flex-direction: column; align-items: stretch; gap: 10px; }
+          .sofun-promo-btn { width: 100%; }
+          .sofun-promo-hint { justify-content: center; }
           .mm-scatter-r,.mm-hero-main,.mm-hero-pill,.mm-hero-dots{display:none!important}
         }
 
@@ -1158,53 +1330,56 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           <div className="sofun-promo-card mm-reveal">
             {/* Promo Info */}
             <div className="sofun-promo-content">
-              <h2 style={{
-                fontSize: 'clamp(24px, 2.4vw, 34px)',
-                fontWeight: 900,
-                lineHeight: 1.3,
-                color: TEXT_MAIN,
-                margin: '0 0 14px 0',
-                letterSpacing: '-0.02em',
-              }}>
+              {/* Refined Minimal Kicker */}
+              <div className="sofun-promo-kicker">
+                <span className="sofun-promo-kicker-dot" />
+                <span className="sofun-promo-kicker-text">
+                  {promoSettings?.promoTag
+                    ? String(promoSettings.promoTag).replace(/^[^w฀-๿]+/g, '').trim()
+                    : 'SPECIAL CAMPAIGN'}
+                </span>
+              </div>
+
+              {/* Promo Title */}
+              <h2 className="sofun-promo-title">
                 {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
               </h2>
 
-              <p style={{
-                fontSize: 'clamp(14px, 1.05vw, 15px)',
-                color: TEXT_MUTED,
-                lineHeight: 1.75,
-                margin: '0 0 22px 0',
-              }}>
+              {/* Promo Description */}
+              <p className="sofun-promo-desc">
                 {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
               </p>
 
+              {/* Pro Minimal Benefit Voucher Card */}
               {promoSettings?.discountAmount && (
-                <div style={{
-                  display: 'inline-flex',
-                  alignItems: 'baseline',
-                  gap: 10,
-                  padding: '8px 16px',
-                  borderRadius: 12,
-                  background: 'rgba(229, 9, 20, 0.05)',
-                  border: '1px solid rgba(229, 9, 20, 0.15)',
-                  marginBottom: 26,
-                  alignSelf: 'flex-start',
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: NETFLIX_RED }}>
-                    {promoSettings.discountType === 'person' ? 'ส่วนลดต่อคน' : 'ส่วนลดทั้งปาร์ตี้'}
-                  </span>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 3 }}>
-                    <span style={{ fontSize: 14, fontWeight: 800, color: NETFLIX_RED }}>฿</span>
-                    <span style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: 28, lineHeight: 1, color: TEXT_MAIN }}>
+                <div className="sofun-promo-benefit">
+                  <div className="sofun-promo-benefit-tag">
+                    <i className="fas fa-ticket-alt" />
+                  </div>
+                  <div className="sofun-promo-benefit-body">
+                    <span className="sofun-promo-benefit-label">
+                      {promoSettings.discountType === 'person' ? 'ส่วนลดต่อท่าน' : 'ส่วนลดทั้งปาร์ตี้'}
+                    </span>
+                    <span className="sofun-promo-benefit-sub">
+                      {promoSettings.discountType === 'person' ? 'ลดคนละเท่ากันทุกที่นั่ง' : 'หักส่วนลดทันทีจากยอดบิล'}
+                    </span>
+                  </div>
+                  <div className="sofun-promo-benefit-divider" />
+                  <div className="sofun-promo-benefit-value">
+                    <span className="sofun-promo-benefit-currency">฿</span>
+                    <span className="sofun-promo-benefit-amount">
                       {promoSettings.discountAmount}
                     </span>
+                    <span className="sofun-promo-benefit-suffix">OFF</span>
                   </div>
                 </div>
               )}
 
-              <div>
+              {/* Action Row */}
+              <div className="sofun-promo-action-row">
                 <button
                   type="button"
+                  className="sofun-promo-btn"
                   onClick={() => {
                     const targetLink = promoSettings?.buttonLink || 'booking';
                     if ((targetLink === 'booking' || targetLink === 'party') && !bookingEnabled) {
@@ -1213,27 +1388,18 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                     }
                     showPage(targetLink);
                   }}
-                  style={{
-                    background: NETFLIX_RED,
-                    color: '#fff',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 13.5,
-                    fontWeight: 800,
-                    letterSpacing: '0.04em',
-                    padding: '13px 26px',
-                    borderRadius: 12,
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20),0.25)',
-                    transition: 'all 0.2s ease',
-                  }}
                 >
-                  <span>{String(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย').replace(/->/g, '').trim()}</span>
-                  <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
+                  <span>
+                    {String(promoSettings?.buttonText || 'จองรอบรับสิทธิ์เลย')
+                      .replace(/\s*(?:→|->)\s*$/g, '')
+                      .trim() || 'จองรอบรับสิทธิ์เลย'}
+                  </span>
+                  <i className="fas fa-arrow-right sofun-promo-btn-arrow" />
                 </button>
+                <div className="sofun-promo-hint">
+                  <i className="fas fa-check-circle" />
+                  <span>ไม่ต้องกรอกโค้ด สิทธิ์คำนวณอัตโนมัติ</span>
+                </div>
               </div>
             </div>
 
