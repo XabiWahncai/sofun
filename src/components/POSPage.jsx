@@ -2560,7 +2560,7 @@ export default function POSPage({
         .form-label { color: rgba(26,26,26,0.5) !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.03em !important; margin-bottom: 4px !important; }
 
         /* ── Promo / discount section ── */
-        .pos-promo-wrap { padding: 10px 14px 14px !important; display: flex !important; flex-direction: column !important; gap: 8px !important; }
+        .pos-promo-wrap { padding: 8px 16px 16px !important; display: flex !important; flex-direction: column !important; gap: 10px !important; box-sizing: border-box !important; width: 100% !important; }
         .pos-promo-name-input {
           background: #faf7f5 !important;
           border: 1px solid rgba(26,26,26,0.08) !important;
@@ -3493,112 +3493,116 @@ export default function POSPage({
 
           {/* Searchable game picker — read-only when locked */}
           {isLocked ? (
-            <div style={{ margin: '0 18px', padding: '10px 12px', background: '#faf7f5', border: '1px solid rgba(26,26,26,0.06)', borderRadius: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: selectedGame ? '#1a1a1a' : 'rgba(26,26,26,0.35)' }}>
-                {selectedGame ? selectedGame.title : '— ไม่ได้เลือกเกม —'}
+            <div style={{ padding: '8px 16px 14px', display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box' }}>
+              <div style={{ padding: '10px 12px', background: '#faf7f5', border: '1px solid rgba(26,26,26,0.06)', borderRadius: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: selectedGame ? '#1a1a1a' : 'rgba(26,26,26,0.35)' }}>
+                  {selectedGame ? selectedGame.title : '— ไม่ได้เลือกเกม —'}
+                </div>
               </div>
-            </div>
-          ) : (
-          <div style={{ position: 'relative', margin: '0 18px' }}>
-            <div
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                background: '#fff', border: '1px solid rgba(0,0,0,0.15)',
-                borderRadius: 8, padding: '0 10px', height: 38, cursor: 'text',
-              }}
-              onClick={() => { setGameDropOpen(true); setTimeout(() => document.getElementById('pos-game-search')?.focus(), 0) }}
-            >
-              <i className="fas fa-search" style={{ color: 'rgba(0,0,0,0.35)', fontSize: 11, flexShrink: 0 }} />
-              <input
-                id="pos-game-search"
-                type="text"
-                placeholder={selectedGame ? selectedGame.title : '— เลือกเกม —'}
-                value={gameSearch}
-                onChange={e => { setGameSearch(e.target.value); setGameDropOpen(true) }}
-                onFocus={() => setGameDropOpen(true)}
-                onBlur={() => setTimeout(() => setGameDropOpen(false), 200)}
-                style={{
-                  flex: 1, background: 'none', border: 'none', outline: 'none',
-                  color: gameSearch ? '#000' : (selectedGame ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.4)'),
-                  fontSize: 13, fontWeight: 600,
-                }}
-              />
-              {(activeSession.scriptId || gameSearch) && (
-                <button
-                  onMouseDown={e => { e.preventDefault(); updateActive({ scriptId: '', eventName: '', customPrice: '' }); setGameSearch(''); setGameDropOpen(false) }}
-                  style={{ background: 'none', border: 'none', color: 'rgba(0,0,0,0.35)', cursor: 'pointer', padding: 0, fontSize: 11 }}
-                ><i className="fas fa-times" /></button>
+              {(activeSession.dm || activeSession.npc || activeSession.room) && (
+                <div style={{ padding: '8px 12px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {activeSession.dm && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>DM</span>
+                      <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{activeSession.dm}</span>
+                    </div>
+                  )}
+                  {activeSession.npc && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, gap: 8, minWidth: 0 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700, flexShrink: 0 }}>NPC</span>
+                      <span style={{ fontWeight: 700, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', minWidth: 0, flex: 1 }} title={activeSession.npc}>
+                        {activeSession.npc}
+                      </span>
+                    </div>
+                  )}
+                  {activeSession.room && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>ห้อง</span>
+                      <span style={{ fontWeight: 700, color: '#c62419' }}>{activeSession.room}</span>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-            {gameDropOpen && (
-              <div style={{
-                position: 'absolute', top: 42, left: 0, right: 0, zIndex: 200,
-                background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
-                borderRadius: 8, maxHeight: 220, overflowY: 'auto',
-                boxShadow: '0 8px 32px rgba(0,0,0,0.6)',
-              }}>
-                {allGames
-                  .filter(g => !gameSearch || g.title?.toLowerCase().includes(gameSearch.toLowerCase()))
-                  .map(g => {
-                    const price = g.payPrice ?? g.price
-                    const isSel = activeSession.scriptId === g.id
-                    return (
-                      <div
-                        key={g.id}
-                        onMouseDown={e => { e.preventDefault(); updateActive({ scriptId: g.id, customPrice: '' }); setGameSearch(''); setGameDropOpen(false) }}
-                        style={{
-                          padding: '9px 12px', cursor: 'pointer', fontSize: 13,
-                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                          background: isSel ? 'rgba(198,36,25,0.15)' : 'transparent',
-                          borderLeft: isSel ? '2px solid #c62419' : '2px solid transparent',
-                          color: isSel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)',
-                        }}
-                        onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
-                        onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent' }}
-                      >
-                        <span style={{ fontWeight: isSel ? 700 : 500 }}>{g.title}</span>
-                        {price ? <span style={{ fontSize: 11, color: '#c8a050', flexShrink: 0 }}>฿{price}/คน</span> : null}
-                      </div>
-                    )
-                  })}
-                {allGames.filter(g => !gameSearch || g.title?.toLowerCase().includes(gameSearch.toLowerCase())).length === 0 && (
-                  <div style={{ padding: '12px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>ไม่พบสคริปต์</div>
-                )}
-              </div>
-            )}
-          </div>
-          )}
-
-          {isLocked ? (
-            ((activeSession.dm || activeSession.npc || activeSession.room) && (
-              <div style={{ margin: '8px 18px 20px', padding: '8px 12px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {activeSession.dm && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>DM</span>
-                    <span style={{ fontWeight: 700, color: '#1a1a1a' }}>{activeSession.dm}</span>
-                  </div>
-                )}
-                {activeSession.npc && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12.5, gap: 8, minWidth: 0 }}>
-                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700, flexShrink: 0 }}>NPC</span>
-                    <span style={{ fontWeight: 700, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', minWidth: 0, flex: 1 }} title={activeSession.npc}>
-                      {activeSession.npc}
-                    </span>
-                  </div>
-                )}
-                {activeSession.room && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5 }}>
-                    <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>ห้อง</span>
-                    <span style={{ fontWeight: 700, color: '#c62419' }}>{activeSession.room}</span>
-                  </div>
-                )}
-              </div>
-            )) || null
           ) : (
-            <>
-              <div className="form-row" style={{ marginTop: 4, display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 12, minWidth: 0, width: '100%' }}>
-                <div className="form-group" style={{ minWidth: 0, width: '100%', marginBottom: 0 }}>
-                  <label className="form-label">DM</label>
+            <div className="pos-game-config-wrap" style={{ padding: '8px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10, width: '100%', boxSizing: 'border-box' }}>
+              {/* Searchable game picker */}
+              <div style={{ position: 'relative', width: '100%', boxSizing: 'border-box' }}>
+                <div
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    background: '#ffffff', border: '1px solid rgba(26,26,26,0.12)',
+                    borderRadius: 10, padding: '0 12px', height: 38, cursor: 'text',
+                    width: '100%', boxSizing: 'border-box',
+                    transition: 'border-color 0.15s, box-shadow 0.15s',
+                  }}
+                  onClick={() => { setGameDropOpen(true); setTimeout(() => document.getElementById('pos-game-search')?.focus(), 0) }}
+                >
+                  <i className="fas fa-search" style={{ color: 'rgba(26,26,26,0.35)', fontSize: 12, flexShrink: 0 }} />
+                  <input
+                    id="pos-game-search"
+                    type="text"
+                    placeholder={selectedGame ? selectedGame.title : '— เลือกเกม —'}
+                    value={gameSearch}
+                    onChange={e => { setGameSearch(e.target.value); setGameDropOpen(true) }}
+                    onFocus={() => setGameDropOpen(true)}
+                    onBlur={() => setTimeout(() => setGameDropOpen(false), 200)}
+                    style={{
+                      flex: 1, background: 'none', border: 'none', outline: 'none',
+                      color: gameSearch ? '#1a1a1a' : (selectedGame ? '#1a1a1a' : 'rgba(26,26,26,0.4)'),
+                      fontSize: 13, fontWeight: selectedGame ? 700 : 500, minWidth: 0,
+                    }}
+                  />
+                  {(activeSession.scriptId || gameSearch) && (
+                    <button
+                      onMouseDown={e => { e.preventDefault(); updateActive({ scriptId: '', eventName: '', customPrice: '' }); setGameSearch(''); setGameDropOpen(false) }}
+                      style={{ background: 'none', border: 'none', color: 'rgba(26,26,26,0.35)', cursor: 'pointer', padding: 2, fontSize: 11, display: 'flex', alignItems: 'center' }}
+                      title="ล้างเกมที่เลือก"
+                    ><i className="fas fa-times" /></button>
+                  )}
+                </div>
+                {gameDropOpen && (
+                  <div style={{
+                    position: 'absolute', top: 42, left: 0, right: 0, zIndex: 200,
+                    background: '#1a1a1a', border: '1px solid rgba(255,255,255,0.12)',
+                    borderRadius: 10, maxHeight: 220, overflowY: 'auto',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+                  }}>
+                    {allGames
+                      .filter(g => !gameSearch || g.title?.toLowerCase().includes(gameSearch.toLowerCase()))
+                      .map(g => {
+                        const price = g.payPrice ?? g.price
+                        const isSel = activeSession.scriptId === g.id
+                        return (
+                          <div
+                            key={g.id}
+                            onMouseDown={e => { e.preventDefault(); updateActive({ scriptId: g.id, customPrice: '' }); setGameSearch(''); setGameDropOpen(false) }}
+                            style={{
+                              padding: '9px 12px', cursor: 'pointer', fontSize: 13,
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                              background: isSel ? 'rgba(198,36,25,0.15)' : 'transparent',
+                              borderLeft: isSel ? '2px solid #c62419' : '2px solid transparent',
+                              color: isSel ? 'rgba(255,255,255,0.95)' : 'rgba(255,255,255,0.7)',
+                            }}
+                            onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'rgba(255,255,255,0.05)' }}
+                            onMouseLeave={e => { if (!isSel) e.currentTarget.style.background = 'transparent' }}
+                          >
+                            <span style={{ fontWeight: isSel ? 700 : 500 }}>{g.title}</span>
+                            {price ? <span style={{ fontSize: 11, color: '#c8a050', flexShrink: 0 }}>฿{price}/คน</span> : null}
+                          </div>
+                        )
+                      })}
+                    {allGames.filter(g => !gameSearch || g.title?.toLowerCase().includes(gameSearch.toLowerCase())).length === 0 && (
+                      <div style={{ padding: '12px', textAlign: 'center', color: 'rgba(255,255,255,0.3)', fontSize: 13 }}>ไม่พบสคริปต์</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* DM & NPC Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: 10, width: '100%', boxSizing: 'border-box' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+                  <label className="form-label" style={{ fontSize: 11, fontWeight: 700, color: 'rgba(26,26,26,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>DM</label>
                   <select
                     className="form-select"
                     value={activeSession.dmUid || ''}
@@ -3609,7 +3613,7 @@ export default function POSPage({
                         dm: member ? (member.nickname || member.firstname || '') : '',
                       })
                     }}
-                    style={{ width: '100%', minWidth: 0, boxSizing: 'border-box' }}
+                    style={{ width: '100%', height: 38, borderRadius: 10, padding: '0 10px', fontSize: 13, background: '#ffffff', border: '1px solid rgba(26,26,26,0.12)', boxSizing: 'border-box' }}
                   >
                     <option value="">— เลือก DM —</option>
                     {adminMembers.map(a => (
@@ -3619,8 +3623,8 @@ export default function POSPage({
                     ))}
                   </select>
                 </div>
-                <div className="form-group" ref={npcDropRef} style={{ position: 'relative', minWidth: 0, width: '100%', marginBottom: 0 }}>
-                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div ref={npcDropRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0, width: '100%', boxSizing: 'border-box' }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, fontWeight: 700, color: 'rgba(26,26,26,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
                     <span>NPC</span>
                     {selectedNpcCount > 0 && (
                       <span style={{ fontSize: 10, fontWeight: 800, color: '#c62419', flexShrink: 0 }}>
@@ -3638,14 +3642,16 @@ export default function POSPage({
                       gap: 6,
                       cursor: 'pointer',
                       userSelect: 'none',
-                      borderColor: npcDropOpen ? '#c62419' : 'rgba(26,26,26,0.1)',
+                      borderColor: npcDropOpen ? '#c62419' : 'rgba(26,26,26,0.12)',
                       boxShadow: npcDropOpen ? '0 0 0 3px rgba(198,36,25,0.08)' : 'none',
-                      minHeight: 38,
                       height: 38,
+                      minHeight: 38,
                       width: '100%',
                       maxWidth: '100%',
                       minWidth: 0,
                       boxSizing: 'border-box',
+                      borderRadius: 10,
+                      padding: '0 10px',
                       background: '#ffffff',
                       overflow: 'hidden'
                     }}
@@ -3765,7 +3771,7 @@ export default function POSPage({
                       ) : (
                         adminMembers.map(a => {
                           const dmName = a.nickname || a.firstname || ''
-                          const fullName = `${dmName}${a.lastname ? ` ${a.lastname}` : ''}`.trim()
+                          const fullName = (dmName + (a.lastname ? ' ' + a.lastname : '')).trim()
                           const isChecked = isNpcSelected(a)
                           const isMainDm = activeSession.dmUid === a.id || (activeSession.dm && activeSession.dm.trim().toLowerCase() === dmName.trim().toLowerCase())
 
@@ -3834,14 +3840,21 @@ export default function POSPage({
                   )}
                 </div>
               </div>
-              <div className="form-group" style={{ marginTop: 4 }}>
-                <label className="form-label">ห้อง</label>
-                <select className="form-select" value={activeSession.room} onChange={e => updateActive({ room: e.target.value })}>
+
+              {/* Room */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, width: '100%', boxSizing: 'border-box' }}>
+                <label className="form-label" style={{ fontSize: 11, fontWeight: 700, color: 'rgba(26,26,26,0.5)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>ห้อง</label>
+                <select
+                  className="form-select"
+                  value={activeSession.room}
+                  onChange={e => updateActive({ room: e.target.value })}
+                  style={{ width: '100%', height: 38, borderRadius: 10, padding: '0 10px', fontSize: 13, background: '#ffffff', border: '1px solid rgba(26,26,26,0.12)', boxSizing: 'border-box' }}
+                >
                   <option value="">— เลือกห้อง —</option>
                   {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
-            </>
+            </div>
           )}
 
           {/* Promo + mode toggle — show locked summary or full editor */}
@@ -3850,7 +3863,7 @@ export default function POSPage({
               <>
                 <div className="pos-divider" />
                 <div className="pos-section-title"><i className="fas fa-tag" /> โปรโมชัน / ส่วนลด</div>
-                <div style={{ margin: '0 18px 14px', padding: '12px 14px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ margin: '0 16px 14px', padding: '12px 14px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {activeSession.promoName || 'ส่วนลด'}
