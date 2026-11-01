@@ -135,6 +135,7 @@ export default function App() {
     return null
   })
   const liffInitialized = useRef(false)
+  const liffInitPromiseRef = useRef(null)
   const posWriteTimerRef = useRef(null)
   const posLoadedRef = useRef(false)
 
@@ -252,7 +253,7 @@ export default function App() {
     if (liffInitialized.current) return
     liffInitialized.current = true
 
-    liff.init({ liffId: LIFF_ID })
+    liffInitPromiseRef.current = liff.init({ liffId: LIFF_ID })
       .then(async () => {
         setLiffReady(true)
         if (!liff.isLoggedIn()) return
@@ -272,6 +273,13 @@ export default function App() {
 
   // ── ตรวจสอบ member ใน Firestore ────────────────────────────────
   const handleProfileCheck = async (profile) => {
+    try {
+      const cached = JSON.parse(localStorage.getItem('sofun_line_user'))
+      if (cached && (cached.uid === profile.userId || cached.id === profile.userId)) {
+        setLineUser(cached)
+        restoreReturnUrl()
+      }
+    } catch {}
     const snap = await getDoc(doc(db, 'members', profile.userId))
     if (snap.exists()) {
       const data = snap.data()
@@ -300,7 +308,7 @@ export default function App() {
   const saveUser = (user) => {
     setLineUser(user)
     localStorage.setItem('sofun_line_user', JSON.stringify(user))
-    setupFCM(user.uid)
+    setTimeout(() => setupFCM(user.uid), 1200)
   }
 
   const setupFCM = async (uid) => {
@@ -324,9 +332,11 @@ export default function App() {
 
   // ── กดปุ่ม LINE Login ────────────────────────────────────────────
   const handleLineLogin = useCallback(async () => {
-    if (!liffReady) return
     setLiffLoading(true)
     try {
+      if (!liffReady && liffInitPromiseRef.current) {
+        await liffInitPromiseRef.current
+      }
       if (!liff.isLoggedIn()) {
         // บันทึก path ปัจจุบัน เพื่อพากลับมาหน้าเดิมหลังล็อกอิน
         try {
