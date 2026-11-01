@@ -80,6 +80,13 @@ export default function App() {
   const [editingGame, setEditingGame] = useState(null)
   const [bookingGameId, setBookingGameId] = useState("")
   const [bookingEnabled, setBookingEnabled] = useState(false)
+  const [promoSettings, setPromoSettings] = useState(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_promo_settings')
+      if (cached) return JSON.parse(cached)
+    } catch {}
+    return null
+  })
 
   useEffect(() => {
     // Clean up any stale true value from past sessions
@@ -101,6 +108,20 @@ export default function App() {
     return unsub
   }, [])
 
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, 'settings', 'promotion'), snap => {
+      if (snap.exists()) {
+        const data = snap.data()
+        setPromoSettings(data)
+        try {
+          localStorage.setItem('sofun_cached_promo_settings', JSON.stringify(data))
+        } catch {}
+      }
+    }, err => {
+      console.warn('Failed to listen to settings/promotion in App:', err)
+    })
+    return unsub
+  }, [])
 
   const [toast, setToast] = useState({ msg: '', type: 'success', visible: false })
   const [lineUser, setLineUser] = useState(() => {
@@ -782,7 +803,7 @@ export default function App() {
         />
       )}
 
-      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
+      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} promoSettings={promoSettings} />}
       {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
       {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} onLogin={handleLineLogin} showToast={showToast} />}

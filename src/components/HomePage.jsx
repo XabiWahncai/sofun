@@ -430,11 +430,25 @@ const PLACEHOLDER = Array.from({ length: 12 }, (_, i) => ({
   price: [0,299,399,499,0,349,399,299,0,349,399,0][i],
 }));
 
-export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser, bookingEnabled = false, showToast = null }) {
+export default function HomePage({ allGames = [], allParties = [], showPage, showDetail, lineUser, bookingEnabled = false, showToast = null, promoSettings: promoSettingsProp = null }) {
   const { t } = useLang();
   const [heroIdx, setHeroIdx]         = useState(0);
   const [heroVisible, setHeroVisible] = useState(true);
-  const [promoSettings, setPromoSettings] = useState(null);
+  const [promoSettings, setPromoSettings] = useState(() => {
+    if (promoSettingsProp) return promoSettingsProp;
+    try {
+      const cached = localStorage.getItem('sofun_cached_promo_settings');
+      if (cached) return JSON.parse(cached);
+    } catch {}
+    return null;
+  });
+
+  /* Sync prop updates */
+  useEffect(() => {
+    if (promoSettingsProp) {
+      setPromoSettings(promoSettingsProp);
+    }
+  }, [promoSettingsProp]);
   const [playedIds, setPlayedIds] = useState(() => new Set());
   const revealRoot = useRef(null);
 
@@ -445,7 +459,11 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'promotion'), (snap) => {
       if (snap.exists()) {
-        setPromoSettings(snap.data());
+        const data = snap.data();
+        setPromoSettings(data);
+        try {
+          localStorage.setItem('sofun_cached_promo_settings', JSON.stringify(data));
+        } catch {}
       }
     });
     return () => unsub();
@@ -477,23 +495,49 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
     });
   }, [allGames]);
 
+  /* Cached hero games from localStorage to prevent any frame-0 flash */
+  const cachedHeroGames = useMemo(() => {
+    try {
+      const cached = localStorage.getItem('sofun_cached_hero_games');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return null;
+  }, []);
+
   /* New Games to display in Hero Card (up to 5) */
   const newGames = useMemo(() => {
+    // 1. If promoSettings has newGameIds, map them with allGames
     if (promoSettings?.newGameIds && Array.isArray(promoSettings.newGameIds) && promoSettings.newGameIds.length > 0) {
       const mapped = promoSettings.newGameIds
         .map(id => allGames.find(g => g.id === id))
         .filter(Boolean);
-      if (mapped.length > 0) return mapped.slice(0, 5);
+      if (mapped.length > 0) {
+        try {
+          localStorage.setItem('sofun_cached_hero_games', JSON.stringify(mapped.slice(0, 5)));
+        } catch {}
+        return mapped.slice(0, 5);
+      }
     }
+
+    // 2. If promoSettings is still loading or allGames is still resolving, use cached hero games
+    if ((!promoSettings || allGames.length === 0) && cachedHeroGames && cachedHeroGames.length > 0) {
+      return cachedHeroGames;
+    }
+
+    // 3. Fallback only if promoSettings is loaded and has no newGameIds
     const source = sortedNewestGames.length > 0 ? sortedNewestGames : (allGames.length > 0 ? allGames : PLACEHOLDER);
     return source.slice(0, 5);
-  }, [promoSettings?.newGameIds, allGames, sortedNewestGames]);
+  }, [promoSettings, allGames, sortedNewestGames, cachedHeroGames]);
 
   /* Hero Featured Games */
   const heroFeaturedGames = useMemo(() => {
     if (newGames && newGames.length > 0) return newGames;
+    if (cachedHeroGames && cachedHeroGames.length > 0) return cachedHeroGames;
     return (allGames.length > 0 ? allGames : PLACEHOLDER).slice(0, 5);
-  }, [newGames, allGames]);
+  }, [newGames, cachedHeroGames, allGames]);
 
   /* Swimlanes Data */
   const beginnerGames = useMemo(() => {

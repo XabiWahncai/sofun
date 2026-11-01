@@ -5079,11 +5079,18 @@ function PromotionTab({ showToast, allGames = [] }) {
   const save = async () => {
     setSaving(true)
     try {
-      await setDoc(doc(db, 'settings', 'promotion'), {
+      const promoData = {
         ...promo,
         newGameIds: (promo.newGameIds || []).slice(0, MAX_NEW_GAMES),
+      }
+      await setDoc(doc(db, 'settings', 'promotion'), {
+        ...promoData,
         updatedAt: serverTimestamp(),
       })
+      try {
+        localStorage.setItem('sofun_cached_promo_settings', JSON.stringify(promoData))
+        localStorage.removeItem('sofun_cached_hero_games')
+      } catch {}
       showToast('บันทึกโปรโมชั่นและเกมใหม่สำเร็จ')
     } catch (err) {
       console.error(err)
