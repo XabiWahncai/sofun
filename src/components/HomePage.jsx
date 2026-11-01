@@ -736,7 +736,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
 
         .mm-hero-text{width:min(52%,700px);padding:clamp(56px,7vw,96px) clamp(36px,5vw,80px) clamp(64px,8vw,96px)}
 
-        /* ── Pro Minimal Promotion Showcase ── */
+        /* ── Minimalist Promotion Card ── */
         .sofun-promo-card {
           display: flex;
           flex-direction: column;
@@ -744,189 +744,99 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           border: 1px solid rgba(0, 0, 0, 0.08);
           border-radius: 20px;
           overflow: hidden;
-          box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
-          transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+          box-shadow: 0 4px 24px rgba(0, 0, 0, 0.03);
+          transition: transform 0.25s ease, box-shadow 0.25s ease;
         }
         .sofun-promo-card:hover {
           transform: translateY(-2px);
-          border-color: rgba(0, 0, 0, 0.12);
-          box-shadow: 0 18px 42px -12px rgba(0, 0, 0, 0.08), 0 2px 6px rgba(0, 0, 0, 0.03);
+          box-shadow: 0 12px 36px rgba(0, 0, 0, 0.06);
         }
         .sofun-promo-content {
-          padding: clamp(28px, 4vw, 44px);
+          padding: clamp(32px, 4.5vw, 52px);
           display: flex;
           flex-direction: column;
           justify-content: center;
           flex: 1;
         }
-        .sofun-promo-kicker {
-          display: inline-flex;
-          align-items: center;
-          gap: 7px;
-          padding: 4px 10px;
-          border-radius: 999px;
-          background: rgba(229, 9, 20, 0.05);
-          border: 1px solid rgba(229, 9, 20, 0.12);
-          margin-bottom: 14px;
-          align-self: flex-start;
-        }
-        .sofun-promo-kicker-dot {
-          width: 6px;
-          height: 6px;
-          border-radius: 50%;
-          background: var(--red, #e50914);
-          box-shadow: 0 0 6px rgba(229, 9, 20, 0.4);
-        }
-        .sofun-promo-kicker-text {
+        .sofun-promo-tag {
           font-size: 10.5px;
           font-weight: 800;
-          letter-spacing: 0.14em;
+          letter-spacing: 0.2em;
           text-transform: uppercase;
           color: var(--red, #e50914);
+          margin-bottom: 12px;
         }
         .sofun-promo-title {
-          font-size: clamp(24px, 2.5vw, 34px);
+          font-size: clamp(24px, 2.6vw, 36px);
           font-weight: 800;
           line-height: 1.25;
           color: #111827;
-          margin: 0 0 12px 0;
           letter-spacing: -0.025em;
+          margin: 0 0 12px 0;
         }
         .sofun-promo-desc {
-          font-size: clamp(14px, 1.05vw, 15px);
-          color: #4b5563;
+          font-size: clamp(14px, 1.1vw, 15px);
+          color: #6b7280;
           line-height: 1.7;
-          margin: 0 0 22px 0;
-          max-width: 520px;
+          margin: 0 0 24px 0;
+          max-width: 480px;
         }
-        .sofun-promo-benefit {
+        .sofun-promo-pill {
           display: inline-flex;
           align-items: center;
-          gap: 14px;
-          padding: 10px 16px;
-          border-radius: 14px;
-          background: #fafafa;
-          border: 1px solid rgba(0, 0, 0, 0.07);
-          margin-bottom: 24px;
+          gap: 10px;
+          padding: 6px 14px;
+          border-radius: 999px;
+          background: #f4f4f5;
+          border: 1px solid rgba(0, 0, 0, 0.06);
+          margin-bottom: 26px;
           align-self: flex-start;
-          transition: background 0.2s ease, border-color 0.2s ease;
         }
-        .sofun-promo-benefit:hover {
-          background: #ffffff;
-          border-color: rgba(229, 9, 20, 0.2);
-        }
-        .sofun-promo-benefit-tag {
-          width: 34px;
-          height: 34px;
-          border-radius: 10px;
-          background: rgba(229, 9, 20, 0.08);
-          color: var(--red, #e50914);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-size: 13px;
-          flex-shrink: 0;
-        }
-        .sofun-promo-benefit-body {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-        .sofun-promo-benefit-label {
+        .sofun-promo-pill-label {
           font-size: 12.5px;
           font-weight: 700;
-          color: #111827;
-          line-height: 1.2;
+          color: #27272a;
         }
-        .sofun-promo-benefit-sub {
-          font-size: 10.5px;
-          font-weight: 500;
-          color: #6b7280;
-          letter-spacing: 0.01em;
+        .sofun-promo-pill-dot {
+          width: 3px;
+          height: 3px;
+          border-radius: 50%;
+          background: #a1a1aa;
         }
-        .sofun-promo-benefit-divider {
-          width: 1px;
-          height: 24px;
-          background: rgba(0, 0, 0, 0.08);
-          flex-shrink: 0;
-        }
-        .sofun-promo-benefit-value {
-          display: flex;
-          align-items: baseline;
-          gap: 3px;
-          flex-shrink: 0;
-        }
-        .sofun-promo-benefit-currency {
-          font-size: 13px;
-          font-weight: 800;
-          color: var(--red, #e50914);
-        }
-        .sofun-promo-benefit-amount {
+        .sofun-promo-pill-val {
           font-family: 'Bebas Neue', sans-serif;
-          font-size: 28px;
+          font-size: 20px;
           line-height: 1;
-          color: #111827;
-          letter-spacing: 0.02em;
-        }
-        .sofun-promo-benefit-suffix {
-          font-size: 10px;
-          font-weight: 800;
           color: var(--red, #e50914);
-          letter-spacing: 0.06em;
-          margin-left: 2px;
-        }
-        .sofun-promo-action-row {
-          display: flex;
-          align-items: center;
-          flex-wrap: wrap;
-          gap: 14px;
+          letter-spacing: 0.04em;
         }
         .sofun-promo-btn {
-          background: var(--red, #e50914);
-          color: #ffffff;
-          border: 1px solid rgba(229, 9, 20, 0.2);
-          cursor: pointer;
-          font-size: 13px;
-          font-weight: 700;
-          letter-spacing: 0.03em;
-          padding: 11px 22px;
-          border-radius: 12px;
           display: inline-flex;
           align-items: center;
           justify-content: center;
           gap: 8px;
-          box-shadow: 0 4px 14px rgba(229, 9, 20, 0.2);
-          transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+          padding: 12px 26px;
+          border-radius: 10px;
+          background: var(--red, #e50914);
+          color: #ffffff;
+          font-size: 13.5px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          border: none;
+          cursor: pointer;
+          box-shadow: 0 4px 14px rgba(229, 9, 20, 0.22);
+          transition: background 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
         }
         .sofun-promo-btn:hover {
+          background: var(--crimson-700, #b80710);
           transform: translateY(-1px);
           box-shadow: 0 6px 20px rgba(229, 9, 20, 0.3);
-          background: var(--crimson-700, #b80710);
-        }
-        .sofun-promo-btn:hover .sofun-promo-btn-arrow {
-          transform: translateX(3px);
-        }
-        .sofun-promo-btn-arrow {
-          font-size: 11px;
-          transition: transform 0.18s ease;
-        }
-        .sofun-promo-hint {
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 11.5px;
-          font-weight: 500;
-          color: #6b7280;
-        }
-        .sofun-promo-hint i {
-          font-size: 10.5px;
-          color: #10b981;
         }
         .sofun-promo-banner-wrap {
           flex: 1.15;
           position: relative;
           min-height: 260px;
-          background: #f9fafb;
+          background: #f4f4f5;
           overflow: hidden;
         }
         .sofun-promo-banner-img {
@@ -934,26 +844,19 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           height: 100%;
           object-fit: cover;
           display: block;
-          transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-        .sofun-promo-card:hover .sofun-promo-banner-img {
-          transform: scale(1.02);
         }
 
         @media(max-width: 899px) {
           .sofun-promo-card { flex-direction: column; }
           .sofun-promo-banner-wrap { order: 1; min-height: 200px; aspect-ratio: 16 / 9; }
           .sofun-promo-content { order: 2; padding: 24px 20px; }
-          .sofun-promo-benefit { width: 100%; box-sizing: border-box; justify-content: space-between; }
-          .sofun-promo-action-row { flex-direction: column; align-items: stretch; gap: 10px; }
           .sofun-promo-btn { width: 100%; }
-          .sofun-promo-hint { justify-content: center; }
           .mm-scatter-r,.mm-hero-main,.mm-hero-pill,.mm-hero-dots{display:none!important}
         }
 
         @media(min-width: 900px) {
           .sofun-promo-card { flex-direction: row; align-items: stretch; }
-          .sofun-promo-content { order: 1; flex: 0 0 460px; max-width: 480px; }
+          .sofun-promo-content { order: 1; flex: 0 0 480px; max-width: 500px; }
           .sofun-promo-banner-wrap { order: 2; flex: 1; min-height: 380px; }
         }
 
@@ -1330,53 +1233,29 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
           <div className="sofun-promo-card mm-reveal">
             {/* Promo Info */}
             <div className="sofun-promo-content">
-              {/* Refined Minimal Kicker */}
-              <div className="sofun-promo-kicker">
-                <span className="sofun-promo-kicker-dot" />
-                <span className="sofun-promo-kicker-text">
-                  {promoSettings?.promoTag
-                    ? String(promoSettings.promoTag).replace(/^[^w฀-๿]+/g, '').trim()
-                    : 'SPECIAL CAMPAIGN'}
-                </span>
-              </div>
+              <div className="sofun-promo-tag">{promoSettings?.promoTag ? String(promoSettings.promoTag).replace(/^[^\p{L}\p{N}]+/u, '').trim() || 'PROMOTION' : 'PROMOTION'}</div>
 
-              {/* Promo Title */}
               <h2 className="sofun-promo-title">
-                {promoSettings?.heading || 'โปรเปิดตี้สืบคดีสุดคุ้ม'}
+                {promoSettings?.heading || 'แต่งผี แต่งแฟนตาซี'}
               </h2>
 
-              {/* Promo Description */}
               <p className="sofun-promo-desc">
-                {promoSettings?.description || 'เริ่มต้นง่าย เลือกสคริปต์ที่ชอบ ชวนเพื่อนมาสืบสวน และค้นหาว่าใครคือฆาตกร พร้อมรับส่วนลดพิเศษเมื่อจองรอบเล่นล่วงหน้า'}
+                {promoSettings?.description || 'เพียงแต่แต่งชุดแฟนตาซีชุดใดก็ได้ทั้งตี้ รับส่วนลด 500 บาท / 1 ปาร์ตี้'}
               </p>
 
-              {/* Pro Minimal Benefit Voucher Card */}
               {promoSettings?.discountAmount && (
-                <div className="sofun-promo-benefit">
-                  <div className="sofun-promo-benefit-tag">
-                    <i className="fas fa-ticket-alt" />
-                  </div>
-                  <div className="sofun-promo-benefit-body">
-                    <span className="sofun-promo-benefit-label">
-                      {promoSettings.discountType === 'person' ? 'ส่วนลดต่อท่าน' : 'ส่วนลดทั้งปาร์ตี้'}
-                    </span>
-                    <span className="sofun-promo-benefit-sub">
-                      {promoSettings.discountType === 'person' ? 'ลดคนละเท่ากันทุกที่นั่ง' : 'หักส่วนลดทันทีจากยอดบิล'}
-                    </span>
-                  </div>
-                  <div className="sofun-promo-benefit-divider" />
-                  <div className="sofun-promo-benefit-value">
-                    <span className="sofun-promo-benefit-currency">฿</span>
-                    <span className="sofun-promo-benefit-amount">
-                      {promoSettings.discountAmount}
-                    </span>
-                    <span className="sofun-promo-benefit-suffix">OFF</span>
-                  </div>
+                <div className="sofun-promo-pill">
+                  <span className="sofun-promo-pill-label">
+                    {promoSettings.discountType === 'person' ? 'ส่วนลดต่อคน' : 'ส่วนลดทั้งปาร์ตี้'}
+                  </span>
+                  <span className="sofun-promo-pill-dot" />
+                  <span className="sofun-promo-pill-val">
+                    ฿{promoSettings.discountAmount} OFF
+                  </span>
                 </div>
               )}
 
-              {/* Action Row */}
-              <div className="sofun-promo-action-row">
+              <div>
                 <button
                   type="button"
                   className="sofun-promo-btn"
@@ -1394,12 +1273,8 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                       .replace(/\s*(?:→|->)\s*$/g, '')
                       .trim() || 'จองรอบรับสิทธิ์เลย'}
                   </span>
-                  <i className="fas fa-arrow-right sofun-promo-btn-arrow" />
+                  <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
                 </button>
-                <div className="sofun-promo-hint">
-                  <i className="fas fa-check-circle" />
-                  <span>ไม่ต้องกรอกโค้ด สิทธิ์คำนวณอัตโนมัติ</span>
-                </div>
               </div>
             </div>
 
