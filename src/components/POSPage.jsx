@@ -275,6 +275,7 @@ export const newPOSSession = () => ({
   customPrice: '',
   dm: '',
   npc: '',
+  npcUids: [],
   room: '',
   order: [],
   confirmedOrderId: null,
@@ -378,6 +379,23 @@ export default function POSPage({
   const [slipVerifyMember, setSlipVerifyMember] = useState(null)
   const [gameSearch, setGameSearch] = useState('')
   const [gameDropOpen, setGameDropOpen] = useState(false)
+  const [npcDropOpen, setNpcDropOpen] = useState(false)
+  const npcDropRef = useRef(null)
+
+  useEffect(() => {
+    if (!npcDropOpen) return
+    const handleOutside = (e) => {
+      if (npcDropRef.current && !npcDropRef.current.contains(e.target)) {
+        setNpcDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [npcDropOpen])
   const [mobilePanel, setMobilePanel] = useState('members') // 'members' | 'menu' | 'order' — mobile only
   const [expandedMembers, setExpandedMembers] = useState(() => new Set())
   const [editingUnlocked, setEditingUnlocked] = useState(false)
@@ -499,6 +517,47 @@ export default function POSPage({
 
   const updateActive = (patch) => updateSession(activeSession.id, patch)
 
+  const isNpcSelected = (member) => {
+    if (!member) return false
+    const uids = Array.isArray(activeSession?.npcUids) ? activeSession.npcUids : []
+    if (uids.includes(member.id)) return true
+
+    const dmName = (member.nickname || member.firstname || '').trim().toLowerCase()
+    if (!dmName) return false
+    const names = (activeSession?.npc || '')
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean)
+    return names.includes(dmName)
+  }
+
+  const toggleNpc = (member) => {
+    if (!member) return
+    const isChecked = isNpcSelected(member)
+    const currentlySelected = adminMembers.filter(m => isNpcSelected(m))
+
+    const nextSelected = isChecked
+      ? currentlySelected.filter(m => m.id !== member.id)
+      : (currentlySelected.some(m => m.id === member.id) ? currentlySelected : [...currentlySelected, member])
+
+    const nextUids = nextSelected.map(m => m.id)
+    const nextNames = nextSelected
+      .map(m => m.nickname || m.firstname || '')
+      .filter(Boolean)
+      .join(', ')
+
+    updateActive({
+      npcUids: nextUids,
+      npc: nextNames,
+    })
+  }
+
+  const selectedNpcCount = useMemo(() => {
+    const matched = adminMembers.filter(m => isNpcSelected(m)).length
+    if (matched > 0) return matched
+    return activeSession?.npc ? activeSession.npc.split(',').map(s => s.trim()).filter(Boolean).length : 0
+  }, [adminMembers, activeSession?.npc, activeSession?.npcUids])
+
   // ── load initialUid into active session once ──────────────────────
   const handledUidRef = useRef(null)
   useEffect(() => {
@@ -599,6 +658,7 @@ export default function POSPage({
               eventName: '',
               dm: mo.dm || '',
               npc: mo.npc || '',
+              npcUids: Array.isArray(mo.npcUids) ? mo.npcUids : [],
               room: mo.room || '',
               order: orderItems,
               confirmedOrderId: mo.id,
@@ -1055,6 +1115,7 @@ export default function POSPage({
           room: activeSession.room || '',
           dm: activeSession.dm || '',
           npc: activeSession.npc || '',
+          npcUids: activeSession.npcUids || [],
           customPrice: activeSession.customPrice ?? '',
           gameUnitPrice: gameUnitPay,
           gameTotal: gamePrice,
@@ -1086,6 +1147,7 @@ export default function POSPage({
           scriptTitle: selectedGame?.title || '',
           dm: activeSession.dm || '',
           npc: activeSession.npc || '',
+          npcUids: activeSession.npcUids || [],
           room: activeSession.room || '',
           updatedAt: serverTimestamp(),
         })
@@ -1108,6 +1170,7 @@ export default function POSPage({
     activeSession?.room,
     activeSession?.dm,
     activeSession?.npc,
+    activeSession?.npcUids,
     selectedGame?.title,
     gamePrice,
     foodTotal,
@@ -1943,6 +2006,7 @@ export default function POSPage({
           scriptTitle: selectedGame?.title || '',
           dm: activeSession.dm,
           npc: activeSession.npc || '',
+          npcUids: activeSession.npcUids || [],
           room: activeSession.room,
           members: activeSession.members.map(m => ({
             uid: m.uid, name: m.name, character: m.character || '',
@@ -3548,14 +3612,209 @@ export default function POSPage({
                     ))}
                   </select>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">NPC</label>
-                  <input
+                <div className="form-group" ref={npcDropRef} style={{ position: 'relative' }}>
+                  <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span>NPC</span>
+                    {selectedNpcCount > 0 && (
+                      <span style={{ fontSize: 10, fontWeight: 800, color: '#c62419' }}>
+                        {selectedNpcCount} คน
+                      </span>
+                    )}
+                  </label>
+                  <div
+                    onClick={() => setNpcDropOpen(prev => !prev)}
                     className="form-input"
-                    placeholder="ชื่อ NPC..."
-                    value={activeSession.npc || ''}
-                    onChange={e => updateActive({ npc: e.target.value })}
-                  />
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 6,
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                      borderColor: npcDropOpen ? '#c62419' : 'rgba(26,26,26,0.1)',
+                      boxShadow: npcDropOpen ? '0 0 0 3px rgba(198,36,25,0.08)' : 'none',
+                      minHeight: 38,
+                      height: 38,
+                      boxSizing: 'border-box',
+                      background: '#ffffff'
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 13,
+                      fontWeight: activeSession.npc ? 700 : 500,
+                      color: activeSession.npc ? '#1a1a1a' : 'rgba(26,26,26,0.4)',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      flex: 1
+                    }}>
+                      {activeSession.npc || '— เลือก NPC —'}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {activeSession.npc && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            updateActive({ npc: '', npcUids: [] })
+                          }}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: 'rgba(26,26,26,0.4)',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            fontSize: 11,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 4
+                          }}
+                          title="ล้างที่เลือก"
+                        >
+                          <i className="fas fa-times" />
+                        </button>
+                      )}
+                      <i
+                        className="fas fa-chevron-down"
+                        style={{
+                          fontSize: 10,
+                          color: 'rgba(26,26,26,0.4)',
+                          transition: 'transform 0.18s ease',
+                          transform: npcDropOpen ? 'rotate(180deg)' : 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  {npcDropOpen && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
+                        background: '#ffffff',
+                        border: '1px solid rgba(26,26,26,0.12)',
+                        borderRadius: 10,
+                        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.15), 0 4px 10px -2px rgba(0,0,0,0.08)',
+                        zIndex: 250,
+                        maxHeight: 240,
+                        overflowY: 'auto',
+                        padding: '4px 0'
+                      }}
+                    >
+                      <div
+                        style={{
+                          padding: '6px 12px',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: 'rgba(26,26,26,0.5)',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid rgba(26,26,26,0.06)',
+                          marginBottom: 2
+                        }}
+                      >
+                        <span>เลือก DM ที่เป็น NPC ({selectedNpcCount} คน)</span>
+                        {selectedNpcCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              updateActive({ npc: '', npcUids: [] })
+                            }}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#c62419',
+                              fontSize: 11,
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                              padding: 0
+                            }}
+                          >
+                            ล้างทั้งหมด
+                          </button>
+                        )}
+                      </div>
+
+                      {adminMembers.length === 0 ? (
+                        <div style={{ padding: '12px', textAlign: 'center', color: 'rgba(26,26,26,0.4)', fontSize: 12 }}>
+                          ไม่พบรายชื่อ DM ในระบบ
+                        </div>
+                      ) : (
+                        adminMembers.map(a => {
+                          const dmName = a.nickname || a.firstname || ''
+                          const fullName = `${dmName}${a.lastname ? ` ${a.lastname}` : ''}`.trim()
+                          const isChecked = isNpcSelected(a)
+                          const isMainDm = activeSession.dmUid === a.id || (activeSession.dm && activeSession.dm.trim().toLowerCase() === dmName.trim().toLowerCase())
+
+                          return (
+                            <label
+                              key={a.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 9,
+                                padding: '8px 12px',
+                                cursor: 'pointer',
+                                fontSize: 12.5,
+                                color: '#1a1a1a',
+                                background: isChecked ? 'rgba(198,36,25,0.06)' : 'transparent',
+                                transition: 'background 0.12s',
+                                userSelect: 'none'
+                              }}
+                              onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = '#faf7f5' }}
+                              onMouseLeave={e => { if (!isChecked) e.currentTarget.style.background = 'transparent' }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => toggleNpc(a)}
+                                style={{
+                                  accentColor: '#c62419',
+                                  width: 15,
+                                  height: 15,
+                                  cursor: 'pointer',
+                                  flexShrink: 0
+                                }}
+                              />
+                              <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span style={{
+                                  fontWeight: isChecked ? 800 : 500,
+                                  color: isChecked ? '#c62419' : '#1a1a1a',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}>
+                                  {fullName}
+                                </span>
+                                {isMainDm && (
+                                  <span style={{
+                                    fontSize: 9.5,
+                                    fontWeight: 700,
+                                    color: 'rgba(26,26,26,0.45)',
+                                    background: 'rgba(26,26,26,0.06)',
+                                    padding: '1px 5px',
+                                    borderRadius: 4,
+                                    flexShrink: 0
+                                  }}>
+                                    DM ประจำโต๊ะ
+                                  </span>
+                                )}
+                              </div>
+                              {isChecked && (
+                                <i className="fas fa-check" style={{ fontSize: 11, color: '#c62419', flexShrink: 0 }} />
+                              )}
+                            </label>
+                          )
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="form-group" style={{ marginTop: 4 }}>
