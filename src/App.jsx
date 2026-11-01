@@ -27,19 +27,24 @@ import { handleDirectLineBooking } from './utils/bookingHelper'
 import RandomWheelPage from './components/RandomWheelPage'
 import AllOfUsWillDiePage from './components/AllOfUsWillDiePage'
 import RehistoryPage from './components/RehistoryPage'
+import HandbookPage from './components/HandbookPage'
 import TierEffect from './components/TierEffect'
 import { ACHIEVEMENT_LIST } from './constants/achievements'
 import { syncMemberTierAchievements } from './utils/achievementTierSync'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 
-const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory']
+const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory', 'handbook']
 
 function parseUrl(pathname) {
   const cleanPath = (pathname || '').split('?')[0].split('#')[0]
   const parts = cleanPath.replace(/^\//, '').split('/')
   const first = parts[0] || ''
   if (first.toLowerCase() === 'allofuswilldie') return { page: 'allofuswilldie', detailId: null }
+  if (first.toLowerCase() === 'handbook') {
+    const rawSlug = parts.slice(1).join('/')
+    return { page: 'handbook', detailId: rawSlug ? decodeURIComponent(rawSlug) : null }
+  }
   if (first === 'games' && parts[1]) return { page: 'detail', detailId: parts[1] }
   if (first === 'admindashboard') return { page: 'admin', detailId: null }
   if (PAGE_PATHS.includes(first.toLowerCase())) return { page: first.toLowerCase(), detailId: null }
@@ -50,6 +55,8 @@ function buildUrl(page, id = null) {
   if (page === 'home') return '/'
   if (page === 'detail' && id) return `/games/${id}`
   if (page === 'allofuswilldie') return '/AllOfUsWillDie'
+  if (page === 'handbook' && id) return '/handbook/' + encodeURIComponent(id)
+  if (page === 'handbook') return '/handbook'
   return `/${page}`
 }
 
@@ -217,7 +224,7 @@ export default function App() {
     const handlePop = () => {
       const { page, detailId: did } = parseUrl(window.location.pathname)
       setCurrentPage(page)
-      if (did) setDetailId(did)
+      setDetailId(did || null)
       window.scrollTo(0, 0)
     }
     window.addEventListener('popstate', handlePop)
@@ -232,8 +239,8 @@ export default function App() {
         sessionStorage.removeItem('sofun_auth_return_url')
         const { page, detailId: did } = parseUrl(returnUrl)
         setCurrentPage(page)
-        if (did) setDetailId(did)
-        window.history.replaceState({ page, detailId: did }, '', returnUrl)
+        setDetailId(did || null)
+        window.history.replaceState({ page, detailId: did || null }, '', returnUrl)
       }
     } catch (e) {
       console.warn('Restore return URL failed:', e)
@@ -724,6 +731,15 @@ export default function App() {
     if (page === 'booking' && extra?.gameId) {
       setBookingGameId(extra.gameId)
     }
+    if (page === 'handbook') {
+      const hid = extra?.gameId || extra?.slug || (typeof extra === 'string' ? extra : null)
+      setDetailId(hid || null)
+      setPrevPage(p => p)
+      setCurrentPage('handbook')
+      window.history.pushState({ page: 'handbook', detailId: hid || null }, '', buildUrl('handbook', hid || null))
+      window.scrollTo(0, 0)
+      return
+    }
     setPrevPage(p => p)
     setCurrentPage(page)
     window.history.pushState({ page }, '', buildUrl(page))
@@ -739,7 +755,7 @@ export default function App() {
 
   return (
     <>
-      {currentPage !== 'random' && currentPage !== 'allofuswilldie' && (
+      {currentPage !== 'random' && currentPage !== 'allofuswilldie' && !(currentPage === 'handbook' && detailId) && (
         <Nav
           currentPage={currentPage}
           showPage={showPage}
@@ -867,6 +883,20 @@ export default function App() {
             isAdmin={isEffectiveAdmin}
             showToast={showToast}
             showPage={showPage}
+          />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'handbook' && (
+        <ErrorBoundary>
+          <HandbookPage
+            lineUser={lineUser}
+            isEffectiveAdmin={isEffectiveAdmin}
+            allGames={allGames}
+            handbookSlug={detailId}
+            showPage={showPage}
+            showDetail={showDetail}
+            onLogin={handleLineLogin}
+            showToast={showToast}
           />
         </ErrorBoundary>
       )}

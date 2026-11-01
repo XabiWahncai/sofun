@@ -8993,6 +8993,7 @@ const NAV_SECTIONS = [
     items: [
       { key: 'random', icon: 'fa-dharmachakra', label: 'วงล้อสุ่ม' },
       { key: 'allofuswilldie', icon: 'fa-user-secret', label: 'All of Us Will Die', href: '/allofuswilldie' },
+      { key: 'handbook', icon: 'fa-book-open', label: 'คู่มือ DM (Handbook)', href: '/handbook' },
     ],
   },
   {
