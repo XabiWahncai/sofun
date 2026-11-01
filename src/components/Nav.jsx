@@ -159,9 +159,6 @@ export default function Nav({
               <button className="nav-admin-btn" onClick={() => handleNav('random')} style={{ background: 'rgba(200,160,80,0.15)', borderColor: '#c8a050', color: '#c8a050' }}>
                 <i className="fas fa-dharmachakra" /> วงล้อ
               </button>
-              <button className="nav-admin-btn" onClick={() => handleNav('handbook')} style={{ background: 'rgba(56,189,248,0.15)', borderColor: '#38bdf8', color: '#38bdf8' }} title="คู่มือ Game Master">
-                <i className="fas fa-book-open" /> Handbook
-              </button>
               <button className="nav-admin-btn" onClick={() => handleNav('admin')}>
                 <i className="fas fa-cog" /> Admin
               </button>
