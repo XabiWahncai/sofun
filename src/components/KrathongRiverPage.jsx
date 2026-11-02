@@ -40,7 +40,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   ])
   const [soundEnabled, setSoundEnabled] = useState(false)
   const audioCtxRef = useRef(null)
-  const ytPlayerRef = useRef(null)
+  const bgAudioRef = useRef(null)
 
   // Real-time animation positions
   const krathongPositionsRef = useRef(new Map())
@@ -237,91 +237,32 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   }
 
   // ── Web Audio Ambient Sound ──────────────────────────────
-    // ── YouTube IFrame API Loader for Background Music (X80o4uXSkOs) ──
+    // ── Cleanup background audio on unmount ───────────────────
   useEffect(() => {
-    let isCancelled = false
-
-    const initYT = () => {
-      if (isCancelled) return
-      if (window.YT && window.YT.Player && !ytPlayerRef.current) {
-        try {
-          ytPlayerRef.current = new window.YT.Player('yt-bg-audio-player', {
-            videoId: 'X80o4uXSkOs',
-            playerVars: {
-              autoplay: 0,
-              controls: 0,
-              loop: 1,
-              playlist: 'X80o4uXSkOs',
-              playsinline: 1,
-              modestbranding: 1,
-              rel: 0,
-            },
-            events: {
-              onReady: (event) => {
-                if (isCancelled) return
-                try {
-                  event.target.setVolume(75)
-                  if (soundEnabled) {
-                    event.target.playVideo()
-                  }
-                } catch {}
-              },
-              onStateChange: (event) => {
-                if (isCancelled) return
-                // Loop when finished
-                if (event.data === window.YT.PlayerState.ENDED) {
-                  try { event.target.playVideo() } catch {}
-                }
-              },
-            },
-          })
-        } catch (err) {
-          console.warn('YouTube player initialization failed:', err)
-        }
-      }
-    }
-
-    if (!window.YT) {
-      const tag = document.createElement('script')
-      tag.src = 'https://www.youtube.com/iframe_api'
-      const firstScriptTag = document.getElementsByTagName('script')[0]
-      if (firstScriptTag && firstScriptTag.parentNode) {
-        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
-      } else {
-        document.head.appendChild(tag)
-      }
-    }
-
-    if (window.YT && window.YT.Player) {
-      initYT()
-    } else {
-      const prevCallback = window.onYouTubeIframeAPIReady
-      window.onYouTubeIframeAPIReady = () => {
-        if (prevCallback) prevCallback()
-        initYT()
-      }
-    }
-
     return () => {
-      isCancelled = true
-      if (ytPlayerRef.current) {
+      if (bgAudioRef.current) {
         try {
-          if (ytPlayerRef.current.destroy) ytPlayerRef.current.destroy()
+          bgAudioRef.current.pause()
         } catch {}
-        ytPlayerRef.current = null
+      }
+      if (audioCtxRef.current) {
+        try {
+          audioCtxRef.current.close()
+        } catch {}
+        audioCtxRef.current = null
       }
     }
   }, [])
 
   const toggleSound = () => {
     if (soundEnabled) {
-      // Pause YouTube Music
-      if (ytPlayerRef.current) {
+      if (bgAudioRef.current) {
         try {
-          if (ytPlayerRef.current.pauseVideo) ytPlayerRef.current.pauseVideo()
-        } catch {}
+          bgAudioRef.current.pause()
+        } catch (err) {
+          console.warn('Audio pause error:', err)
+        }
       }
-      // Stop Web Audio pink noise
       if (audioCtxRef.current) {
         try {
           audioCtxRef.current.close()
@@ -331,15 +272,21 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       setSoundEnabled(false)
       if (showToast) showToast('ปิดเสียงดนตรีและสายน้ำแล้ว')
     } else {
-      // Play YouTube Music (รำวงวันลอยกระทง ระนาดเอก X80o4uXSkOs)
-      if (ytPlayerRef.current) {
+      // Play Background Loy Krathong Ranad Music
+      if (bgAudioRef.current) {
         try {
-          if (ytPlayerRef.current.playVideo) ytPlayerRef.current.playVideo()
+          bgAudioRef.current.volume = 0.8
+          const playPromise = bgAudioRef.current.play()
+          if (playPromise !== undefined) {
+            playPromise.catch((err) => {
+              console.warn('Audio play failed:', err)
+            })
+          }
         } catch (err) {
-          console.warn('YouTube playVideo failed:', err)
+          console.warn('Audio play failed:', err)
         }
       }
-      // Start Gentle River Water Web Audio
+      // Start Gentle River Water Web Audio (Pink Noise)
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext
         const ctx = new AudioContext()
@@ -1332,7 +1279,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             }}
           >
             <i
-              className={`fas ${soundEnabled ? 'fa-music' : 'fa-volume-xmark'}`}
+              className={`fas ${soundEnabled ? 'fa-volume-high' : 'fa-music'}`}
               style={{
                 fontSize: '13px',
                 color: soundEnabled ? '#fde047' : '#94a3b8',
@@ -1340,7 +1287,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               }}
             />
             <span style={{ whiteSpace: 'nowrap', fontSize: '11px' }}>
-              {soundEnabled ? 'เปิดเพลงลอยกระทง' : 'เปิดเพลง'}
+              {soundEnabled ? 'ปิดเพลงลอยกระทง' : 'เปิดเพลงลอยกระทง'}
             </span>
           </button>
         </div>
@@ -1463,22 +1410,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         )}
       </div>
 
-      {/* Hidden Background YouTube Music Player Container */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: '-200px',
-          right: '-200px',
-          width: '20px',
-          height: '20px',
-          opacity: 0.01,
-          pointerEvents: 'none',
-          overflow: 'hidden',
-          zIndex: -1,
-        }}
-      >
-        <div id="yt-bg-audio-player" />
-      </div>
+      {/* Background Loy Krathong Ranad Music Audio Element */}
+      <audio
+        ref={bgAudioRef}
+        src="/loykrathong-music.mp3"
+        preload="auto"
+        loop
+        playsInline
+      />
 
       <style>{`
         @keyframes waveScrollLeft {
