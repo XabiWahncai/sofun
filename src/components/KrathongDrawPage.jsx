@@ -573,259 +573,289 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #050814 0%, #0a1329 45%, #0d1e3d 100%)',
-      color: '#ffffff',
-      fontFamily: "'Sarabun', sans-serif",
-      paddingBottom: '80px',
+      background: 'radial-gradient(ellipse at 50% -10%, #1a1a24 0%, #08080c 60%, #000000 100%)',
+      color: '#f5f5f7',
+      fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Sukhumvit Set', 'Sarabun', sans-serif",
+      paddingBottom: '96px',
+      WebkitFontSmoothing: 'antialiased',
+      MozOsxFontSmoothing: 'grayscale',
     }}>
-      {/* Top Header */}
+      {/* Apple-style Minimal Glass Navigation Bar */}
       <header style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: '16px 20px',
+        padding: '0 24px',
+        height: '52px',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
-        background: 'rgba(5, 8, 20, 0.88)',
-        backdropFilter: 'blur(12px)',
+        background: 'rgba(0, 0, 0, 0.72)',
+        backdropFilter: 'blur(20px)',
+        WebkitBackdropFilter: 'blur(20px)',
         position: 'sticky',
         top: 0,
         zIndex: 50,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <button
-            type="button"
-            onClick={() => showPage('loykrathong')}
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              color: '#ffffff',
-              borderRadius: '8px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-            }}
-          >
-            <i className="fas fa-arrow-left" /> กลับ
-          </button>
-          <div>
-            <h1 style={{
-              fontSize: '16px',
-              fontWeight: 800,
-              margin: 0,
-              color: '#fef08a',
-            }}>
-              สตูดิโอวาดกระทงทำมือ
-            </h1>
-            <p style={{
-              fontSize: '11px',
-              color: 'rgba(255, 255, 255, 0.65)',
-              margin: 0,
-            }}>
-              /Krathong — วาด ใส่ชื่อ และส่งคำอธิษฐาน
-            </p>
-          </div>
+        <button
+          type="button"
+          onClick={() => showPage('loykrathong')}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#86868b',
+            cursor: 'pointer',
+            fontSize: '13px',
+            fontWeight: 500,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '6px 0',
+            transition: 'color 0.16s ease',
+          }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff' }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b' }}
+        >
+          <i className="fas fa-chevron-left" style={{ fontSize: '11px' }} /> หน้าหลัก
+        </button>
+
+        <div style={{
+          fontSize: '13.5px',
+          fontWeight: 600,
+          color: '#f5f5f7',
+          letterSpacing: '-0.01em',
+        }}>
+          สตูดิโอกระทงทำมือ
         </div>
 
         <button
           type="button"
           onClick={() => showPage('river')}
           style={{
-            background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
-            border: 'none',
-            color: '#ffffff',
-            borderRadius: '10px',
-            padding: '7px 14px',
-            fontSize: '13px',
-            fontWeight: 700,
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            color: '#f5f5f7',
+            borderRadius: '9999px',
+            padding: '5px 14px',
+            fontSize: '12px',
+            fontWeight: 600,
             cursor: 'pointer',
-            display: 'flex',
+            display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            boxShadow: '0 4px 14px rgba(2, 132, 199, 0.35)',
+            backdropFilter: 'blur(12px)',
+            transition: 'background 0.16s ease, border-color 0.16s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
           }}
         >
-          <i className="fas fa-water" /> ดูแม่น้ำ (/River)
+          ชมแม่น้ำ <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '9px' }} />
         </button>
       </header>
 
-      {/* Main Container */}
-      <main style={{
-        maxWidth: '1080px',
+      {/* Apple-style Hero Typography Header */}
+      <section style={{
+        textAlign: 'center',
+        padding: '44px 20px 32px',
+        maxWidth: '680px',
         margin: '0 auto',
-        padding: '24px 16px',
       }}>
-        {/* Prominent Guidance Banner */}
         <div style={{
-          background: 'linear-gradient(90deg, rgba(245, 158, 11, 0.15) 0%, rgba(217, 119, 6, 0.08) 100%)',
-          border: '1px solid rgba(245, 158, 11, 0.35)',
-          borderRadius: '16px',
-          padding: '16px 20px',
-          marginBottom: '24px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '14px',
+          fontSize: '11px',
+          fontWeight: 700,
+          textTransform: 'uppercase',
+          letterSpacing: '0.14em',
+          color: '#f5a623',
+          marginBottom: '10px',
         }}>
-          <div style={{
-            width: '42px',
-            height: '42px',
-            borderRadius: '10px',
-            background: 'rgba(245, 158, 11, 0.2)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fef08a',
-            fontSize: '20px',
-            flexShrink: 0,
-          }}>
-            <i className="fas fa-palette" />
-          </div>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 700, color: '#fef08a' }}>
-              คำแนะนำ: ออกแบบกระทงของคุณให้งดงามตามจินตนาการ
-            </div>
-            <div style={{ fontSize: '12.5px', color: 'rgba(255, 255, 255, 0.8)', lineHeight: 1.5 }}>
-              ใช้แปรงเรืองแสงหรือพู่กันระบายกลีบดอกบัว เทียน และธูป เมื่อวาดเสร็จให้เขียนชื่อและคำอธิษฐาน จากนั้นกดปุ่ม "ปล่อยกระทง" เพื่อส่งกระทงของคุณไปลอยที่หน้า /River
-            </div>
-          </div>
+          เทศกาลลอยกระทง 2026
         </div>
+        <h1 style={{
+          fontSize: 'clamp(28px, 4.2vw, 40px)',
+          fontWeight: 700,
+          letterSpacing: '-0.025em',
+          color: '#f5f5f7',
+          margin: '0 0 10px',
+          lineHeight: 1.15,
+        }}>
+          สร้างสรรค์กระทงของคุณ.
+        </h1>
+        <p style={{
+          fontSize: '15px',
+          color: '#86868b',
+          lineHeight: 1.55,
+          margin: '0 auto',
+          fontWeight: 400,
+          maxWidth: '480px',
+        }}>
+          วาดกระทงด้วยพู่กันดิจิทัล เขียนคำอธิษฐาน และปล่อยลอยสู่สายน้ำร่วมกับผู้เล่นทุกคนในคืนวันเพ็ญ
+        </p>
+      </section>
 
-        {/* Studio Workspace Layout */}
+      {/* Studio Workspace Layout */}
+      <main style={{
+        maxWidth: '1040px',
+        margin: '0 auto',
+        padding: '0 20px',
+      }}>
         <div style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-          gap: '24px',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(330px, 1fr))',
+          gap: '28px',
           alignItems: 'start',
         }}>
-          {/* Left Column: Canvas Studio */}
+          {/* Left Column: Digital Art Canvas & Floating Tool Dock */}
           <div style={{
-            background: 'rgba(15, 23, 42, 0.75)',
-            border: '1.5px solid rgba(255, 255, 255, 0.12)',
-            borderRadius: '20px',
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
             padding: '20px',
-            boxShadow: '0 16px 40px rgba(0, 0, 0, 0.45)',
+            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(20px)',
           }}>
-            {/* Action Bar on top of canvas */}
+            {/* Top Canvas Utility Bar (Minimal Icon Pills) */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
               marginBottom: '14px',
-              flexWrap: 'wrap',
               gap: '8px',
+              flexWrap: 'wrap',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* History & Clear */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                 <button
                   type="button"
                   onClick={handleUndo}
                   title="ย้อนกลับ (Undo)"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#ffffff',
-                    borderRadius: '8px',
-                    padding: '6px 10px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  <i className="fas fa-undo" /> ย้อนกลับ
-                </button>
-                <button
-                  type="button"
-                  onClick={handleRedo}
-                  title="ทำซ้ำ (Redo)"
-                  style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#ffffff',
-                    borderRadius: '8px',
-                    padding: '6px 10px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  <i className="fas fa-redo" /> ทำซ้ำ
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClear}
-                  title="ล้างผ้าใบ"
-                  style={{
-                    background: 'rgba(239, 68, 68, 0.15)',
-                    border: '1px solid rgba(239, 68, 68, 0.3)',
-                    color: '#f87171',
-                    borderRadius: '8px',
-                    padding: '6px 10px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                  }}
-                >
-                  <i className="fas fa-trash-can" /> ล้าง
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <button
-                  type="button"
-                  onClick={() => setShowGuide(!showGuide)}
-                  style={{
-                    background: showGuide ? 'rgba(245, 158, 11, 0.2)' : 'rgba(255, 255, 255, 0.06)',
-                    border: showGuide ? '1px solid rgba(245, 158, 11, 0.5)' : '1px solid rgba(255, 255, 255, 0.12)',
-                    color: showGuide ? '#fef08a' : 'rgba(255, 255, 255, 0.7)',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#f5f5f7',
                     borderRadius: '8px',
                     padding: '6px 10px',
                     cursor: 'pointer',
                     fontSize: '12px',
                     display: 'flex',
                     alignItems: 'center',
+                    gap: '4px',
+                    transition: 'background 0.14s ease',
+                  }}
+                >
+                  <i className="fas fa-rotate-left" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRedo}
+                  title="ทำซ้ำ (Redo)"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#f5f5f7',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'background 0.14s ease',
+                  }}
+                >
+                  <i className="fas fa-rotate-right" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  title="ล้างภาพวาด"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#86868b',
+                    borderRadius: '8px',
+                    padding: '6px 10px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    transition: 'color 0.14s ease',
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b' }}
+                >
+                  <i className="fas fa-trash-can" />
+                </button>
+              </div>
+
+              {/* Guide Toggle, Quick Stamps & Download */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowGuide(!showGuide)}
+                  style={{
+                    background: showGuide ? 'rgba(245, 166, 35, 0.18)' : 'rgba(255, 255, 255, 0.06)',
+                    border: showGuide ? '1px solid rgba(245, 166, 35, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
+                    color: showGuide ? '#f5a623' : '#86868b',
+                    borderRadius: '8px',
+                    padding: '5px 10px',
+                    fontSize: '11.5px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
                     gap: '5px',
                   }}
                 >
-                  <i className="fas fa-shapes" /> เส้นไกด์ร่าง {showGuide ? 'เปิด' : 'ปิด'}
+                  <i className="fas fa-shapes" style={{ fontSize: '10px' }} />
+                  เส้นร่าง {showGuide ? 'เปิด' : 'ปิด'}
                 </button>
                 <button
                   type="button"
                   onClick={handleDownload}
-                  title="ดาวน์โหลดรูปภาพกระทง"
+                  title="บันทึกรูปภาพ"
                   style={{
-                    background: 'rgba(255, 255, 255, 0.08)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    color: '#ffffff',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    color: '#86868b',
                     borderRadius: '8px',
                     padding: '6px 10px',
                     cursor: 'pointer',
                     fontSize: '12px',
                   }}
+                  onMouseEnter={(e) => { e.currentTarget.style.color = '#f5f5f7' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b' }}
                 >
-                  <i className="fas fa-download" />
+                  <i className="fas fa-arrow-down-to-line" />
                 </button>
               </div>
             </div>
 
-            {/* Canvas Box (Checkerboard transparency preview) */}
+            {/* Apple Gallery-Style Canvas Frame */}
             <div style={{
               position: 'relative',
               width: '100%',
               aspectRatio: '1 / 1',
-              borderRadius: '16px',
+              borderRadius: '20px',
               overflow: 'hidden',
-              boxShadow: 'inset 0 0 20px rgba(0, 0, 0, 0.8), 0 8px 24px rgba(0, 0, 0, 0.5)',
-              background: '#0a0f1d',
-              border: '2px solid rgba(245, 158, 11, 0.25)',
+              background: '#09090b',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              boxShadow: 'inset 0 0 40px rgba(0, 0, 0, 0.9), 0 16px 36px rgba(0, 0, 0, 0.6)',
               touchAction: 'none',
             }}>
-              {/* Water background aesthetic inside canvas */}
+              {/* Subtle ambient gradient */}
               <div style={{
                 position: 'absolute',
                 inset: 0,
-                background: 'radial-gradient(circle at 50% 50%, rgba(15, 30, 66, 0.6) 0%, rgba(5, 10, 25, 0.95) 100%)',
+                background: 'radial-gradient(circle at 50% 50%, rgba(30, 41, 59, 0.4) 0%, rgba(9, 9, 11, 0.95) 100%)',
                 pointerEvents: 'none',
               }} />
 
-              {/* Guide Canvas Overlay */}
+              {/* Guide Canvas */}
               <canvas
                 ref={guideCanvasRef}
                 style={{
@@ -851,195 +881,207 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                   inset: 0,
                   width: '100%',
                   height: '100%',
-                  cursor: tool === 'eraser' ? 'cell' : tool === 'bucket' ? 'crosshair' : 'crosshair',
+                  cursor: tool === 'eraser' ? 'cell' : 'crosshair',
                   zIndex: 3,
                   touchAction: 'none',
                 }}
               />
             </div>
 
-            {/* Quick Stamps for Easy Krathong Decorating */}
+            {/* Quick Stamps (Candle & Lotus) */}
             <div style={{
-              marginTop: '14px',
+              marginTop: '12px',
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               gap: '8px',
-              flexWrap: 'wrap',
             }}>
-              <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)', fontWeight: 600 }}>
-                ตราประทับด่วน:
+              <span style={{ fontSize: '11.5px', color: '#86868b' }}>
+                ตราประทับสำเร็จรูป:
               </span>
-              <button
-                type="button"
-                onClick={() => stampItem('candle')}
-                style={{
-                  background: 'rgba(245, 158, 11, 0.15)',
-                  border: '1px solid rgba(245, 158, 11, 0.35)',
-                  color: '#fef08a',
-                  borderRadius: '8px',
-                  padding: '5px 10px',
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <i className="fas fa-fire" /> จุดธูปเทียนทอง
-              </button>
-              <button
-                type="button"
-                onClick={() => stampItem('lotus')}
-                style={{
-                  background: 'rgba(244, 63, 94, 0.15)',
-                  border: '1px solid rgba(244, 63, 94, 0.35)',
-                  color: '#fbcfe8',
-                  borderRadius: '8px',
-                  padding: '5px 10px',
-                  fontSize: '11.5px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '5px',
-                }}
-              >
-                <i className="fas fa-spa" /> ฐานกระทงบัวหลวง
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => stampItem('candle')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.09)',
+                    color: '#f5a623',
+                    borderRadius: '8px',
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <i className="fas fa-fire" /> ธูปเทียน
+                </button>
+                <button
+                  type="button"
+                  onClick={() => stampItem('lotus')}
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.09)',
+                    color: '#f43f5e',
+                    borderRadius: '8px',
+                    padding: '4px 10px',
+                    fontSize: '11px',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <i className="fas fa-spa" /> ฐานบัว
+                </button>
+              </div>
             </div>
-          </div>
 
-          {/* Right Column: Complete Drawing Tools & Details Form */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            {/* Tool Selection Box */}
+            {/* iPadOS-Style Floating Brush Segmented Dock */}
             <div style={{
-              background: 'rgba(15, 23, 42, 0.75)',
-              border: '1.5px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '20px',
-              padding: '20px',
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3)',
+              marginTop: '16px',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '16px',
+              padding: '6px',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(6, 1fr)',
+              gap: '4px',
             }}>
-              <h3 style={{
-                fontSize: '14px',
-                fontWeight: 700,
-                color: '#fef08a',
-                margin: '0 0 12px',
-                letterSpacing: '0.02em',
-              }}>
-                เครื่องมือและหัวแปรงพู่กัน
-              </h3>
-
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(3, 1fr)',
-                gap: '8px',
-                marginBottom: '16px',
-              }}>
-                {[
-                  { id: 'glow', label: 'แปรงเรืองแสง', icon: 'fa-wand-magic-sparkles' },
-                  { id: 'brush', label: 'พู่กันสีน้ำ', icon: 'fa-paintbrush' },
-                  { id: 'pen', label: 'ปากกาเส้นคม', icon: 'fa-pen-nib' },
-                  { id: 'sparkle', label: 'ประกายดาว', icon: 'fa-star' },
-                  { id: 'bucket', label: 'ถังเทสี', icon: 'fa-fill-drip' },
-                  { id: 'eraser', label: 'ยางลบ', icon: 'fa-eraser' },
-                ].map((item) => (
+              {[
+                { id: 'glow', label: 'เรืองแสง', icon: 'fa-wand-magic-sparkles' },
+                { id: 'brush', label: 'พู่กัน', icon: 'fa-paintbrush' },
+                { id: 'pen', label: 'ปากกา', icon: 'fa-pen-nib' },
+                { id: 'sparkle', label: 'ประกาย', icon: 'fa-star' },
+                { id: 'bucket', label: 'เทสี', icon: 'fa-fill-drip' },
+                { id: 'eraser', label: 'ยางลบ', icon: 'fa-eraser' },
+              ].map((item) => {
+                const isActive = tool === item.id
+                return (
                   <button
                     key={item.id}
                     type="button"
                     onClick={() => setTool(item.id)}
                     style={{
-                      background: tool === item.id ? 'rgba(245, 158, 11, 0.25)' : 'rgba(255, 255, 255, 0.05)',
-                      border: tool === item.id ? '1.5px solid #f59e0b' : '1px solid rgba(255, 255, 255, 0.1)',
-                      color: tool === item.id ? '#fef08a' : 'rgba(255, 255, 255, 0.85)',
+                      background: isActive ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+                      border: 'none',
+                      color: isActive ? '#ffffff' : '#86868b',
                       borderRadius: '10px',
-                      padding: '10px 6px',
-                      fontSize: '12px',
-                      fontWeight: tool === item.id ? 700 : 500,
+                      padding: '8px 2px',
+                      fontSize: '11px',
+                      fontWeight: isActive ? 600 : 500,
                       cursor: 'pointer',
                       display: 'flex',
                       flexDirection: 'column',
                       alignItems: 'center',
-                      gap: '6px',
-                      transition: 'all 0.18s',
+                      gap: '4px',
+                      transition: 'all 0.16s ease',
+                      boxShadow: isActive ? '0 2px 8px rgba(0, 0, 0, 0.25)' : 'none',
                     }}
                   >
-                    <i className={`fas ${item.icon}`} style={{ fontSize: '15px' }} />
-                    <span>{item.label}</span>
+                    <i className={`fas ${item.icon}`} style={{ fontSize: '13px' }} />
+                    <span style={{ fontSize: '10px' }}>{item.label}</span>
                   </button>
-                ))}
-              </div>
+                )
+              })}
+            </div>
 
-              {/* Stroke Size & Opacity Controls */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginBottom: '14px' }}>
-                <div>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    marginBottom: '4px',
-                  }}>
-                    <span>ขนาดแปรง</span>
-                    <span style={{ color: '#fef08a', fontWeight: 700 }}>{brushSize}px</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="2"
-                    max="48"
-                    value={brushSize}
-                    onChange={(e) => setBrushSize(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }}
-                  />
-                </div>
-
-                <div>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    fontSize: '12px',
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    marginBottom: '4px',
-                  }}>
-                    <span>ความโปร่งใส</span>
-                    <span style={{ color: '#fef08a', fontWeight: 700 }}>{opacity}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="10"
-                    max="100"
-                    value={opacity}
-                    onChange={(e) => setOpacity(Number(e.target.value))}
-                    style={{ width: '100%', accentColor: '#f59e0b', cursor: 'pointer' }}
-                  />
-                </div>
-              </div>
-
-              {/* RGB Color System */}
-              <div style={{
-                background: 'rgba(0, 0, 0, 0.3)',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
-                borderRadius: '14px',
-                padding: '14px',
-              }}>
+            {/* Apple Minimal Sliders: Size & Opacity */}
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: '16px',
+              marginTop: '16px',
+              padding: '12px 14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '14px',
+            }}>
+              <div>
                 <div style={{
                   display: 'flex',
-                  alignItems: 'center',
                   justifyContent: 'space-between',
-                  marginBottom: '10px',
+                  fontSize: '11.5px',
+                  color: '#86868b',
+                  marginBottom: '6px',
                 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      width: '26px',
-                      height: '26px',
-                      borderRadius: '6px',
-                      background: currentColorHex,
-                      border: '2px solid #ffffff',
-                      boxShadow: `0 0 10px ${currentColorHex}`,
-                    }} />
-                    <span style={{ fontSize: '13px', fontWeight: 700, color: '#ffffff' }}>
-                      สีระบบ RGB ({colorR}, {colorG}, {colorB})
-                    </span>
-                  </div>
+                  <span>ขนาดหัวแปรง</span>
+                  <span style={{ color: '#f5f5f7', fontWeight: 600 }}>{brushSize}px</span>
+                </div>
+                <input
+                  type="range"
+                  min="2"
+                  max="48"
+                  value={brushSize}
+                  onChange={(e) => setBrushSize(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#f5a623', cursor: 'pointer' }}
+                />
+              </div>
 
+              <div>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: '11.5px',
+                  color: '#86868b',
+                  marginBottom: '6px',
+                }}>
+                  <span>ความทึบแสง</span>
+                  <span style={{ color: '#f5f5f7', fontWeight: 600 }}>{opacity}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="100"
+                  value={opacity}
+                  onChange={(e) => setOpacity(Number(e.target.value))}
+                  style={{ width: '100%', accentColor: '#f5a623', cursor: 'pointer' }}
+                />
+              </div>
+            </div>
+
+            {/* Apple Color Selection Section */}
+            <div style={{
+              marginTop: '16px',
+              padding: '14px',
+              background: 'rgba(255, 255, 255, 0.02)',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              borderRadius: '14px',
+            }}>
+              {/* Color Header with Preview and Native Picker */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '12px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{
+                    width: '20px',
+                    height: '20px',
+                    borderRadius: '50%',
+                    background: currentColorHex,
+                    boxShadow: `0 0 10px ${currentColorHex}`,
+                    border: '2px solid rgba(255, 255, 255, 0.8)',
+                  }} />
+                  <span style={{ fontSize: '12px', fontWeight: 600, color: '#f5f5f7' }}>
+                    สีระบบ RGB ({colorR}, {colorG}, {colorB})
+                  </span>
+                </div>
+
+                <label style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  fontSize: '11px',
+                  color: '#86868b',
+                  cursor: 'pointer',
+                }}>
+                  <span>เลือกสีอิสระ</span>
                   <input
                     type="color"
                     value={currentColorHex}
@@ -1050,78 +1092,29 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                       setColorB(b)
                     }}
                     style={{
-                      width: '32px',
-                      height: '28px',
+                      width: '22px',
+                      height: '22px',
                       padding: 0,
                       border: 'none',
-                      borderRadius: '6px',
+                      borderRadius: '50%',
                       cursor: 'pointer',
                       background: 'transparent',
                     }}
-                    title="เปิดกล่องเลือกสีอิสระ"
                   />
-                </div>
+                </label>
+              </div>
 
-                {/* Individual R, G, B Sliders */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                  {/* Red Slider */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ width: '14px', fontSize: '11px', fontWeight: 800, color: '#ef4444' }}>R</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="255"
-                      value={colorR}
-                      onChange={(e) => setColorR(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: '#ef4444', cursor: 'pointer' }}
-                    />
-                    <span style={{ width: '28px', textAlign: 'right', fontSize: '11px', color: '#ef4444', fontWeight: 700 }}>
-                      {colorR}
-                    </span>
-                  </div>
-
-                  {/* Green Slider */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ width: '14px', fontSize: '11px', fontWeight: 800, color: '#22c55e' }}>G</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="255"
-                      value={colorG}
-                      onChange={(e) => setColorG(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: '#22c55e', cursor: 'pointer' }}
-                    />
-                    <span style={{ width: '28px', textAlign: 'right', fontSize: '11px', color: '#22c55e', fontWeight: 700 }}>
-                      {colorG}
-                    </span>
-                  </div>
-
-                  {/* Blue Slider */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <span style={{ width: '14px', fontSize: '11px', fontWeight: 800, color: '#3b82f6' }}>B</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="255"
-                      value={colorB}
-                      onChange={(e) => setColorB(Number(e.target.value))}
-                      style={{ flex: 1, accentColor: '#3b82f6', cursor: 'pointer' }}
-                    />
-                    <span style={{ width: '28px', textAlign: 'right', fontSize: '11px', color: '#3b82f6', fontWeight: 700 }}>
-                      {colorB}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Preset Palette Chips */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  flexWrap: 'wrap',
-                  marginTop: '12px',
-                }}>
-                  {PRESET_COLORS.map((item, idx) => (
+              {/* Minimalist Circular Color Swatches */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                flexWrap: 'wrap',
+                marginBottom: '14px',
+              }}>
+                {PRESET_COLORS.map((item, idx) => {
+                  const isSelected = currentColorHex.toLowerCase() === item.hex.toLowerCase()
+                  return (
                     <button
                       key={idx}
                       type="button"
@@ -1135,50 +1128,99 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                       style={{
                         width: '24px',
                         height: '24px',
-                        borderRadius: '6px',
+                        borderRadius: '50%',
                         background: item.hex,
-                        border: currentColorHex.toLowerCase() === item.hex.toLowerCase() ? '2px solid #ffffff' : '1px solid rgba(255, 255, 255, 0.25)',
+                        border: 'none',
                         cursor: 'pointer',
                         padding: 0,
-                        transform: currentColorHex.toLowerCase() === item.hex.toLowerCase() ? 'scale(1.15)' : 'scale(1)',
-                        transition: 'transform 0.15s',
+                        outline: isSelected ? '2px solid #ffffff' : 'none',
+                        outlineOffset: '2px',
+                        transform: isSelected ? 'scale(1.1)' : 'scale(1)',
+                        transition: 'transform 0.15s ease',
                       }}
                     />
-                  ))}
+                  )
+                })}
+              </div>
+
+              {/* Slim RGB Track Controls */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '12px', fontSize: '10.5px', fontWeight: 700, color: '#ef4444' }}>R</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={colorR}
+                    onChange={(e) => setColorR(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: '#ef4444', cursor: 'pointer', height: '4px' }}
+                  />
+                  <span style={{ width: '24px', textAlign: 'right', fontSize: '11px', color: '#86868b' }}>{colorR}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '12px', fontSize: '10.5px', fontWeight: 700, color: '#22c55e' }}>G</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={colorG}
+                    onChange={(e) => setColorG(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: '#22c55e', cursor: 'pointer', height: '4px' }}
+                  />
+                  <span style={{ width: '24px', textAlign: 'right', fontSize: '11px', color: '#86868b' }}>{colorG}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '12px', fontSize: '10.5px', fontWeight: 700, color: '#38bdf8' }}>B</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="255"
+                    value={colorB}
+                    onChange={(e) => setColorB(Number(e.target.value))}
+                    style={{ flex: 1, accentColor: '#38bdf8', cursor: 'pointer', height: '4px' }}
+                  />
+                  <span style={{ width: '24px', textAlign: 'right', fontSize: '11px', color: '#86868b' }}>{colorB}</span>
                 </div>
               </div>
             </div>
+          </div>
 
-            {/* Form: Owner Name & Wish Textarea */}
-            <form onSubmit={handleReleaseKrathong} style={{
-              background: 'rgba(15, 23, 42, 0.75)',
-              border: '1.5px solid rgba(255, 255, 255, 0.12)',
-              borderRadius: '20px',
-              padding: '20px',
-              boxShadow: '0 8px 30px rgba(0, 0, 0, 0.3)',
-            }}>
-              <h3 style={{
-                fontSize: '15px',
-                fontWeight: 700,
-                color: '#fef08a',
-                margin: '0 0 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-              }}>
-                <i className="fas fa-scroll" /> ข้อมูลเจ้าของกระทงและคำอธิษฐาน
-              </h3>
+          {/* Right Column: Apple-Style Details & Release Form */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '24px',
+            padding: '28px',
+            boxShadow: '0 24px 60px rgba(0, 0, 0, 0.6)',
+            backdropFilter: 'blur(20px)',
+          }}>
+            <form onSubmit={handleReleaseKrathong}>
+              <div style={{ marginBottom: '22px' }}>
+                <h2 style={{
+                  fontSize: '18px',
+                  fontWeight: 600,
+                  letterSpacing: '-0.02em',
+                  color: '#f5f5f7',
+                  margin: '0 0 6px',
+                }}>
+                  คำอธิษฐานและข้อมูล
+                </h2>
+                <p style={{ fontSize: '13px', color: '#86868b', margin: 0, lineHeight: 1.45 }}>
+                  ระบุชื่อและพรที่ปรารถนาเพื่อส่งต่อลงสู่สายน้ำ
+                </p>
+              </div>
 
-              {/* Owner Name */}
-              <div style={{ marginBottom: '14px' }}>
+              {/* Owner Name Input */}
+              <div style={{ marginBottom: '20px' }}>
                 <label style={{
                   display: 'block',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
+                  color: '#86868b',
                   marginBottom: '6px',
-                  color: 'rgba(255, 255, 255, 0.9)',
+                  letterSpacing: '-0.01em',
                 }}>
-                  ชื่อเจ้าของกระทง <span style={{ color: '#ef4444' }}>*</span>
+                  ชื่อของคุณ
                 </label>
                 <input
                   type="text"
@@ -1186,59 +1228,78 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                   maxLength={40}
                   value={ownerName}
                   onChange={(e) => setOwnerName(e.target.value)}
-                  placeholder="เช่น พี่วาฬ หรือ แก๊งเด็ก RCA"
+                  placeholder="เช่น พี่ว่าน หรือ ทีมงาน Sofun"
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    background: 'rgba(0, 0, 0, 0.35)',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'rgba(255, 255, 255, 0.04)',
                     color: '#ffffff',
-                    fontSize: '14px',
+                    fontSize: '14.5px',
                     outline: 'none',
                     boxSizing: 'border-box',
+                    transition: 'border-color 0.16s ease, background 0.16s ease',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#f5a623'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
                   }}
                 />
               </div>
 
               {/* Wish Textarea */}
-              <div style={{ marginBottom: '14px' }}>
+              <div style={{ marginBottom: '18px' }}>
                 <label style={{
                   display: 'block',
-                  fontSize: '13px',
+                  fontSize: '12.5px',
                   fontWeight: 600,
+                  color: '#86868b',
                   marginBottom: '6px',
-                  color: 'rgba(255, 255, 255, 0.9)',
+                  letterSpacing: '-0.01em',
                 }}>
-                  เขียนคำอธิษฐาน <span style={{ color: '#ef4444' }}>*</span>
+                  คำอธิษฐาน
                 </label>
                 <textarea
                   required
-                  rows={3}
+                  rows={4}
                   maxLength={240}
                   value={wish}
                   onChange={(e) => setWish(e.target.value)}
-                  placeholder="ขอให้พบเจอแต่ความสุข สมหวังในหน้าที่การงาน ความรักราบรื่น สุขภาพแข็งแรง..."
+                  placeholder="ขอให้พบเจอแต่ความสุข ความเจริญในหน้าที่การงาน และสุขภาพร่างกายแข็งแรง..."
                   style={{
                     width: '100%',
-                    padding: '10px 14px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    background: 'rgba(0, 0, 0, 0.35)',
+                    padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 255, 255, 0.12)',
+                    background: 'rgba(255, 255, 255, 0.04)',
                     color: '#ffffff',
-                    fontSize: '14px',
+                    fontSize: '14.5px',
                     outline: 'none',
                     lineHeight: 1.5,
                     resize: 'none',
                     boxSizing: 'border-box',
+                    transition: 'border-color 0.16s ease, background 0.16s ease',
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = '#f5a623'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.06)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+                    e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
                   }}
                 />
               </div>
 
-              {/* Quick Wish Buttons */}
-              <div style={{ marginBottom: '20px' }}>
-                <div style={{ fontSize: '11.5px', color: 'rgba(255, 255, 255, 0.6)', marginBottom: '6px' }}>
-                  คำอธิษฐานแนะนำ (คลิกเพื่อใส่ข้อความ):
+              {/* Quick Wish Pills */}
+              <div style={{ marginBottom: '28px' }}>
+                <div style={{ fontSize: '11px', color: '#86868b', marginBottom: '8px' }}>
+                  คำอธิษฐานแนะนำ (คลิกเพื่อเลือก):
                 </div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                   {QUICK_WISHES.map((w, idx) => (
@@ -1247,18 +1308,27 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                       type="button"
                       onClick={() => setWish(w)}
                       style={{
-                        background: 'rgba(255, 255, 255, 0.06)',
-                        border: '1px solid rgba(255, 255, 255, 0.12)',
-                        color: 'rgba(255, 255, 255, 0.8)',
-                        borderRadius: '6px',
-                        padding: '4px 8px',
-                        fontSize: '11px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        border: '1px solid rgba(255, 255, 255, 0.08)',
+                        color: '#a1a1a6',
+                        borderRadius: '9999px',
+                        padding: '5px 12px',
+                        fontSize: '11.5px',
                         cursor: 'pointer',
                         textAlign: 'left',
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         maxWidth: '100%',
+                        transition: 'all 0.14s ease',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
+                        e.currentTarget.style.color = '#f5f5f7'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
+                        e.currentTarget.style.color = '#a1a1a6'
                       }}
                     >
                       {w}
@@ -1267,27 +1337,28 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                 </div>
               </div>
 
-              {/* Submit Release Button */}
+              {/* Apple Signature CTA Button */}
               <button
                 type="submit"
                 disabled={isSubmitting}
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  height: '50px',
+                  background: 'linear-gradient(180deg, #f5a623 0%, #d97706 100%)',
                   border: 'none',
                   color: '#ffffff',
-                  borderRadius: '12px',
-                  padding: '14px',
-                  fontSize: '16px',
-                  fontWeight: 800,
+                  borderRadius: '9999px',
+                  fontSize: '15px',
+                  fontWeight: 600,
                   cursor: isSubmitting ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: '8px',
-                  boxShadow: '0 6px 20px rgba(245, 158, 11, 0.35)',
-                  transition: 'transform 0.18s, box-shadow 0.18s',
-                  opacity: isSubmitting ? 0.7 : 1,
+                  boxShadow: '0 8px 24px rgba(245, 166, 35, 0.35)',
+                  transition: 'opacity 0.18s ease, transform 0.18s ease',
+                  opacity: isSubmitting ? 0.6 : 1,
+                  letterSpacing: '-0.01em',
                 }}
               >
                 {isSubmitting ? (
@@ -1296,7 +1367,7 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                   </>
                 ) : (
                   <>
-                    <i className="fas fa-fire" /> จุดเทียนและปล่อยกระทงลงแม่น้ำ
+                    <i className="fas fa-paper-plane" /> ปล่อยกระทงลงสู่แม่น้ำ
                   </>
                 )}
               </button>
@@ -1305,129 +1376,121 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
         </div>
       </main>
 
-      {/* Celebration Modal when Krathong is Released */}
+      {/* Apple Dialog Sheet: Celebration Modal */}
       {releasedKrathong && (
         <div style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(0, 0, 0, 0.82)',
-          backdropFilter: 'blur(8px)',
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '20px',
           zIndex: 100,
+          animation: 'appleModalFadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
         }}>
           <div style={{
-            background: 'linear-gradient(180deg, #0d1e3d 0%, #081122 100%)',
-            border: '2px solid rgba(245, 158, 11, 0.6)',
+            background: 'rgba(28, 28, 30, 0.85)',
+            border: '1px solid rgba(255, 255, 255, 0.14)',
             borderRadius: '24px',
-            padding: '32px 24px',
-            maxWidth: '440px',
+            padding: '36px 28px',
+            maxWidth: '420px',
             width: '100%',
             textAlign: 'center',
-            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8), 0 0 50px rgba(245, 158, 11, 0.25)',
+            boxShadow: '0 30px 80px rgba(0, 0, 0, 0.8)',
+            backdropFilter: 'blur(40px)',
+            WebkitBackdropFilter: 'blur(40px)',
           }}>
-            {/* Animated Krathong Preview on Water Ripple */}
+            {/* Krathong Preview Badge */}
             <div style={{
-              width: '160px',
-              height: '160px',
+              width: '140px',
+              height: '140px',
               margin: '0 auto 20px',
-              position: 'relative',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(14, 165, 233, 0.2) 0%, rgba(5, 8, 20, 0.8) 70%)',
+              background: 'radial-gradient(circle, rgba(245, 166, 35, 0.15) 0%, rgba(0, 0, 0, 0.4) 70%)',
+              border: '1px solid rgba(245, 166, 35, 0.3)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 0 30px rgba(245, 158, 11, 0.3)',
+              boxShadow: '0 0 30px rgba(245, 166, 35, 0.2)',
             }}>
               <img
                 src={releasedKrathong.imageData}
                 alt="กระทงที่ปล่อย"
                 style={{
-                  maxWidth: '120px',
-                  maxHeight: '120px',
+                  maxWidth: '100px',
+                  maxHeight: '100px',
                   objectFit: 'contain',
-                  filter: 'drop-shadow(0 0 12px rgba(254, 240, 138, 0.6))',
+                  filter: 'drop-shadow(0 0 12px rgba(245, 166, 35, 0.5))',
                   animation: 'gentleBob 3s ease-in-out infinite alternate',
                 }}
               />
             </div>
 
-            <div style={{
-              display: 'inline-block',
-              fontSize: '11px',
-              fontWeight: 800,
-              color: '#fef08a',
-              background: 'rgba(245, 158, 11, 0.2)',
-              padding: '4px 12px',
-              borderRadius: '12px',
-              marginBottom: '10px',
-            }}>
-              ขอขมาพระแม่คงคาสำเร็จแล้ว
-            </div>
-
             <h2 style={{
-              fontSize: '22px',
-              fontWeight: 800,
-              color: '#ffffff',
-              margin: '0 0 8px',
+              fontSize: '21px',
+              fontWeight: 700,
+              color: '#f5f5f7',
+              margin: '0 0 6px',
+              letterSpacing: '-0.02em',
             }}>
               กระทงของคุณลอยสู่แม่น้ำแล้ว
             </h2>
 
             <p style={{
               fontSize: '13.5px',
-              color: 'rgba(255, 255, 255, 0.75)',
-              margin: '0 0 20px',
-              lineHeight: 1.6,
+              color: '#86868b',
+              margin: '0 0 18px',
+              lineHeight: 1.55,
             }}>
-              คำอธิษฐานของ <strong>{releasedKrathong.name}</strong> ได้ลอยสู่สายนทีใต้แสงจันทร์ ร่วมกับผู้เล่นทุกคนในคืนวันเพ็ญ
+              คำอธิษฐานของ <strong>{releasedKrathong.name}</strong> ลอยส่องแสงเคียงคู่ผู้เล่นทุกคนใต้แสงจันทร์เต็มดวง
             </p>
 
             <div style={{
-              background: 'rgba(0, 0, 0, 0.35)',
+              background: 'rgba(255, 255, 255, 0.04)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '12px',
-              padding: '12px',
+              padding: '12px 16px',
               fontSize: '13px',
               color: '#fde68a',
               fontStyle: 'italic',
               marginBottom: '24px',
+              lineHeight: 1.5,
             }}>
               "{releasedKrathong.wish}"
             </div>
 
-            {/* Buttons */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {/* Apple Actions */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
                 type="button"
                 onClick={() => showPage('river')}
                 style={{
                   width: '100%',
-                  background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                  height: '46px',
+                  background: 'linear-gradient(180deg, #f5a623 0%, #d97706 100%)',
                   border: 'none',
                   color: '#ffffff',
-                  borderRadius: '12px',
-                  padding: '13px',
-                  fontSize: '15px',
-                  fontWeight: 800,
+                  borderRadius: '9999px',
+                  fontSize: '14.5px',
+                  fontWeight: 600,
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '8px',
-                  boxShadow: '0 6px 20px rgba(2, 132, 199, 0.4)',
+                  gap: '6px',
+                  boxShadow: '0 6px 20px rgba(245, 166, 35, 0.35)',
                 }}
               >
-                <i className="fas fa-water" /> เปิดดูแม่น้ำทันที (/River)
+                ดูแม่น้ำทันที (/River) <i className="fas fa-arrow-right" style={{ fontSize: '11px' }} />
               </button>
 
               <button
                 type="button"
                 onClick={() => {
                   setReleasedKrathong(null)
-                  // Reset canvas for a new one
                   const canvas = drawCanvasRef.current
                   if (canvas) {
                     const ctx = canvas.getContext('2d')
@@ -1438,14 +1501,16 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                 }}
                 style={{
                   width: '100%',
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.15)',
-                  color: '#ffffff',
-                  borderRadius: '12px',
-                  padding: '11px',
+                  height: '44px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#86868b',
                   fontSize: '13.5px',
                   cursor: 'pointer',
+                  transition: 'color 0.14s ease',
                 }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b' }}
               >
                 วาดกระทงเพิ่มอีกหนึ่งใบ
               </button>
@@ -1458,6 +1523,10 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
         @keyframes gentleBob {
           0% { transform: translateY(0) rotate(-2deg); }
           100% { transform: translateY(-8px) rotate(2deg); }
+        }
+        @keyframes appleModalFadeIn {
+          from { opacity: 0; transform: scale(0.96); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </div>
