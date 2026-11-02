@@ -28,19 +28,25 @@ import RandomWheelPage from './components/RandomWheelPage'
 import AllOfUsWillDiePage from './components/AllOfUsWillDiePage'
 import RehistoryPage from './components/RehistoryPage'
 import HandbookPage from './components/HandbookPage'
+import LoyKrathongHubPage from './components/LoyKrathongHubPage'
+import KrathongDrawPage from './components/KrathongDrawPage'
+import KrathongRiverPage from './components/KrathongRiverPage'
 import TierEffect from './components/TierEffect'
 import { ACHIEVEMENT_LIST } from './constants/achievements'
 import { syncMemberTierAchievements } from './utils/achievementTierSync'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 
-const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory', 'handbook']
+const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory', 'handbook', 'loykrathong', 'krathong', 'river']
 
 function parseUrl(pathname) {
   const cleanPath = (pathname || '').split('?')[0].split('#')[0]
   const parts = cleanPath.replace(/^\//, '').split('/')
   const first = parts[0] || ''
   if (first.toLowerCase() === 'allofuswilldie') return { page: 'allofuswilldie', detailId: null }
+  if (first.toLowerCase() === 'loykrathong') return { page: 'loykrathong', detailId: null }
+  if (first.toLowerCase() === 'krathong') return { page: 'krathong', detailId: null }
+  if (first.toLowerCase() === 'river') return { page: 'river', detailId: null }
   if (first.toLowerCase() === 'handbook') {
     const rawSlug = parts.slice(1).join('/')
     return { page: 'handbook', detailId: rawSlug ? decodeURIComponent(rawSlug) : null }
@@ -55,6 +61,9 @@ function buildUrl(page, id = null) {
   if (page === 'home') return '/'
   if (page === 'detail' && id) return `/games/${id}`
   if (page === 'allofuswilldie') return '/AllOfUsWillDie'
+  if (page === 'loykrathong') return '/LoyKrathong'
+  if (page === 'krathong') return '/Krathong'
+  if (page === 'river') return '/River'
   if (page === 'handbook' && id) return '/handbook/' + encodeURIComponent(id)
   if (page === 'handbook') return '/handbook'
   return `/${page}`
@@ -786,7 +795,7 @@ export default function App() {
 
   return (
     <>
-      {currentPage !== 'random' && currentPage !== 'allofuswilldie' && !(currentPage === 'handbook' && detailId) && (
+      {currentPage !== 'random' && currentPage !== 'allofuswilldie' && currentPage !== 'loykrathong' && currentPage !== 'krathong' && currentPage !== 'river' && !(currentPage === 'handbook' && detailId) && (
         <Nav
           currentPage={currentPage}
           showPage={showPage}
@@ -929,6 +938,21 @@ export default function App() {
             onLogin={handleLineLogin}
             showToast={showToast}
           />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'loykrathong' && (
+        <ErrorBoundary>
+          <LoyKrathongHubPage showPage={showPage} lineUser={lineUser} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'krathong' && (
+        <ErrorBoundary>
+          <KrathongDrawPage showPage={showPage} lineUser={lineUser} showToast={showToast} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'river' && (
+        <ErrorBoundary>
+          <KrathongRiverPage showPage={showPage} lineUser={lineUser} showToast={showToast} />
         </ErrorBoundary>
       )}
       {currentPage === 'rehistory' && (

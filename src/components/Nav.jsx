@@ -44,6 +44,9 @@ export default function Nav({
           <button className={`nav-btn${currentPage === 'games'  ? ' active' : ''}`} onClick={() => handleNav('games')}>
             {t('nav', 'scripts')}
           </button>
+          <button className={`nav-btn${currentPage === 'loykrathong' ? ' active' : ''}`} onClick={() => handleNav('loykrathong')} style={{ color: '#d97706', fontWeight: 700 }}>
+            <i className="fas fa-water" style={{ marginRight: '5px', fontSize: '11px' }} />ลอยกระทง
+          </button>
           {bookingEnabled && (
             <>
               <button className={`nav-btn${currentPage === 'party'  ? ' active' : ''}`} onClick={() => handleNav('party')}>
@@ -118,6 +121,9 @@ export default function Nav({
                   )}
                   <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
                     <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
+                  </button>
+                  <button className="nav-user-menu-item" onClick={() => handleNav('loykrathong')}>
+                    <i className="fas fa-water" style={{ color: '#d97706' }} /> ลอยกระทงออนไลน์
                   </button>
                   {hasActiveOrder && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('order')}>

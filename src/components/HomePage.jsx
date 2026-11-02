@@ -1324,6 +1324,99 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
       </section>
 
       {/* ══════════════════════════════════════════
+          LOY KRATHONG FESTIVAL BANNER
+      ══════════════════════════════════════════ */}
+      <section style={{
+        background: 'linear-gradient(135deg, #050814 0%, #0a1329 50%, #0d1e3d 100%)',
+        color: '#ffffff',
+        padding: 'clamp(36px, 5vw, 56px) clamp(20px, 5vw, 48px)',
+        position: 'relative',
+        overflow: 'hidden',
+        borderTop: '1px solid rgba(245, 158, 11, 0.25)',
+        borderBottom: '1px solid rgba(245, 158, 11, 0.25)',
+      }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24, position: 'relative', zIndex: 2 }}>
+          <div style={{ maxWidth: 640 }}>
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              background: 'rgba(245, 158, 11, 0.15)',
+              border: '1px solid rgba(245, 158, 11, 0.35)',
+              borderRadius: 20,
+              padding: '4px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              color: '#fef08a',
+              marginBottom: 12,
+            }}>
+              <i className="fas fa-water" /> เทศกาลลอยกระทงดิจิทัล 2569
+            </div>
+            <h2 style={{
+              fontFamily: "'Sarabun', sans-serif",
+              fontSize: 'clamp(24px, 3.2vw, 36px)',
+              fontWeight: 800,
+              color: '#ffffff',
+              margin: '0 0 10px',
+              lineHeight: 1.25,
+            }}>
+              วาดกระทงส่งคำอธิษฐาน ลอยสู่แม่น้ำสายบุญ 2D Parallax
+            </h2>
+            <p style={{
+              fontSize: 'clamp(13.5px, 1.2vw, 15px)',
+              color: 'rgba(255, 255, 255, 0.8)',
+              lineHeight: 1.6,
+              margin: 0,
+            }}>
+              ร่วมสืบสานประเพณีลอยกระทงออนไลน์ วาดกระทงด้วยตนเองพร้อมระบบสี RGB ครบครัน และเปิดชมแม่น้ำเจ้าพระยาใต้แสงจันทร์พร้อมอ่านคำอธิษฐานของผู้เล่นทุกคน
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => showPage('krathong')}
+              style={{
+                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: 12,
+                padding: '13px 22px',
+                fontSize: 14,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                boxShadow: '0 6px 20px rgba(245, 158, 11, 0.35)',
+              }}
+            >
+              <i className="fas fa-paint-brush" /> วาดกระทง (/Krathong)
+            </button>
+            <button
+              type="button"
+              onClick={() => showPage('river')}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                border: '1.5px solid rgba(56, 189, 248, 0.45)',
+                color: '#7dd3fc',
+                borderRadius: 12,
+                padding: '12px 20px',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+              }}
+            >
+              <i className="fas fa-water" /> เปิดชมแม่น้ำ (/River)
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
           4. HOW TO PLAY (WHITE THEME)
       ══════════════════════════════════════════ */}
       <section style={{ background: BG_PAGE, color: TEXT_MAIN, padding: 'clamp(64px,8vw,104px) clamp(20px,5vw,60px)' }}>
