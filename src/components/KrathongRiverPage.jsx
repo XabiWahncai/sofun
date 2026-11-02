@@ -766,51 +766,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 filter: isWishOpen ? 'drop-shadow(0 0 20px rgba(254, 240, 138, 0.95))' : 'none',
               }}
             >
-              {/* Floating Candle Light Water Halo */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-8px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '110px',
-                height: '24px',
-                borderRadius: '50%',
-                background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.45) 0%, transparent 70%)',
-                filter: 'blur(6px)',
-                pointerEvents: 'none',
-              }} />
-
-              {/* Concentric Water Wave Ring Expanding Underneath Krathong */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-6px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '120px',
-                height: '26px',
-                borderRadius: '50%',
-                border: '1px solid rgba(56, 189, 248, 0.45)',
-                background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.3) 0%, rgba(56, 189, 248, 0.1) 45%, transparent 75%)',
-                filter: 'blur(1px)',
-                pointerEvents: 'none',
-                animation: 'krathongWaterWake 2.6s ease-out infinite',
-              }} />
-
-              {/* Water Candle Flame Reflection Beam Trailing Down Into River */}
-              <div style={{
-                position: 'absolute',
-                bottom: '-34px',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                width: '26px',
-                height: '42px',
-                background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.6) 0%, rgba(245, 158, 11, 0.3) 45%, transparent 100%)',
-                filter: 'blur(3px)',
-                pointerEvents: 'none',
-                animation: 'candleFlicker 1.5s ease-in-out infinite alternate',
-              }} />
-
-              {/* Krathong Body (Exact User Drawing Canvas Image) */}
+              {/* Krathong Body (Exact User Drawing Canvas Image) with Water Effects Directly Underneath */}
               <div style={{
                 width: '130px',
                 height: '110px',
@@ -819,6 +775,53 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 justifyContent: 'center',
                 position: 'relative',
               }}>
+                {/* Floating Candle Light Water Halo (Directly at base of Krathong) */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '2px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '110px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.45) 0%, transparent 70%)',
+                  filter: 'blur(6px)',
+                  pointerEvents: 'none',
+                  zIndex: 0,
+                }} />
+
+                {/* Concentric Water Wave Ring Expanding Underneath Krathong Base */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '4px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '120px',
+                  height: '26px',
+                  borderRadius: '50%',
+                  border: '1px solid rgba(56, 189, 248, 0.45)',
+                  background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.3) 0%, rgba(56, 189, 248, 0.1) 45%, transparent 75%)',
+                  filter: 'blur(1px)',
+                  pointerEvents: 'none',
+                  animation: 'krathongWaterWake 2.6s ease-out infinite',
+                  zIndex: 0,
+                }} />
+
+                {/* Water Candle Flame Reflection Beam Trailing Down Into River from Krathong */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-24px',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: '26px',
+                  height: '38px',
+                  background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.6) 0%, rgba(245, 158, 11, 0.3) 45%, transparent 100%)',
+                  filter: 'blur(3px)',
+                  pointerEvents: 'none',
+                  animation: 'candleFlicker 1.5s ease-in-out infinite alternate',
+                  zIndex: 0,
+                }} />
+
                 {k.imageData && (
                   <img
                     src={k.imageData}
@@ -828,6 +831,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                       maxHeight: '100px',
                       objectFit: 'contain',
                       filter: 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.65))',
+                      position: 'relative',
+                      zIndex: 1,
                     }}
                   />
                 )}
@@ -845,14 +850,17 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   boxShadow: '0 0 14px 6px rgba(245, 158, 11, 0.75)',
                   pointerEvents: 'none',
                   animation: 'candleFlicker 1.5s ease-in-out infinite alternate',
+                  zIndex: 2,
                 }} />
               </div>
 
               {/* Owner Name Tag directly below Krathong (Amber Glowing Capsule Pill) */}
               <div style={{
-                marginTop: '4px',
+                marginTop: '6px',
                 textAlign: 'center',
                 whiteSpace: 'nowrap',
+                position: 'relative',
+                zIndex: 3,
               }}>
                 <span style={{
                   display: 'inline-flex',
