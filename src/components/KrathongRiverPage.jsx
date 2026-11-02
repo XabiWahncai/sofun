@@ -7,7 +7,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
   // Firestore Krathongs state (Real data only, zero mockups)
   const [firestoreKrathongs, setFirestoreKrathongs] = useState([])
-  const [activeWishId, setActiveWishId] = useState(null)
+  const [activeWishIds, setActiveWishIds] = useState(() => new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [newArrivalNotice, setNewArrivalNotice] = useState(null)
   const isInitialLoadRef = useRef(true)
@@ -27,12 +27,25 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const krathongPositionsRef = useRef(new Map())
   const [, setTick] = useState(0)
 
+  // ── Toggle wish bubble for a specific krathong ─────────────
+  const toggleWish = (id) => {
+    setActiveWishIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
   // ── Auto-highlight newly released Krathong if user just floated one ──
   useEffect(() => {
     try {
       const recentId = sessionStorage.getItem('sofun_recent_krathong')
       if (recentId) {
-        setActiveWishId(recentId)
+        setActiveWishIds(new Set([recentId]))
         sessionStorage.removeItem('sofun_recent_krathong')
       }
     } catch {
@@ -94,6 +107,15 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               })
             }
           })
+
+          // If user didn't specify a recent one, open the first krathong's wish so river is immediately interactive
+          setActiveWishIds((prev) => {
+            if (prev.size === 0 && items.length > 0) {
+              return new Set([items[0].id])
+            }
+            return prev
+          })
+
           isInitialLoadRef.current = false
         }
 
@@ -154,19 +176,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
     animId = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(animId)
   }, [firestoreKrathongs])
-
-  // ── Send Blessing / Like ("สาธุ") ────────────────────────
-  const handleSendBlessing = async (krathong) => {
-    try {
-      const krathongRef = doc(db, 'krathongs', krathong.id)
-      await updateDoc(krathongRef, {
-        likes: increment(1),
-      })
-      if (showToast) showToast('ร่วมอนุโมทนาสาธุกับคำอธิษฐานแล้ว')
-    } catch (err) {
-      console.warn('Could not increment likes:', err)
-    }
-  }
 
   // ── Release a Sky Lantern ────────────────────────────────
   const handleReleaseSkyLantern = () => {
@@ -527,12 +536,12 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
           const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * 2.2
 
-          const isSelected = activeWishId === k.id
+          const isWishOpen = activeWishIds.has(k.id)
 
           return (
             <div
               key={k.id}
-              onClick={() => setActiveWishId(isSelected ? null : k.id)}
+              onClick={() => toggleWish(k.id)}
               style={{
                 position: 'absolute',
                 left: `${pos.x}px`,
@@ -541,9 +550,9 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 transformOrigin: '50% 85%',
                 cursor: 'pointer',
                 pointerEvents: 'auto',
-                zIndex: isSelected ? 30 : laneZIndex,
+                zIndex: isWishOpen ? 30 : laneZIndex,
                 transition: 'filter 0.2s',
-                filter: isSelected ? 'drop-shadow(0 0 16px rgba(254, 240, 138, 0.95))' : 'none',
+                filter: isWishOpen ? 'drop-shadow(0 0 16px rgba(254, 240, 138, 0.95))' : 'none',
               }}
             >
               {/* Floating Candle Light Water Halo */}
@@ -608,9 +617,9 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  background: isSelected ? 'rgba(245, 158, 11, 0.95)' : 'rgba(5, 10, 25, 0.85)',
-                  border: isSelected ? '1px solid #fef08a' : '1px solid rgba(254, 240, 138, 0.35)',
-                  color: isSelected ? '#111827' : '#fef08a',
+                  background: isWishOpen ? 'rgba(245, 158, 11, 0.95)' : 'rgba(5, 10, 25, 0.85)',
+                  border: isWishOpen ? '1px solid #fef08a' : '1px solid rgba(254, 240, 138, 0.35)',
+                  color: isWishOpen ? '#111827' : '#fef08a',
                   borderRadius: '12px',
                   padding: '2px 8px',
                   fontSize: '11px',
@@ -622,115 +631,99 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   {k.name}
                 </span>
               </div>
+            </div>
+          )
+        })}
+      </div>
 
-              {/* ── Active Wish Bubble (Floats in Lockstep with Krathong!) ── */}
-              {isSelected && (
-                <div
-                  onClick={(e) => e.stopPropagation()}
-                  style={{
-                    position: 'absolute',
-                    bottom: '120px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: '240px',
-                    background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.96) 0%, rgba(8, 15, 30, 0.98) 100%)',
-                    border: '1.5px solid rgba(245, 158, 11, 0.85)',
-                    borderRadius: '16px',
-                    padding: '14px',
-                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(245, 158, 11, 0.3)',
-                    backdropFilter: 'blur(10px)',
-                    zIndex: 50,
-                    pointerEvents: 'auto',
-                    textAlign: 'left',
-                    animation: 'bubbleAppear 0.25s ease-out',
-                  }}
-                >
-                  {/* Bubble Pointer Arrow at bottom */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '-8px',
-                    left: '50%',
-                    transform: 'translateX(-50%) rotate(45deg)',
-                    width: '14px',
-                    height: '14px',
-                    background: 'rgba(8, 15, 30, 0.98)',
-                    borderRight: '1.5px solid rgba(245, 158, 11, 0.85)',
-                    borderBottom: '1.5px solid rgba(245, 158, 11, 0.85)',
-                  }} />
+      {/* ── Layer 5: Unscaled Translucent Wish Bubbles (Constant Readable Font on Near & Far Lanes) ── */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        height: '380px',
+        zIndex: 35,
+        pointerEvents: 'none',
+      }}>
+        {Array.from(activeWishIds).map((id) => {
+          const k = firestoreKrathongs.find((item) => item.id === id)
+          if (!k) return null
+          const pos = krathongPositionsRef.current.get(k.id)
+          if (!pos) return null
 
-                  {/* Header: Name and Close button */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '8px',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                    paddingBottom: '6px',
-                  }}>
-                    <span style={{ fontSize: '13px', fontWeight: 800, color: '#fef08a' }}>
-                      คุณ {k.name}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setActiveWishId(null)}
-                      style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: 'rgba(255, 255, 255, 0.6)',
-                        cursor: 'pointer',
-                        padding: '2px 6px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      <i className="fas fa-times" />
-                    </button>
-                  </div>
+          const lane = k.lane || 0
+          const laneBottom = lane === 0 ? 230 : lane === 1 ? 130 : 35
+          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05)
 
-                  {/* Wish Text */}
-                  <div style={{
-                    fontSize: '12.5px',
-                    color: '#ffffff',
-                    lineHeight: 1.55,
-                    marginBottom: '12px',
-                    fontStyle: 'normal',
-                  }}>
-                    "{k.wish}"
-                  </div>
+          const timeSec = performance.now() / 1000
+          const bobFreq = k.bobFreq || 1.4
+          const bobAmp = k.bobAmp || 4
+          const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
 
-                  {/* Footer: Blessing / Sadhu button */}
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    paddingTop: '6px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                  }}>
-                    <button
-                      type="button"
-                      onClick={() => handleSendBlessing(k)}
-                      style={{
-                        background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                        border: 'none',
-                        color: '#ffffff',
-                        borderRadius: '8px',
-                        padding: '4px 10px',
-                        fontSize: '11px',
-                        fontWeight: 700,
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                      }}
-                    >
-                      <i className="fas fa-hands-praying" /> สาธุ ({k.likes || 0})
-                    </button>
+          // Calculate real-time unscaled position over the Krathong:
+          const bubbleX = pos.x + 65
+          const bubbleBottom = laneBottom + offsetY + (100 * laneScale) + 12
 
-                    <span style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.5)' }}>
-                      ลอยอยู่ในสายนที
-                    </span>
-                  </div>
+          return (
+            <div
+              key={`wish-${k.id}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleWish(k.id)
+              }}
+              style={{
+                position: 'absolute',
+                left: `${bubbleX}px`,
+                bottom: `${bubbleBottom}px`,
+                transform: 'translateX(-50%)',
+                pointerEvents: 'auto',
+                cursor: 'pointer',
+                zIndex: 35,
+                animation: 'bubbleAppear 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+              title="คลิกเพื่อปิดคำอธิษฐาน"
+            >
+              {/* Translucent Frosted Glass Card - Clean Wish Text Only */}
+              <div style={{
+                background: 'rgba(6, 14, 30, 0.65)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                border: '1.5px solid rgba(254, 240, 138, 0.45)',
+                borderRadius: '16px',
+                padding: '9px 16px',
+                maxWidth: 'min(300px, 80vw)',
+                minWidth: '120px',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(245, 158, 11, 0.2)',
+                textAlign: 'center',
+                position: 'relative',
+              }}>
+                {/* Downward Pointer Triangle */}
+                <div style={{
+                  position: 'absolute',
+                  bottom: '-6px',
+                  left: '50%',
+                  transform: 'translateX(-50%) rotate(45deg)',
+                  width: '10px',
+                  height: '10px',
+                  background: 'rgba(6, 14, 30, 0.7)',
+                  borderRight: '1.5px solid rgba(254, 240, 138, 0.45)',
+                  borderBottom: '1.5px solid rgba(254, 240, 138, 0.45)',
+                }} />
+
+                {/* Only Wish Text - Constant readable 14.5px font */}
+                <div style={{
+                  fontSize: '14.5px',
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  lineHeight: 1.5,
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.95)',
+                  wordBreak: 'break-word',
+                  letterSpacing: '0.01em',
+                }}>
+                  "{k.wish}"
                 </div>
-              )}
+              </div>
             </div>
           )
         })}
@@ -941,7 +934,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   <div
                     key={item.id}
                     onClick={() => {
-                      setActiveWishId(item.id)
+                      setActiveWishIds(new Set([item.id]))
                       setSearchQuery('')
                     }}
                     style={{
@@ -974,7 +967,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           100% { transform: translateX(-52%) scale(0.95); opacity: 0.85; }
         }
         @keyframes bubbleAppear {
-          0% { transform: translateX(-50%) translateY(10px) scale(0.9); opacity: 0; }
+          0% { transform: translateX(-50%) translateY(8px) scale(0.92); opacity: 0; }
           100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
         }
       `}</style>
