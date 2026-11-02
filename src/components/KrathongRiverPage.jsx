@@ -340,7 +340,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       {/* ── Layer 2: Temple & City Skyline Silhouette ──────── */}
       <div style={{
         position: 'absolute',
-        bottom: '360px',
+        bottom: '380px',
         left: 0,
         right: 0,
         height: '260px',
@@ -410,44 +410,262 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         </svg>
       </div>
 
-      {/* ── Layer 3: Flowing Water & Moonlight Shimmer ──────── */}
+      {/* ── Layer 3: Living Flowing River with Waves, Shimmer & Reflections ──────── */}
       <div style={{
         position: 'absolute',
         bottom: 0,
         left: 0,
         right: 0,
-        height: '380px',
-        background: 'linear-gradient(180deg, rgba(8, 20, 45, 0.95) 0%, #061126 50%, #030814 100%)',
+        height: '420px',
+        background: 'linear-gradient(180deg, #091e3e 0%, #0c2d5c 20%, #0a254e 45%, #061937 72%, #020a1c 100%)',
+        overflow: 'hidden',
         zIndex: 3,
+        pointerEvents: 'none',
       }}>
-        {/* Animated Water Waves Layers */}
+        {/* Far River Shore Horizon & Water Mist */}
         <div style={{
           position: 'absolute',
           top: 0,
           left: 0,
           right: 0,
-          height: '40px',
-          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.12) 0%, transparent 100%)',
-          pointerEvents: 'none',
+          height: '45px',
+          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.16) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 100%)',
+          borderTop: '1px solid rgba(254, 240, 138, 0.35)',
         }} />
 
-        {/* Water Ripple Ripples */}
-        <svg viewBox="0 0 1200 80" style={{ width: '100%', height: '80px', position: 'absolute', top: 0, left: 0, opacity: 0.35 }}>
-          <path d="M 0 20 Q 300 35 600 20 T 1200 20 L 1200 0 L 0 0 Z" fill="#38bdf8" />
-          <path d="M 0 45 Q 300 25 600 45 T 1200 45 L 1200 0 L 0 0 Z" fill="#0284c7" opacity="0.5" />
-        </svg>
+        {/* Wat Arun Central Stupa Golden Water Reflection */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: '180px',
+          height: '140px',
+          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.32) 0%, rgba(180, 83, 9, 0.16) 50%, transparent 100%)',
+          filter: 'blur(10px)',
+          animation: 'templeReflectionUndulate 4.5s ease-in-out infinite alternate',
+        }} />
 
-        {/* Moonlight Path Reflection down the River */}
+        {/* Thai Temple Golden Water Reflection */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: '74%',
+          width: '130px',
+          height: '110px',
+          background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.28) 0%, rgba(146, 64, 14, 0.12) 55%, transparent 100%)',
+          filter: 'blur(9px)',
+          animation: 'templeReflectionUndulate 5.2s ease-in-out infinite alternate 1.8s',
+        }} />
+
+        {/* Riverside Festival Lamps Water Light Droplets */}
+        {[8, 18, 33, 61, 82, 93].map((pct, idx) => (
+          <div
+            key={idx}
+            style={{
+              position: 'absolute',
+              top: '4px',
+              left: `${pct}%`,
+              width: '14px',
+              height: '35px',
+              background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.6) 0%, rgba(245, 158, 11, 0.2) 60%, transparent 100%)',
+              filter: 'blur(3px)',
+              animation: `moonShimmer 2.${idx + 2}s ease-in-out infinite alternate`,
+            }}
+          />
+        ))}
+
+        {/* ── Continuous Flowing Wave Band 1: Far Water (Slow, Deep Indigo) ── */}
+        <div style={{
+          position: 'absolute',
+          top: '30px',
+          left: 0,
+          width: '2880px',
+          height: '55px',
+          animation: 'waveScrollLeft 24s linear infinite',
+          opacity: 0.5,
+        }}>
+          <svg viewBox="0 0 2880 55" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 20 Q 120 35 240 20 T 480 20 T 720 20 T 960 20 T 1200 20 T 1440 20 T 1680 20 T 1920 20 T 2160 20 T 2400 20 T 2640 20 T 2880 20 L 2880 55 L 0 55 Z"
+              fill="#1e40af"
+              fillOpacity="0.35"
+            />
+            <path
+              d="M 0 20 Q 120 35 240 20 T 480 20 T 720 20 T 960 20 T 1200 20 T 1440 20 T 1680 20 T 1920 20 T 2160 20 T 2400 20 T 2640 20 T 2880 20"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="1.5"
+              strokeOpacity="0.6"
+            />
+          </svg>
+        </div>
+
+        {/* ── Continuous Flowing Wave Band 2: Mid Water (Medium Cerulean) ── */}
+        <div style={{
+          position: 'absolute',
+          top: '145px',
+          left: 0,
+          width: '2880px',
+          height: '65px',
+          animation: 'waveScrollLeft 16s linear infinite',
+          opacity: 0.55,
+        }}>
+          <svg viewBox="0 0 2880 65" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 25 Q 180 45 360 25 T 720 25 T 1080 25 T 1440 25 T 1800 25 T 2160 25 T 2520 25 T 2880 25 L 2880 65 L 0 65 Z"
+              fill="#0284c7"
+              fillOpacity="0.32"
+            />
+            <path
+              d="M 0 25 Q 180 45 360 25 T 720 25 T 1080 25 T 1440 25 T 1800 25 T 2160 25 T 2520 25 T 2880 25"
+              fill="none"
+              stroke="#7dd3fc"
+              strokeWidth="1.8"
+              strokeOpacity="0.65"
+            />
+          </svg>
+        </div>
+
+        {/* ── Moonlight Specular Reflection Path down River ── */}
         <div style={{
           position: 'absolute',
           top: 0,
           bottom: 0,
-          right: '12%',
-          width: '180px',
-          background: 'radial-gradient(ellipse at 50% 0%, rgba(254, 243, 199, 0.18) 0%, rgba(254, 240, 138, 0.04) 60%, transparent 100%)',
+          right: '8%',
+          width: '280px',
           pointerEvents: 'none',
-          filter: 'blur(10px)',
+        }}>
+          {/* Radial Light Falloff */}
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'radial-gradient(ellipse at 50% 15%, rgba(254, 243, 199, 0.22) 0%, rgba(254, 240, 138, 0.05) 55%, transparent 80%)',
+            filter: 'blur(14px)',
+          }} />
+
+          {/* Golden Glistening Water Shimmer Ripple Bars */}
+          {[
+            { w: 32, y: 15, d: '0s', dur: '2.4s' },
+            { w: 48, y: 40, d: '0.6s', dur: '3.1s' },
+            { w: 72, y: 72, d: '1.2s', dur: '2.8s' },
+            { w: 96, y: 110, d: '0.4s', dur: '3.3s' },
+            { w: 124, y: 155, d: '1.6s', dur: '2.7s' },
+            { w: 155, y: 205, d: '0.9s', dur: '3.2s' },
+            { w: 188, y: 260, d: '1.4s', dur: '2.9s' },
+            { w: 220, y: 315, d: '0.5s', dur: '3.5s' },
+            { w: 250, y: 370, d: '2.0s', dur: '3.0s' },
+          ].map((bar, idx) => (
+            <div
+              key={idx}
+              style={{
+                position: 'absolute',
+                top: `${bar.y}px`,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: `${bar.w}px`,
+                height: '3.5px',
+                borderRadius: '50%',
+                background: 'linear-gradient(90deg, transparent 0%, rgba(254, 243, 199, 0.3) 15%, rgba(254, 240, 138, 0.95) 50%, rgba(254, 243, 199, 0.3) 85%, transparent 100%)',
+                boxShadow: '0 0 10px rgba(254, 240, 138, 0.75), 0 0 20px rgba(245, 158, 11, 0.35)',
+                animation: `moonShimmer ${bar.dur} ease-in-out infinite alternate`,
+                animationDelay: bar.d,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* ── Flowing Water Ripple Streaks Drifting with Current ── */}
+        {[
+          { top: '85px', left: '15%', w: '120px', dur: '9s', d: '0s' },
+          { top: '115px', left: '60%', w: '160px', dur: '12s', d: '2s' },
+          { top: '190px', left: '30%', w: '140px', dur: '8s', d: '1s' },
+          { top: '230px', left: '75%', w: '180px', dur: '11s', d: '3s' },
+          { top: '310px', left: '20%', w: '150px', dur: '7s', d: '1.5s' },
+          { top: '345px', left: '50%', w: '190px', dur: '10s', d: '4s' },
+        ].map((rip, idx) => (
+          <div
+            key={idx}
+            style={{
+              position: 'absolute',
+              top: rip.top,
+              left: rip.left,
+              width: rip.w,
+              height: '2px',
+              borderRadius: '50%',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.45) 50%, transparent 100%)',
+              filter: 'blur(0.5px)',
+              animation: `waterCurrentDrift ${rip.dur} linear infinite`,
+              animationDelay: rip.d,
+            }}
+          />
+        ))}
+
+        {/* ── Continuous Flowing Wave Band 3: Near Water (Faster, Crisp Azure Highlights) ── */}
+        <div style={{
+          position: 'absolute',
+          top: '265px',
+          left: 0,
+          width: '2880px',
+          height: '75px',
+          animation: 'waveScrollLeft 10s linear infinite',
+          opacity: 0.65,
+        }}>
+          <svg viewBox="0 0 2880 75" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 30 Q 240 55 480 30 T 960 30 T 1440 30 T 1920 30 T 2400 30 T 2880 30 L 2880 75 L 0 75 Z"
+              fill="#0369a1"
+              fillOpacity="0.4"
+            />
+            <path
+              d="M 0 30 Q 240 55 480 30 T 960 30 T 1440 30 T 1920 30 T 2400 30 T 2880 30"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="2.2"
+              strokeOpacity="0.8"
+            />
+          </svg>
+        </div>
+
+        {/* ── Near Shore Water Foam & Foreground Embankment Edge ── */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '50px',
+          background: 'linear-gradient(0deg, rgba(2, 6, 18, 0.98) 0%, rgba(4, 15, 36, 0.6) 60%, transparent 100%)',
+          borderBottom: '2px solid rgba(56, 189, 248, 0.25)',
         }} />
+
+        {/* Left Shore Floating Lotus Lily Pads */}
+        <div style={{
+          position: 'absolute',
+          bottom: '12px',
+          left: '20px',
+          opacity: 0.8,
+          animation: 'lotusBob 5s ease-in-out infinite alternate',
+        }}>
+          <svg width="84" height="42" viewBox="0 0 84 42">
+            <ellipse cx="36" cy="22" rx="32" ry="14" fill="#064e3b" stroke="#059669" strokeWidth="1.5" />
+            <path d="M 36 22 L 64 28" stroke="#022c22" strokeWidth="2" />
+            <ellipse cx="64" cy="14" rx="16" ry="8" fill="#047857" opacity="0.85" />
+          </svg>
+        </div>
+
+        {/* Right Shore Floating Lotus Lily Pads */}
+        <div style={{
+          position: 'absolute',
+          bottom: '10px',
+          right: '25px',
+          opacity: 0.75,
+          animation: 'lotusBob 6s ease-in-out infinite alternate 1.2s',
+        }}>
+          <svg width="76" height="38" viewBox="0 0 76 38">
+            <ellipse cx="38" cy="20" rx="30" ry="12" fill="#064e3b" stroke="#059669" strokeWidth="1.5" />
+            <path d="M 38 20 L 60 14" stroke="#022c22" strokeWidth="2" />
+          </svg>
+        </div>
       </div>
 
       {/* ── Real-time Notification Banner for Newly Arrived Krathong ── */}
@@ -592,6 +810,36 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.45) 0%, transparent 70%)',
                 filter: 'blur(6px)',
                 pointerEvents: 'none',
+              }} />
+
+              {/* Concentric Water Wave Ring Expanding Underneath Krathong */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-6px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '120px',
+                height: '26px',
+                borderRadius: '50%',
+                border: '1px solid rgba(56, 189, 248, 0.45)',
+                background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.3) 0%, rgba(56, 189, 248, 0.1) 45%, transparent 75%)',
+                filter: 'blur(1px)',
+                pointerEvents: 'none',
+                animation: 'krathongWaterWake 2.6s ease-out infinite',
+              }} />
+
+              {/* Water Candle Flame Reflection Beam Trailing Down Into River */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-34px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                width: '26px',
+                height: '42px',
+                background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.6) 0%, rgba(245, 158, 11, 0.3) 45%, transparent 100%)',
+                filter: 'blur(3px)',
+                pointerEvents: 'none',
+                animation: 'candleFlicker 1.5s ease-in-out infinite alternate',
               }} />
 
               {/* Krathong Body (Exact User Drawing Canvas Image) */}
@@ -1060,6 +1308,34 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       </div>
 
       <style>{`
+        @keyframes waveScrollLeft {
+          0% { transform: translate3d(0, 0, 0); }
+          100% { transform: translate3d(-1440px, 0, 0); }
+        }
+        @keyframes moonShimmer {
+          0% { transform: translateX(-50%) scaleX(0.8); opacity: 0.55; }
+          50% { transform: translateX(-50%) scaleX(1.15); opacity: 0.95; }
+          100% { transform: translateX(-50%) scaleX(0.88); opacity: 0.65; }
+        }
+        @keyframes templeReflectionUndulate {
+          0% { transform: translateX(-50%) scaleX(0.92) skewX(-2deg); opacity: 0.65; }
+          100% { transform: translateX(-50%) scaleX(1.12) skewX(2.5deg); opacity: 0.95; }
+        }
+        @keyframes waterCurrentDrift {
+          0% { transform: translate3d(80px, 0, 0); opacity: 0; }
+          25% { opacity: 0.65; }
+          75% { opacity: 0.65; }
+          100% { transform: translate3d(-180px, 0, 0); opacity: 0; }
+        }
+        @keyframes lotusBob {
+          0% { transform: translateY(0) rotate(-1.5deg); }
+          100% { transform: translateY(-4px) rotate(2deg); }
+        }
+        @keyframes krathongWaterWake {
+          0% { transform: translateX(-50%) scale(0.75); opacity: 0.8; }
+          50% { transform: translateX(-50%) scale(1.08); opacity: 0.45; }
+          100% { transform: translateX(-50%) scale(1.35); opacity: 0; }
+        }
         @keyframes candleFlicker {
           0% { transform: translateX(-50%) scale(1); opacity: 0.9; }
           50% { transform: translateX(-48%) scale(1.15); opacity: 1; }
