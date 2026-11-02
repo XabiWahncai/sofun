@@ -40,6 +40,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   ])
   const [soundEnabled, setSoundEnabled] = useState(false)
   const audioCtxRef = useRef(null)
+  const ytPlayerRef = useRef(null)
 
   // Real-time animation positions
   const krathongPositionsRef = useRef(new Map())
@@ -236,20 +237,114 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   }
 
   // ── Web Audio Ambient Sound ──────────────────────────────
+    // ── YouTube IFrame API Loader for Background Music (X80o4uXSkOs) ──
+  useEffect(() => {
+    let isCancelled = false
+
+    const initYT = () => {
+      if (isCancelled) return
+      if (window.YT && window.YT.Player && !ytPlayerRef.current) {
+        try {
+          ytPlayerRef.current = new window.YT.Player('yt-bg-audio-player', {
+            videoId: 'X80o4uXSkOs',
+            playerVars: {
+              autoplay: 0,
+              controls: 0,
+              loop: 1,
+              playlist: 'X80o4uXSkOs',
+              playsinline: 1,
+              modestbranding: 1,
+              rel: 0,
+            },
+            events: {
+              onReady: (event) => {
+                if (isCancelled) return
+                try {
+                  event.target.setVolume(75)
+                  if (soundEnabled) {
+                    event.target.playVideo()
+                  }
+                } catch {}
+              },
+              onStateChange: (event) => {
+                if (isCancelled) return
+                // Loop when finished
+                if (event.data === window.YT.PlayerState.ENDED) {
+                  try { event.target.playVideo() } catch {}
+                }
+              },
+            },
+          })
+        } catch (err) {
+          console.warn('YouTube player initialization failed:', err)
+        }
+      }
+    }
+
+    if (!window.YT) {
+      const tag = document.createElement('script')
+      tag.src = 'https://www.youtube.com/iframe_api'
+      const firstScriptTag = document.getElementsByTagName('script')[0]
+      if (firstScriptTag && firstScriptTag.parentNode) {
+        firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+      } else {
+        document.head.appendChild(tag)
+      }
+    }
+
+    if (window.YT && window.YT.Player) {
+      initYT()
+    } else {
+      const prevCallback = window.onYouTubeIframeAPIReady
+      window.onYouTubeIframeAPIReady = () => {
+        if (prevCallback) prevCallback()
+        initYT()
+      }
+    }
+
+    return () => {
+      isCancelled = true
+      if (ytPlayerRef.current) {
+        try {
+          if (ytPlayerRef.current.destroy) ytPlayerRef.current.destroy()
+        } catch {}
+        ytPlayerRef.current = null
+      }
+    }
+  }, [])
+
   const toggleSound = () => {
     if (soundEnabled) {
+      // Pause YouTube Music
+      if (ytPlayerRef.current) {
+        try {
+          if (ytPlayerRef.current.pauseVideo) ytPlayerRef.current.pauseVideo()
+        } catch {}
+      }
+      // Stop Web Audio pink noise
       if (audioCtxRef.current) {
-        audioCtxRef.current.close()
+        try {
+          audioCtxRef.current.close()
+        } catch {}
         audioCtxRef.current = null
       }
       setSoundEnabled(false)
+      if (showToast) showToast('ปิดเสียงดนตรีและสายน้ำแล้ว')
     } else {
+      // Play YouTube Music (รำวงวันลอยกระทง ระนาดเอก X80o4uXSkOs)
+      if (ytPlayerRef.current) {
+        try {
+          if (ytPlayerRef.current.playVideo) ytPlayerRef.current.playVideo()
+        } catch (err) {
+          console.warn('YouTube playVideo failed:', err)
+        }
+      }
+      // Start Gentle River Water Web Audio
       try {
         const AudioContext = window.AudioContext || window.webkitAudioContext
         const ctx = new AudioContext()
         audioCtxRef.current = ctx
 
-        // Create pink noise for gentle river wave sound
         const bufferSize = ctx.sampleRate * 2
         const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
         const output = noiseBuffer.getChannelData(0)
@@ -275,17 +370,18 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         filter.frequency.setValueAtTime(320, ctx.currentTime)
 
         const gainNode = ctx.createGain()
-        gainNode.gain.setValueAtTime(0.3, ctx.currentTime)
+        gainNode.gain.setValueAtTime(0.22, ctx.currentTime)
 
         whiteNoise.connect(filter)
         filter.connect(gainNode)
         gainNode.connect(ctx.destination)
         whiteNoise.start()
-
-        setSoundEnabled(true)
       } catch (err) {
         console.warn('Audio context init failed:', err)
       }
+
+      setSoundEnabled(true)
+      if (showToast) showToast('กำลังเล่น: เพลงรำวงวันลอยกระทง (ระนาดเอก)')
     }
   }
 
@@ -1152,27 +1248,47 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             </div>
           </div>
 
-          {/* Sound Toggle Button */}
+          {/* Sound / Music Toggle Button */}
           <button
             type="button"
             onClick={toggleSound}
-            title={soundEnabled ? 'ปิดเสียงสายน้ำ' : 'เปิดเสียงสายน้ำ'}
+            title={soundEnabled ? 'ปิดเพลงรำวงวันลอยกระทง' : 'เปิดเพลงรำวงวันลอยกระทง (ระนาดเอก)'}
             style={{
-              background: soundEnabled ? 'rgba(56, 189, 248, 0.25)' : 'rgba(255, 255, 255, 0.08)',
-              border: soundEnabled ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.18)',
-              color: soundEnabled ? '#38bdf8' : '#ffffff',
-              borderRadius: '8px',
-              padding: '8px 12px',
+              background: soundEnabled
+                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.45) 100%)'
+                : 'rgba(15, 23, 42, 0.78)',
+              border: soundEnabled
+                ? '1px solid rgba(254, 240, 138, 0.65)'
+                : '1px solid rgba(255, 255, 255, 0.18)',
+              color: soundEnabled ? '#fef08a' : '#ffffff',
+              borderRadius: '12px',
+              padding: '6px 12px',
               cursor: 'pointer',
-              fontSize: '13px',
-              backdropFilter: 'blur(8px)',
+              fontSize: '12px',
+              fontWeight: 700,
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
               height: '42px',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center',
+              gap: '6px',
+              boxShadow: soundEnabled
+                ? '0 0 15px rgba(245, 158, 11, 0.4), 0 2px 8px rgba(0, 0, 0, 0.4)'
+                : '0 2px 8px rgba(0, 0, 0, 0.3)',
+              transition: 'all 0.2s ease',
             }}
           >
-            <i className={`fas ${soundEnabled ? 'fa-volume-high' : 'fa-volume-xmark'}`} />
+            <i
+              className={`fas ${soundEnabled ? 'fa-music' : 'fa-volume-xmark'}`}
+              style={{
+                fontSize: '13px',
+                color: soundEnabled ? '#fde047' : '#94a3b8',
+                animation: soundEnabled ? 'musicNotePulse 1.8s ease-in-out infinite' : 'none',
+              }}
+            />
+            <span style={{ whiteSpace: 'nowrap', fontSize: '11px' }}>
+              {soundEnabled ? 'เปิดเพลงลอยกระทง' : 'เปิดเพลง'}
+            </span>
           </button>
         </div>
       </div>
@@ -1294,6 +1410,23 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         )}
       </div>
 
+      {/* Hidden Background YouTube Music Player Container */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: '-200px',
+          right: '-200px',
+          width: '20px',
+          height: '20px',
+          opacity: 0.01,
+          pointerEvents: 'none',
+          overflow: 'hidden',
+          zIndex: -1,
+        }}
+      >
+        <div id="yt-bg-audio-player" />
+      </div>
+
       <style>{`
         @keyframes waveScrollLeft {
           0% { transform: translate3d(0, 0, 0); }
@@ -1331,6 +1464,10 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         @keyframes bubbleAppear {
           0% { transform: translateX(-50%) translateY(8px) scale(0.92); opacity: 0; }
           100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes musicNotePulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.22) rotate(6deg); }
         }
         @keyframes fireworkBurst {
           0% { transform: scale(0.2); opacity: 0; }
