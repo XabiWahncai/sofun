@@ -832,23 +832,31 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
           type="button"
           onClick={() => showPage('home')}
           style={{
-            background: 'none',
-            border: 'none',
-            color: '#86868b',
+            background: 'rgba(255, 255, 255, 0.08)',
+            border: '1px solid rgba(255, 255, 255, 0.12)',
+            color: '#f5f5f7',
+            borderRadius: '9999px',
+            padding: '5px 14px',
+            fontSize: '12px',
+            fontWeight: 600,
             cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: 500,
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
-            padding: '6px 0',
-            transition: 'color 0.16s ease',
+            backdropFilter: 'blur(12px)',
+            transition: 'background 0.16s ease, border-color 0.16s ease',
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff' }}
-          onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b' }}
-          title="กลับสู่หน้าหลัก SOFUN (Home)"
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+          }}
+          title="กลับหน้า Home"
         >
-          <i className="fas fa-house" style={{ fontSize: '11px' }} /> หน้าแรก
+          <i className="fas fa-house" style={{ fontSize: '11px' }} /> กลับหน้า Home
         </button>
 
         <div style={{
