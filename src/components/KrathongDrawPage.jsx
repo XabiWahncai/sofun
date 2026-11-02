@@ -17,13 +17,6 @@ const PRESET_COLORS = [
   { name: 'ดำคราม', hex: '#1e293b' },
 ]
 
-const QUICK_WISHES = [
-  'ขอให้พบแต่ความสุข สุขภาพร่างกายแข็งแรง ไร้โรคภัยเบียดเบียน',
-  'ขอให้การงานเจริญก้าวหน้า การเงินคล่องตัว มั่งคั่งร่ำรวย',
-  'ขอให้ความรักมั่นคง สมหวังในสิ่งที่ปรารถนาทุกประการ',
-  'ลอยเคราะห์ ลอยโศก ลอยสิ่งไม่ดีทั้งหมดออกจากชีวิต',
-  'ขอให้ครอบครัวสงบสุข ร่มเย็น แคล้วคลาดปลอดภัยทุกการเดินทาง',
-]
 
 function hexToRgb(hex) {
   let c = hex.replace('#', '')
@@ -1294,47 +1287,6 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                     e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
                   }}
                 />
-              </div>
-
-              {/* Quick Wish Pills */}
-              <div style={{ marginBottom: '28px' }}>
-                <div style={{ fontSize: '11px', color: '#86868b', marginBottom: '8px' }}>
-                  คำอธิษฐานแนะนำ (คลิกเพื่อเลือก):
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                  {QUICK_WISHES.map((w, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => setWish(w)}
-                      style={{
-                        background: 'rgba(255, 255, 255, 0.04)',
-                        border: '1px solid rgba(255, 255, 255, 0.08)',
-                        color: '#a1a1a6',
-                        borderRadius: '9999px',
-                        padding: '5px 12px',
-                        fontSize: '11.5px',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: '100%',
-                        transition: 'all 0.14s ease',
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'
-                        e.currentTarget.style.color = '#f5f5f7'
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255, 255, 255, 0.04)'
-                        e.currentTarget.style.color = '#a1a1a6'
-                      }}
-                    >
-                      {w}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* Apple Signature CTA Button */}
