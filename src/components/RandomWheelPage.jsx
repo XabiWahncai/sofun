@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
-  collection, doc, onSnapshot, getDocs, updateDoc,
+  collection, doc, onSnapshot, getDocs, updateDoc, deleteDoc,
   setDoc, addDoc, serverTimestamp, query, orderBy, limit
 } from 'firebase/firestore'
 import { db } from '../firebase'
@@ -1034,6 +1034,19 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
     }
   }
 
+  // ── Clear Winner History Action ───────────────────────────────────────────
+  const handleClearWinnerHistory = async () => {
+    if (!window.confirm('ยืนยันล้างประวัติผู้ชนะทั้งหมดหรือไม่? การดำเนินการนี้ไม่สามารถย้อนกลับได้')) return
+    try {
+      const snap = await getDocs(collection(db, 'wheelHistory'))
+      const deletePromises = snap.docs.map(d => deleteDoc(doc(db, 'wheelHistory', d.id)))
+      await Promise.all(deletePromises)
+      showToast('ล้างประวัติผู้ชนะเรียบร้อยแล้ว')
+    } catch (e) {
+      showToast('เกิดข้อผิดพลาดในการล้างประวัติ: ' + e.message, 'error')
+    }
+  }
+
   // ── Update Rigged / Locked Winner ──────────────────────────────────────────
   const handleSetLockedWinner = async (targetId) => {
     try {
@@ -1669,6 +1682,29 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
             {/* ── TAB 3: WINNER HISTORY ── */}
             {activeTab === 'history' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {isAdmin && winnerHistory.length > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+                    <button
+                      onClick={handleClearWinnerHistory}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: 8,
+                        background: 'rgba(239, 68, 68, 0.12)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#ef4444',
+                        fontSize: 12,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                      }}
+                    >
+                      <i className="fas fa-trash-alt" style={{ fontSize: 11 }} />
+                      <span>ล้างประวัติผู้ชนะ</span>
+                    </button>
+                  </div>
+                )}
                 {winnerHistory.length === 0 ? (
                   <div style={{ textAlign: 'center', padding: '30px 0', color: '#666', fontSize: 13 }}>
                     ยังไม่มีประวัติการสุ่ม
