@@ -21,26 +21,26 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
   return (
     <div style={{
       minHeight: '100vh',
-      background: 'linear-gradient(180deg, #050814 0%, #0a1128 50%, #0f1c3f 100%)',
+      background: 'radial-gradient(120% 90% at 50% -10%, #AF3F16 0%, #2b0b00 35%, #0a1128 75%, #050814 100%)',
       color: '#ffffff',
       fontFamily: "'Sarabun', sans-serif",
       position: 'relative',
       overflowX: 'hidden',
       paddingBottom: '80px',
     }}>
-      {/* Authentic Bangkok Temples & Full Moon Panoramic Backdrop Banner */}
+      {/* Authentic 2D Vector Bangkok Temples & Skyline Backdrop Banner */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         height: '380px',
-        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
-        backgroundSize: 'cover',
+        backgroundImage: "url('/loykrathong-vector-bg.webp'), url('/loykrathong-vector-bg.png')",
+        backgroundSize: 'auto 100%',
         backgroundPosition: 'center bottom',
-        backgroundRepeat: 'no-repeat',
+        backgroundRepeat: 'repeat-x',
         pointerEvents: 'none',
-        opacity: 0.55,
+        opacity: 0.65,
         maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 65%, transparent 100%)',
         WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 65%, transparent 100%)',
       }} />
