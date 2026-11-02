@@ -830,7 +830,7 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
       }}>
         <button
           type="button"
-          onClick={() => showPage('loykrathong')}
+          onClick={() => showPage('home')}
           style={{
             background: 'none',
             border: 'none',
@@ -846,8 +846,9 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
           }}
           onMouseEnter={(e) => { e.currentTarget.style.color = '#ffffff' }}
           onMouseLeave={(e) => { e.currentTarget.style.color = '#86868b' }}
+          title="กลับสู่หน้าหลัก SOFUN (Home)"
         >
-          <i className="fas fa-chevron-left" style={{ fontSize: '11px' }} /> หน้าหลัก
+          <i className="fas fa-house" style={{ fontSize: '11px' }} /> หน้าแรก
         </button>
 
         <div style={{

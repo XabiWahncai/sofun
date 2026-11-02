@@ -997,11 +997,12 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         background: 'linear-gradient(180deg, rgba(5, 8, 20, 0.6) 0%, transparent 100%)',
         pointerEvents: 'none',
       }}>
-        {/* Left: Back Button Only */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', pointerEvents: 'auto' }}>
+        {/* Left: Navigation Buttons (Back to /Krathong & Home) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
           <button
             type="button"
-            onClick={() => showPage('loykrathong')}
+            onClick={() => showPage('krathong')}
+            title="ย้อนกลับไปหน้าวาดกระทง (/Krathong)"
             style={{
               background: 'rgba(255, 255, 255, 0.12)',
               border: '1px solid rgba(255, 255, 255, 0.22)',
@@ -1019,6 +1020,29 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             }}
           >
             <i className="fas fa-arrow-left" /> กลับ
+          </button>
+
+          <button
+            type="button"
+            onClick={() => showPage('home')}
+            title="กลับสู่หน้าหลัก SOFUN (Home)"
+            style={{
+              background: 'rgba(255, 255, 255, 0.12)',
+              border: '1px solid rgba(255, 255, 255, 0.22)',
+              color: '#ffffff',
+              borderRadius: '8px',
+              padding: '6px 14px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+            }}
+          >
+            <i className="fas fa-house" /> หน้าแรก
           </button>
         </div>
 
