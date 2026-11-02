@@ -7211,6 +7211,66 @@ nav {
   --focus-ring: #E11D48;
   --focus-ring-glow: rgba(225, 29, 72, 0.12);
 }
+:root[data-achievement="toon_army"] {
+  --curtain-crimson: #18181b;
+  --curtain-crimson-light: #27272a;
+  --curtain-crimson-deep: #09090b;
+  --curtain-crimson-rgb: 24, 24, 27;
+  --red: #18181b;
+  --red-light: #27272a;
+  --red-dark: #09090b;
+  --red-glow: rgba(0, 0, 0, 0.35);
+  --n-border-red: rgba(0, 0, 0, 0.35);
+  --ed-red: #18181b;
+  --ed-red-bg: rgba(0, 0, 0, 0.08);
+  --ed-border-red: rgba(0, 0, 0, 0.30);
+  --crimson-300: #71717a;
+  --crimson-400: #3f3f46;
+  --crimson-500: #18181b;
+  --crimson-500-rgb: 24, 24, 27;
+  --crimson-600: #09090b;
+  --crimson-700: #000000;
+  --action-primary: #18181b;
+  --action-primary-hover: #000000;
+  --text-link: #18181b;
+  --text-link-hover: #000000;
+  --border-focus: #18181b;
+  --focus-ring: #18181b;
+  --focus-ring-glow: rgba(0, 0, 0, 0.15);
+}
+
+/* ── Toon Army Newcastle United Black & White Accents ── */
+:root[data-achievement="toon_army"] .nav-root {
+  border-bottom: 3px solid transparent !important;
+  border-image: repeating-linear-gradient(90deg, #000000 0px, #000000 16px, #ffffff 16px, #ffffff 32px) 3 !important;
+}
+:root[data-achievement="toon_army"] .mm-btn-pri,
+:root[data-achievement="toon_army"] .sofun-promo-btn {
+  background: #09090b !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.30) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+}
+:root[data-achievement="toon_army"] .mm-btn-pri:hover,
+:root[data-achievement="toon_army"] .sofun-promo-btn:hover {
+  background: #18181b !important;
+  border-color: #ffffff !important;
+}
+:root[data-achievement="toon_army"] .mm-hero-pill {
+  background: repeating-linear-gradient(90deg, #18181b 0px, #18181b 10px, #ffffff 10px, #ffffff 20px) !important;
+  color: #ffffff !important;
+  border: 1.5px solid #000000 !important;
+}
+:root[data-achievement="toon_army"] .mm-hero-pill div {
+  color: #ffffff !important;
+  text-shadow: 0 2px 4px #000000, 0 0 2px #000000;
+}
+:root[data-achievement="toon_army"] .sofun-promo-tag {
+  color: #18181b !important;
+}
+:root[data-achievement="toon_army"] .sofun-promo-pill-val {
+  color: #18181b !important;
+}
 :root[data-achievement="new_era"],
 :root[data-achievement="first_party"] {
   --curtain-crimson: #06B6D4;

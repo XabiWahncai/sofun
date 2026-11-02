@@ -119,6 +119,18 @@ const THEME_PROFILES = {
     cardBorder: 'rgba(225, 29, 72, 0.55)',
     watermarkIcon: 'fa-wand-magic-sparkles'
   },
+  toon_army: {
+    id: 'toon_army',
+    name: 'Toon Army',
+    title: 'MAGPIES PASS',
+    subtitle: 'สาวกสาลิกาดงตัวจริง จิตวิญญาณขาวดำแห่ง St James\' Park (Howay the Lads!)',
+    accent: '#FFFFFF',
+    accentRgb: '255, 255, 255',
+    cardBg: 'repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 16px, transparent 16px, transparent 32px), linear-gradient(145deg, #09090b 0%, #18181b 50%, #000000 100%)',
+    borderGlow: 'rgba(255, 255, 255, 0.70)',
+    cardBorder: 'rgba(255, 255, 255, 0.50)',
+    watermarkIcon: 'fa-crow'
+  },
   new_era: {
     id: 'new_era',
     name: 'First Party',

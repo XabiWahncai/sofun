@@ -20,6 +20,18 @@ export const ACHIEVEMENTS = {
     bg: 'rgba(225,29,72,0.14)',
     border: 'rgba(225,29,72,0.35)',
   },
+  toon_army: {
+    id: 'toon_army',
+    rarity: 'event',
+    icon: 'fa-crow',
+    label: 'Toon Army',
+    labelTH: 'ทูนอาร์มี',
+    desc: 'Howay the Lads! Pure black and white blood runs deep for the Geordies of Newcastle United at St James\' Park.',
+    descTH: 'สาวกสาลิกาดงตัวจริง หัวใจสีขาวดำแห่งนิวคาสเซิลยูไนเต็ด Howay the Lads!',
+    color: '#18181b',
+    bg: 'rgba(24,24,27,0.12)',
+    border: 'rgba(24,24,27,0.35)',
+  },
   new_era: {
     id: 'new_era',
     rarity: 'legendary',

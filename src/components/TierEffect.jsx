@@ -652,6 +652,56 @@ function WaterEffect() {
   )
 }
 
+// ── 14. Toon Army Effect (Newcastle United Magpies, Footballs & Black-White Confetti) ──
+const TOON_ARMY_ICONS = [
+  { icon: 'fa-crow', color: '#FFFFFF', glow: 'rgba(255,255,255,0.85)' },
+  { icon: 'fa-futbol', color: '#FFFFFF', glow: 'rgba(255,255,255,0.70)' },
+  { icon: 'fa-shield-halved', color: '#E4E4E7', glow: 'rgba(255,255,255,0.60)' },
+  { icon: 'fa-feather-pointed', color: '#F4F4F5', glow: 'rgba(255,255,255,0.60)' },
+  { icon: 'fa-star', color: '#FBBF24', glow: 'rgba(251,191,36,0.70)' },
+  { icon: 'fa-flag', color: '#FFFFFF', glow: 'rgba(255,255,255,0.65)' },
+]
+
+function ToonArmyEffect() {
+  const items = useMemo(() => (
+    Array.from({ length: 26 }, (_, i) => ({
+      id: i,
+      x: rand(2, 95),
+      size: rand(14, 26),
+      duration: rand(5, 9),
+      delay: rand(0, 7),
+      drift: rand(-40, 40),
+      rot: rand(-180, 180),
+      item: TOON_ARMY_ICONS[i % TOON_ARMY_ICONS.length],
+    }))
+  ), [])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 10, overflow: 'hidden' }}>
+      {items.map(item => (
+        <span
+          key={item.id}
+          className="tier-toon-rise"
+          style={{
+            position: 'absolute',
+            left: `${item.x}%`,
+            fontSize: item.size,
+            color: item.item.color,
+            animationDuration: `${item.duration}s`,
+            animationDelay: `-${item.delay}s`,
+            '--drift': `${item.drift}px`,
+            '--rot': `${item.rot}deg`,
+            filter: 'drop-shadow(0 0 10px ' + item.item.glow + ')',
+            pointerEvents: 'none',
+          }}
+        >
+          <i className={`fas ${item.item.icon}`} />
+        </span>
+      ))}
+    </div>
+  )
+}
+
 // ── Global Color Fallback ───────────────────────────────────────────────────
 const TIER_COLOR = {
   golden:     '#D4AF37',
@@ -668,6 +718,7 @@ const TIER_COLOR = {
   veteran:    '#7C3AED',
   explorer:   '#059669',
   potterhead: '#E11D48',
+  toon_army:  '#FFFFFF',
   new_era:    '#06B6D4',
   first_party: '#06B6D4',
   manager:    '#10B981',
@@ -816,6 +867,21 @@ export default function TierEffect({ tier }) {
           85%  { opacity: 0.85; }
           100% { transform: translateY(-115vh) translateX(var(--drift)) rotate(var(--rot)); opacity: 0; }
         }
+
+        /* Toon Army Newcastle rise */
+        .tier-toon-rise {
+          position: absolute;
+          bottom: -50px;
+          user-select: none;
+          line-height: 1;
+          animation: toon-rise ease-in-out infinite;
+        }
+        @keyframes toon-rise {
+          0%   { transform: translateY(0) translateX(0) rotate(0deg); opacity: 0; }
+          12%  { opacity: 0.95; }
+          85%  { opacity: 0.9; }
+          100% { transform: translateY(-115vh) translateX(var(--drift)) rotate(var(--rot)); opacity: 0; }
+        }
       `}</style>
 
       {/* Render bespoke effect based on tier */}
@@ -827,6 +893,7 @@ export default function TierEffect({ tier }) {
       {tier === 'veteran' && <VeteranEffect />}
       {tier === 'explorer' && <ExplorerEffect />}
       {tier === 'potterhead' && <PotterEffect />}
+      {tier === 'toon_army' && <ToonArmyEffect />}
       {(tier === 'new_era' || tier === 'first_party') && <NewEraEffect />}
       {tier === 'manager' && <ManagerEffect />}
       {SPARKLE_CONFIG[tier] && <SparkleEffect tier={tier} />}
