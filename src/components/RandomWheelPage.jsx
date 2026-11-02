@@ -4,6 +4,7 @@ import {
   setDoc, addDoc, serverTimestamp, query, orderBy, limit
 } from 'firebase/firestore'
 import { db } from '../firebase'
+import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId } from '../utils/achievementTierSync'
 
 // ── Vibrant slice color palette ──────────────────────────────────────────────
 const SLICE_COLORS = [
@@ -89,7 +90,7 @@ const fmtThaiDT = (d) => {
   }) + ' · ' + date.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
 }
 
-export default function RandomWheelPage({ lineUser, showToast, showPage }) {
+export default function RandomWheelPage({ lineUser, showToast, showPage, allGames = [] }) {
   // ── Firestore live states ──────────────────────────────────────────────────
   const [playHistory, setPlayHistory] = useState([])
   const [payments, setPayments] = useState([])
@@ -232,13 +233,41 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
     }
   }, [isSpinning])
 
-  // ── Combine & Deduplicate Play Records ─────────────────────────────────────
+  // ── Combine & Deduplicate Play Records (Excluding Special Event) ───────────
   const allPlayRecords = useMemo(() => {
     const records = []
     const seenKeys = new Set()
 
-    // 1. From playHistory collection
+    const gameMap = new Map()
+    if (Array.isArray(allGames)) {
+      allGames.forEach(g => {
+        const id = String(g.id || g._id || '').toLowerCase()
+        if (id) gameMap.set(id, g)
+        if (g.title) {
+          const raw = g.title.trim().toLowerCase()
+          gameMap.set(raw, g)
+          gameMap.set(raw.replace(/\s+/g, ''), g)
+        }
+      })
+    }
+
+    const isSpecialRecord = (item) => {
+      if (!item) return false
+      if (isSpecialEventHistory(item)) return true
+      if (isSpecialEventId(item.scriptId)) return true
+      const sid = item.scriptId ? String(item.scriptId).toLowerCase() : null
+      const rawTitle = item.scriptTitle ? item.scriptTitle.trim().toLowerCase() : ''
+      const normTitle = rawTitle ? rawTitle.replace(/\s+/g, '') : ''
+      const g = (sid && gameMap.get(sid)) ||
+                (rawTitle && gameMap.get(rawTitle)) ||
+                (normTitle && gameMap.get(normTitle))
+      if (g && isSpecialEventGame(g)) return true
+      return false
+    }
+
+    // 1. From playHistory collection (excluding Special Event)
     playHistory.forEach(ph => {
+      if (isSpecialRecord(ph)) return
       const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : new Date())
       const uid = ph.userId || ph.userName || 'unknown'
       const key = `${uid}_${ph.scriptId || ph.scriptTitle}_${pDate.toDateString()}`
@@ -259,8 +288,9 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
       })
     })
 
-    // 2. From payments collection
+    // 2. From payments collection (excluding Special Event)
     payments.forEach(pm => {
+      if (isSpecialRecord(pm)) return
       const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : pm.createdAt?.toDate ? pm.createdAt.toDate() : new Date())
       const members = Array.isArray(pm.members) ? pm.members : []
       members.forEach(m => {
@@ -287,7 +317,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
     })
 
     return records.sort((a, b) => b.playedAt.getTime() - a.playedAt.getTime())
-  }, [playHistory, payments])
+  }, [playHistory, payments, allGames])
 
   // ── Logged-in User Plays & Stats ───────────────────────────────────────────
   const myPlays = useMemo(() => {
@@ -437,7 +467,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage }) {
     removedSet.forEach(uid => {
       const mem = membersMap[uid]
       const manual = manualParticipants.find(m => m.id === uid)
-      const ph = playHistory.find(p => p.userId === uid || p.userName === uid)
+      const ph = allPlayRecords.find(p => p.userId === uid || p.userName === uid) || playHistory.find(p => p.userId === uid || p.userName === uid)
       const name = mem?.nickname || mem?.firstname || manual?.name || ph?.userName || uid
       const avatar = mem?.pictureUrl || manual?.avatar || ph?.userAvatar || ''
       list.push({ id: uid, name, avatar })

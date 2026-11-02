@@ -97,9 +97,9 @@ export function isSpecialEventGame(g) {
 
 export function isSpecialEventHistory(h) {
   if (!h) return false
-  const title = (h.scriptTitle || h.title || '').trim().toLowerCase()
-  const sid = String(h.scriptId || h.id || '').toLowerCase()
-  const room = (h.room || '').trim().toLowerCase()
+  const title = (h.scriptTitle || h.title || h.gameTitle || '').trim().toLowerCase()
+  const sid = String(h.scriptId || h.id || h.gameId || '').toLowerCase()
+  const room = (h.room || h.sessionLabel || '').trim().toLowerCase()
   return (
     title.includes('special event') ||
     title.includes('secial event') ||

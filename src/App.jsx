@@ -905,7 +905,7 @@ export default function App() {
         </ErrorBoundary>
       )}
       {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} initialGameId={bookingGameId} />}
-      {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} />}
+      {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} allGames={allGames} />}
       {currentPage === 'allofuswilldie' && (
         <ErrorBoundary>
           <AllOfUsWillDiePage
