@@ -622,7 +622,7 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
                 gap: 4,
               }}
             >
-              <i className="fas fa-crown" style={{ fontSize: 8.5 }} /> DM แนะนำ
+              DM แนะนำ
             </span>
           )}
         </div>
@@ -703,7 +703,6 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
             }}
             title={`${dmRec.dmName}: ${dmRec.reason}`}
           >
-            <i className="fas fa-crown" style={{ fontSize: 8, color: '#f472b6', flexShrink: 0 }} />
             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
               <strong>{dmRec.dmName}:</strong> {dmRec.reason}
             </span>
