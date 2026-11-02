@@ -960,45 +960,36 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         alignItems: 'center',
         justifyContent: 'space-between',
         zIndex: 40,
-        background: 'linear-gradient(180deg, rgba(5, 8, 20, 0.85) 0%, transparent 100%)',
-        flexWrap: 'wrap',
-        gap: '10px',
+        background: 'linear-gradient(180deg, rgba(5, 8, 20, 0.6) 0%, transparent 100%)',
+        pointerEvents: 'none',
       }}>
-        {/* Left: Back & Title */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        {/* Left: Back Button Only */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', pointerEvents: 'auto' }}>
           <button
             type="button"
             onClick={() => showPage('loykrathong')}
             style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '1px solid rgba(255, 255, 255, 0.18)',
+              background: 'rgba(255, 255, 255, 0.12)',
+              border: '1px solid rgba(255, 255, 255, 0.22)',
               color: '#ffffff',
               borderRadius: '8px',
-              padding: '6px 12px',
+              padding: '6px 14px',
               cursor: 'pointer',
               fontSize: '13px',
+              fontWeight: 700,
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
               backdropFilter: 'blur(8px)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
             }}
           >
             <i className="fas fa-arrow-left" /> กลับ
           </button>
-
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 800, color: '#fef08a' }}>
-              แม่น้ำสายบุญ 2D Parallax
-            </div>
-            <div style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.7)' }}>
-              คลิกที่กระทงเพื่ออ่านคำอธิษฐานที่ลอยไปพร้อมกระทง
-            </div>
-          </div>
         </div>
 
-        {/* Right: Actions */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Sound Toggle */}
+        {/* Right: Sound Toggle Button Only */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
           <button
             type="button"
             onClick={toggleSound}
@@ -1015,50 +1006,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             }}
           >
             <i className={`fas ${soundEnabled ? 'fa-volume-high' : 'fa-volume-xmark'}`} />
-          </button>
-
-          {/* Release Sky Lantern Button */}
-          <button
-            type="button"
-            onClick={handleReleaseSkyLantern}
-            style={{
-              background: 'rgba(245, 158, 11, 0.18)',
-              border: '1px solid rgba(245, 158, 11, 0.45)',
-              color: '#fef08a',
-              borderRadius: '8px',
-              padding: '7px 12px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 700,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              backdropFilter: 'blur(8px)',
-            }}
-          >
-            <i className="fas fa-fire-flame-curved" /> ปล่อยโคมลอย
-          </button>
-
-          {/* Go Draw Krathong Button */}
-          <button
-            type="button"
-            onClick={() => showPage('krathong')}
-            style={{
-              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-              border: 'none',
-              color: '#ffffff',
-              borderRadius: '8px',
-              padding: '7px 14px',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: 800,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: '0 4px 14px rgba(245, 158, 11, 0.35)',
-            }}
-          >
-            <i className="fas fa-paint-brush" /> วาดกระทงของคุณ
           </button>
         </div>
       </div>
