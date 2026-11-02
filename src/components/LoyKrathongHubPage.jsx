@@ -28,7 +28,24 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
       overflowX: 'hidden',
       paddingBottom: '80px',
     }}>
-      {/* Night Sky Stars & Moon Background Decoration */}
+      {/* Authentic Bangkok Temples & Full Moon Panoramic Backdrop Banner */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '380px',
+        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center bottom',
+        backgroundRepeat: 'no-repeat',
+        pointerEvents: 'none',
+        opacity: 0.55,
+        maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 65%, transparent 100%)',
+        WebkitMaskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 65%, transparent 100%)',
+      }} />
+
+      {/* Floating Lanterns in Sky */}
       <div style={{
         position: 'absolute',
         top: 0,
@@ -38,32 +55,6 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
         pointerEvents: 'none',
         overflow: 'hidden',
       }}>
-        {/* Full Moon */}
-        <div style={{
-          position: 'absolute',
-          top: '36px',
-          right: '8%',
-          width: '110px',
-          height: '110px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #fffbeb 20%, #fef3c7 60%, #fde68a 100%)',
-          boxShadow: '0 0 60px 15px rgba(254, 240, 138, 0.45)',
-          opacity: 0.95,
-        }} />
-
-        {/* Ambient Moon Glow Ring */}
-        <div style={{
-          position: 'absolute',
-          top: '6px',
-          right: 'calc(8% - 30px)',
-          width: '170px',
-          height: '170px',
-          borderRadius: '50%',
-          border: '1px solid rgba(254, 243, 199, 0.2)',
-          boxShadow: '0 0 80px rgba(254, 243, 199, 0.15)',
-        }} />
-
-        {/* Floating Lanterns in Sky */}
         {[
           { left: '15%', top: '120px', delay: '0s', size: 14, opacity: 0.75 },
           { left: '28%', top: '60px', delay: '1.2s', size: 18, opacity: 0.85 },

@@ -292,31 +292,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         userSelect: 'none',
       }}
     >
-      {/* ── Layer 1: Night Sky, Stars & Glowing Moon ───────── */}
+      {/* ── Layer 1: Night Sky, Stars & Glowing Ambience ───────── */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }}>
-        {/* Full Moon */}
-        <div style={{
-          position: 'absolute',
-          top: '40px',
-          right: '12%',
-          width: '120px',
-          height: '120px',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, #fffbeb 25%, #fef3c7 60%, #fde68a 100%)',
-          boxShadow: '0 0 70px 20px rgba(254, 243, 199, 0.4)',
-        }}>
-          {/* Subtle lunar maria texture */}
-          <div style={{
-            position: 'absolute',
-            top: '25px',
-            left: '30px',
-            width: '35px',
-            height: '25px',
-            borderRadius: '50%',
-            background: 'rgba(217, 119, 6, 0.08)',
-          }} />
-        </div>
-
         {/* Floating Sky Lanterns (โคมลอย) */}
         {skyLanterns.map((lan) => (
           <div
@@ -337,77 +314,29 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         ))}
       </div>
 
-      {/* ── Layer 2: Temple & City Skyline Silhouette ──────── */}
+      {/* ── Layer 2: Authentic Bangkok Temples & Full Moon Panoramic Backdrop ── */}
       <div style={{
         position: 'absolute',
-        bottom: '380px',
+        top: 0,
         left: 0,
         right: 0,
-        height: '260px',
+        bottom: '360px',
+        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
+        backgroundSize: 'cover',
+        backgroundPosition: 'center bottom',
+        backgroundRepeat: 'no-repeat',
         pointerEvents: 'none',
         zIndex: 2,
-        opacity: 0.9,
       }}>
-        {/* SVG Detailed Wat Arun & Thai Temple Silhouette with Golden Warm Illumination */}
-        <svg
-          viewBox="0 0 1440 260"
-          preserveAspectRatio="none"
-          style={{ width: '100%', height: '100%', display: 'block' }}
-        >
-          <defs>
-            <linearGradient id="templeGoldGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#f59e0b" stopOpacity="0.8" />
-              <stop offset="40%" stopColor="#b45309" stopOpacity="0.6" />
-              <stop offset="100%" stopColor="#08142b" stopOpacity="0.95" />
-            </linearGradient>
-            <linearGradient id="templeDark" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#0a1a36" stopOpacity="0.95" />
-              <stop offset="100%" stopColor="#050e1f" stopOpacity="1" />
-            </linearGradient>
-          </defs>
-
-          {/* Far Distant Shore / Trees */}
-          <path d="M 0 220 Q 180 200 360 215 T 720 210 T 1080 215 T 1440 210 L 1440 260 L 0 260 Z" fill="url(#templeDark)" />
-
-          {/* Thai Temple 1: Small Pavilion on Left */}
-          <path d="M 140 220 L 140 180 L 130 180 L 150 145 L 170 180 L 160 180 L 160 220 Z" fill="url(#templeDark)" />
-
-          {/* Wat Arun Grand Prang (Central Stupa) in Center */}
-          <g transform="translate(640, 20)">
-            {/* Illuminated Golden Spire */}
-            <path d="M 80 0 L 82 45 L 86 90 L 92 135 L 98 180 L 108 220 L 52 220 L 62 180 L 68 135 L 74 90 L 78 45 Z" fill="url(#templeGoldGrad)" />
-            {/* Stepped Prang Base */}
-            <rect x="40" y="200" width="80" height="20" fill="url(#templeGoldGrad)" rx="2" />
-            <rect x="25" y="215" width="110" height="15" fill="url(#templeDark)" rx="2" />
-            {/* Small flanker stupas */}
-            <path d="M 20 120 L 22 170 L 26 215 L 14 215 L 18 170 Z" fill="url(#templeGoldGrad)" />
-            <path d="M 140 120 L 142 170 L 146 215 L 134 215 L 138 170 Z" fill="url(#templeGoldGrad)" />
-            {/* Spire Top Glowing Crystal */}
-            <circle cx="80" cy="0" r="4" fill="#fef08a" filter="drop-shadow(0 0 10px #f59e0b)" />
-          </g>
-
-          {/* Thai Traditional Tiered Roof Temple on Right */}
-          <g transform="translate(980, 70)">
-            {/* Tier 1 Spire */}
-            <polygon points="70,0 72,50 68,50" fill="#f59e0b" />
-            {/* Tier 1 Roof */}
-            <path d="M 40 50 Q 70 35 100 50 L 105 60 L 35 60 Z" fill="#b45309" />
-            {/* Tier 2 Roof */}
-            <path d="M 25 65 Q 70 45 115 65 L 122 80 L 18 80 Z" fill="#b45309" />
-            {/* Tier 3 Main Roof with Chofah tips */}
-            <path d="M 10 85 Q 70 60 130 85 L 140 105 L 0 105 Z" fill="#92400e" />
-            {/* Temple Pillars & Base */}
-            <rect x="25" y="105" width="90" height="65" fill="url(#templeDark)" />
-            {/* Window warm light */}
-            <rect x="45" y="120" width="14" height="26" fill="#fef08a" opacity="0.6" rx="2" />
-            <rect x="80" y="120" width="14" height="26" fill="#fef08a" opacity="0.6" rx="2" />
-          </g>
-
-          {/* Riverside Festival Lamps */}
-          {[120, 260, 480, 880, 1180, 1340].map((rx, idx) => (
-            <circle key={idx} cx={rx} cy="216" r="3" fill="#fef08a" filter="drop-shadow(0 0 8px #f59e0b)" />
-          ))}
-        </svg>
+        {/* Soft atmospheric gradient blending bottom embankment into river water */}
+        <div style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          height: '70px',
+          background: 'linear-gradient(180deg, transparent 0%, rgba(9, 30, 62, 0.45) 50%, rgba(9, 30, 62, 0.95) 100%)',
+        }} />
       </div>
 
       {/* ── Layer 3: Living Flowing River with Waves, Shimmer & Reflections ──────── */}
@@ -433,33 +362,60 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           borderTop: '1px solid rgba(254, 240, 138, 0.35)',
         }} />
 
-        {/* Wat Arun Central Stupa Golden Water Reflection */}
+        {/* Wat Arun Grand Prang Golden Water Reflection (Aligned to Wat Arun at left: 23%) */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '50%',
+          left: '23%',
           transform: 'translateX(-50%)',
-          width: '180px',
+          width: '130px',
           height: '140px',
           background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.32) 0%, rgba(180, 83, 9, 0.16) 50%, transparent 100%)',
           filter: 'blur(10px)',
           animation: 'templeReflectionUndulate 4.5s ease-in-out infinite alternate',
         }} />
 
-        {/* Thai Temple Golden Water Reflection */}
+        {/* Grand Palace Royal Pavilion Golden Reflection (Aligned to Grand Palace at left: 52%) */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '74%',
-          width: '130px',
-          height: '110px',
+          left: '52%',
+          transform: 'translateX(-50%)',
+          width: '190px',
+          height: '125px',
           background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.28) 0%, rgba(146, 64, 14, 0.12) 55%, transparent 100%)',
-          filter: 'blur(9px)',
-          animation: 'templeReflectionUndulate 5.2s ease-in-out infinite alternate 1.8s',
+          filter: 'blur(10px)',
+          animation: 'templeReflectionUndulate 5s ease-in-out infinite alternate 1s',
         }} />
 
-        {/* Riverside Festival Lamps Water Light Droplets */}
-        {[8, 18, 33, 61, 82, 93].map((pct, idx) => (
+        {/* Golden Chedi Stupa Reflection (Aligned to Chedi at left: 66%) */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: '66%',
+          transform: 'translateX(-50%)',
+          width: '110px',
+          height: '115px',
+          background: 'linear-gradient(180deg, rgba(251, 191, 36, 0.28) 0%, rgba(180, 83, 9, 0.12) 50%, transparent 100%)',
+          filter: 'blur(9px)',
+          animation: 'templeReflectionUndulate 4.8s ease-in-out infinite alternate 0.5s',
+        }} />
+
+        {/* Giant Swing Subtle Warm Red-Amber Reflection (Aligned to Giant Swing at left: 76%) */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: '76%',
+          transform: 'translateX(-50%)',
+          width: '65px',
+          height: '95px',
+          background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.08) 55%, transparent 100%)',
+          filter: 'blur(8px)',
+          animation: 'templeReflectionUndulate 5.5s ease-in-out infinite alternate 2s',
+        }} />
+
+        {/* Riverside Embankment Festival Lamps Water Light Reflections */}
+        {[12, 23, 35, 47, 56, 66, 76, 88].map((pct, idx) => (
           <div
             key={idx}
             style={{
@@ -527,12 +483,13 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           </svg>
         </div>
 
-        {/* ── Moonlight Specular Reflection Path down River ── */}
+        {/* ── Moonlight Specular Reflection Path down River (Aligned to Moon at left: 27%) ── */}
         <div style={{
           position: 'absolute',
           top: 0,
           bottom: 0,
-          right: '8%',
+          left: '27%',
+          transform: 'translateX(-50%)',
           width: '280px',
           pointerEvents: 'none',
         }}>
@@ -943,6 +900,10 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           return (
             <div
               key={`wish-${k.id}`}
+              onClick={(e) => {
+                e.stopPropagation()
+                toggleWish(k.id)
+              }}
               style={{
                 position: 'absolute',
                 left: `${bubbleX}px`,
@@ -951,124 +912,47 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 pointerEvents: 'auto',
                 zIndex: 35,
                 animation: 'bubbleAppear 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                cursor: 'pointer',
               }}
             >
-              {/* Dark Modal Card Container matching Sanook style */}
+              {/* Translucent Frosted Glass Card: Pure Wish Text Only, Fixed Readable Font */}
               <div style={{
-                background: '#181f2a',
-                border: '1.5px solid rgba(245, 158, 11, 0.45)',
-                borderRadius: '14px',
-                padding: '12px 16px 12px',
-                width: 'min(300px, 85vw)',
-                boxShadow: '0 8px 28px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 158, 11, 0.25)',
+                background: 'rgba(15, 23, 42, 0.75)',
+                backdropFilter: 'blur(10px)',
+                WebkitBackdropFilter: 'blur(10px)',
+                border: '1.5px solid rgba(254, 240, 138, 0.45)',
+                borderRadius: '12px',
+                padding: '10px 18px',
+                width: 'max-content',
+                maxWidth: 'min(280px, 85vw)',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.65), 0 0 16px rgba(245, 158, 11, 0.25)',
                 position: 'relative',
+                textAlign: 'center',
               }}>
                 {/* Downward Pointer Triangle */}
                 <div style={{
                   position: 'absolute',
-                  bottom: '-7px',
+                  bottom: '-6px',
                   left: '50%',
                   transform: 'translateX(-50%) rotate(45deg)',
-                  width: '12px',
-                  height: '12px',
-                  background: '#181f2a',
-                  borderRight: '1.5px solid rgba(245, 158, 11, 0.45)',
-                  borderBottom: '1.5px solid rgba(245, 158, 11, 0.45)',
+                  width: '10px',
+                  height: '10px',
+                  background: 'rgba(15, 23, 42, 0.85)',
+                  borderRight: '1.5px solid rgba(254, 240, 138, 0.45)',
+                  borderBottom: '1.5px solid rgba(254, 240, 138, 0.45)',
                 }} />
 
-                {/* Header Row: คุณ {k.name} on left, close 'x' on right */}
+                {/* Wish Text: Unscaled, Clear and Legible at any distance */}
                 <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: '8px',
-                }}>
-                  <div style={{
-                    fontSize: '13.5px',
-                    fontWeight: 800,
-                    color: '#ffffff',
-                    letterSpacing: '0.01em',
-                  }}>
-                    คุณ {k.name}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      toggleWish(k.id)
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: 'rgba(255, 255, 255, 0.55)',
-                      fontSize: '15px',
-                      cursor: 'pointer',
-                      padding: '0 2px',
-                      lineHeight: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    title="ปิดคำอธิษฐาน"
-                  >
-                    <i className="fas fa-times" />
-                  </button>
-                </div>
-
-                {/* Wish Quote Text */}
-                <div style={{
-                  fontSize: '13px',
-                  fontWeight: 600,
-                  color: '#f3f4f6',
+                  fontSize: '13.5px',
+                  fontWeight: 700,
+                  color: '#ffffff',
                   lineHeight: 1.5,
-                  margin: '0 0 12px',
                   wordBreak: 'break-word',
-                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.8)',
+                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.95)',
+                  letterSpacing: '0.01em',
                 }}>
-                  "{k.wish}"
-                </div>
-
-                {/* Footer Row: สาธุ Button & Floating River Status */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  gap: '8px',
-                  paddingTop: '6px',
-                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
-                }}>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleSadhu(k.id)
-                    }}
-                    style={{
-                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-                      border: 'none',
-                      borderRadius: '7px',
-                      color: '#ffffff',
-                      padding: '4px 11px',
-                      fontSize: '11.5px',
-                      fontWeight: 800,
-                      cursor: 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      boxShadow: '0 2px 8px rgba(245, 158, 11, 0.45)',
-                    }}
-                  >
-                    <i className="fas fa-hands-praying" style={{ fontSize: '11px' }} />
-                    สาธุ ({sadhuCounts[k.id] ?? k.sadhuCount ?? k.likes ?? 0})
-                  </button>
-
-                  <div style={{
-                    fontSize: '11px',
-                    color: 'rgba(255, 255, 255, 0.55)',
-                    whiteSpace: 'nowrap',
-                  }}>
-                    ลอยอยู่ในสายน้ำ
-                  </div>
+                  {k.wish}
                 </div>
               </div>
             </div>
