@@ -308,49 +308,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         userSelect: 'none',
       }}
     >
-      {/* ── Layer 1: Night Sky, Full Moon, Fireworks & Sky Lanterns ───────── */}
+      {/* ── Layer 1: Night Sky, Stars & Floating Sky Lanterns ───────── */}
       <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }}>
-        {/* 2D Vector Full Moon (Sanook Vector Art Style) */}
-        <div style={{
-          position: 'absolute',
-          top: '25px',
-          left: 'calc(50% - 460px)',
-          width: '180px',
-          height: '180px',
-          backgroundImage: "url('/loykrathong-vector-moon.webp'), url('/loykrathong-vector-moon.png')",
-          backgroundSize: 'contain',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          filter: 'drop-shadow(0 0 28px rgba(254, 240, 138, 0.6))',
-          pointerEvents: 'none',
-        }} />
-
-        {/* 2D Vector Fireworks (Sanook Vector Firework SVGs) */}
-        <div style={{
-          position: 'absolute',
-          top: '55px',
-          right: '12%',
-          width: '64px',
-          height: '64px',
-          backgroundImage: "url('/firework.svg')",
-          backgroundSize: 'contain',
-          backgroundRepeat: 'no-repeat',
-          animation: 'fireworkBurst 3.6s ease-out infinite',
-          pointerEvents: 'none',
-        }} />
-        <div style={{
-          position: 'absolute',
-          top: '85px',
-          left: '26%',
-          width: '50px',
-          height: '50px',
-          backgroundImage: "url('/firework.svg')",
-          backgroundSize: 'contain',
-          backgroundRepeat: 'no-repeat',
-          animation: 'fireworkBurst 4.2s ease-out infinite 1.8s',
-          pointerEvents: 'none',
-        }} />
-
         {/* Floating Sky Lanterns (โคมลอย) */}
         {skyLanterns.map((lan) => (
           <div
@@ -371,35 +330,19 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         ))}
       </div>
 
-      {/* ── Layer 2: 2D Vector Bangkok Temples & Skyline (Sanook 2D Vector Art Style) ── */}
+      {/* ── Layer 2: Authentic Bangkok Temples & Full Moon Panoramic Backdrop ── */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         bottom: '340px',
-        backgroundImage: "url('/loykrathong-vector-bg.webp'), url('/loykrathong-vector-bg.png')",
-        backgroundSize: 'auto 100%',
+        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
+        backgroundSize: 'cover',
         backgroundPosition: 'center bottom',
-        backgroundRepeat: 'repeat-x',
+        backgroundRepeat: 'no-repeat',
         pointerEvents: 'none',
         zIndex: 2,
-      }} />
-
-      {/* Riverbank Embankment Wall Seam (Sanook bgwall) */}
-      <div style={{
-        position: 'absolute',
-        bottom: '337px',
-        left: 0,
-        right: 0,
-        height: '14px',
-        backgroundImage: "url('/loykrathong-vector-wall.png')",
-        backgroundRepeat: 'repeat-x',
-        backgroundSize: 'auto 100%',
-        backgroundPosition: 'center bottom',
-        zIndex: 2,
-        pointerEvents: 'none',
-        opacity: 0.95,
       }} />
 
       {/* ── Layer 3: Living Flowing River with Waves, Shimmer & Reflections ──────── */}

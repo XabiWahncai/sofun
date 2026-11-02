@@ -28,17 +28,17 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
       overflowX: 'hidden',
       paddingBottom: '80px',
     }}>
-      {/* Authentic 2D Vector Bangkok Temples & Skyline Backdrop Banner */}
+      {/* Authentic Bangkok Temples & Skyline Backdrop Banner */}
       <div style={{
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
         height: '380px',
-        backgroundImage: "url('/loykrathong-vector-bg.webp'), url('/loykrathong-vector-bg.png')",
-        backgroundSize: 'auto 100%',
+        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
+        backgroundSize: 'cover',
         backgroundPosition: 'center bottom',
-        backgroundRepeat: 'repeat-x',
+        backgroundRepeat: 'no-repeat',
         pointerEvents: 'none',
         opacity: 0.65,
         maskImage: 'linear-gradient(180deg, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 65%, transparent 100%)',

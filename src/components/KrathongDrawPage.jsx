@@ -37,13 +37,235 @@ function rgbToHex(r, g, b) {
   return `#${toHex(r)}${toHex(g)}${toHex(b)}`
 }
 
+function rgbToHsv(r, g, b) {
+  const rn = r / 255
+  const gn = g / 255
+  const bn = b / 255
+  const max = Math.max(rn, gn, bn)
+  const min = Math.min(rn, gn, bn)
+  const delta = max - min
+  let h = 0
+  if (delta > 0) {
+    if (max === rn) {
+      h = (60 * ((gn - bn) / delta) + 360) % 360
+    } else if (max === gn) {
+      h = (60 * ((bn - rn) / delta) + 120) % 360
+    } else {
+      h = (60 * ((rn - gn) / delta) + 240) % 360
+    }
+  }
+  const s = max === 0 ? 0 : delta / max
+  const v = max
+  return { h, s, v }
+}
+
+function hsvToRgb(h, s, v) {
+  const c = v * s
+  const x = c * (1 - Math.abs(((h / 60) % 2) - 1))
+  const m = v - c
+  let r = 0, g = 0, b = 0
+  if (h >= 0 && h < 60) {
+    r = c; g = x; b = 0
+  } else if (h >= 60 && h < 120) {
+    r = x; g = c; b = 0
+  } else if (h >= 120 && h < 180) {
+    r = 0; g = c; b = x
+  } else if (h >= 180 && h < 240) {
+    r = 0; g = x; b = c
+  } else if (h >= 240 && h < 300) {
+    r = x; g = 0; b = c
+  } else {
+    r = c; g = 0; b = x
+  }
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255),
+  }
+}
+
+function AppleColorWheel({ colorR, colorG, colorB, onChangeRgb }) {
+  const wheelCanvasRef = useRef(null)
+  const wheelContainerRef = useRef(null)
+  const isDraggingRef = useRef(false)
+
+  const { h, s, v } = rgbToHsv(colorR, colorG, colorB)
+  const radius = 68
+  const diameter = radius * 2
+
+  // Render static H/S wheel onto canvas on mount
+  useEffect(() => {
+    const canvas = wheelCanvasRef.current
+    if (!canvas) return
+    canvas.width = diameter
+    canvas.height = diameter
+    const ctx = canvas.getContext('2d')
+    const imgData = ctx.createImageData(diameter, diameter)
+    const data = imgData.data
+
+    for (let y = 0; y < diameter; y++) {
+      for (let x = 0; x < diameter; x++) {
+        const dx = x - radius
+        const dy = y - radius
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        const idx = (y * diameter + x) * 4
+
+        if (dist <= radius) {
+          const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360
+          const sat = dist / radius
+          const { r, g, b } = hsvToRgb(angle, sat, 1.0)
+          data[idx] = r
+          data[idx + 1] = g
+          data[idx + 2] = b
+          data[idx + 3] = 255
+        } else {
+          data[idx + 3] = 0
+        }
+      }
+    }
+    ctx.putImageData(imgData, 0, 0)
+  }, [diameter, radius])
+
+  // Calculate pointer position from current (h, s)
+  const rad = (h * Math.PI) / 180
+  const dist = s * radius
+  const thumbX = radius + Math.cos(rad) * dist
+  const thumbY = radius + Math.sin(rad) * dist
+
+  // Color with brightness = 1 (pure hue/sat) for gradient track
+  const pureColor = hsvToRgb(h, s, 1.0)
+  const pureHex = rgbToHex(pureColor.r, pureColor.g, pureColor.b)
+  const currentHex = rgbToHex(colorR, colorG, colorB)
+
+  const updateColorFromPoint = (clientX, clientY) => {
+    const container = wheelContainerRef.current
+    if (!container) return
+    const rect = container.getBoundingClientRect()
+    const dx = clientX - rect.left - radius
+    const dy = clientY - rect.top - radius
+    const angle = (Math.atan2(dy, dx) * 180 / Math.PI + 360) % 360
+    const rawDist = Math.sqrt(dx * dx + dy * dy)
+    const sat = Math.min(1, Math.max(0, rawDist / radius))
+    const currentBrightness = v > 0.05 ? v : 1.0
+    const { r, g, b } = hsvToRgb(angle, sat, currentBrightness)
+    onChangeRgb(r, g, b)
+  }
+
+  const handlePointerDown = (e) => {
+    isDraggingRef.current = true
+    if (e.currentTarget.setPointerCapture) {
+      try { e.currentTarget.setPointerCapture(e.pointerId) } catch {}
+    }
+    updateColorFromPoint(e.clientX, e.clientY)
+  }
+
+  const handlePointerMove = (e) => {
+    if (!isDraggingRef.current) return
+    updateColorFromPoint(e.clientX, e.clientY)
+  }
+
+  const handlePointerUp = (e) => {
+    isDraggingRef.current = false
+    if (e.currentTarget.releasePointerCapture) {
+      try { e.currentTarget.releasePointerCapture(e.pointerId) } catch {}
+    }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+      {/* Circular Color Wheel */}
+      <div
+        ref={wheelContainerRef}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{
+          position: 'relative',
+          width: `${diameter}px`,
+          height: `${diameter}px`,
+          borderRadius: '50%',
+          cursor: 'crosshair',
+          touchAction: 'none',
+          boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45), inset 0 0 10px rgba(0, 0, 0, 0.35)',
+          filter: `brightness(${Math.max(0.18, v)})`,
+          transition: 'filter 0.08s ease',
+        }}
+      >
+        <canvas
+          ref={wheelCanvasRef}
+          style={{
+            width: `${diameter}px`,
+            height: `${diameter}px`,
+            borderRadius: '50%',
+            display: 'block',
+            pointerEvents: 'none',
+          }}
+        />
+
+        {/* Circular Selection Thumb / Indicator Ring */}
+        <div
+          style={{
+            position: 'absolute',
+            left: `${thumbX}px`,
+            top: `${thumbY}px`,
+            width: '18px',
+            height: '18px',
+            borderRadius: '50%',
+            background: currentHex,
+            border: '2.5px solid #ffffff',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.75), inset 0 0 2px rgba(0, 0, 0, 0.5)',
+            transform: 'translate(-50%, -50%)',
+            pointerEvents: 'none',
+          }}
+        />
+      </div>
+
+      {/* Brightness / Lightness Track Slider */}
+      <div style={{ width: '100%', marginTop: '12px' }}>
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '11px',
+          color: '#86868b',
+          marginBottom: '6px',
+        }}>
+          <span>ความสว่าง (Brightness)</span>
+          <span style={{ color: '#f5f5f7', fontWeight: 600 }}>{Math.round(v * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min="0"
+          max="100"
+          value={Math.round(v * 100)}
+          onChange={(e) => {
+            const newV = Number(e.target.value) / 100
+            const { r, g, b } = hsvToRgb(h, s, newV)
+            onChangeRgb(r, g, b)
+          }}
+          style={{
+            width: '100%',
+            cursor: 'pointer',
+            height: '5px',
+            borderRadius: '3px',
+            accentColor: '#f5a623',
+            background: `linear-gradient(to right, #000000 0%, ${pureHex} 65%, #ffffff 100%)`,
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
 export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
   // Canvas refs
   const drawCanvasRef = useRef(null)
   const guideCanvasRef = useRef(null)
 
   // Drawing state
-  const [tool, setTool] = useState('glow') // 'pen' | 'brush' | 'glow' | 'marker' | 'eraser' | 'bucket'
+  const [tool, setTool] = useState('glow') // 'glow' | 'brush' | 'pen' | 'sparkle' | 'bucket' | 'eraser' | 'picker'
+  const prevToolRef = useRef('brush') // 'pen' | 'brush' | 'glow' | 'marker' | 'eraser' | 'bucket'
   const [colorR, setColorR] = useState(250)
   const [colorG, setColorG] = useState(204)
   const [colorB, setColorB] = useState(21)
@@ -255,6 +477,24 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
   const startDrawing = (e) => {
     e.preventDefault()
     const { x, y } = getCoordinates(e)
+
+    if (tool === 'picker') {
+      const canvas = drawCanvasRef.current
+      if (canvas) {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true })
+        const pixel = ctx.getImageData(Math.floor(x), Math.floor(y), 1, 1).data
+        if (pixel[3] > 10) {
+          setColorR(pixel[0])
+          setColorG(pixel[1])
+          setColorB(pixel[2])
+          if (showToast) showToast(`ดูดสีสำเร็จ: rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`)
+          setTool(prevToolRef.current || 'brush')
+        } else {
+          if (showToast) showToast('จุดนี้ไม่มีสี แตะบนส่วนที่ระบายไว้')
+        }
+      }
+      return
+    }
 
     if (tool === 'bucket') {
       floodFill(x, y, colorR, colorG, colorB, Math.round((opacity / 100) * 255))
@@ -874,7 +1114,7 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                   inset: 0,
                   width: '100%',
                   height: '100%',
-                  cursor: tool === 'eraser' ? 'cell' : 'crosshair',
+                  cursor: tool === 'picker' ? 'copy' : tool === 'eraser' ? 'cell' : 'crosshair',
                   zIndex: 3,
                   touchAction: 'none',
                 }}
@@ -942,7 +1182,7 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
               borderRadius: '16px',
               padding: '6px',
               display: 'grid',
-              gridTemplateColumns: 'repeat(6, 1fr)',
+              gridTemplateColumns: 'repeat(7, 1fr)',
               gap: '4px',
             }}>
               {[
@@ -952,13 +1192,40 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                 { id: 'sparkle', label: 'ประกาย', icon: 'fa-star' },
                 { id: 'bucket', label: 'เทสี', icon: 'fa-fill-drip' },
                 { id: 'eraser', label: 'ยางลบ', icon: 'fa-eraser' },
+                { id: 'picker', label: 'ดูดสี', icon: 'fa-eye-dropper' },
               ].map((item) => {
                 const isActive = tool === item.id
                 return (
                   <button
                     key={item.id}
                     type="button"
-                    onClick={() => setTool(item.id)}
+                    onClick={async () => {
+                      if (item.id === 'picker') {
+                        if (tool !== 'picker') prevToolRef.current = tool
+                        if (window.EyeDropper) {
+                          try {
+                            const eyeDropper = new window.EyeDropper()
+                            const result = await eyeDropper.open()
+                            if (result && result.sRGBHex) {
+                              const { r, g, b } = hexToRgb(result.sRGBHex)
+                              setColorR(r)
+                              setColorG(g)
+                              setColorB(b)
+                              if (showToast) showToast(`ดูดสีสำเร็จ: ${result.sRGBHex}`)
+                              setTool(prevToolRef.current || 'brush')
+                              return
+                            }
+                          } catch {
+                            // Cancelled native picker
+                          }
+                        }
+                        setTool('picker')
+                        if (showToast) showToast('แตะบนภาพเพื่อดูดสี')
+                      } else {
+                        prevToolRef.current = item.id
+                        setTool(item.id)
+                      }
+                    }}
                     style={{
                       background: isActive ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
                       border: 'none',
@@ -1062,7 +1329,7 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                     border: '2px solid rgba(255, 255, 255, 0.8)',
                   }} />
                   <span style={{ fontSize: '12px', fontWeight: 600, color: '#f5f5f7' }}>
-                    สีระบบ RGB ({colorR}, {colorG}, {colorB})
+                    วงล้อสี RGB ({colorR}, {colorG}, {colorB})
                   </span>
                 </div>
 
@@ -1136,45 +1403,17 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
                 })}
               </div>
 
-              {/* Slim RGB Track Controls */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', fontSize: '10.5px', fontWeight: 700, color: '#ef4444' }}>R</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="255"
-                    value={colorR}
-                    onChange={(e) => setColorR(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: '#ef4444', cursor: 'pointer', height: '4px' }}
-                  />
-                  <span style={{ width: '24px', textAlign: 'right', fontSize: '11px', color: '#86868b' }}>{colorR}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', fontSize: '10.5px', fontWeight: 700, color: '#22c55e' }}>G</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="255"
-                    value={colorG}
-                    onChange={(e) => setColorG(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: '#22c55e', cursor: 'pointer', height: '4px' }}
-                  />
-                  <span style={{ width: '24px', textAlign: 'right', fontSize: '11px', color: '#86868b' }}>{colorG}</span>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ width: '12px', fontSize: '10.5px', fontWeight: 700, color: '#38bdf8' }}>B</span>
-                  <input
-                    type="range"
-                    min="0"
-                    max="255"
-                    value={colorB}
-                    onChange={(e) => setColorB(Number(e.target.value))}
-                    style={{ flex: 1, accentColor: '#38bdf8', cursor: 'pointer', height: '4px' }}
-                  />
-                  <span style={{ width: '24px', textAlign: 'right', fontSize: '11px', color: '#86868b' }}>{colorB}</span>
-                </div>
-              </div>
+              {/* Apple-Style Interactive Color Wheel (วงล้อสี) */}
+              <AppleColorWheel
+                colorR={colorR}
+                colorG={colorG}
+                colorB={colorB}
+                onChangeRgb={(r, g, b) => {
+                  setColorR(r)
+                  setColorG(g)
+                  setColorB(b)
+                }}
+              />
             </div>
           </div>
 
