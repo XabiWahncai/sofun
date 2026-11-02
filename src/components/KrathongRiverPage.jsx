@@ -3,18 +3,64 @@ import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, incremen
 import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
 
-// ── 4 Depth Lanes Configuration (From farthest back to closest front) ──
-// Strictly defined bottom Y, perspective scale, parallax speed, and z-index.
-// Higher lane index = closer to camera = higher z-index (Lane 0 is farthest, Lane 3 is nearest foreground).
+// 4 Depth Lanes Configuration (From farthest back to closest front)
 const LANE_CONFIG = [
   // Lane 0: ไกลสุด / Furthest back near river horizon
-  { bottom: 205, scaleMult: 0.58, speedMult: 0.65, baseZIndex: 11 },
+  {
+    bottom: 232,
+    scaleMult: 0.44,
+    speedMult: 0.35,
+    baseZIndex: 11,
+    opacity: 0.82,
+    blur: '0.4px',
+    glowRadius: '8px',
+    glowSpread: '2px',
+    waterHaloWidth: '65px',
+    bobAmpMult: 0.55,
+    parallaxShift: 14,
+  },
   // Lane 1: ไกลกลาง / Mid-far
-  { bottom: 145, scaleMult: 0.74, speedMult: 0.85, baseZIndex: 13 },
+  {
+    bottom: 165,
+    scaleMult: 0.68,
+    speedMult: 0.65,
+    baseZIndex: 13,
+    opacity: 0.90,
+    blur: '0px',
+    glowRadius: '14px',
+    glowSpread: '4px',
+    waterHaloWidth: '92px',
+    bobAmpMult: 0.8,
+    parallaxShift: 26,
+  },
   // Lane 2: ใกล้กลาง / Mid-near
-  { bottom: 85,  scaleMult: 0.92, speedMult: 1.05, baseZIndex: 15 },
+  {
+    bottom: 95,
+    scaleMult: 0.98,
+    speedMult: 1.05,
+    baseZIndex: 15,
+    opacity: 0.98,
+    blur: '0px',
+    glowRadius: '22px',
+    glowSpread: '7px',
+    waterHaloWidth: '122px',
+    bobAmpMult: 1.1,
+    parallaxShift: 44,
+  },
   // Lane 3: ใกล้สุด / Nearest foreground
-  { bottom: 22,  scaleMult: 1.10, speedMult: 1.25, baseZIndex: 17 },
+  {
+    bottom: 18,
+    scaleMult: 1.38,
+    speedMult: 1.65,
+    baseZIndex: 17,
+    opacity: 1.0,
+    blur: '0px',
+    glowRadius: '34px',
+    glowSpread: '10px',
+    waterHaloWidth: '160px',
+    bobAmpMult: 1.5,
+    parallaxShift: 72,
+  },
 ]
 
 export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
@@ -42,8 +88,30 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const audioCtxRef = useRef(null)
   const bgAudioRef = useRef(null)
 
-  // Real-time animation positions
+  // Real-time animation positions & Parallax tracking
   const krathongPositionsRef = useRef(new Map())
+  const parallaxRef = useRef({ targetX: 0, currentX: 0, targetY: 0, currentY: 0 })
+
+  // Listen to mousemove / touchmove for interactive camera parallax
+  useEffect(() => {
+    const handleMove = (e) => {
+      const w = window.innerWidth || 1000
+      const h = window.innerHeight || 800
+      const clientX = e.clientX !== undefined ? e.clientX : (e.touches && e.touches[0]?.clientX)
+      const clientY = e.clientY !== undefined ? e.clientY : (e.touches && e.touches[0]?.clientY)
+      if (clientX === undefined) return
+      const normX = ((clientX / w) - 0.5) * 2 // Range -1 to +1
+      const normY = ((clientY / h) - 0.5) * 2 // Range -1 to +1
+      parallaxRef.current.targetX = normX
+      parallaxRef.current.targetY = normY
+    }
+    window.addEventListener('mousemove', handleMove, { passive: true })
+    window.addEventListener('touchmove', handleMove, { passive: true })
+    return () => {
+      window.removeEventListener('mousemove', handleMove)
+      window.removeEventListener('touchmove', handleMove)
+    }
+  }, [])
   const [, setTick] = useState(0)
   const [sadhuCounts, setSadhuCounts] = useState({})
 
@@ -194,6 +262,10 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
       const containerW = containerRef.current ? containerRef.current.clientWidth : (window.innerWidth || 1000)
 
+      // Smooth exponential lerp for buttery camera parallax
+      parallaxRef.current.currentX += (parallaxRef.current.targetX - parallaxRef.current.currentX) * 0.05
+      parallaxRef.current.currentY += (parallaxRef.current.targetY - parallaxRef.current.currentY) * 0.05
+
       // Move each Krathong smoothly along x-axis from right to left with perspective parallax
       firestoreKrathongs.forEach((k) => {
         const pos = krathongPositionsRef.current.get(k.id)
@@ -203,9 +275,9 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const moveSpeed = (k.speed || 0.4) * (cfg.speedMult || 1) * 48 * dt
           pos.x -= moveSpeed
 
-          // Fast & fluid wrap-around: As soon as krathong floats past left edge (-240px),
+          // Fast & fluid wrap-around: As soon as krathong floats past left edge (-280px),
           // immediately re-enter from the right edge with a newly randomized depth lane across 4 levels
-          if (pos.x < -240) {
+          if (pos.x < -280) {
             pos.x = containerW + 40 + Math.random() * 160
             pos.lane = Math.floor(Math.random() * 4)
             pos.bobOffset = Math.random() * Math.PI * 2
@@ -367,7 +439,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       }}
     >
       {/* ── Layer 1: Night Sky, Stars & Floating Sky Lanterns ───────── */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 1 }}>
+      <div style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        zIndex: 1,
+        transform: `translate3d(${parallaxRef.current.currentX * -8}px, ${parallaxRef.current.currentY * -4}px, 0)`,
+        transition: 'transform 0.05s ease-out',
+      }}>
         {/* Floating Sky Lanterns (โคมลอย) */}
         {skyLanterns.map((lan) => (
           <div
@@ -388,12 +467,12 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         ))}
       </div>
 
-      {/* ── Layer 2: Authentic Bangkok Temples & Full Moon Panoramic Backdrop ── */}
+      {/* ── Layer 2: Authentic Bangkok Temples & Full Moon Panoramic Backdrop (Parallax Horizon) ── */}
       <div style={{
         position: 'absolute',
         top: 0,
-        left: 0,
-        right: 0,
+        left: '-30px',
+        right: '-30px',
         bottom: '340px',
         backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
         backgroundSize: 'cover',
@@ -401,14 +480,16 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         backgroundRepeat: 'no-repeat',
         pointerEvents: 'none',
         zIndex: 2,
+        transform: `translate3d(${parallaxRef.current.currentX * -14}px, ${parallaxRef.current.currentY * -6}px, 0)`,
+        transition: 'transform 0.05s ease-out',
       }} />
 
       {/* ── Riverside Embankment Railing & Seam Barrier (รั้วกั้นริมตลิ่ง) ── */}
       <div style={{
         position: 'absolute',
         bottom: '334px',
-        left: 0,
-        right: 0,
+        left: '-30px',
+        right: '-30px',
         height: '20px',
         backgroundImage: "url('/river-fence.svg')",
         backgroundRepeat: 'repeat-x',
@@ -417,6 +498,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         zIndex: 4,
         pointerEvents: 'none',
         filter: 'drop-shadow(0 2px 5px rgba(0, 0, 0, 0.8))',
+        transform: `translate3d(${parallaxRef.current.currentX * -20}px, 0, 0)`,
       }}>
         {/* Subtle Warm Amber Glow along Promenade Railing */}
         <div style={{
@@ -437,7 +519,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         left: 0,
         width: '2880px',
         height: '22px',
-        animation: 'waveScrollLeft 24s linear infinite',
+        animation: 'waveScrollLeft 52s linear infinite',
         zIndex: 5,
         pointerEvents: 'none',
         filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7))',
@@ -486,7 +568,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           width: '2880px',
           height: '24px',
-          animation: 'waveScrollLeft 24s linear infinite',
+          animation: 'waveScrollLeft 52s linear infinite',
           zIndex: 4,
           pointerEvents: 'none',
         }}>
@@ -582,7 +664,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           width: '2880px',
           height: '55px',
-          animation: 'waveScrollLeft 24s linear infinite',
+          animation: 'waveScrollLeft 36s linear infinite',
           opacity: 0.5,
         }}>
           <svg viewBox="0 0 2880 55" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
@@ -608,7 +690,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           width: '2880px',
           height: '65px',
-          animation: 'waveScrollLeft 16s linear infinite',
+          animation: 'waveScrollLeft 22s linear infinite',
           opacity: 0.55,
         }}>
           <svg viewBox="0 0 2880 65" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
@@ -708,7 +790,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           width: '2880px',
           height: '75px',
-          animation: 'waveScrollLeft 10s linear infinite',
+          animation: 'waveScrollLeft 13s linear infinite',
           opacity: 0.65,
         }}>
           <svg viewBox="0 0 2880 75" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
@@ -723,6 +805,35 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               stroke="#38bdf8"
               strokeWidth="2.2"
               strokeOpacity="0.8"
+            />
+          </svg>
+        </div>
+
+        
+
+        {/* ── Continuous Flowing Wave Band 4: Foreground Shore Surf (Fastest 7.5s, Foaming Highlights) ── */}
+        <div style={{
+          position: 'absolute',
+          top: '285px',
+          left: 0,
+          width: '2880px',
+          height: '55px',
+          animation: 'waveScrollLeft 7.5s linear infinite',
+          opacity: 0.7,
+          pointerEvents: 'none',
+        }}>
+          <svg viewBox="0 0 2880 55" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 16 Q 180 34 360 16 T 720 16 T 1080 16 T 1440 16 T 1800 16 T 2160 16 T 2520 16 T 2880 16 L 2880 55 L 0 55 Z"
+              fill="#0284c7"
+              fillOpacity="0.22"
+            />
+            <path
+              d="M 0 16 Q 180 34 360 16 T 720 16 T 1080 16 T 1440 16 T 1800 16 T 2160 16 T 2520 16 T 2880 16"
+              fill="none"
+              stroke="#e0f2fe"
+              strokeWidth="2.5"
+              strokeOpacity="0.85"
             />
           </svg>
         </div>
@@ -883,12 +994,16 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             const isWishOpen = activeWishIds.has(k.id)
             const itemZIndex = isWishOpen ? cfg.baseZIndex + 1 : cfg.baseZIndex
 
-            // Real-time gentle sinusoidal bobbing & tilting
+            // Real-time gentle sinusoidal bobbing & tilting with lane-scaled dynamics
             const timeSec = performance.now() / 1000
-            const bobFreq = k.bobFreq || 1.4
-            const bobAmp = k.bobAmp || 4
+            const bobFreq = (k.bobFreq || 1.4) * (0.8 + lane * 0.15)
+            const bobAmp = (k.bobAmp || 4) * (cfg.bobAmpMult || 1)
             const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
-            const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * 2.2
+            const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * (1.6 + lane * 0.4)
+
+            // Dynamic camera parallax offset based on depth lane
+            const pX = parallaxRef.current.currentX || 0
+            const renderedX = pos.x + (pX * (cfg.parallaxShift || 20))
 
             return (
               <div
@@ -896,15 +1011,18 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 onClick={() => toggleWish(k.id)}
                 style={{
                   position: 'absolute',
-                  left: `${pos.x}px`,
+                  left: `${renderedX}px`,
                   bottom: `${laneBottom + offsetY}px`,
                   transform: `rotate(${rotateDeg}deg) scale(${laneScale})`,
                   transformOrigin: '50% 85%',
                   cursor: 'pointer',
                   pointerEvents: 'auto',
                   zIndex: itemZIndex,
-                  transition: 'filter 0.2s',
-                  filter: isWishOpen ? 'drop-shadow(0 0 20px rgba(254, 240, 138, 0.95))' : 'none',
+                  opacity: cfg.opacity || 1,
+                  transition: 'filter 0.2s, opacity 0.2s',
+                  filter: isWishOpen
+                    ? 'drop-shadow(0 0 22px rgba(254, 240, 138, 0.95))'
+                    : (cfg.blur && cfg.blur !== '0px' ? `blur(${cfg.blur})` : 'none'),
                 }}
               >
               {/* Krathong Body (Exact User Drawing Canvas Image) with Water Effects Directly Underneath */}
@@ -922,7 +1040,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   bottom: '2px',
                   left: '50%',
                   transform: 'translateX(-50%)',
-                  width: '110px',
+                  width: cfg.waterHaloWidth || '110px',
                   height: '24px',
                   borderRadius: '50%',
                   background: 'radial-gradient(ellipse, rgba(245, 158, 11, 0.45) 0%, transparent 70%)',
@@ -988,7 +1106,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   height: '10px',
                   borderRadius: '50%',
                   background: '#fef08a',
-                  boxShadow: '0 0 14px 6px rgba(245, 158, 11, 0.75)',
+                  boxShadow: `0 0 ${cfg.glowRadius || '14px'} ${cfg.glowSpread || '6px'} rgba(245, 158, 11, 0.75)`,
                   pointerEvents: 'none',
                   animation: 'candleFlicker 1.5s ease-in-out infinite alternate',
                   zIndex: 2,
@@ -1054,8 +1172,9 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const bobAmp = k.bobAmp || 4
           const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
 
-          // Calculate real-time unscaled position over the Krathong:
-          const bubbleX = pos.x + 65
+          // Calculate real-time unscaled position over the Krathong with parallax:
+          const pX = parallaxRef.current.currentX || 0
+          const bubbleX = (pos.x + (pX * (cfg.parallaxShift || 20))) + 65
           const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 12
 
           return (
