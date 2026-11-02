@@ -472,6 +472,33 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         }} />
       </div>
 
+      {/* ── Topmost River Boundary Wave Crest (คลื่นขอบบนสุดเชื่อมฉากหลังกับผืนน้ำ ไม่เป็นเส้นตรง) ── */}
+      <div style={{
+        position: 'absolute',
+        bottom: '332px',
+        left: 0,
+        width: '2880px',
+        height: '22px',
+        animation: 'waveScrollLeft 24s linear infinite',
+        zIndex: 5,
+        pointerEvents: 'none',
+        filter: 'drop-shadow(0 2px 4px rgba(0, 0, 0, 0.7))',
+      }}>
+        <svg viewBox="0 0 2880 22" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+          <path
+            d="M 0 8 Q 120 0 240 8 T 480 8 T 720 8 T 960 8 T 1200 8 T 1440 8 T 1680 8 T 1920 8 T 2160 8 T 2400 8 T 2640 8 T 2880 8 L 2880 22 L 0 22 Z"
+            fill="#091e3e"
+          />
+          <path
+            d="M 0 8 Q 120 0 240 8 T 480 8 T 720 8 T 960 8 T 1200 8 T 1440 8 T 1680 8 T 1920 8 T 2160 8 T 2400 8 T 2640 8 T 2880 8"
+            fill="none"
+            stroke="#38bdf8"
+            strokeWidth="1.8"
+            strokeOpacity="0.85"
+          />
+        </svg>
+      </div>
+
       {/* ── Layer 3: Living Flowing River with Waves, Shimmer & Reflections ──────── */}
       <div style={{
         position: 'absolute',
@@ -492,8 +519,34 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           right: 0,
           height: '45px',
           background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.16) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 100%)',
-          borderTop: '1px solid rgba(254, 240, 138, 0.35)',
         }} />
+
+        {/* ── Topmost River Horizon Wave Crest (แนวคลื่นขอบแม่น้ำบนสุด แทนเส้นตรง) ── */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '2880px',
+          height: '24px',
+          animation: 'waveScrollLeft 24s linear infinite',
+          zIndex: 4,
+          pointerEvents: 'none',
+        }}>
+          <svg viewBox="0 0 2880 24" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 6 Q 120 16 240 6 T 480 6 T 720 6 T 960 6 T 1200 6 T 1440 6 T 1680 6 T 1920 6 T 2160 6 T 2400 6 T 2640 6 T 2880 6 L 2880 24 L 0 24 Z"
+              fill="#091e3e"
+              fillOpacity="0.5"
+            />
+            <path
+              d="M 0 6 Q 120 16 240 6 T 480 6 T 720 6 T 960 6 T 1200 6 T 1440 6 T 1680 6 T 1920 6 T 2160 6 T 2400 6 T 2640 6 T 2880 6"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="1.8"
+              strokeOpacity="0.75"
+            />
+          </svg>
+        </div>
 
         {/* Wat Arun Grand Prang Golden Water Reflection (Aligned to Wat Arun at left: 23%) */}
         <div style={{
