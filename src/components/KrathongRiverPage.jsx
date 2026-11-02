@@ -409,7 +409,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         left: 0,
         right: 0,
         height: '340px',
-        background: 'linear-gradient(180deg, #185a88 0%, #11446c 22%, #0c3353 48%, #082138 72%, #03101c 100%)',
+        background: 'linear-gradient(180deg, #091e3e 0%, #0c2d5c 20%, #0a254e 45%, #061937 72%, #020a1c 100%)',
         overflow: 'hidden',
         zIndex: 3,
         pointerEvents: 'none',
@@ -420,71 +420,70 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           top: 0,
           left: 0,
           right: 0,
-          height: '35px',
-          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.22) 0%, rgba(56, 189, 248, 0.1) 50%, transparent 100%)',
+          height: '45px',
+          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.16) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 100%)',
           borderTop: '1px solid rgba(254, 240, 138, 0.35)',
         }} />
 
-        {/* 2D Vector Temple Reflections on Water Surface */}
-        {/* Pagoda Prang Reflection (15%) */}
+        {/* Wat Arun Grand Prang Golden Water Reflection (Aligned to Wat Arun at left: 23%) */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '15%',
+          left: '23%',
           transform: 'translateX(-50%)',
-          width: '120px',
-          height: '130px',
-          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.3) 0%, rgba(180, 83, 9, 0.14) 50%, transparent 100%)',
-          filter: 'blur(9px)',
+          width: '130px',
+          height: '140px',
+          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.32) 0%, rgba(180, 83, 9, 0.16) 50%, transparent 100%)',
+          filter: 'blur(10px)',
           animation: 'templeReflectionUndulate 4.5s ease-in-out infinite alternate',
         }} />
 
-        {/* Grand Palace Pavilion Reflection (40%) */}
+        {/* Grand Palace Royal Pavilion Golden Reflection (Aligned to Grand Palace at left: 52%) */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '40%',
+          left: '52%',
           transform: 'translateX(-50%)',
-          width: '180px',
-          height: '120px',
-          background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.26) 0%, rgba(146, 64, 14, 0.1) 55%, transparent 100%)',
-          filter: 'blur(9px)',
+          width: '190px',
+          height: '125px',
+          background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.28) 0%, rgba(146, 64, 14, 0.12) 55%, transparent 100%)',
+          filter: 'blur(10px)',
           animation: 'templeReflectionUndulate 5s ease-in-out infinite alternate 1s',
         }} />
 
-        {/* Golden Chedi Stupa Reflection (58%) */}
+        {/* Golden Chedi Stupa Reflection (Aligned to Chedi at left: 66%) */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '58%',
+          left: '66%',
           transform: 'translateX(-50%)',
-          width: '130px',
-          height: '125px',
+          width: '110px',
+          height: '115px',
           background: 'linear-gradient(180deg, rgba(251, 191, 36, 0.28) 0%, rgba(180, 83, 9, 0.12) 50%, transparent 100%)',
-          filter: 'blur(8px)',
+          filter: 'blur(9px)',
           animation: 'templeReflectionUndulate 4.8s ease-in-out infinite alternate 0.5s',
         }} />
 
-        {/* Riverside Stupas Reflection (81%) */}
+        {/* Giant Swing Subtle Warm Red-Amber Reflection (Aligned to Giant Swing at left: 76%) */}
         <div style={{
           position: 'absolute',
           top: 0,
-          left: '81%',
+          left: '76%',
           transform: 'translateX(-50%)',
-          width: '140px',
-          height: '110px',
-          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.24) 0%, rgba(185, 28, 28, 0.08) 55%, transparent 100%)',
+          width: '65px',
+          height: '95px',
+          background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.08) 55%, transparent 100%)',
           filter: 'blur(8px)',
           animation: 'templeReflectionUndulate 5.5s ease-in-out infinite alternate 2s',
         }} />
 
         {/* Riverside Embankment Festival Lamps Water Light Reflections */}
-        {[10, 22, 33, 44, 55, 67, 78, 89].map((pct, idx) => (
+        {[12, 23, 35, 47, 56, 66, 76, 88].map((pct, idx) => (
           <div
             key={idx}
             style={{
               position: 'absolute',
-              top: '2px',
+              top: '4px',
               left: `${pct}%`,
               width: '14px',
               height: '35px',
@@ -495,47 +494,57 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           />
         ))}
 
-        {/* ── Vector Wave Band 1: Far Water (Sanook wave-1.svg) ── */}
+        {/* ── Continuous Flowing Wave Band 1: Far Water (Slow, Deep Indigo) ── */}
         <div style={{
           position: 'absolute',
-          top: '20px',
-          left: 0,
-          width: '2880px',
-          height: '45px',
-          backgroundImage: "url('/wave-1.svg')",
-          backgroundRepeat: 'repeat-x',
-          backgroundSize: 'auto 100%',
-          animation: 'waveScrollLeft 24s linear infinite',
-          opacity: 0.42,
-        }} />
-
-        {/* ── Vector Wave Band 2: Mid Water (Sanook wave-2.svg) ── */}
-        <div style={{
-          position: 'absolute',
-          top: '115px',
+          top: '30px',
           left: 0,
           width: '2880px',
           height: '55px',
-          backgroundImage: "url('/wave-2.svg')",
-          backgroundRepeat: 'repeat-x',
-          backgroundSize: 'auto 100%',
-          animation: 'waveScrollLeft 16s linear infinite',
-          opacity: 0.48,
-        }} />
+          animation: 'waveScrollLeft 24s linear infinite',
+          opacity: 0.5,
+        }}>
+          <svg viewBox="0 0 2880 55" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 20 Q 120 35 240 20 T 480 20 T 720 20 T 960 20 T 1200 20 T 1440 20 T 1680 20 T 1920 20 T 2160 20 T 2400 20 T 2640 20 T 2880 20 L 2880 55 L 0 55 Z"
+              fill="#1e40af"
+              fillOpacity="0.35"
+            />
+            <path
+              d="M 0 20 Q 120 35 240 20 T 480 20 T 720 20 T 960 20 T 1200 20 T 1440 20 T 1680 20 T 1920 20 T 2160 20 T 2400 20 T 2640 20 T 2880 20"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="1.5"
+              strokeOpacity="0.6"
+            />
+          </svg>
+        </div>
 
-        {/* ── Vector Wave Band 3: Near Water (Sanook wave-3.svg) ── */}
+        {/* ── Continuous Flowing Wave Band 2: Mid Water (Medium Cerulean) ── */}
         <div style={{
           position: 'absolute',
-          top: '215px',
+          top: '145px',
           left: 0,
           width: '2880px',
-          height: '50px',
-          backgroundImage: "url('/wave-3.svg')",
-          backgroundRepeat: 'repeat-x',
-          backgroundSize: 'auto 100%',
-          animation: 'waveScrollLeft 12s linear infinite',
-          opacity: 0.52,
-        }} />
+          height: '65px',
+          animation: 'waveScrollLeft 16s linear infinite',
+          opacity: 0.55,
+        }}>
+          <svg viewBox="0 0 2880 65" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 25 Q 180 45 360 25 T 720 25 T 1080 25 T 1440 25 T 1800 25 T 2160 25 T 2520 25 T 2880 25 L 2880 65 L 0 65 Z"
+              fill="#0284c7"
+              fillOpacity="0.32"
+            />
+            <path
+              d="M 0 25 Q 180 45 360 25 T 720 25 T 1080 25 T 1440 25 T 1800 25 T 2160 25 T 2520 25 T 2880 25"
+              fill="none"
+              stroke="#7dd3fc"
+              strokeWidth="1.8"
+              strokeOpacity="0.65"
+            />
+          </svg>
+        </div>
 
         {/* ── Moonlight Specular Reflection Path down River (Aligned to Moon at left: 27%) ── */}
         <div style={{
@@ -610,6 +619,32 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             }}
           />
         ))}
+
+        {/* ── Continuous Flowing Wave Band 3: Near Water (Faster, Crisp Azure Highlights) ── */}
+        <div style={{
+          position: 'absolute',
+          top: '225px',
+          left: 0,
+          width: '2880px',
+          height: '75px',
+          animation: 'waveScrollLeft 10s linear infinite',
+          opacity: 0.65,
+        }}>
+          <svg viewBox="0 0 2880 75" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
+            <path
+              d="M 0 30 Q 240 55 480 30 T 960 30 T 1440 30 T 1920 30 T 2400 30 T 2880 30 L 2880 75 L 0 75 Z"
+              fill="#0369a1"
+              fillOpacity="0.4"
+            />
+            <path
+              d="M 0 30 Q 240 55 480 30 T 960 30 T 1440 30 T 1920 30 T 2400 30 T 2880 30"
+              fill="none"
+              stroke="#38bdf8"
+              strokeWidth="2.2"
+              strokeOpacity="0.8"
+            />
+          </svg>
+        </div>
 
         {/* ── Near Shore Water Foam & Foreground Embankment Edge ── */}
         <div style={{
