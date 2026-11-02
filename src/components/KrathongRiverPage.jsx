@@ -320,24 +320,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         top: 0,
         left: 0,
         right: 0,
-        bottom: '360px',
+        bottom: '340px',
         backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
         backgroundSize: 'cover',
         backgroundPosition: 'center bottom',
         backgroundRepeat: 'no-repeat',
         pointerEvents: 'none',
         zIndex: 2,
-      }}>
-        {/* Soft atmospheric gradient blending bottom embankment into river water */}
-        <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          height: '70px',
-          background: 'linear-gradient(180deg, transparent 0%, rgba(9, 30, 62, 0.45) 50%, rgba(9, 30, 62, 0.95) 100%)',
-        }} />
-      </div>
+      }} />
 
       {/* ── Layer 3: Living Flowing River with Waves, Shimmer & Reflections ──────── */}
       <div style={{
@@ -345,7 +335,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: '420px',
+        height: '340px',
         background: 'linear-gradient(180deg, #091e3e 0%, #0c2d5c 20%, #0a254e 45%, #061937 72%, #020a1c 100%)',
         overflow: 'hidden',
         zIndex: 3,
@@ -503,15 +493,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
           {/* Golden Glistening Water Shimmer Ripple Bars */}
           {[
-            { w: 32, y: 15, d: '0s', dur: '2.4s' },
-            { w: 48, y: 40, d: '0.6s', dur: '3.1s' },
-            { w: 72, y: 72, d: '1.2s', dur: '2.8s' },
-            { w: 96, y: 110, d: '0.4s', dur: '3.3s' },
-            { w: 124, y: 155, d: '1.6s', dur: '2.7s' },
-            { w: 155, y: 205, d: '0.9s', dur: '3.2s' },
-            { w: 188, y: 260, d: '1.4s', dur: '2.9s' },
-            { w: 220, y: 315, d: '0.5s', dur: '3.5s' },
-            { w: 250, y: 370, d: '2.0s', dur: '3.0s' },
+            { w: 32, y: 12, d: '0s', dur: '2.4s' },
+            { w: 48, y: 35, d: '0.6s', dur: '3.1s' },
+            { w: 72, y: 65, d: '1.2s', dur: '2.8s' },
+            { w: 96, y: 100, d: '0.4s', dur: '3.3s' },
+            { w: 124, y: 140, d: '1.6s', dur: '2.7s' },
+            { w: 155, y: 185, d: '0.9s', dur: '3.2s' },
+            { w: 188, y: 235, d: '1.4s', dur: '2.9s' },
+            { w: 220, y: 285, d: '0.5s', dur: '3.5s' },
           ].map((bar, idx) => (
             <div
               key={idx}
@@ -534,12 +523,12 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
         {/* ── Flowing Water Ripple Streaks Drifting with Current ── */}
         {[
-          { top: '85px', left: '15%', w: '120px', dur: '9s', d: '0s' },
-          { top: '115px', left: '60%', w: '160px', dur: '12s', d: '2s' },
-          { top: '190px', left: '30%', w: '140px', dur: '8s', d: '1s' },
-          { top: '230px', left: '75%', w: '180px', dur: '11s', d: '3s' },
-          { top: '310px', left: '20%', w: '150px', dur: '7s', d: '1.5s' },
-          { top: '345px', left: '50%', w: '190px', dur: '10s', d: '4s' },
+          { top: '55px', left: '15%', w: '120px', dur: '9s', d: '0s' },
+          { top: '85px', left: '60%', w: '160px', dur: '12s', d: '2s' },
+          { top: '145px', left: '30%', w: '140px', dur: '8s', d: '1s' },
+          { top: '195px', left: '75%', w: '180px', dur: '11s', d: '3s' },
+          { top: '245px', left: '20%', w: '150px', dur: '7s', d: '1.5s' },
+          { top: '290px', left: '50%', w: '190px', dur: '10s', d: '4s' },
         ].map((rip, idx) => (
           <div
             key={idx}
@@ -561,7 +550,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         {/* ── Continuous Flowing Wave Band 3: Near Water (Faster, Crisp Azure Highlights) ── */}
         <div style={{
           position: 'absolute',
-          top: '265px',
+          top: '225px',
           left: 0,
           width: '2880px',
           height: '75px',
@@ -716,7 +705,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: '380px',
+        height: '340px',
         zIndex: 10,
         pointerEvents: 'none',
       }}>
@@ -725,7 +714,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const lane = pos.lane !== undefined ? pos.lane : (k.lane !== undefined ? k.lane % 3 : 1)
 
           // Depth Configuration per Lane (0: ไกล / Far, 1: กลาง / Mid, 2: ใกล้ / Near) - Scaled 1.5x
-          const laneBottom = lane === 0 ? 230 : lane === 1 ? 130 : 35
+          const laneBottom = lane === 0 ? 190 : lane === 1 ? 110 : 25
           const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05) * 1.5
           const laneZIndex = lane === 0 ? 11 : lane === 1 ? 12 : 13
 
@@ -874,7 +863,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         bottom: 0,
         left: 0,
         right: 0,
-        height: '380px',
+        height: '340px',
         zIndex: 35,
         pointerEvents: 'none',
       }}>
@@ -885,7 +874,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           if (!pos) return null
 
           const lane = pos.lane !== undefined ? pos.lane : (k.lane !== undefined ? k.lane % 3 : 1)
-          const laneBottom = lane === 0 ? 230 : lane === 1 ? 130 : 35
+          const laneBottom = lane === 0 ? 190 : lane === 1 ? 110 : 25
           const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05) * 1.5
 
           const timeSec = performance.now() / 1000
@@ -895,7 +884,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
           // Calculate real-time unscaled position over the Krathong:
           const bubbleX = pos.x + 65
-          const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 16
+          const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 10
 
           return (
             <div
