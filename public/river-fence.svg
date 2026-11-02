@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="36" height="20" viewBox="0 0 36 20">
+  <defs>
+    <linearGradient id="fenceGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="45%" stop-color="#b45309" />
+      <stop offset="100%" stop-color="#451a03" />
+    </linearGradient>
+    <linearGradient id="curbStone" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3b2b1e" />
+      <stop offset="40%" stop-color="#241a12" />
+      <stop offset="100%" stop-color="#100b07" />
+    </linearGradient>
+  </defs>
+
+  <!-- Stone Embankment Curb / Seam Base -->
+  <rect x="0" y="14" width="36" height="6" fill="url(#curbStone)" />
+  <!-- Crisp Moonlight Highlight on Curb Top Edge -->
+  <line x1="0" y1="14" x2="36" y2="14" stroke="#fef08a" stroke-opacity="0.5" stroke-width="0.8" />
+  
+  <!-- Balusters / Pickets -->
+  <rect x="9" y="4" width="1.5" height="10" fill="#92400e" opacity="0.9" />
+  <rect x="17" y="4" width="1.5" height="10" fill="#92400e" opacity="0.9" />
+  <rect x="26" y="4" width="1.5" height="10" fill="#92400e" opacity="0.9" />
+  
+  <!-- Mid Support Rail Wire -->
+  <rect x="0" y="9" width="36" height="1.2" fill="#582404" opacity="0.8" />
+  
+  <!-- Main Post Pillar with Golden Lotus Tip -->
+  <rect x="0" y="2" width="3.5" height="12" fill="url(#fenceGold)" />
+  <polygon points="0,3 1.75,0 3.5,3" fill="#fef08a" />
+  
+  <!-- Top Handrail Bar -->
+  <rect x="0" y="3.5" width="36" height="2.5" rx="0.8" fill="url(#fenceGold)" />
+  <line x1="0" y1="4" x2="36" y2="4" stroke="#fef08a" stroke-opacity="0.65" stroke-width="0.6" />
+</svg>

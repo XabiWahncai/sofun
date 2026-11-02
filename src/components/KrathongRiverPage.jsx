@@ -349,6 +349,33 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         zIndex: 2,
       }} />
 
+      {/* ── Riverside Embankment Railing & Seam Barrier (รั้วกั้นริมตลิ่ง) ── */}
+      <div style={{
+        position: 'absolute',
+        bottom: '334px',
+        left: 0,
+        right: 0,
+        height: '20px',
+        backgroundImage: "url('/river-fence.svg')",
+        backgroundRepeat: 'repeat-x',
+        backgroundSize: 'auto 100%',
+        backgroundPosition: 'center bottom',
+        zIndex: 4,
+        pointerEvents: 'none',
+        filter: 'drop-shadow(0 2px 5px rgba(0, 0, 0, 0.8))',
+      }}>
+        {/* Subtle Warm Amber Glow along Promenade Railing */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: '6px',
+          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.22) 0%, transparent 100%)',
+          pointerEvents: 'none',
+        }} />
+      </div>
+
       {/* ── Layer 3: Living Flowing River with Waves, Shimmer & Reflections ──────── */}
       <div style={{
         position: 'absolute',
