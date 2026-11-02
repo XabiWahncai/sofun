@@ -116,7 +116,6 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
   const [isSpinning, setIsSpinning] = useState(false)
   const [currentWinner, setCurrentWinner] = useState(null)
   const [showWinnerModal, setShowWinnerModal] = useState(false)
-  const [needleTick, setNeedleTick] = useState(false)
   const [muted, setMuted] = useState(false)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
@@ -137,6 +136,10 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
   const rotationRef = useRef(0)
   const lastSliceIndexRef = useRef(-1)
   const lastProcessedSpinCommand = useRef(null)
+  const needleDeflectionRef = useRef(0)
+  const wheelBufferRef = useRef(null)
+  const rimBufferRef = useRef(null)
+  const hubBufferRef = useRef(null)
 
   const isAdmin = lineUser?.role === 'admin' || lineUser?.role === 'super_admin'
 
@@ -478,20 +481,19 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
     return list
   }, [config.removedUserIds, membersMap, manualParticipants, playHistory])
 
-  // ── Draw Wheel on Canvas ───────────────────────────────────────────────────
-  const drawWheel = useCallback((rotationDeg = rotationRef.current) => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const size = canvas.width
+  // ── Helper to Create Offscreen Rim Buffer (Zero-Cost Static Rim) ─────────
+  const getOrCreateRimBuffer = useCallback((size) => {
+    if (rimBufferRef.current && rimBufferRef.current.width === size) {
+      return rimBufferRef.current
+    }
+    const offscreen = document.createElement('canvas')
+    offscreen.width = size
+    offscreen.height = size
+    const ctx = offscreen.getContext('2d')
     const center = size / 2
     const radius = center - 24
 
-    ctx.clearRect(0, 0, size, size)
-
-    // Draw background shadow
+    // Background shadow
     ctx.save()
     ctx.shadowColor = 'rgba(0,0,0,0.6)'
     ctx.shadowBlur = 32
@@ -532,94 +534,22 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
       ctx.restore()
     }
 
-    if (candidates.length === 0) {
-      // Empty wheel message
-      ctx.save()
-      ctx.beginPath()
-      ctx.arc(center, center, radius, 0, Math.PI * 2)
-      ctx.fillStyle = '#141420'
-      ctx.fill()
-      ctx.fillStyle = '#888'
-      ctx.font = "bold 20px 'Sarabun', sans-serif"
-      ctx.textAlign = 'center'
-      ctx.textBaseline = 'middle'
-      ctx.fillText('ยังไม่มีรายชื่อผู้เล่น', center, center - 12)
-      ctx.font = "14px 'Sarabun', sans-serif"
-      ctx.fillStyle = '#555'
-      ctx.fillText('สแกน QR หรือเพิ่มชื่อเพื่อเริ่มสุ่ม', center, center + 18)
-      ctx.restore()
-      return
-    }
+    rimBufferRef.current = offscreen
+    return offscreen
+  }, [])
 
-    // ── Rotate Wheel Context ─────────────────────────────────────────────────
-    ctx.save()
-    ctx.translate(center, center)
-    ctx.rotate((rotationDeg * Math.PI) / 180)
+  // ── Helper to Create Offscreen Center Hub Buffer ───────────────────────────
+  const getOrCreateHubBuffer = useCallback(() => {
+    if (hubBufferRef.current) return hubBufferRef.current
+    const hubSize = 120
+    const offscreen = document.createElement('canvas')
+    offscreen.width = hubSize
+    offscreen.height = hubSize
+    const ctx = offscreen.getContext('2d')
+    const center = hubSize / 2
 
-    // Draw Slices
-    candidates.forEach((cand) => {
-      const startRad = (cand.startAngle * Math.PI) / 180
-      const endRad = (cand.endAngle * Math.PI) / 180
-
-      ctx.beginPath()
-      ctx.moveTo(0, 0)
-      ctx.arc(0, 0, radius, startRad, endRad)
-      ctx.closePath()
-
-      // Gradient slice for depth
-      const sliceGrad = ctx.createRadialGradient(0, 0, radius * 0.15, 0, 0, radius)
-      sliceGrad.addColorStop(0, cand.color)
-      sliceGrad.addColorStop(0.85, cand.color)
-      sliceGrad.addColorStop(1, '#00000035')
-      ctx.fillStyle = sliceGrad
-      ctx.fill()
-
-      // Slice border
-      ctx.lineWidth = 1.5
-      ctx.strokeStyle = 'rgba(255,255,255,0.22)'
-      ctx.stroke()
-
-      // ── Slice Text & Badge ─────────────────────────────────────────────────
-      ctx.save()
-      const midRad = (cand.midAngle * Math.PI) / 180
-      ctx.rotate(midRad)
-
-      // Position text outwards
-      const textDist = radius * 0.68
-      ctx.fillStyle = '#ffffff'
-      ctx.textAlign = 'right'
-      ctx.textBaseline = 'middle'
-      ctx.shadowColor = 'rgba(0,0,0,0.85)'
-      ctx.shadowBlur = 4
-
-      // Dynamic font size based on slice count
-      const isNarrow = cand.sliceAngle < 18
-      const fontSize = isNarrow ? 12 : Math.min(18, Math.max(13, cand.sliceAngle * 0.75))
-      ctx.font = `bold ${fontSize}px 'Sarabun', sans-serif`
-
-      // Name label
-      let label = cand.name
-      if (label.length > (isNarrow ? 8 : 13)) {
-        label = label.slice(0, isNarrow ? 7 : 12) + '…'
-      }
-
-      ctx.fillText(label, textDist, 0)
-
-      // Tickets pill / chance text
-      if (!isNarrow && cand.sliceAngle >= 24) {
-        ctx.font = `800 11px 'Barlow Condensed', sans-serif`
-        ctx.fillStyle = 'rgba(255,255,255,0.85)'
-        ctx.fillText(`🎟️ x${cand.tickets} (${cand.chance}%)`, textDist, fontSize + 3)
-      }
-
-      ctx.restore()
-    })
-
-    ctx.restore() // End of rotated wheel
-
-    // ── Center Hub / Medallion ───────────────────────────────────────────────
-    ctx.save()
     // Hub outer shadow
+    ctx.save()
     ctx.shadowColor = 'rgba(0,0,0,0.65)'
     ctx.shadowBlur = 18
     ctx.beginPath()
@@ -653,22 +583,159 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
     ctx.fillText('LUCKY', center, center + 9)
     ctx.restore()
 
-    // ── Top Needle / Pointer Indicator (at 12 o'clock / angle 270°) ───────────
+    hubBufferRef.current = offscreen
+    return offscreen
+  }, [])
+
+  // ── Pre-render Wheel Slices into Offscreen Buffer (60 FPS Caching) ─────────
+  const updateWheelBuffer = useCallback((size) => {
+    if (candidates.length === 0) {
+      wheelBufferRef.current = null
+      return
+    }
+    const offscreen = document.createElement('canvas')
+    offscreen.width = size
+    offscreen.height = size
+    const ctx = offscreen.getContext('2d')
+    const center = size / 2
+    const radius = center - 24
+
     ctx.save()
-    const pointerSize = 28
+    ctx.translate(center, center)
+
+    candidates.forEach((cand) => {
+      const startRad = (cand.startAngle * Math.PI) / 180
+      const endRad = (cand.endAngle * Math.PI) / 180
+
+      ctx.beginPath()
+      ctx.moveTo(0, 0)
+      ctx.arc(0, 0, radius, startRad, endRad)
+      ctx.closePath()
+
+      // Gradient slice for depth
+      const sliceGrad = ctx.createRadialGradient(0, 0, radius * 0.15, 0, 0, radius)
+      sliceGrad.addColorStop(0, cand.color)
+      sliceGrad.addColorStop(0.85, cand.color)
+      sliceGrad.addColorStop(1, '#00000035')
+      ctx.fillStyle = sliceGrad
+      ctx.fill()
+
+      // Slice border
+      ctx.lineWidth = 1.5
+      ctx.strokeStyle = 'rgba(255,255,255,0.22)'
+      ctx.stroke()
+
+      // ── Slice Text & Badge ─────────────────────────────────────────────────
+      ctx.save()
+      const midRad = (cand.midAngle * Math.PI) / 180
+      ctx.rotate(midRad)
+
+      const textDist = radius * 0.68
+      ctx.fillStyle = '#ffffff'
+      ctx.textAlign = 'right'
+      ctx.textBaseline = 'middle'
+      ctx.shadowColor = 'rgba(0,0,0,0.85)'
+      ctx.shadowBlur = 4
+
+      const isNarrow = cand.sliceAngle < 18
+      const fontSize = cand.sliceAngle < 4 ? 9 : cand.sliceAngle < 8 ? 10 : isNarrow ? 12 : Math.min(18, Math.max(13, cand.sliceAngle * 0.75))
+      ctx.font = `bold ${fontSize}px 'Sarabun', sans-serif`
+
+      let label = cand.name
+      const maxLen = cand.sliceAngle < 4 ? 5 : isNarrow ? 8 : 13
+      if (label.length > maxLen) {
+        label = label.slice(0, maxLen - 1) + '…'
+      }
+
+      ctx.fillText(label, textDist, 0)
+
+      // Tickets pill / chance text (no emojis)
+      if (!isNarrow && cand.sliceAngle >= 24) {
+        ctx.font = `800 11px 'Barlow Condensed', sans-serif`
+        ctx.fillStyle = 'rgba(255,255,255,0.85)'
+        ctx.fillText(`x${cand.tickets} (${cand.chance}%)`, textDist, fontSize + 3)
+      }
+
+      ctx.restore()
+    })
+
+    ctx.restore()
+    wheelBufferRef.current = offscreen
+  }, [candidates])
+
+  // ── Draw Wheel on Canvas (Hardware Accelerated Blit at 60 FPS) ────────────
+  const drawWheel = useCallback((rotationDeg = rotationRef.current) => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const size = canvas.width
+    const center = size / 2
+
+    ctx.clearRect(0, 0, size, size)
+
+    // 1. Draw static Rim & LEDs
+    const rimBuffer = rimBufferRef.current || getOrCreateRimBuffer(size)
+    if (rimBuffer) {
+      ctx.drawImage(rimBuffer, 0, 0)
+    }
+
+    // 2. Draw Wheel Slices
+    if (candidates.length === 0) {
+      ctx.save()
+      ctx.beginPath()
+      ctx.arc(center, center, center - 24, 0, Math.PI * 2)
+      ctx.fillStyle = '#141420'
+      ctx.fill()
+      ctx.fillStyle = '#888'
+      ctx.font = "bold 20px 'Sarabun', sans-serif"
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText('ยังไม่มีรายชื่อผู้เล่น', center, center - 12)
+      ctx.font = "14px 'Sarabun', sans-serif"
+      ctx.fillStyle = '#555'
+      ctx.fillText('สแกน QR หรือเพิ่มชื่อเพื่อเริ่มสุ่ม', center, center + 18)
+      ctx.restore()
+    } else {
+      if (!wheelBufferRef.current) {
+        updateWheelBuffer(size)
+      }
+      if (wheelBufferRef.current) {
+        ctx.save()
+        ctx.translate(center, center)
+        ctx.rotate((rotationDeg * Math.PI) / 180)
+        ctx.drawImage(wheelBufferRef.current, -center, -center)
+        ctx.restore()
+      }
+    }
+
+    // 3. Draw Center Hub
+    const hubBuffer = hubBufferRef.current || getOrCreateHubBuffer()
+    if (hubBuffer) {
+      ctx.drawImage(hubBuffer, center - 60, center - 60)
+    }
+
+    // 4. Draw Needle with Physical Deflection Spring
     const topY = 12
+    const pivotX = center
+    const pivotY = topY + 4
+    const deflection = needleDeflectionRef.current
 
-    ctx.shadowColor = 'rgba(0,0,0,0.7)'
+    ctx.save()
+    ctx.translate(pivotX, pivotY)
+    ctx.rotate((deflection * Math.PI) / 180)
+    ctx.translate(-pivotX, -pivotY)
+
+    ctx.shadowColor = 'rgba(0,0,0,0.65)'
     ctx.shadowBlur = 8
-
     ctx.beginPath()
-    // Triangular needle pointing down towards the rim
-    ctx.moveTo(center - 14, topY)
-    ctx.lineTo(center + 14, topY)
-    ctx.lineTo(center, topY + pointerSize + (needleTick ? 4 : 0))
+    ctx.moveTo(center - 13, topY)
+    ctx.lineTo(center + 13, topY)
+    ctx.lineTo(center, topY + 30)
     ctx.closePath()
 
-    const ptrGrad = ctx.createLinearGradient(center - 14, topY, center + 14, topY + pointerSize)
+    const ptrGrad = ctx.createLinearGradient(center - 13, topY, center + 13, topY + 30)
     ptrGrad.addColorStop(0, '#f5d77f')
     ptrGrad.addColorStop(0.5, '#c8a050')
     ptrGrad.addColorStop(1, '#b45309')
@@ -687,22 +754,38 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
     ctx.lineWidth = 1.5
     ctx.stroke()
     ctx.restore()
-  }, [candidates, needleTick])
 
-  // Redraw whenever candidates change or tick changes
+    // Spring physics decay towards 0
+    if (deflection !== 0) {
+      needleDeflectionRef.current *= 0.82
+      if (Math.abs(needleDeflectionRef.current) < 0.15) {
+        needleDeflectionRef.current = 0
+      }
+    }
+  }, [candidates, getOrCreateRimBuffer, getOrCreateHubBuffer, updateWheelBuffer])
+
+  // Pre-render buffer and redraw whenever candidates change
   useEffect(() => {
+    const canvas = canvasRef.current
+    const size = canvas ? canvas.width : 700
+    getOrCreateRimBuffer(size)
+    getOrCreateHubBuffer()
+    updateWheelBuffer(size)
     drawWheel()
-  }, [drawWheel])
+  }, [candidates, getOrCreateRimBuffer, getOrCreateHubBuffer, updateWheelBuffer, drawWheel])
 
-  // Idle slow rotation when not spinning
+  // Idle slow rotation with frame-rate independent delta time
   useEffect(() => {
     if (isSpinning || candidates.length === 0) {
       if (idleFrameRef.current) cancelAnimationFrame(idleFrameRef.current)
       return
     }
-    const IDLE_SPEED = 0.3
-    const tick = () => {
-      rotationRef.current = (rotationRef.current + IDLE_SPEED) % 360
+    let lastTime = performance.now()
+    const tick = (now) => {
+      const dt = Math.min(50, now - lastTime)
+      lastTime = now
+      // 18 degrees per second = ~0.3 deg per frame at 60fps
+      rotationRef.current = (rotationRef.current + (0.3 * dt) / 16.67) % 360
       drawWheel(rotationRef.current)
       idleFrameRef.current = requestAnimationFrame(tick)
     }
@@ -798,10 +881,8 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
       const sliceInfo = getSliceUnderNeedle(curRot)
       if (sliceInfo && sliceInfo.index !== lastSliceIndexRef.current) {
         lastSliceIndexRef.current = sliceInfo.index
-        setNeedleTick(true)
-        setTimeout(() => setNeedleTick(false), 30)
-
-        // Pitch gets lower as the wheel slows down
+        // Realistic physical deflection without React setState re-renders
+        needleDeflectionRef.current = 14
         const speedRatio = 1 - progress
         wheelAudio.playTick(0.6 + speedRatio * 0.7)
       }
@@ -960,7 +1041,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
         lockedWinnerId: targetId || null,
         updatedAt: serverTimestamp(),
       })
-      showToast(targetId ? '🔒 ตั้งค่าล็อคผลเรียบร้อยแล้ว' : 'ปลดล็อคการสุ่มเรียบร้อยแล้ว')
+      showToast(targetId ? 'ตั้งค่าล็อคผลเรียบร้อยแล้ว' : 'ปลดล็อคการสุ่มเรียบร้อยแล้ว')
     } catch (e) {
       showToast('บันทึกล้มเหลว: ' + e.message, 'error')
     }
@@ -1526,7 +1607,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
                         </div>
 
                         <div style={{ fontSize: 12, fontWeight: 600, color: '#fbbf24', marginBottom: 4 }}>
-                          🎮 {r.scriptTitle}
+                          {r.scriptTitle}
                         </div>
 
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 10px', fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>
@@ -1605,7 +1686,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
                       >
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                           <span style={{ fontSize: 14, fontWeight: 800, color: '#fbbf24' }}>
-                            🎉 {w.winnerName}
+                            {w.winnerName}
                           </span>
                           <span style={{ fontSize: 11, color: '#888' }}>{timeStr}</span>
                         </div>
@@ -1664,7 +1745,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
               boxShadow: '0 8px 24px rgba(251,191,36,0.5)',
               border: '3px solid #fff',
             }}>
-              👑
+              ★
             </div>
 
             <div style={{
@@ -1933,7 +2014,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
                         }}>
                           {idx + 1}
                         </span>
-                        🎮 {item.scriptTitle}
+                        {item.scriptTitle}
                       </span>
 
                       <span style={{
