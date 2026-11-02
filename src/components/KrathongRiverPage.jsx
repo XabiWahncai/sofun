@@ -2,6 +2,20 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, increment } from 'firebase/firestore'
 import { db } from '../firebase'
 
+// ── 4 Depth Lanes Configuration (From farthest back to closest front) ──
+// Strictly defined bottom Y, perspective scale, parallax speed, and z-index.
+// Higher lane index = closer to camera = higher z-index (Lane 0 is farthest, Lane 3 is nearest foreground).
+const LANE_CONFIG = [
+  // Lane 0: ไกลสุด / Furthest back near river horizon
+  { bottom: 205, scaleMult: 0.58, speedMult: 0.65, baseZIndex: 11 },
+  // Lane 1: ไกลกลาง / Mid-far
+  { bottom: 145, scaleMult: 0.74, speedMult: 0.85, baseZIndex: 13 },
+  // Lane 2: ใกล้กลาง / Mid-near
+  { bottom: 85,  scaleMult: 0.92, speedMult: 1.05, baseZIndex: 15 },
+  // Lane 3: ใกล้สุด / Nearest foreground
+  { bottom: 22,  scaleMult: 1.10, speedMult: 1.25, baseZIndex: 17 },
+]
+
 export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const containerRef = useRef(null)
 
@@ -87,8 +101,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               const d = change.doc.data()
               // Put new arrival starting on right edge to float across
               krathongPositionsRef.current.set(change.doc.id, {
-                x: containerW + 40,
-                lane: Math.floor(Math.random() * 3),
+                x: containerW + 40 + Math.random() * 120,
+                lane: Math.floor(Math.random() * 4),
                 bobOffset: Math.random() * Math.PI * 2,
               })
               setNewArrivalNotice(d.name || 'มีผู้ร่วมลอยกระทงใหม่')
@@ -104,7 +118,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             name: d.name || 'ผู้ร่วมลอยกระทง',
             wish: d.wish || 'ขอพรพระแม่คงคา',
             imageData: d.imageData || null,
-            lane: d.lane !== undefined ? d.lane % 3 : idx % 3,
+            lane: d.lane !== undefined ? d.lane % 4 : idx % 4,
             speed: d.speed || (0.35 + ((idx % 5) * 0.08)),
             scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
             bobFreq: d.bobFreq || (1.2 + (idx % 4) * 0.2),
@@ -125,7 +139,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               const startX = total === 1 ? containerW * 0.55 : (idx * slot + 60) % (containerW + 160)
               krathongPositionsRef.current.set(k.id, {
                 x: startX,
-                lane: k.lane !== undefined ? k.lane % 3 : Math.floor(Math.random() * 3),
+                lane: k.lane !== undefined ? k.lane % 4 : (idx % 4),
                 bobOffset: Math.random() * Math.PI * 2,
               })
             }
@@ -164,18 +178,20 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
       const containerW = containerRef.current ? containerRef.current.clientWidth : (window.innerWidth || 1000)
 
-      // Move each Krathong smoothly along x-axis from right to left
+      // Move each Krathong smoothly along x-axis from right to left with perspective parallax
       firestoreKrathongs.forEach((k) => {
         const pos = krathongPositionsRef.current.get(k.id)
         if (pos) {
-          const moveSpeed = (k.speed || 0.4) * 48 * dt
+          const lane = pos.lane !== undefined ? pos.lane % 4 : (k.lane !== undefined ? k.lane % 4 : 1)
+          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[1]
+          const moveSpeed = (k.speed || 0.4) * (cfg.speedMult || 1) * 48 * dt
           pos.x -= moveSpeed
 
           // Fast & fluid wrap-around: As soon as krathong floats past left edge (-240px),
-          // immediately re-enter from the right edge with a newly randomized depth lane (ไกล, กลาง, ใกล้)
+          // immediately re-enter from the right edge with a newly randomized depth lane across 4 levels
           if (pos.x < -240) {
-            pos.x = containerW + 40 + Math.random() * 80
-            pos.lane = Math.floor(Math.random() * 3)
+            pos.x = containerW + 40 + Math.random() * 160
+            pos.lane = Math.floor(Math.random() * 4)
             pos.bobOffset = Math.random() * Math.PI * 2
           }
         }
@@ -731,41 +747,50 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         zIndex: 10,
         pointerEvents: 'none',
       }}>
-        {firestoreKrathongs.map((k) => {
-          const pos = krathongPositionsRef.current.get(k.id) || { x: 500, lane: 1, bobOffset: 0 }
-          const lane = pos.lane !== undefined ? pos.lane : (k.lane !== undefined ? k.lane % 3 : 1)
+        {[...firestoreKrathongs]
+          .sort((a, b) => {
+            const laneA = (krathongPositionsRef.current.get(a.id)?.lane ?? (a.lane !== undefined ? a.lane % 4 : 1)) % 4
+            const laneB = (krathongPositionsRef.current.get(b.id)?.lane ?? (b.lane !== undefined ? b.lane % 4 : 1)) % 4
+            return laneA - laneB
+          })
+          .map((k) => {
+            const pos = krathongPositionsRef.current.get(k.id) || { x: 500, lane: 1, bobOffset: 0 }
+            const lane = pos.lane !== undefined ? pos.lane % 4 : (k.lane !== undefined ? k.lane % 4 : 1)
+            const cfg = LANE_CONFIG[lane] || LANE_CONFIG[1]
 
-          // Depth Configuration per Lane (0: ไกล / Far, 1: กลาง / Mid, 2: ใกล้ / Near) - Scaled 1.5x
-          const laneBottom = lane === 0 ? 190 : lane === 1 ? 110 : 25
-          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05) * 1.5
-          const laneZIndex = lane === 0 ? 11 : lane === 1 ? 12 : 13
+            // 4 Depth Levels Configuration: Strictly separated bottom Y and perspective scale
+            const laneBottom = cfg.bottom
+            const laneScale = (k.scale || 0.85) * cfg.scaleMult * 1.5
 
-          // Real-time gentle sinusoidal bobbing & tilting
-          const timeSec = performance.now() / 1000
-          const bobFreq = k.bobFreq || 1.4
-          const bobAmp = k.bobAmp || 4
-          const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
-          const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * 2.2
+            // Strict z-index discipline: Lane 0 (11-12) < Lane 1 (13-14) < Lane 2 (15-16) < Lane 3 (17-18)
+            // Distant krathongs NEVER jump in front of foreground krathongs
+            const isWishOpen = activeWishIds.has(k.id)
+            const itemZIndex = isWishOpen ? cfg.baseZIndex + 1 : cfg.baseZIndex
 
-          const isWishOpen = activeWishIds.has(k.id)
+            // Real-time gentle sinusoidal bobbing & tilting
+            const timeSec = performance.now() / 1000
+            const bobFreq = k.bobFreq || 1.4
+            const bobAmp = k.bobAmp || 4
+            const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
+            const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * 2.2
 
-          return (
-            <div
-              key={k.id}
-              onClick={() => toggleWish(k.id)}
-              style={{
-                position: 'absolute',
-                left: `${pos.x}px`,
-                bottom: `${laneBottom + offsetY}px`,
-                transform: `rotate(${rotateDeg}deg) scale(${laneScale})`,
-                transformOrigin: '50% 85%',
-                cursor: 'pointer',
-                pointerEvents: 'auto',
-                zIndex: isWishOpen ? 30 : laneZIndex,
-                transition: 'filter 0.2s',
-                filter: isWishOpen ? 'drop-shadow(0 0 20px rgba(254, 240, 138, 0.95))' : 'none',
-              }}
-            >
+            return (
+              <div
+                key={k.id}
+                onClick={() => toggleWish(k.id)}
+                style={{
+                  position: 'absolute',
+                  left: `${pos.x}px`,
+                  bottom: `${laneBottom + offsetY}px`,
+                  transform: `rotate(${rotateDeg}deg) scale(${laneScale})`,
+                  transformOrigin: '50% 85%',
+                  cursor: 'pointer',
+                  pointerEvents: 'auto',
+                  zIndex: itemZIndex,
+                  transition: 'filter 0.2s',
+                  filter: isWishOpen ? 'drop-shadow(0 0 20px rgba(254, 240, 138, 0.95))' : 'none',
+                }}
+              >
               {/* Krathong Body (Exact User Drawing Canvas Image) with Water Effects Directly Underneath */}
               <div style={{
                 width: '130px',
@@ -903,9 +928,10 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const pos = krathongPositionsRef.current.get(k.id)
           if (!pos) return null
 
-          const lane = pos.lane !== undefined ? pos.lane : (k.lane !== undefined ? k.lane % 3 : 1)
-          const laneBottom = lane === 0 ? 190 : lane === 1 ? 110 : 25
-          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05) * 1.5
+          const lane = pos.lane !== undefined ? pos.lane % 4 : (k.lane !== undefined ? k.lane % 4 : 1)
+          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[1]
+          const laneBottom = cfg.bottom
+          const laneScale = (k.scale || 0.85) * cfg.scaleMult * 1.5
 
           const timeSec = performance.now() / 1000
           const bobFreq = k.bobFreq || 1.4
@@ -914,7 +940,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
           // Calculate real-time unscaled position over the Krathong:
           const bubbleX = pos.x + 65
-          const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 10
+          const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 12
 
           return (
             <div

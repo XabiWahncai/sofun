@@ -533,7 +533,7 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
         createdAt: serverTimestamp(),
         userId: lineUser?.userId || null,
         userPicture: lineUser?.pictureUrl || null,
-        lane: Math.floor(Math.random() * 5),
+        lane: Math.floor(Math.random() * 4),
         speed: 0.35 + Math.random() * 0.45,
         scale: 0.75 + Math.random() * 0.35,
         bobFreq: 1.2 + Math.random() * 1.5,
