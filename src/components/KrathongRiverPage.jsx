@@ -1305,18 +1305,18 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
         {/* Right: QR Code to /Krathong & Sound Toggle Button */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', pointerEvents: 'auto' }}>
-          {/* QR Code Link Card to /Krathong */}
+          {/* QR Code Link Card to /Krathong (2x Enlarged, QR Code Only) */}
           <div
             onClick={() => showPage('krathong')}
             title="สแกน QR Code หรือคลิกเพื่อเข้าสู่หน้าวาดกระทง (/Krathong)"
             style={{
               background: 'rgba(15, 23, 42, 0.78)',
               border: '1px solid rgba(254, 240, 138, 0.45)',
-              borderRadius: '12px',
-              padding: '6px 10px',
+              borderRadius: '14px',
+              padding: '6px',
               display: 'flex',
               alignItems: 'center',
-              gap: '10px',
+              justifyContent: 'center',
               backdropFilter: 'blur(10px)',
               WebkitBackdropFilter: 'blur(10px)',
               boxShadow: '0 4px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(245, 158, 11, 0.25)',
@@ -1324,7 +1324,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               transition: 'transform 0.15s ease, border-color 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.transform = 'scale(1.03)'
+              e.currentTarget.style.transform = 'scale(1.04)'
               e.currentTarget.style.borderColor = 'rgba(254, 240, 138, 0.8)'
             }}
             onMouseLeave={(e) => {
@@ -1332,49 +1332,23 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               e.currentTarget.style.borderColor = 'rgba(254, 240, 138, 0.45)'
             }}
           >
-            {/* White QR Badge */}
+            {/* White QR Badge (2x Size: 116px) */}
             <div style={{
               background: '#ffffff',
-              borderRadius: '6px',
+              borderRadius: '8px',
               padding: '4px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.35)',
             }}>
               <QRCodeSVG
                 value={krathongUrl}
-                size={58}
+                size={116}
                 level="M"
                 bgColor="#ffffff"
                 fgColor="#0f172a"
               />
-            </div>
-
-            {/* Label and Hint */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <div style={{
-                fontSize: '11.5px',
-                fontWeight: 800,
-                color: '#fef08a',
-                letterSpacing: '0.01em',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '5px',
-                whiteSpace: 'nowrap',
-              }}>
-                <i className="fas fa-qrcode" style={{ fontSize: '11px', color: '#f59e0b' }} />
-                สแกนวาดกระทง
-              </div>
-              <div style={{
-                fontSize: '10px',
-                color: 'rgba(255, 255, 255, 0.75)',
-                fontWeight: 600,
-                marginTop: '1px',
-                whiteSpace: 'nowrap',
-              }}>
-                sofunclub.co/Krathong
-              </div>
             </div>
           </div>
 
