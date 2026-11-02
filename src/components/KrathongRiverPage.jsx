@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, increment } from 'firebase/firestore'
+import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
 
 // ── 4 Depth Lanes Configuration (From farthest back to closest front) ──
@@ -18,6 +19,9 @@ const LANE_CONFIG = [
 
 export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const containerRef = useRef(null)
+  const krathongUrl = typeof window !== 'undefined' && window.location.origin
+    ? `${window.location.origin}/Krathong`
+    : 'https://sofunclub.co/Krathong'
 
   // Firestore Krathongs state (Real data only, zero mockups)
   const [firestoreKrathongs, setFirestoreKrathongs] = useState([])
@@ -1046,8 +1050,82 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           </button>
         </div>
 
-        {/* Right: Sound Toggle Button Only */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', pointerEvents: 'auto' }}>
+        {/* Right: QR Code to /Krathong & Sound Toggle Button */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', pointerEvents: 'auto' }}>
+          {/* QR Code Link Card to /Krathong */}
+          <div
+            onClick={() => showPage('krathong')}
+            title="สแกน QR Code หรือคลิกเพื่อเข้าสู่หน้าวาดกระทง (/Krathong)"
+            style={{
+              background: 'rgba(15, 23, 42, 0.78)',
+              border: '1px solid rgba(254, 240, 138, 0.45)',
+              borderRadius: '12px',
+              padding: '6px 10px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              backdropFilter: 'blur(10px)',
+              WebkitBackdropFilter: 'blur(10px)',
+              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.45), 0 0 12px rgba(245, 158, 11, 0.25)',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease, border-color 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.03)'
+              e.currentTarget.style.borderColor = 'rgba(254, 240, 138, 0.8)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1)'
+              e.currentTarget.style.borderColor = 'rgba(254, 240, 138, 0.45)'
+            }}
+          >
+            {/* White QR Badge */}
+            <div style={{
+              background: '#ffffff',
+              borderRadius: '6px',
+              padding: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 2px 6px rgba(0, 0, 0, 0.35)',
+            }}>
+              <QRCodeSVG
+                value={krathongUrl}
+                size={58}
+                level="M"
+                bgColor="#ffffff"
+                fgColor="#0f172a"
+              />
+            </div>
+
+            {/* Label and Hint */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{
+                fontSize: '11.5px',
+                fontWeight: 800,
+                color: '#fef08a',
+                letterSpacing: '0.01em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                whiteSpace: 'nowrap',
+              }}>
+                <i className="fas fa-qrcode" style={{ fontSize: '11px', color: '#f59e0b' }} />
+                สแกนวาดกระทง
+              </div>
+              <div style={{
+                fontSize: '10px',
+                color: 'rgba(255, 255, 255, 0.75)',
+                fontWeight: 600,
+                marginTop: '1px',
+                whiteSpace: 'nowrap',
+              }}>
+                sofunclub.co/Krathong
+              </div>
+            </div>
+          </div>
+
+          {/* Sound Toggle Button */}
           <button
             type="button"
             onClick={toggleSound}
@@ -1057,10 +1135,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               border: soundEnabled ? '1px solid #38bdf8' : '1px solid rgba(255, 255, 255, 0.18)',
               color: soundEnabled ? '#38bdf8' : '#ffffff',
               borderRadius: '8px',
-              padding: '7px 11px',
+              padding: '8px 12px',
               cursor: 'pointer',
               fontSize: '13px',
               backdropFilter: 'blur(8px)',
+              height: '42px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
           >
             <i className={`fas ${soundEnabled ? 'fa-volume-high' : 'fa-volume-xmark'}`} />
