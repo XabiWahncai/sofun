@@ -507,7 +507,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           right: 0,
           height: '6px',
-          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.22) 0%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(251, 146, 60, 0.35) 0%, rgba(245, 158, 11, 0.15) 60%, transparent 100%)',
           pointerEvents: 'none',
         }} />
       </div>
@@ -527,14 +527,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         <svg viewBox="0 0 2880 22" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
           <path
             d="M 0 8 Q 120 0 240 8 T 480 8 T 720 8 T 960 8 T 1200 8 T 1440 8 T 1680 8 T 1920 8 T 2160 8 T 2400 8 T 2640 8 T 2880 8 L 2880 22 L 0 22 Z"
-            fill="#091e3e"
+            fill="#3f1406"
           />
           <path
             d="M 0 8 Q 120 0 240 8 T 480 8 T 720 8 T 960 8 T 1200 8 T 1440 8 T 1680 8 T 1920 8 T 2160 8 T 2400 8 T 2640 8 T 2880 8"
             fill="none"
-            stroke="#38bdf8"
+            stroke="#fbbf24"
             strokeWidth="1.8"
-            strokeOpacity="0.85"
+            strokeOpacity="0.88"
           />
         </svg>
       </div>
@@ -546,7 +546,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         left: 0,
         right: 0,
         height: '340px',
-        background: 'linear-gradient(180deg, #091e3e 0%, #0c2d5c 20%, #0a254e 45%, #061937 72%, #020a1c 100%)',
+        background: 'linear-gradient(180deg, #3f1406 0%, #561c10 12%, #4a1538 28%, #2d124d 46%, #1e1b4b 68%, #0c1228 88%, #060914 100%)',
         overflow: 'hidden',
         zIndex: 3,
         pointerEvents: 'none',
@@ -558,7 +558,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           right: 0,
           height: '45px',
-          background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.16) 0%, rgba(56, 189, 248, 0.08) 50%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(251, 146, 60, 0.3) 0%, rgba(244, 63, 94, 0.15) 45%, rgba(192, 132, 252, 0.08) 75%, transparent 100%)',
         }} />
 
         {/* ── Topmost River Horizon Wave Crest (แนวคลื่นขอบแม่น้ำบนสุด แทนเส้นตรง) ── */}
@@ -575,15 +575,15 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           <svg viewBox="0 0 2880 24" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
             <path
               d="M 0 6 Q 120 16 240 6 T 480 6 T 720 6 T 960 6 T 1200 6 T 1440 6 T 1680 6 T 1920 6 T 2160 6 T 2400 6 T 2640 6 T 2880 6 L 2880 24 L 0 24 Z"
-              fill="#091e3e"
-              fillOpacity="0.5"
+              fill="#3f1406"
+              fillOpacity="0.6"
             />
             <path
               d="M 0 6 Q 120 16 240 6 T 480 6 T 720 6 T 960 6 T 1200 6 T 1440 6 T 1680 6 T 1920 6 T 2160 6 T 2400 6 T 2640 6 T 2880 6"
               fill="none"
-              stroke="#38bdf8"
+              stroke="#f59e0b"
               strokeWidth="1.8"
-              strokeOpacity="0.75"
+              strokeOpacity="0.8"
             />
           </svg>
         </div>
@@ -596,7 +596,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           transform: 'translateX(-50%)',
           width: '130px',
           height: '140px',
-          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.32) 0%, rgba(180, 83, 9, 0.16) 50%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(245, 158, 11, 0.42) 0%, rgba(225, 29, 72, 0.2) 50%, transparent 100%)',
           filter: 'blur(10px)',
           animation: 'templeReflectionUndulate 4.5s ease-in-out infinite alternate',
         }} />
@@ -609,7 +609,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           transform: 'translateX(-50%)',
           width: '190px',
           height: '125px',
-          background: 'linear-gradient(180deg, rgba(217, 119, 6, 0.28) 0%, rgba(146, 64, 14, 0.12) 55%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(251, 146, 60, 0.38) 0%, rgba(180, 83, 9, 0.18) 55%, transparent 100%)',
           filter: 'blur(10px)',
           animation: 'templeReflectionUndulate 5s ease-in-out infinite alternate 1s',
         }} />
@@ -622,7 +622,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           transform: 'translateX(-50%)',
           width: '110px',
           height: '115px',
-          background: 'linear-gradient(180deg, rgba(251, 191, 36, 0.28) 0%, rgba(180, 83, 9, 0.12) 50%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(252, 211, 77, 0.36) 0%, rgba(217, 119, 6, 0.16) 50%, transparent 100%)',
           filter: 'blur(9px)',
           animation: 'templeReflectionUndulate 4.8s ease-in-out infinite alternate 0.5s',
         }} />
@@ -635,7 +635,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           transform: 'translateX(-50%)',
           width: '65px',
           height: '95px',
-          background: 'linear-gradient(180deg, rgba(239, 68, 68, 0.22) 0%, rgba(185, 28, 28, 0.08) 55%, transparent 100%)',
+          background: 'linear-gradient(180deg, rgba(244, 63, 94, 0.32) 0%, rgba(159, 18, 57, 0.12) 55%, transparent 100%)',
           filter: 'blur(8px)',
           animation: 'templeReflectionUndulate 5.5s ease-in-out infinite alternate 2s',
         }} />
@@ -650,7 +650,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               left: `${pct}%`,
               width: '14px',
               height: '35px',
-              background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.6) 0%, rgba(245, 158, 11, 0.2) 60%, transparent 100%)',
+              background: 'linear-gradient(180deg, rgba(254, 240, 138, 0.75) 0%, rgba(249, 115, 22, 0.35) 60%, transparent 100%)',
               filter: 'blur(3px)',
               animation: `moonShimmer 2.${idx + 2}s ease-in-out infinite alternate`,
             }}
@@ -670,15 +670,15 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           <svg viewBox="0 0 2880 55" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
             <path
               d="M 0 20 Q 120 35 240 20 T 480 20 T 720 20 T 960 20 T 1200 20 T 1440 20 T 1680 20 T 1920 20 T 2160 20 T 2400 20 T 2640 20 T 2880 20 L 2880 55 L 0 55 Z"
-              fill="#1e40af"
-              fillOpacity="0.35"
+              fill="#7c2d12"
+              fillOpacity="0.36"
             />
             <path
               d="M 0 20 Q 120 35 240 20 T 480 20 T 720 20 T 960 20 T 1200 20 T 1440 20 T 1680 20 T 1920 20 T 2160 20 T 2400 20 T 2640 20 T 2880 20"
               fill="none"
-              stroke="#38bdf8"
-              strokeWidth="1.5"
-              strokeOpacity="0.6"
+              stroke="#fb923c"
+              strokeWidth="1.6"
+              strokeOpacity="0.75"
             />
           </svg>
         </div>
@@ -696,15 +696,15 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           <svg viewBox="0 0 2880 65" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
             <path
               d="M 0 25 Q 180 45 360 25 T 720 25 T 1080 25 T 1440 25 T 1800 25 T 2160 25 T 2520 25 T 2880 25 L 2880 65 L 0 65 Z"
-              fill="#0284c7"
-              fillOpacity="0.32"
+              fill="#581c87"
+              fillOpacity="0.34"
             />
             <path
               d="M 0 25 Q 180 45 360 25 T 720 25 T 1080 25 T 1440 25 T 1800 25 T 2160 25 T 2520 25 T 2880 25"
               fill="none"
-              stroke="#7dd3fc"
+              stroke="#f472b6"
               strokeWidth="1.8"
-              strokeOpacity="0.65"
+              strokeOpacity="0.7"
             />
           </svg>
         </div>
@@ -775,7 +775,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               width: rip.w,
               height: '2px',
               borderRadius: '50%',
-              background: 'linear-gradient(90deg, transparent 0%, rgba(56, 189, 248, 0.45) 50%, transparent 100%)',
+              background: 'linear-gradient(90deg, transparent 0%, rgba(251, 146, 60, 0.55) 50%, transparent 100%)',
               filter: 'blur(0.5px)',
               animation: `waterCurrentDrift ${rip.dur} linear infinite`,
               animationDelay: rip.d,
@@ -796,15 +796,15 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           <svg viewBox="0 0 2880 75" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
             <path
               d="M 0 30 Q 240 55 480 30 T 960 30 T 1440 30 T 1920 30 T 2400 30 T 2880 30 L 2880 75 L 0 75 Z"
-              fill="#0369a1"
-              fillOpacity="0.4"
+              fill="#1e1b4b"
+              fillOpacity="0.42"
             />
             <path
               d="M 0 30 Q 240 55 480 30 T 960 30 T 1440 30 T 1920 30 T 2400 30 T 2880 30"
               fill="none"
-              stroke="#38bdf8"
+              stroke="#60a5fa"
               strokeWidth="2.2"
-              strokeOpacity="0.8"
+              strokeOpacity="0.75"
             />
           </svg>
         </div>
@@ -825,14 +825,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           <svg viewBox="0 0 2880 55" preserveAspectRatio="none" style={{ width: '100%', height: '100%', display: 'block' }}>
             <path
               d="M 0 16 Q 180 34 360 16 T 720 16 T 1080 16 T 1440 16 T 1800 16 T 2160 16 T 2520 16 T 2880 16 L 2880 55 L 0 55 Z"
-              fill="#0284c7"
-              fillOpacity="0.22"
+              fill="#0f172a"
+              fillOpacity="0.28"
             />
             <path
               d="M 0 16 Q 180 34 360 16 T 720 16 T 1080 16 T 1440 16 T 1800 16 T 2160 16 T 2520 16 T 2880 16"
               fill="none"
-              stroke="#e0f2fe"
-              strokeWidth="2.5"
+              stroke="#fef08a"
+              strokeWidth="2.4"
               strokeOpacity="0.85"
             />
           </svg>
@@ -845,8 +845,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           left: 0,
           right: 0,
           height: '50px',
-          background: 'linear-gradient(0deg, rgba(2, 6, 18, 0.98) 0%, rgba(4, 15, 36, 0.6) 60%, transparent 100%)',
-          borderBottom: '2px solid rgba(56, 189, 248, 0.25)',
+          background: 'linear-gradient(0deg, rgba(6, 9, 20, 0.98) 0%, rgba(26, 14, 32, 0.6) 60%, transparent 100%)',
+          borderBottom: '2px solid rgba(251, 146, 60, 0.35)',
         }} />
 
         {/* Left Shore Floating Lotus Lily Pads */}
