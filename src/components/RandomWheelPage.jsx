@@ -4,7 +4,7 @@ import {
   setDoc, addDoc, serverTimestamp, query, orderBy, limit
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId } from '../utils/achievementTierSync'
+import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId, isRetroactiveRecord } from '../utils/achievementTierSync'
 
 // ── Vibrant slice color palette ──────────────────────────────────────────────
 const SLICE_COLORS = [
@@ -233,7 +233,7 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
     }
   }, [isSpinning])
 
-  // ── Combine & Deduplicate Play Records (Excluding Special Event) ───────────
+  // ── Combine & Deduplicate Play Records (Excluding Retroactive & Special Event) ───
   const allPlayRecords = useMemo(() => {
     const records = []
     const seenKeys = new Set()
@@ -251,8 +251,11 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
       })
     }
 
-    const isSpecialRecord = (item) => {
+    const isExcludedRecord = (item) => {
       if (!item) return false
+      // Exclude retroactive self-recorded history
+      if (isRetroactiveRecord(item)) return true
+      // Exclude Special Event
       if (isSpecialEventHistory(item)) return true
       if (isSpecialEventId(item.scriptId)) return true
       const sid = item.scriptId ? String(item.scriptId).toLowerCase() : null
@@ -265,9 +268,9 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
       return false
     }
 
-    // 1. From playHistory collection (excluding Special Event)
+    // 1. From playHistory collection (excluding Retroactive & Special Event)
     playHistory.forEach(ph => {
-      if (isSpecialRecord(ph)) return
+      if (isExcludedRecord(ph)) return
       const pDate = ph.playedAt?.toDate ? ph.playedAt.toDate() : (ph.playedAt ? new Date(ph.playedAt) : new Date())
       const uid = ph.userId || ph.userName || 'unknown'
       const key = `${uid}_${ph.scriptId || ph.scriptTitle}_${pDate.toDateString()}`
@@ -288,9 +291,9 @@ export default function RandomWheelPage({ lineUser, showToast, showPage, allGame
       })
     })
 
-    // 2. From payments collection (excluding Special Event)
+    // 2. From payments collection (excluding Retroactive & Special Event)
     payments.forEach(pm => {
-      if (isSpecialRecord(pm)) return
+      if (isExcludedRecord(pm)) return
       const pDate = pm.paidAt?.toDate ? pm.paidAt.toDate() : (pm.paidAt ? new Date(pm.paidAt) : pm.createdAt?.toDate ? pm.createdAt.toDate() : new Date())
       const members = Array.isArray(pm.members) ? pm.members : []
       members.forEach(m => {

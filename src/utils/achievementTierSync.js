@@ -110,6 +110,15 @@ export function isSpecialEventHistory(h) {
   )
 }
 
+export function isRetroactiveRecord(item) {
+  if (!item) return false
+  return (
+    item.isRetroactive === true ||
+    String(item.source || '').toLowerCase() === 'rehistory' ||
+    String(item.recordedBy || '').toLowerCase() === 'rehistory'
+  )
+}
+
 export function isSpecialEventId(id) {
   if (!id) return false
   return String(id).toLowerCase() === 'vqpyqhfwsbq3niklsqtc'
