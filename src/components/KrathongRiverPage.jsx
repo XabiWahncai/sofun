@@ -3,63 +3,78 @@ import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, incremen
 import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
 
-// 4 Depth Lanes Configuration (From farthest back to closest front)
+// 5 Depth Lanes Configuration (From farthest back Lane 0 to closest front Lane 4)
+// Equal 20% random distribution across 5 levels; freshly released krathongs start at Lane 4 (Nearest foreground)
 const LANE_CONFIG = [
   // Lane 0: ไกลสุด / Furthest back near river horizon
   {
-    bottom: 232,
-    scaleMult: 0.44,
-    speedMult: 0.35,
+    bottom: 245,
+    scaleMult: 0.38,
+    speedMult: 0.28,
     baseZIndex: 11,
-    opacity: 0.82,
+    opacity: 0.78,
     blur: '0.4px',
-    glowRadius: '8px',
+    glowRadius: '6px',
     glowSpread: '2px',
-    waterHaloWidth: '65px',
-    bobAmpMult: 0.55,
-    parallaxShift: 14,
+    waterHaloWidth: '55px',
+    bobAmpMult: 0.45,
+    parallaxShift: 10,
   },
   // Lane 1: ไกลกลาง / Mid-far
   {
-    bottom: 165,
-    scaleMult: 0.68,
-    speedMult: 0.65,
+    bottom: 190,
+    scaleMult: 0.58,
+    speedMult: 0.55,
     baseZIndex: 13,
-    opacity: 0.90,
+    opacity: 0.86,
     blur: '0px',
-    glowRadius: '14px',
-    glowSpread: '4px',
-    waterHaloWidth: '92px',
-    bobAmpMult: 0.8,
-    parallaxShift: 26,
+    glowRadius: '11px',
+    glowSpread: '3px',
+    waterHaloWidth: '78px',
+    bobAmpMult: 0.7,
+    parallaxShift: 22,
   },
-  // Lane 2: ใกล้กลาง / Mid-near
+  // Lane 2: กึ่งกลาง / Center
   {
-    bottom: 95,
-    scaleMult: 0.98,
-    speedMult: 1.05,
+    bottom: 132,
+    scaleMult: 0.82,
+    speedMult: 0.88,
     baseZIndex: 15,
+    opacity: 0.94,
+    blur: '0px',
+    glowRadius: '18px',
+    glowSpread: '5px',
+    waterHaloWidth: '105px',
+    bobAmpMult: 0.95,
+    parallaxShift: 38,
+  },
+  // Lane 3: ใกล้กลาง / Mid-near
+  {
+    bottom: 74,
+    scaleMult: 1.10,
+    speedMult: 1.25,
+    baseZIndex: 17,
     opacity: 0.98,
     blur: '0px',
-    glowRadius: '22px',
-    glowSpread: '7px',
-    waterHaloWidth: '122px',
-    bobAmpMult: 1.1,
-    parallaxShift: 44,
+    glowRadius: '26px',
+    glowSpread: '8px',
+    waterHaloWidth: '135px',
+    bobAmpMult: 1.25,
+    parallaxShift: 56,
   },
-  // Lane 3: ใกล้สุด / Nearest foreground
+  // Lane 4: ใกล้สุด / Nearest foreground
   {
-    bottom: 18,
-    scaleMult: 1.38,
-    speedMult: 1.65,
-    baseZIndex: 17,
+    bottom: 16,
+    scaleMult: 1.45,
+    speedMult: 1.70,
+    baseZIndex: 19,
     opacity: 1.0,
     blur: '0px',
-    glowRadius: '34px',
+    glowRadius: '36px',
     glowSpread: '10px',
-    waterHaloWidth: '160px',
-    bobAmpMult: 1.5,
-    parallaxShift: 72,
+    waterHaloWidth: '170px',
+    bobAmpMult: 1.6,
+    parallaxShift: 78,
   },
 ]
 
@@ -75,6 +90,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [newArrivalNotice, setNewArrivalNotice] = useState(null)
   const isInitialLoadRef = useRef(true)
+  const recentKrathongIdRef = useRef(null)
 
   // Sky Lanterns particle animation state
   const [skyLanterns, setSkyLanterns] = useState([
@@ -152,6 +168,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
     try {
       const recentId = sessionStorage.getItem('sofun_recent_krathong')
       if (recentId) {
+        recentKrathongIdRef.current = recentId
         setActiveWishIds(new Set([recentId]))
         sessionStorage.removeItem('sofun_recent_krathong')
       }
@@ -173,10 +190,10 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             if (change.type === 'added') {
               const d = change.doc.data()
               if (d.hidden === true || d.isVisible === false) return
-              // Put new arrival starting on right edge to float across
+              // Put new arrival starting on right edge in nearest foreground (Lane 4)
               krathongPositionsRef.current.set(change.doc.id, {
                 x: containerW + 40 + Math.random() * 120,
-                lane: Math.floor(Math.random() * 4),
+                lane: 4, // Freshly released krathong is always placed in the nearest foreground lane (Lane 4)
                 bobOffset: Math.random() * Math.PI * 2,
               })
               setNewArrivalNotice(d.name || 'มีผู้ร่วมลอยกระทงใหม่')
@@ -192,18 +209,20 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           })
         }
 
+        const recentId = recentKrathongIdRef.current
         const items = snapshot.docs
           .map((docSnap, idx) => {
             const d = docSnap.data()
+            const isRecent = recentId && docSnap.id === recentId
             return {
               id: docSnap.id,
               name: d.name || 'ผู้ร่วมลอยกระทง',
               wish: d.wish || 'ขอพรพระแม่คงคา',
               imageData: d.imageData || null,
-              lane: d.lane !== undefined ? d.lane % 4 : idx % 4,
+              lane: isRecent ? 4 : (d.lane !== undefined ? d.lane % 5 : idx % 5),
               speed: d.speed || (0.35 + ((idx % 5) * 0.08)),
               scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
-              bobFreq: d.bobFreq || (1.2 + (idx % 4) * 0.2),
+              bobFreq: d.bobFreq || (1.2 + (idx % 5) * 0.18),
               bobAmp: d.bobAmp || (3.5 + (idx % 3) * 1.5),
               sadhuCount: d.sadhuCount || d.likes || 0,
               likes: d.likes || d.sadhuCount || 0,
@@ -217,13 +236,17 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         if (isInitialLoadRef.current && items.length > 0) {
           const total = items.length
           const slot = (containerW + 160) / total
+          const recentId = recentKrathongIdRef.current
           items.forEach((k, idx) => {
             if (!krathongPositionsRef.current.has(k.id)) {
-              // Stagger positions across the visible river from center to right
-              const startX = total === 1 ? containerW * 0.55 : (idx * slot + 60) % (containerW + 160)
+              const isRecent = recentId && k.id === recentId
+              // Freshly placed krathong starts prominently in nearest foreground (Lane 4)
+              const startX = isRecent
+                ? containerW * 0.52
+                : (total === 1 ? containerW * 0.55 : (idx * slot + 60) % (containerW + 160))
               krathongPositionsRef.current.set(k.id, {
                 x: startX,
-                lane: k.lane !== undefined ? k.lane % 4 : (idx % 4),
+                lane: isRecent ? 4 : (k.lane !== undefined ? k.lane % 5 : (idx % 5)),
                 bobOffset: Math.random() * Math.PI * 2,
               })
             }
@@ -270,16 +293,16 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       firestoreKrathongs.forEach((k) => {
         const pos = krathongPositionsRef.current.get(k.id)
         if (pos) {
-          const lane = pos.lane !== undefined ? pos.lane % 4 : (k.lane !== undefined ? k.lane % 4 : 1)
-          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[1]
+          const lane = pos.lane !== undefined ? pos.lane % 5 : (k.lane !== undefined ? k.lane % 5 : 2)
+          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[2]
           const moveSpeed = (k.speed || 0.4) * (cfg.speedMult || 1) * 48 * dt
           pos.x -= moveSpeed
 
           // Fast & fluid wrap-around: As soon as krathong floats past left edge (-280px),
-          // immediately re-enter from the right edge with a newly randomized depth lane across 4 levels
+          // immediately re-enter from the right edge with a newly randomized depth lane across 5 levels (20% equal chance)
           if (pos.x < -280) {
             pos.x = containerW + 40 + Math.random() * 160
-            pos.lane = Math.floor(Math.random() * 4)
+            pos.lane = Math.floor(Math.random() * 5)
             pos.bobOffset = Math.random() * Math.PI * 2
           }
         }
@@ -956,30 +979,30 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       }}>
         {[...firestoreKrathongs]
           .sort((a, b) => {
-            const laneA = (krathongPositionsRef.current.get(a.id)?.lane ?? (a.lane !== undefined ? a.lane % 4 : 1)) % 4
-            const laneB = (krathongPositionsRef.current.get(b.id)?.lane ?? (b.lane !== undefined ? b.lane % 4 : 1)) % 4
+            const laneA = (krathongPositionsRef.current.get(a.id)?.lane ?? (a.lane !== undefined ? a.lane % 5 : 2)) % 5
+            const laneB = (krathongPositionsRef.current.get(b.id)?.lane ?? (b.lane !== undefined ? b.lane % 5 : 2)) % 5
             return laneA - laneB
           })
           .map((k) => {
-            const pos = krathongPositionsRef.current.get(k.id) || { x: 500, lane: 1, bobOffset: 0 }
-            const lane = pos.lane !== undefined ? pos.lane % 4 : (k.lane !== undefined ? k.lane % 4 : 1)
-            const cfg = LANE_CONFIG[lane] || LANE_CONFIG[1]
+            const pos = krathongPositionsRef.current.get(k.id) || { x: 500, lane: 2, bobOffset: 0 }
+            const lane = pos.lane !== undefined ? pos.lane % 5 : (k.lane !== undefined ? k.lane % 5 : 2)
+            const cfg = LANE_CONFIG[lane] || LANE_CONFIG[2]
 
-            // 4 Depth Levels Configuration: Strictly separated bottom Y and perspective scale
+            // 5 Depth Levels Configuration: Strictly separated bottom Y and perspective scale
             const laneBottom = cfg.bottom
             const laneScale = (k.scale || 0.85) * cfg.scaleMult * 1.5
 
-            // Strict z-index discipline: Lane 0 (11-12) < Lane 1 (13-14) < Lane 2 (15-16) < Lane 3 (17-18)
+            // Strict z-index discipline: Lane 0 (11-12) < Lane 1 (13-14) < Lane 2 (15-16) < Lane 3 (17-18) < Lane 4 (19-20)
             // Distant krathongs NEVER jump in front of foreground krathongs
             const isWishOpen = activeWishIds.has(k.id)
             const itemZIndex = isWishOpen ? cfg.baseZIndex + 1 : cfg.baseZIndex
 
             // Real-time gentle sinusoidal bobbing & tilting with lane-scaled dynamics
             const timeSec = performance.now() / 1000
-            const bobFreq = (k.bobFreq || 1.4) * (0.8 + lane * 0.15)
+            const bobFreq = (k.bobFreq || 1.4) * (0.75 + lane * 0.12)
             const bobAmp = (k.bobAmp || 4) * (cfg.bobAmpMult || 1)
             const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
-            const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * (1.6 + lane * 0.4)
+            const rotateDeg = Math.sin(timeSec * bobFreq + pos.bobOffset) * (1.5 + lane * 0.35)
 
             // Dynamic camera parallax offset based on depth lane
             const pX = parallaxRef.current.currentX || 0
@@ -1142,8 +1165,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const pos = krathongPositionsRef.current.get(k.id)
           if (!pos) return null
 
-          const lane = pos.lane !== undefined ? pos.lane % 4 : (k.lane !== undefined ? k.lane % 4 : 1)
-          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[1]
+          const lane = pos.lane !== undefined ? pos.lane % 5 : (k.lane !== undefined ? k.lane % 5 : 2)
+          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[2]
           const laneBottom = cfg.bottom
           const laneScale = (k.scale || 0.85) * cfg.scaleMult * 1.5
 
