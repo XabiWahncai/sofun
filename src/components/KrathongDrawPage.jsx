@@ -550,6 +550,10 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
 
       const docRef = await addDoc(collection(db, 'krathongs'), newDoc)
 
+      try {
+        sessionStorage.setItem('sofun_recent_krathong', docRef.id)
+      } catch {}
+
       setReleasedKrathong({
         id: docRef.id,
         name: ownerName.trim(),

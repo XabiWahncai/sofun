@@ -2,111 +2,17 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, increment } from 'firebase/firestore'
 import { db } from '../firebase'
 
-// Fallback seed Krathongs to ensure the river is lively even before many user submissions
-const SEED_KRATHONGS = [
-  {
-    id: 'seed-1',
-    name: 'น้องเนย & แก๊งเพื่อน',
-    wish: 'ขอให้ปีนี้สอบติดคณะที่หวัง สุขภาพแข็งแรง มีความสุขในทุกๆ วัน',
-    lane: 0,
-    speed: 0.38,
-    scale: 0.7,
-    x: 120,
-    likes: 18,
-    isSeed: true,
-  },
-  {
-    id: 'seed-2',
-    name: 'พี่วาฬ Sofun',
-    wish: 'ขอให้คอมมูนิตี้ Sofun Club อบอุ่น มีคนมาเล่นเกมสืบสวน Script Murder กันเยอะๆ',
-    lane: 2,
-    speed: 0.55,
-    scale: 1.0,
-    x: 480,
-    likes: 42,
-    isSeed: true,
-  },
-  {
-    id: 'seed-3',
-    name: 'ต้นกล้า & พลอย',
-    wish: 'ขอให้ความรักมั่นคง อยู่เคียงข้างกันตลอดไป มีแต่รอยยิ้มและเสียงหัวเราะ',
-    lane: 1,
-    speed: 0.44,
-    scale: 0.85,
-    x: 820,
-    likes: 29,
-    isSeed: true,
-  },
-  {
-    id: 'seed-4',
-    name: 'ครอบครัวสุขสันต์',
-    wish: 'ขอขมาพระแม่คงคา ขอให้ครอบครัวร่มเย็นเป็นสุข ปราศจากโรคภัยไข้เจ็บทั้งปวง',
-    lane: 0,
-    speed: 0.35,
-    scale: 0.68,
-    x: 1150,
-    likes: 35,
-    isSeed: true,
-  },
-  {
-    id: 'seed-5',
-    name: 'เกมเมอร์สายสืบ',
-    wish: 'ขอให้เล่นคดีไหนก็จับฆาตกรได้ ไม่โดนหลอกตาแตก และพบเพื่อนเล่นดีๆ เสมอ',
-    lane: 2,
-    speed: 0.58,
-    scale: 0.98,
-    x: 1480,
-    likes: 51,
-    isSeed: true,
-  },
-]
-
-// Default Krathong SVG graphics for seeds or rendering fallback
-function DefaultKrathongSvg({ scale = 1, glowColor = '#f59e0b' }) {
-  return (
-    <svg width={140 * scale} height={110 * scale} viewBox="0 0 140 110" style={{ overflow: 'visible' }}>
-      {/* Water reflection glow */}
-      <ellipse cx="70" cy="98" rx="60" ry="12" fill={glowColor} opacity="0.3" filter="blur(8px)" />
-
-      {/* Krathong Banana Leaf Base */}
-      <ellipse cx="70" cy="85" rx="55" ry="18" fill="#15803d" />
-      <ellipse cx="70" cy="82" rx="50" ry="15" fill="#16a34a" />
-
-      {/* Lotus Petals Layer 1 (Dark pink) */}
-      <path d="M 20 80 Q 25 55 35 70" stroke="#be123c" strokeWidth="2" fill="#e11d48" />
-      <path d="M 35 72 Q 45 48 55 68" stroke="#be123c" strokeWidth="2" fill="#f43f5e" />
-      <path d="M 55 70 Q 70 42 85 70" stroke="#be123c" strokeWidth="2" fill="#fb7185" />
-      <path d="M 85 68 Q 95 48 105 72" stroke="#be123c" strokeWidth="2" fill="#f43f5e" />
-      <path d="M 105 70 Q 115 55 120 80" stroke="#be123c" strokeWidth="2" fill="#e11d48" />
-
-      {/* Lotus Petals Layer 2 (Front) */}
-      <path d="M 30 84 Q 45 62 60 82" fill="#fda4af" />
-      <path d="M 60 82 Q 70 58 80 82" fill="#fecdd3" />
-      <path d="M 80 82 Q 95 62 110 84" fill="#fda4af" />
-
-      {/* Incense sticks */}
-      <line x1="62" y1="76" x2="58" y2="28" stroke="#78350f" strokeWidth="2.5" />
-      <line x1="78" y1="76" x2="82" y2="28" stroke="#78350f" strokeWidth="2.5" />
-      {/* Incense embers glowing */}
-      <circle cx="58" cy="28" r="2.5" fill="#ef4444" filter="drop-shadow(0 0 4px #f87171)" />
-      <circle cx="82" cy="28" r="2.5" fill="#ef4444" filter="drop-shadow(0 0 4px #f87171)" />
-
-      {/* Yellow Candle in Center */}
-      <rect x="66" y="44" width="8" height="34" rx="2" fill="#f59e0b" />
-      {/* Candle Flame with intense pulsing flicker */}
-      <path d="M 70 44 C 65 36 65 24 70 18 C 75 24 75 36 70 44 Z" fill="#fef08a" filter="drop-shadow(0 0 8px #f59e0b)" />
-      <circle cx="70" cy="30" r="14" fill="#fbbf24" opacity="0.35" filter="blur(6px)" />
-    </svg>
-  )
-}
-
 export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const containerRef = useRef(null)
 
-  // Krathongs state
+  // Firestore Krathongs state (Real data only, zero mockups)
   const [firestoreKrathongs, setFirestoreKrathongs] = useState([])
   const [activeWishId, setActiveWishId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [newArrivalNotice, setNewArrivalNotice] = useState(null)
+  const isInitialLoadRef = useRef(true)
+
+  // Sky Lanterns particle animation state
   const [skyLanterns, setSkyLanterns] = useState([
     { id: 'lan-1', x: 15, y: 35, size: 16, speed: 0.15 },
     { id: 'lan-2', x: 38, y: 22, size: 22, speed: 0.22 },
@@ -121,11 +27,42 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const krathongPositionsRef = useRef(new Map())
   const [, setTick] = useState(0)
 
-  // ── Firestore Subscription ─────────────────────────────────
+  // ── Auto-highlight newly released Krathong if user just floated one ──
   useEffect(() => {
     try {
-      const q = query(collection(db, 'krathongs'), orderBy('createdAt', 'desc'), limit(120))
+      const recentId = sessionStorage.getItem('sofun_recent_krathong')
+      if (recentId) {
+        setActiveWishId(recentId)
+        sessionStorage.removeItem('sofun_recent_krathong')
+      }
+    } catch {
+      // Ignored
+    }
+  }, [])
+
+  // ── Real-time Firestore Subscription (Real Data Only) ───────
+  useEffect(() => {
+    try {
+      const q = query(collection(db, 'krathongs'), orderBy('createdAt', 'desc'), limit(150))
       const unsub = onSnapshot(q, (snapshot) => {
+        const containerW = containerRef.current ? containerRef.current.clientWidth : (window.innerWidth || 1000)
+
+        // Check for new Krathongs added after initial load
+        if (!isInitialLoadRef.current) {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === 'added') {
+              const d = change.doc.data()
+              // Put new arrival starting on right edge to float across
+              krathongPositionsRef.current.set(change.doc.id, {
+                x: containerW + 40,
+                bobOffset: Math.random() * Math.PI * 2,
+              })
+              setNewArrivalNotice(d.name || 'มีผู้ร่วมลอยกระทงใหม่')
+              setTimeout(() => setNewArrivalNotice(null), 5000)
+            }
+          })
+        }
+
         const items = snapshot.docs.map((docSnap, idx) => {
           const d = docSnap.data()
           return {
@@ -135,49 +72,41 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             imageData: d.imageData || null,
             lane: d.lane !== undefined ? d.lane % 3 : idx % 3,
             speed: d.speed || (0.35 + ((idx % 5) * 0.08)),
-            scale: d.scale || (0.75 + ((idx % 3) * 0.15)),
-            bobFreq: d.bobFreq || (1.2 + Math.random()),
-            bobAmp: d.bobAmp || (3 + Math.random() * 4),
+            scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
+            bobFreq: d.bobFreq || (1.2 + (idx % 4) * 0.2),
+            bobAmp: d.bobAmp || (3.5 + (idx % 3) * 1.5),
             likes: d.likes || 0,
             createdAt: d.createdAt,
-            // Assign staggered initial X positions across a wide virtual river (0 to 3200px)
-            initialX: (idx * 280 + 100) % 3200,
           }
         })
+
+        // On initial load, spread all real krathongs across the visible river
+        if (isInitialLoadRef.current && items.length > 0) {
+          const total = items.length
+          const slot = (containerW + 160) / total
+          items.forEach((k, idx) => {
+            if (!krathongPositionsRef.current.has(k.id)) {
+              // Stagger positions across the visible river from center to right
+              const startX = total === 1 ? containerW * 0.55 : (idx * slot + 60) % (containerW + 160)
+              krathongPositionsRef.current.set(k.id, {
+                x: startX,
+                bobOffset: Math.random() * Math.PI * 2,
+              })
+            }
+          })
+          isInitialLoadRef.current = false
+        }
+
         setFirestoreKrathongs(items)
       }, (err) => {
-        console.warn('Firestore error in KrathongRiverPage:', err)
+        console.warn('Firestore subscription error:', err)
       })
+
       return () => unsub()
     } catch {
       // Fallback
     }
   }, [])
-
-  // ── Combined Krathong List ────────────────────────────────
-  const allKrathongs = useMemo(() => {
-    if (firestoreKrathongs.length === 0) {
-      return SEED_KRATHONGS
-    }
-    // Merge real ones with seed ones if real count is less than 5
-    if (firestoreKrathongs.length < 5) {
-      return [...firestoreKrathongs, ...SEED_KRATHONGS.slice(0, 5 - firestoreKrathongs.length)]
-    }
-    return firestoreKrathongs
-  }, [firestoreKrathongs])
-
-  // Initialize positions map
-  useEffect(() => {
-    allKrathongs.forEach((k, idx) => {
-      if (!krathongPositionsRef.current.has(k.id)) {
-        const startX = k.initialX !== undefined ? k.initialX : ((idx * 260 + 60) % 2400)
-        krathongPositionsRef.current.set(k.id, {
-          x: startX,
-          bobOffset: Math.random() * Math.PI * 2,
-        })
-      }
-    })
-  }, [allKrathongs])
 
   // ── 60 FPS Animation Loop for River & Parallax ─────────────
   useEffect(() => {
@@ -188,18 +117,19 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       const dt = Math.min((currentTime - lastTime) / 1000, 0.1)
       lastTime = currentTime
 
-      const containerW = containerRef.current ? containerRef.current.clientWidth : window.innerWidth
-      const riverVirtualWidth = Math.max(containerW + 600, 2400)
+      const containerW = containerRef.current ? containerRef.current.clientWidth : (window.innerWidth || 1000)
 
       // Move each Krathong smoothly along x-axis from right to left
-      allKrathongs.forEach((k) => {
+      firestoreKrathongs.forEach((k) => {
         const pos = krathongPositionsRef.current.get(k.id)
         if (pos) {
-          const moveSpeed = (k.speed || 0.4) * 55 * dt
+          const moveSpeed = (k.speed || 0.4) * 48 * dt
           pos.x -= moveSpeed
-          // Wrap around to right side when floating past left edge
-          if (pos.x < -220) {
-            pos.x = riverVirtualWidth + Math.random() * 200
+
+          // Fast & fluid wrap-around: As soon as krathong floats past left edge (-160px),
+          // immediately re-enter from the right edge so the river never stays empty!
+          if (pos.x < -160) {
+            pos.x = containerW + 40 + Math.random() * 80
           }
         }
       })
@@ -223,21 +153,19 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
     animId = requestAnimationFrame(animate)
     return () => cancelAnimationFrame(animId)
-  }, [allKrathongs])
+  }, [firestoreKrathongs])
 
   // ── Send Blessing / Like ("สาธุ") ────────────────────────
   const handleSendBlessing = async (krathong) => {
-    if (!krathong.isSeed) {
-      try {
-        const krathongRef = doc(db, 'krathongs', krathong.id)
-        await updateDoc(krathongRef, {
-          likes: increment(1),
-        })
-      } catch (err) {
-        console.warn('Could not increment likes:', err)
-      }
+    try {
+      const krathongRef = doc(db, 'krathongs', krathong.id)
+      await updateDoc(krathongRef, {
+        likes: increment(1),
+      })
+      if (showToast) showToast('ร่วมอนุโมทนาสาธุกับคำอธิษฐานแล้ว')
+    } catch (err) {
+      console.warn('Could not increment likes:', err)
     }
-    if (showToast) showToast('ร่วมอนุโมทนาสาธุกับคำอธิษฐานแล้ว')
   }
 
   // ── Release a Sky Lantern ────────────────────────────────
@@ -307,19 +235,14 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
     }
   }
 
-  // ── Active Krathong details for floating wish bubble ──────
-  const activeKrathong = useMemo(() => {
-    return allKrathongs.find((k) => k.id === activeWishId) || null
-  }, [allKrathongs, activeWishId])
-
   // Filtered search
   const filteredList = useMemo(() => {
     if (!searchQuery.trim()) return []
-    return allKrathongs.filter((k) =>
+    return firestoreKrathongs.filter((k) =>
       k.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       k.wish.toLowerCase().includes(searchQuery.toLowerCase())
     )
-  }, [allKrathongs, searchQuery])
+  }, [firestoreKrathongs, searchQuery])
 
   return (
     <div
@@ -463,7 +386,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         background: 'linear-gradient(180deg, rgba(8, 20, 45, 0.95) 0%, #061126 50%, #030814 100%)',
         zIndex: 3,
       }}>
-        {/* Animated Water Waves Layers (Canvas or SVG) */}
+        {/* Animated Water Waves Layers */}
         <div style={{
           position: 'absolute',
           top: 0,
@@ -493,7 +416,92 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         }} />
       </div>
 
-      {/* ── Layer 4: Floating Krathongs on River Lanes ──────── */}
+      {/* ── Real-time Notification Banner for Newly Arrived Krathong ── */}
+      {newArrivalNotice && (
+        <div style={{
+          position: 'absolute',
+          top: '76px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(245, 158, 11, 0.92)',
+          color: '#111827',
+          padding: '6px 18px',
+          borderRadius: '20px',
+          fontSize: '12.5px',
+          fontWeight: 800,
+          boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5), 0 0 20px rgba(245, 158, 11, 0.5)',
+          zIndex: 45,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          animation: 'bubbleAppear 0.3s ease-out',
+        }}>
+          <i className="fas fa-water" /> มีกระทงใหม่จาก คุณ {newArrivalNotice} ลอยลงสู่แม่น้ำแล้ว
+        </div>
+      )}
+
+      {/* ── Empty River State (If 0 real krathongs in database) ── */}
+      {firestoreKrathongs.length === 0 && (
+        <div style={{
+          position: 'absolute',
+          top: '45%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          textAlign: 'center',
+          background: 'rgba(5, 12, 28, 0.88)',
+          border: '1.5px solid rgba(245, 158, 11, 0.45)',
+          borderRadius: '20px',
+          padding: '28px 32px',
+          boxShadow: '0 12px 40px rgba(0, 0, 0, 0.7), 0 0 30px rgba(245, 158, 11, 0.15)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 25,
+          maxWidth: '380px',
+          width: '90%',
+        }}>
+          <div style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '14px',
+            background: 'rgba(245, 158, 11, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#fef08a',
+            fontSize: '24px',
+            margin: '0 auto 14px',
+          }}>
+            <i className="fas fa-water" />
+          </div>
+          <h3 style={{ fontSize: '18px', fontWeight: 800, color: '#fef08a', margin: '0 0 8px' }}>
+            ยังไม่มีกระทงในสายน้ำ
+          </h3>
+          <p style={{ fontSize: '13.5px', color: 'rgba(255, 255, 255, 0.75)', lineHeight: 1.55, margin: '0 0 20px' }}>
+            ร่วมเป็นคนแรกที่วาดกระทงและส่งคำอธิษฐานลงสู่แม่น้ำสายบุญใต้แสงจันทร์
+          </p>
+          <button
+            type="button"
+            onClick={() => showPage('krathong')}
+            style={{
+              background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+              border: 'none',
+              color: '#ffffff',
+              borderRadius: '10px',
+              padding: '11px 22px',
+              fontSize: '14px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 16px rgba(245, 158, 11, 0.35)',
+            }}
+          >
+            <i className="fas fa-paint-brush" /> วาดกระทงใบแรก (/Krathong)
+          </button>
+        </div>
+      )}
+
+      {/* ── Layer 4: Real-time Floating Krathongs on River ────── */}
       <div style={{
         position: 'absolute',
         bottom: 0,
@@ -503,14 +511,11 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         zIndex: 10,
         pointerEvents: 'none',
       }}>
-        {allKrathongs.map((k) => {
+        {firestoreKrathongs.map((k) => {
           const pos = krathongPositionsRef.current.get(k.id) || { x: 500, bobOffset: 0 }
           const lane = k.lane || 0
 
           // Depth Configuration per Lane
-          // Lane 0: Distant (higher up, smaller, slower)
-          // Lane 1: Mid
-          // Lane 2: Foreground (lower down, larger, faster)
           const laneBottom = lane === 0 ? 230 : lane === 1 ? 130 : 35
           const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05)
           const laneZIndex = lane === 0 ? 11 : lane === 1 ? 12 : 13
@@ -538,7 +543,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 pointerEvents: 'auto',
                 zIndex: isSelected ? 30 : laneZIndex,
                 transition: 'filter 0.2s',
-                filter: isSelected ? 'drop-shadow(0 0 16px rgba(254, 240, 138, 0.9))' : 'none',
+                filter: isSelected ? 'drop-shadow(0 0 16px rgba(254, 240, 138, 0.95))' : 'none',
               }}
             >
               {/* Floating Candle Light Water Halo */}
@@ -555,7 +560,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 pointerEvents: 'none',
               }} />
 
-              {/* Krathong Body (Custom User Canvas Image OR Default SVG) */}
+              {/* Krathong Body (Exact User Drawing Canvas Image) */}
               <div style={{
                 width: '130px',
                 height: '110px',
@@ -564,7 +569,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 justifyContent: 'center',
                 position: 'relative',
               }}>
-                {k.imageData ? (
+                {k.imageData && (
                   <img
                     src={k.imageData}
                     alt={k.name}
@@ -572,11 +577,9 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                       maxWidth: '120px',
                       maxHeight: '100px',
                       objectFit: 'contain',
-                      filter: 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.6))',
+                      filter: 'drop-shadow(0 0 10px rgba(245, 158, 11, 0.65))',
                     }}
                   />
-                ) : (
-                  <DefaultKrathongSvg scale={1} glowColor="#f59e0b" />
                 )}
 
                 {/* Flickering Flame Particle above Krathong */}
@@ -605,7 +608,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                   display: 'inline-flex',
                   alignItems: 'center',
                   gap: '4px',
-                  background: isSelected ? 'rgba(245, 158, 11, 0.95)' : 'rgba(5, 10, 25, 0.82)',
+                  background: isSelected ? 'rgba(245, 158, 11, 0.95)' : 'rgba(5, 10, 25, 0.85)',
                   border: isSelected ? '1px solid #fef08a' : '1px solid rgba(254, 240, 138, 0.35)',
                   color: isSelected ? '#111827' : '#fef08a',
                   borderRadius: '12px',
@@ -630,8 +633,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                     left: '50%',
                     transform: 'translateX(-50%)',
                     width: '240px',
-                    background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.95) 0%, rgba(8, 15, 30, 0.98) 100%)',
-                    border: '1.5px solid rgba(245, 158, 11, 0.8)',
+                    background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.96) 0%, rgba(8, 15, 30, 0.98) 100%)',
+                    border: '1.5px solid rgba(245, 158, 11, 0.85)',
                     borderRadius: '16px',
                     padding: '14px',
                     boxShadow: '0 12px 32px rgba(0, 0, 0, 0.75), 0 0 20px rgba(245, 158, 11, 0.3)',
@@ -651,8 +654,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                     width: '14px',
                     height: '14px',
                     background: 'rgba(8, 15, 30, 0.98)',
-                    borderRight: '1.5px solid rgba(245, 158, 11, 0.8)',
-                    borderBottom: '1.5px solid rgba(245, 158, 11, 0.8)',
+                    borderRight: '1.5px solid rgba(245, 158, 11, 0.85)',
+                    borderBottom: '1.5px solid rgba(245, 158, 11, 0.85)',
                   }} />
 
                   {/* Header: Name and Close button */}
@@ -877,89 +880,91 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           alignItems: 'center',
           gap: '6px',
         }}>
-          <i className="fas fa-water" /> กระทงทั้งหมด {allKrathongs.length} ใบในสายน้ำ
+          <i className="fas fa-water" /> กระทงจริงในสายน้ำ {firestoreKrathongs.length} ใบ
         </div>
 
         {/* Search Krathong by Name */}
-        <div style={{
-          position: 'relative',
-          pointerEvents: 'auto',
-          maxWidth: '280px',
-          width: '100%',
-        }}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="ค้นหากระทงตามชื่อ..."
-            style={{
-              width: '100%',
-              padding: '7px 12px 7px 32px',
-              borderRadius: '20px',
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              background: 'rgba(5, 10, 25, 0.85)',
-              color: '#ffffff',
-              fontSize: '12px',
-              outline: 'none',
-              backdropFilter: 'blur(8px)',
-              boxSizing: 'border-box',
-            }}
-          />
-          <i
-            className="fas fa-search"
-            style={{
-              position: 'absolute',
-              left: '12px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              fontSize: '11px',
-              color: 'rgba(255, 255, 255, 0.5)',
-            }}
-          />
+        {firestoreKrathongs.length > 0 && (
+          <div style={{
+            position: 'relative',
+            pointerEvents: 'auto',
+            maxWidth: '280px',
+            width: '100%',
+          }}>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหากระทงตามชื่อ..."
+              style={{
+                width: '100%',
+                padding: '7px 12px 7px 32px',
+                borderRadius: '20px',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                background: 'rgba(5, 10, 25, 0.85)',
+                color: '#ffffff',
+                fontSize: '12px',
+                outline: 'none',
+                backdropFilter: 'blur(8px)',
+                boxSizing: 'border-box',
+              }}
+            />
+            <i
+              className="fas fa-search"
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                fontSize: '11px',
+                color: 'rgba(255, 255, 255, 0.5)',
+              }}
+            />
 
-          {/* Search Results Dropdown */}
-          {filteredList.length > 0 && (
-            <div style={{
-              position: 'absolute',
-              bottom: '36px',
-              left: 0,
-              right: 0,
-              background: 'rgba(15, 23, 42, 0.95)',
-              border: '1px solid rgba(245, 158, 11, 0.4)',
-              borderRadius: '12px',
-              padding: '6px',
-              maxHeight: '180px',
-              overflowY: 'auto',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
-              backdropFilter: 'blur(8px)',
-            }}>
-              {filteredList.map((item) => (
-                <div
-                  key={item.id}
-                  onClick={() => {
-                    setActiveWishId(item.id)
-                    setSearchQuery('')
-                  }}
-                  style={{
-                    padding: '6px 10px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    color: '#fef08a',
-                    borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(245, 158, 11, 0.2)')}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                >
-                  <div style={{ fontWeight: 700 }}>คุณ {item.name}</div>
-                  <div style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {item.wish}
+            {/* Search Results Dropdown */}
+            {filteredList.length > 0 && (
+              <div style={{
+                position: 'absolute',
+                bottom: '36px',
+                left: 0,
+                right: 0,
+                background: 'rgba(15, 23, 42, 0.95)',
+                border: '1px solid rgba(245, 158, 11, 0.4)',
+                borderRadius: '12px',
+                padding: '6px',
+                maxHeight: '180px',
+                overflowY: 'auto',
+                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.6)',
+                backdropFilter: 'blur(8px)',
+              }}>
+                {filteredList.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      setActiveWishId(item.id)
+                      setSearchQuery('')
+                    }}
+                    style={{
+                      padding: '6px 10px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      color: '#fef08a',
+                      borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(245, 158, 11, 0.2)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    <div style={{ fontWeight: 700 }}>คุณ {item.name}</div>
+                    <div style={{ fontSize: '10.5px', color: 'rgba(255, 255, 255, 0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {item.wish}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <style>{`
