@@ -26,6 +26,26 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   // Real-time animation positions
   const krathongPositionsRef = useRef(new Map())
   const [, setTick] = useState(0)
+  const [sadhuCounts, setSadhuCounts] = useState({})
+
+  // ── Increment Sadhu Count ──────────────────────────────────
+  const handleSadhu = async (krathongId) => {
+    setSadhuCounts((prev) => {
+      const target = firestoreKrathongs.find((x) => x.id === krathongId)
+      const cur = prev[krathongId] ?? target?.sadhuCount ?? target?.likes ?? 0
+      return { ...prev, [krathongId]: cur + 1 }
+    })
+
+    try {
+      const docRef = doc(db, 'krathongs', krathongId)
+      await updateDoc(docRef, {
+        sadhuCount: increment(1),
+        likes: increment(1),
+      })
+    } catch (err) {
+      console.warn('Sadhu update error:', err)
+    }
+  }
 
   // ── Toggle wish bubble for a specific krathong ─────────────
   const toggleWish = (id) => {
@@ -68,6 +88,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               // Put new arrival starting on right edge to float across
               krathongPositionsRef.current.set(change.doc.id, {
                 x: containerW + 40,
+                lane: Math.floor(Math.random() * 3),
                 bobOffset: Math.random() * Math.PI * 2,
               })
               setNewArrivalNotice(d.name || 'มีผู้ร่วมลอยกระทงใหม่')
@@ -88,7 +109,8 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
             bobFreq: d.bobFreq || (1.2 + (idx % 4) * 0.2),
             bobAmp: d.bobAmp || (3.5 + (idx % 3) * 1.5),
-            likes: d.likes || 0,
+            sadhuCount: d.sadhuCount || d.likes || 0,
+            likes: d.likes || d.sadhuCount || 0,
             createdAt: d.createdAt,
           }
         })
@@ -103,6 +125,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               const startX = total === 1 ? containerW * 0.55 : (idx * slot + 60) % (containerW + 160)
               krathongPositionsRef.current.set(k.id, {
                 x: startX,
+                lane: k.lane !== undefined ? k.lane % 3 : Math.floor(Math.random() * 3),
                 bobOffset: Math.random() * Math.PI * 2,
               })
             }
@@ -148,10 +171,12 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const moveSpeed = (k.speed || 0.4) * 48 * dt
           pos.x -= moveSpeed
 
-          // Fast & fluid wrap-around: As soon as krathong floats past left edge (-160px),
-          // immediately re-enter from the right edge so the river never stays empty!
-          if (pos.x < -160) {
+          // Fast & fluid wrap-around: As soon as krathong floats past left edge (-240px),
+          // immediately re-enter from the right edge with a newly randomized depth lane (ไกล, กลาง, ใกล้)
+          if (pos.x < -240) {
             pos.x = containerW + 40 + Math.random() * 80
+            pos.lane = Math.floor(Math.random() * 3)
+            pos.bobOffset = Math.random() * Math.PI * 2
           }
         }
       })
@@ -521,12 +546,12 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         pointerEvents: 'none',
       }}>
         {firestoreKrathongs.map((k) => {
-          const pos = krathongPositionsRef.current.get(k.id) || { x: 500, bobOffset: 0 }
-          const lane = k.lane || 0
+          const pos = krathongPositionsRef.current.get(k.id) || { x: 500, lane: 1, bobOffset: 0 }
+          const lane = pos.lane !== undefined ? pos.lane : (k.lane !== undefined ? k.lane % 3 : 1)
 
-          // Depth Configuration per Lane
+          // Depth Configuration per Lane (0: ไกล / Far, 1: กลาง / Mid, 2: ใกล้ / Near) - Scaled 1.5x
           const laneBottom = lane === 0 ? 230 : lane === 1 ? 130 : 35
-          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05)
+          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05) * 1.5
           const laneZIndex = lane === 0 ? 11 : lane === 1 ? 12 : 13
 
           // Real-time gentle sinusoidal bobbing & tilting
@@ -552,7 +577,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 pointerEvents: 'auto',
                 zIndex: isWishOpen ? 30 : laneZIndex,
                 transition: 'filter 0.2s',
-                filter: isWishOpen ? 'drop-shadow(0 0 16px rgba(254, 240, 138, 0.95))' : 'none',
+                filter: isWishOpen ? 'drop-shadow(0 0 20px rgba(254, 240, 138, 0.95))' : 'none',
               }}
             >
               {/* Floating Candle Light Water Halo */}
@@ -607,27 +632,29 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 }} />
               </div>
 
-              {/* Owner Name Tag directly below Krathong */}
+              {/* Owner Name Tag directly below Krathong (Amber Glowing Capsule Pill) */}
               <div style={{
-                marginTop: '2px',
+                marginTop: '4px',
                 textAlign: 'center',
                 whiteSpace: 'nowrap',
               }}>
                 <span style={{
                   display: 'inline-flex',
                   alignItems: 'center',
-                  gap: '4px',
-                  background: isWishOpen ? 'rgba(245, 158, 11, 0.95)' : 'rgba(5, 10, 25, 0.85)',
-                  border: isWishOpen ? '1px solid #fef08a' : '1px solid rgba(254, 240, 138, 0.35)',
-                  color: isWishOpen ? '#111827' : '#fef08a',
-                  borderRadius: '12px',
-                  padding: '2px 8px',
-                  fontSize: '11px',
-                  fontWeight: 700,
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.6)',
-                  backdropFilter: 'blur(4px)',
+                  gap: '5px',
+                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                  color: '#111827',
+                  borderRadius: '9999px',
+                  padding: '3px 12px',
+                  fontSize: '11.5px',
+                  fontWeight: 800,
+                  boxShadow: isWishOpen
+                    ? '0 0 20px rgba(245, 158, 11, 0.95), 0 2px 8px rgba(0, 0, 0, 0.6)'
+                    : '0 0 14px rgba(245, 158, 11, 0.65), 0 2px 6px rgba(0, 0, 0, 0.4)',
+                  border: '1px solid rgba(254, 240, 138, 0.5)',
+                  letterSpacing: '0.02em',
                 }}>
-                  <i className="fas fa-feather-pointed" style={{ fontSize: '9px' }} />
+                  <i className="fas fa-leaf" style={{ fontSize: '9.5px', color: '#111827' }} />
                   {k.name}
                 </span>
               </div>
@@ -636,7 +663,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         })}
       </div>
 
-      {/* ── Layer 5: Unscaled Translucent Wish Bubbles (Constant Readable Font on Near & Far Lanes) ── */}
+      {/* ── Layer 5: Wish Modal Cards (Centered above Krathong with Pointer Caret) ── */}
       <div style={{
         position: 'absolute',
         bottom: 0,
@@ -652,9 +679,9 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           const pos = krathongPositionsRef.current.get(k.id)
           if (!pos) return null
 
-          const lane = k.lane || 0
+          const lane = pos.lane !== undefined ? pos.lane : (k.lane !== undefined ? k.lane % 3 : 1)
           const laneBottom = lane === 0 ? 230 : lane === 1 ? 130 : 35
-          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05)
+          const laneScale = (k.scale || 0.85) * (lane === 0 ? 0.68 : lane === 1 ? 0.88 : 1.05) * 1.5
 
           const timeSec = performance.now() / 1000
           const bobFreq = k.bobFreq || 1.4
@@ -663,65 +690,137 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
           // Calculate real-time unscaled position over the Krathong:
           const bubbleX = pos.x + 65
-          const bubbleBottom = laneBottom + offsetY + (100 * laneScale) + 12
+          const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 16
 
           return (
             <div
               key={`wish-${k.id}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleWish(k.id)
-              }}
               style={{
                 position: 'absolute',
                 left: `${bubbleX}px`,
                 bottom: `${bubbleBottom}px`,
                 transform: 'translateX(-50%)',
                 pointerEvents: 'auto',
-                cursor: 'pointer',
                 zIndex: 35,
                 animation: 'bubbleAppear 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
               }}
-              title="คลิกเพื่อปิดคำอธิษฐาน"
             >
-              {/* Translucent Frosted Glass Card - Clean Wish Text Only */}
+              {/* Dark Modal Card Container matching Sanook style */}
               <div style={{
-                background: 'rgba(6, 14, 30, 0.65)',
-                backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)',
-                border: '1.5px solid rgba(254, 240, 138, 0.45)',
-                borderRadius: '16px',
-                padding: '9px 16px',
-                maxWidth: 'min(300px, 80vw)',
-                minWidth: '120px',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45), 0 0 16px rgba(245, 158, 11, 0.2)',
-                textAlign: 'center',
+                background: '#181f2a',
+                border: '1.5px solid rgba(245, 158, 11, 0.45)',
+                borderRadius: '14px',
+                padding: '12px 16px 12px',
+                width: 'min(300px, 85vw)',
+                boxShadow: '0 8px 28px rgba(0, 0, 0, 0.7), 0 0 20px rgba(245, 158, 11, 0.25)',
                 position: 'relative',
               }}>
                 {/* Downward Pointer Triangle */}
                 <div style={{
                   position: 'absolute',
-                  bottom: '-6px',
+                  bottom: '-7px',
                   left: '50%',
                   transform: 'translateX(-50%) rotate(45deg)',
-                  width: '10px',
-                  height: '10px',
-                  background: 'rgba(6, 14, 30, 0.7)',
-                  borderRight: '1.5px solid rgba(254, 240, 138, 0.45)',
-                  borderBottom: '1.5px solid rgba(254, 240, 138, 0.45)',
+                  width: '12px',
+                  height: '12px',
+                  background: '#181f2a',
+                  borderRight: '1.5px solid rgba(245, 158, 11, 0.45)',
+                  borderBottom: '1.5px solid rgba(245, 158, 11, 0.45)',
                 }} />
 
-                {/* Only Wish Text - Constant readable 14.5px font */}
+                {/* Header Row: คุณ {k.name} on left, close 'x' on right */}
                 <div style={{
-                  fontSize: '14.5px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: '8px',
+                }}>
+                  <div style={{
+                    fontSize: '13.5px',
+                    fontWeight: 800,
+                    color: '#ffffff',
+                    letterSpacing: '0.01em',
+                  }}>
+                    คุณ {k.name}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleWish(k.id)
+                    }}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.55)',
+                      fontSize: '15px',
+                      cursor: 'pointer',
+                      padding: '0 2px',
+                      lineHeight: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title="ปิดคำอธิษฐาน"
+                  >
+                    <i className="fas fa-times" />
+                  </button>
+                </div>
+
+                {/* Wish Quote Text */}
+                <div style={{
+                  fontSize: '13px',
                   fontWeight: 600,
-                  color: '#ffffff',
+                  color: '#f3f4f6',
                   lineHeight: 1.5,
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.95)',
+                  margin: '0 0 12px',
                   wordBreak: 'break-word',
-                  letterSpacing: '0.01em',
+                  textShadow: '0 1px 3px rgba(0, 0, 0, 0.8)',
                 }}>
                   "{k.wish}"
+                </div>
+
+                {/* Footer Row: สาธุ Button & Floating River Status */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  paddingTop: '6px',
+                  borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+                }}>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      handleSadhu(k.id)
+                    }}
+                    style={{
+                      background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      border: 'none',
+                      borderRadius: '7px',
+                      color: '#ffffff',
+                      padding: '4px 11px',
+                      fontSize: '11.5px',
+                      fontWeight: 800,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      boxShadow: '0 2px 8px rgba(245, 158, 11, 0.45)',
+                    }}
+                  >
+                    <i className="fas fa-hands-praying" style={{ fontSize: '11px' }} />
+                    สาธุ ({sadhuCounts[k.id] ?? k.sadhuCount ?? k.likes ?? 0})
+                  </button>
+
+                  <div style={{
+                    fontSize: '11px',
+                    color: 'rgba(255, 255, 255, 0.55)',
+                    whiteSpace: 'nowrap',
+                  }}>
+                    ลอยอยู่ในสายน้ำ
+                  </div>
                 </div>
               </div>
             </div>

@@ -148,12 +148,17 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
-    // Loy Krathong event - public read and create, admin update and delete
+    // Loy Krathong event - public read and create, admin delete, public update for sadhuCount and likes
     match /krathongs/{id} {
       allow read: if true;
       allow create: if request.resource.data.name is string &&
                       request.resource.data.imageData is string;
-      allow update, delete: if request.auth != null;
+      allow update: if request.auth != null || (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['sadhuCount', 'likes']) &&
+        (!('sadhuCount' in request.resource.data) || request.resource.data.sadhuCount is int) &&
+        (!('likes' in request.resource.data) || request.resource.data.likes is int)
+      );
+      allow delete: if request.auth != null;
     }
 
     // Deny everything else
