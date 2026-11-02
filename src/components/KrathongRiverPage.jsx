@@ -104,6 +104,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           snapshot.docChanges().forEach((change) => {
             if (change.type === 'added') {
               const d = change.doc.data()
+              if (d.hidden === true || d.isVisible === false) return
               // Put new arrival starting on right edge to float across
               krathongPositionsRef.current.set(change.doc.id, {
                 x: containerW + 40 + Math.random() * 120,
@@ -112,27 +113,37 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               })
               setNewArrivalNotice(d.name || 'มีผู้ร่วมลอยกระทงใหม่')
               setTimeout(() => setNewArrivalNotice(null), 5000)
+            } else if (change.type === 'removed') {
+              krathongPositionsRef.current.delete(change.doc.id)
+            } else if (change.type === 'modified') {
+              const d = change.doc.data()
+              if (d.hidden === true || d.isVisible === false) {
+                krathongPositionsRef.current.delete(change.doc.id)
+              }
             }
           })
         }
 
-        const items = snapshot.docs.map((docSnap, idx) => {
-          const d = docSnap.data()
-          return {
-            id: docSnap.id,
-            name: d.name || 'ผู้ร่วมลอยกระทง',
-            wish: d.wish || 'ขอพรพระแม่คงคา',
-            imageData: d.imageData || null,
-            lane: d.lane !== undefined ? d.lane % 4 : idx % 4,
-            speed: d.speed || (0.35 + ((idx % 5) * 0.08)),
-            scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
-            bobFreq: d.bobFreq || (1.2 + (idx % 4) * 0.2),
-            bobAmp: d.bobAmp || (3.5 + (idx % 3) * 1.5),
-            sadhuCount: d.sadhuCount || d.likes || 0,
-            likes: d.likes || d.sadhuCount || 0,
-            createdAt: d.createdAt,
-          }
-        })
+        const items = snapshot.docs
+          .map((docSnap, idx) => {
+            const d = docSnap.data()
+            return {
+              id: docSnap.id,
+              name: d.name || 'ผู้ร่วมลอยกระทง',
+              wish: d.wish || 'ขอพรพระแม่คงคา',
+              imageData: d.imageData || null,
+              lane: d.lane !== undefined ? d.lane % 4 : idx % 4,
+              speed: d.speed || (0.35 + ((idx % 5) * 0.08)),
+              scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
+              bobFreq: d.bobFreq || (1.2 + (idx % 4) * 0.2),
+              bobAmp: d.bobAmp || (3.5 + (idx % 3) * 1.5),
+              sadhuCount: d.sadhuCount || d.likes || 0,
+              likes: d.likes || d.sadhuCount || 0,
+              createdAt: d.createdAt,
+              hidden: d.hidden === true || d.isVisible === false,
+            }
+          })
+          .filter((k) => !k.hidden)
 
         // On initial load, spread all real krathongs across the visible river
         if (isInitialLoadRef.current && items.length > 0) {

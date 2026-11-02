@@ -8,7 +8,11 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
   useEffect(() => {
     try {
       const unsub = onSnapshot(collection(db, 'krathongs'), (snapshot) => {
-        setTotalKrathongs(snapshot.size)
+        const activeCount = snapshot.docs.filter((d) => {
+          const data = d.data()
+          return data.hidden !== true && data.isVisible !== false
+        }).length
+        setTotalKrathongs(activeCount)
       }, (err) => {
         console.warn('Could not fetch krathong count:', err)
       })

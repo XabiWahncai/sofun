@@ -15,6 +15,7 @@ import {
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
 import { calculateDepositDeadline } from './BookingPage'
 import SecurityTab from './SecurityTab'
+import KrathongAdminTab from './KrathongAdminTab'
 import DmRecommendationsTab from './DmRecommendationsTab'
 import { toOptimizedUrl as convertImg, convertImageUrl } from '../utils/imageUrl'
 import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSecurityEvent } from '../utils/security'
@@ -8998,6 +8999,7 @@ const NAV_SECTIONS = [
   {
     label: 'กิจกรรม',
     items: [
+      { key: 'krathong', icon: 'fa-water', label: 'จัดการกระทง' },
       { key: 'random', icon: 'fa-dharmachakra', label: 'วงล้อสุ่ม' },
       { key: 'allofuswilldie', icon: 'fa-user-secret', label: 'All of Us Will Die', href: '/allofuswilldie' },
       { key: 'handbook', icon: 'fa-book-open', label: 'คู่มือ DM (Handbook)', href: '/handbook' },
@@ -9222,6 +9224,7 @@ export default function AdminPage({ showToast, openModal, openEdit, allGames = [
               )}
               {tab === 'menu'      && <MenuTab showToast={showToast} />}
               {tab === 'bookings'  && <BookingsTab showToast={showToast} adminUser={isAdmin} allGames={allGames} />}
+              {tab === 'krathong'  && <KrathongAdminTab showToast={showToast} />}
               {tab === 'random'    && <RandomWheelTab showToast={showToast} members={members} />}
               {tab === 'payment'   && <PaymentTab showToast={showToast} />}
               {tab === 'receipt'   && <ReceiptSettingsTab showToast={showToast} />}
