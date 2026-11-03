@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '../firebase'
+import MyKrathongsModal, { generateKrathongCardDataUrl } from './MyKrathongsModal'
 
 const PRESET_COLORS = [
   { name: 'เขียวตองอ่อน', hex: '#22c55e' },
@@ -254,6 +255,14 @@ function AppleColorWheel({ colorR, colorG, colorB, onChangeRgb }) {
           }}
         />
       </div>
+      {/* My Krathongs History Modal */}
+      <MyKrathongsModal
+        isOpen={showMyKrathongs}
+        onClose={() => setShowMyKrathongs(false)}
+        lineUser={lineUser}
+        showPage={showPage}
+        showToast={showToast}
+      />
     </div>
   )
 }
@@ -284,6 +293,46 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
   const [wish, setWish] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [releasedKrathong, setReleasedKrathong] = useState(null)
+  const [showMyKrathongs, setShowMyKrathongs] = useState(false)
+  const [downloadingCard, setDownloadingCard] = useState(false)
+
+  const handleDownloadRawPng = (k) => {
+    if (!k || !k.imageData) return
+    try {
+      const link = document.createElement('a')
+      link.href = k.imageData
+      const safeName = (k.name || 'my-krathong').replace(/[^\w\u0E00-\u0E7F]/g, '_')
+      link.download = `krathong-${safeName}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      if (showToast) showToast('บันทึกรูปกระทง PNG สำเร็จแล้ว')
+    } catch (err) {
+      console.error('Download raw PNG failed:', err)
+      alert('บันทึกรูปภาพไม่สำเร็จ โปรดลองอีกครั้ง')
+    }
+  }
+
+  const handleDownloadCardPng = async (k) => {
+    if (!k) return
+    try {
+      setDownloadingCard(true)
+      const dataUrl = await generateKrathongCardDataUrl(k)
+      const link = document.createElement('a')
+      link.href = dataUrl
+      const safeName = (k.name || 'sofun').replace(/[^\w\u0E00-\u0E7F]/g, '_')
+      link.download = `krathong-card-${safeName}.png`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      if (showToast) showToast('บันทึกการ์ดที่ระลึก PNG สำเร็จแล้ว')
+    } catch (err) {
+      console.error('Error generating card:', err)
+      alert('เกิดข้อผิดพลาดในการสร้างการ์ดที่ระลึก โปรดลองอีกครั้ง')
+    } finally {
+      setDownloadingCard(false)
+    }
+  }
 
   const currentColorHex = rgbToHex(colorR, colorG, colorB)
   const currentRgbaString = `rgba(${colorR}, ${colorG}, ${colorB}, ${opacity / 100})`
@@ -787,6 +836,30 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
         sessionStorage.setItem('sofun_recent_krathong', docRef.id)
       } catch {}
 
+      // Save to localStorage for instant user history retrieval (even guest or offline)
+      try {
+        const myLocalItem = {
+          id: docRef.id,
+          name: ownerName.trim(),
+          wish: wish.trim(),
+          imageData: dataUrl,
+          createdAt: new Date().toISOString(),
+          userId: lineUser?.userId || null,
+          likes: 0,
+          sadhuCount: 0,
+        }
+        const existing = JSON.parse(localStorage.getItem('sofun_my_krathongs') || '[]')
+        const updated = [myLocalItem, ...existing.filter((x) => x.id !== docRef.id)]
+        localStorage.setItem('sofun_my_krathongs', JSON.stringify(updated.slice(0, 50)))
+
+        const existingIds = JSON.parse(localStorage.getItem('sofun_my_krathong_ids') || '[]')
+        if (!existingIds.includes(docRef.id)) {
+          localStorage.setItem('sofun_my_krathong_ids', JSON.stringify([docRef.id, ...existingIds]))
+        }
+      } catch (e) {
+        console.warn('LocalStorage save error:', e)
+      }
+
       setReleasedKrathong({
         id: docRef.id,
         name: ownerName.trim(),
@@ -868,35 +941,60 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
           สตูดิโอกระทงทำมือ
         </div>
 
-        <button
-          type="button"
-          onClick={() => showPage('river')}
-          style={{
-            background: 'rgba(255, 255, 255, 0.08)',
-            border: '1px solid rgba(255, 255, 255, 0.12)',
-            color: '#f5f5f7',
-            borderRadius: '9999px',
-            padding: '5px 14px',
-            fontSize: '12px',
-            fontWeight: 600,
-            cursor: 'pointer',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '6px',
-            backdropFilter: 'blur(12px)',
-            transition: 'background 0.16s ease, border-color 0.16s ease',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
-            e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
-          }}
-        >
-          ชมแม่น้ำ <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '9px' }} />
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setShowMyKrathongs(true)}
+            title="ตรวจดูกระทงของฉันย้อนหลังและบันทึกรูป PNG"
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
+              border: '1px solid rgba(254, 240, 138, 0.5)',
+              color: '#fef08a',
+              borderRadius: '9999px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(12px)',
+              transition: 'all 0.16s ease',
+            }}
+          >
+            <i className="fas fa-layer-group" style={{ fontSize: '11px' }} /> กระทงของฉัน
+          </button>
+
+          <button
+            type="button"
+            onClick={() => showPage('river')}
+            style={{
+              background: 'rgba(255, 255, 255, 0.08)',
+              border: '1px solid rgba(255, 255, 255, 0.12)',
+              color: '#f5f5f7',
+              borderRadius: '9999px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(12px)',
+              transition: 'background 0.16s ease, border-color 0.16s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.14)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.25)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'
+              e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.12)'
+            }}
+          >
+            ชมแม่น้ำ <i className="fas fa-arrow-up-right-from-square" style={{ fontSize: '9px' }} />
+          </button>
+        </div>
       </header>
 
       {/* Apple-style Hero Typography Header */}
@@ -1661,6 +1759,79 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
             }}>
               "{releasedKrathong.wish}"
             </div>
+
+            {/* PNG Download & Saved Krathong Actions */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+              <button
+                type="button"
+                disabled={downloadingCard}
+                onClick={() => handleDownloadCardPng(releasedKrathong)}
+                style={{
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
+                  border: '1px solid rgba(254, 240, 138, 0.55)',
+                  color: '#fef08a',
+                  borderRadius: '12px',
+                  padding: '9px 10px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: downloadingCard ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                }}
+              >
+                <i className="fas fa-id-card" />
+                {downloadingCard ? 'กำลังสร้างการ์ด...' : 'บันทึกการ์ด (PNG)'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownloadRawPng(releasedKrathong)}
+                style={{
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.18)',
+                  color: '#ffffff',
+                  borderRadius: '12px',
+                  padding: '9px 10px',
+                  fontSize: '12px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '5px',
+                }}
+              >
+                <i className="fas fa-image" />
+                บันทึกรูปกระทง (PNG)
+              </button>
+            </div>
+
+            {/* View All Past Krathongs Button */}
+            <button
+              type="button"
+              onClick={() => setShowMyKrathongs(true)}
+              style={{
+                width: '100%',
+                background: 'rgba(15, 23, 42, 0.65)',
+                border: '1px dashed rgba(254, 240, 138, 0.45)',
+                color: '#fef08a',
+                borderRadius: '12px',
+                padding: '9px 12px',
+                fontSize: '12.5px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                marginBottom: '10px',
+              }}
+            >
+              <i className="fas fa-layer-group" /> ดูประวัติกระทงทั้งหมดของฉัน
+            </button>
 
             {/* Apple Actions */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>

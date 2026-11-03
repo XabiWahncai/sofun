@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import { collection, onSnapshot } from 'firebase/firestore'
 import { db } from '../firebase'
+import MyKrathongsModal from './MyKrathongsModal'
 
 export default function LoyKrathongHubPage({ showPage, lineUser }) {
   const [totalKrathongs, setTotalKrathongs] = useState(0)
+  const [showMyKrathongs, setShowMyKrathongs] = useState(false)
 
   useEffect(() => {
     try {
@@ -129,6 +131,27 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setShowMyKrathongs(true)}
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(217, 119, 6, 0.45) 100%)',
+              border: '1px solid rgba(254, 240, 138, 0.6)',
+              color: '#fef08a',
+              borderRadius: '20px',
+              padding: '5px 14px',
+              fontSize: '12px',
+              fontWeight: 700,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <i className="fas fa-layer-group" /> กระทงของฉัน
+          </button>
+
           <span style={{
             fontSize: '12px',
             color: 'rgba(255, 255, 255, 0.7)',
@@ -441,6 +464,13 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
           100% { transform: translateY(-16px) scale(1.05); }
         }
       `}</style>
+      {/* My Krathongs History Modal */}
+      <MyKrathongsModal
+        isOpen={showMyKrathongs}
+        onClose={() => setShowMyKrathongs(false)}
+        lineUser={lineUser}
+        showPage={showPage}
+      />
     </div>
   )
 }

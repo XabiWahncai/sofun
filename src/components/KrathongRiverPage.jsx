@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { collection, onSnapshot, query, orderBy, limit, doc, updateDoc, increment } from 'firebase/firestore'
 import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
+import MyKrathongsModal from './MyKrathongsModal'
 
 // 5 Depth Lanes Configuration (From farthest back Lane 0 to closest front Lane 4)
 // Weighted Spawn Distribution:
@@ -109,6 +110,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const [firestoreKrathongs, setFirestoreKrathongs] = useState([])
   const [activeWishIds, setActiveWishIds] = useState(() => new Set())
   const [searchQuery, setSearchQuery] = useState('')
+  const [showMyKrathongs, setShowMyKrathongs] = useState(false)
   const [newArrivalNotice, setNewArrivalNotice] = useState(null)
   const isInitialLoadRef = useRef(true)
   const recentKrathongIdRef = useRef(null)
@@ -1325,6 +1327,31 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           >
             <i className="fas fa-house" /> หน้าแรก
           </button>
+
+          {/* My Krathongs History Button */}
+          <button
+            type="button"
+            onClick={() => setShowMyKrathongs(true)}
+            title="ตรวจดูกระทงของฉันย้อนหลังและบันทึกรูป PNG"
+            style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.45) 100%)',
+              border: '1px solid rgba(254, 240, 138, 0.65)',
+              color: '#fef08a',
+              borderRadius: '8px',
+              padding: '6px 14px',
+              cursor: 'pointer',
+              fontSize: '13px',
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backdropFilter: 'blur(8px)',
+              boxShadow: '0 2px 10px rgba(245, 158, 11, 0.35)',
+              transition: 'all 0.15s ease',
+            }}
+          >
+            <i className="fas fa-layer-group" /> กระทงของฉัน
+          </button>
         </div>
 
         {/* Right: QR Code to /Krathong & Sound Toggle Button */}
@@ -1597,6 +1624,25 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           100% { transform: scale(1.18); opacity: 0; }
         }
       `}</style>
+      {/* My Krathongs History & PNG Export Modal */}
+      <MyKrathongsModal
+        isOpen={showMyKrathongs}
+        onClose={() => setShowMyKrathongs(false)}
+        lineUser={lineUser}
+        showPage={showPage}
+        showToast={showToast}
+        onSelectKrathong={(k) => {
+          setActiveWishIds(new Set([k.id]))
+          const pos = krathongPositionsRef.current.get(k.id)
+          if (pos && containerRef.current) {
+            const containerW = containerRef.current.clientWidth || 1000
+            if (pos.x < 100 || pos.x > containerW - 100) {
+              pos.x = containerW * 0.55
+            }
+          }
+          if (showToast) showToast(`กำลังแสดงกระทงของคุณ ${k.name}`)
+        }}
+      />
     </div>
   )
 }
