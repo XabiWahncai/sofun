@@ -4,7 +4,13 @@ import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
 
 // 5 Depth Lanes Configuration (From farthest back Lane 0 to closest front Lane 4)
-// Equal 20% random distribution across 5 levels; freshly released krathongs start at Lane 4 (Nearest foreground)
+// Weighted Spawn Distribution:
+// - ระยะ 1 ใกล้สุด (Lane 4): 10%
+// - ระยะ 2 ใกล้กลาง (Lane 3): 20%
+// - ระยะ 3 กึ่งกลาง (Lane 2): 20%
+// - ระยะ 4 ไกลกลาง (Lane 1): 25%
+// - ระยะ 5 ไกลสุด (Lane 0): 25%
+// Rule: Newly released krathongs start in ระยะ 1 (Lane 4) on round 1, then randomize with weighted rates on subsequent wraps
 const LANE_CONFIG = [
   // Lane 0: ไกลสุด / Furthest back near river horizon
   {
@@ -62,7 +68,7 @@ const LANE_CONFIG = [
     bobAmpMult: 1.25,
     parallaxShift: 56,
   },
-  // Lane 4: ใกล้สุด / Nearest foreground
+  // Lane 4: ใกล้สุด / Nearest foreground (ระยะ 1)
   {
     bottom: 16,
     scaleMult: 1.45,
@@ -77,6 +83,21 @@ const LANE_CONFIG = [
     parallaxShift: 78,
   },
 ]
+
+// Weighted random lane distribution:
+// ระยะ 1 ใกล้สุด (Lane 4): 10%
+// ระยะ 2 ใกล้กลาง (Lane 3): 20%
+// ระยะ 3 กึ่งกลาง (Lane 2): 20%
+// ระยะ 4 ไกลกลาง (Lane 1): 25%
+// ระยะ 5 ไกลสุด (Lane 0): 25%
+const getRandomLane = () => {
+  const r = Math.random() * 100
+  if (r < 10) return 4 // ระยะ 1 ใกล้สุด (10%)
+  if (r < 30) return 3 // ระยะ 2 ใกล้กลาง (20%)
+  if (r < 50) return 2 // ระยะ 3 กึ่งกลาง (20%)
+  if (r < 75) return 1 // ระยะ 4 ไกลกลาง (25%)
+  return 0             // ระยะ 5 ไกลสุด (25%)
+}
 
 export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const containerRef = useRef(null)
@@ -219,7 +240,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               name: d.name || 'ผู้ร่วมลอยกระทง',
               wish: d.wish || 'ขอพรพระแม่คงคา',
               imageData: d.imageData || null,
-              lane: isRecent ? 4 : (d.lane !== undefined ? d.lane % 5 : idx % 5),
+              lane: isRecent ? 4 : (krathongPositionsRef.current.get(docSnap.id)?.lane ?? getRandomLane()),
               speed: d.speed || (0.35 + ((idx % 5) * 0.08)),
               scale: d.scale || (0.8 + ((idx % 3) * 0.15)),
               bobFreq: d.bobFreq || (1.2 + (idx % 5) * 0.18),
@@ -246,7 +267,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
                 : (total === 1 ? containerW * 0.55 : (idx * slot + 60) % (containerW + 160))
               krathongPositionsRef.current.set(k.id, {
                 x: startX,
-                lane: isRecent ? 4 : (k.lane !== undefined ? k.lane % 5 : (idx % 5)),
+                lane: isRecent ? 4 : getRandomLane(),
                 bobOffset: Math.random() * Math.PI * 2,
               })
             }
@@ -299,10 +320,10 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           pos.x -= moveSpeed
 
           // Fast & fluid wrap-around: As soon as krathong floats past left edge (-280px),
-          // immediately re-enter from the right edge with a newly randomized depth lane across 5 levels (20% equal chance)
+          // re-enter from right edge with weighted randomized depth lane (ระยะ 1: 10%, ระยะ 2: 20%, ระยะ 3: 20%, ระยะ 4: 25%, ระยะ 5: 25%)
           if (pos.x < -280) {
             pos.x = containerW + 40 + Math.random() * 160
-            pos.lane = Math.floor(Math.random() * 5)
+            pos.lane = getRandomLane()
             pos.bobOffset = Math.random() * Math.PI * 2
           }
         }
