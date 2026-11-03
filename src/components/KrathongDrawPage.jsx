@@ -255,14 +255,6 @@ function AppleColorWheel({ colorR, colorG, colorB, onChangeRgb }) {
           }}
         />
       </div>
-      {/* My Krathongs History Modal */}
-      <MyKrathongsModal
-        isOpen={showMyKrathongs}
-        onClose={() => setShowMyKrathongs(false)}
-        lineUser={lineUser}
-        showPage={showPage}
-        showToast={showToast}
-      />
     </div>
   )
 }
@@ -1900,6 +1892,15 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
+
+      {/* My Krathongs History Modal */}
+      <MyKrathongsModal
+        isOpen={showMyKrathongs}
+        onClose={() => setShowMyKrathongs(false)}
+        lineUser={lineUser}
+        showPage={showPage}
+        showToast={showToast}
+      />
     </div>
   )
 }
