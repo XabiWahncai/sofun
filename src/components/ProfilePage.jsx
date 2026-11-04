@@ -4,6 +4,7 @@ import { doc, getDoc, updateDoc, serverTimestamp, collection, query, where, orde
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import { convertImageUrl } from '../utils/imageUrl'
 import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId } from '../utils/achievementTierSync'
+import { getMemberSingleBill } from '../utils/billing'
 
 const C = 'var(--red, #c62419)'
 const INK = '#1a1a1a'
@@ -25,20 +26,23 @@ const fmtDT = d => {
 function buildReceiptHTML(h, meUid) {
   const myBill = h.memberBills?.find(m => m.uid === meUid)
   const me = h.members?.find(m => m.uid === meUid)
+  const allMembers = h.members || []
   const paidAt = h.paidAt?.toDate?.()
   const serial = h.serial ? String(h.serial).padStart(10, '0') : '-'
-  const myTotal = myBill?.total ?? h.grandTotal ?? 0
-  const myGamePrice = myBill?.gamePrice ?? (h.gameUnitPrice > 0 ? h.gameUnitPrice : (h.gameTotal || 0))
+  const myTotal = getMemberSingleBill(h, meUid)
+  const myGamePrice = myBill?.gamePrice ?? (h.gameUnitPrice > 0 ? h.gameUnitPrice : (allMembers.length > 1 ? Math.round((h.gameTotal || 0) / allMembers.length) : (h.gameTotal || 0)))
   const myDisc = myBill?.discount ?? (h.discount?.applied && (!h.memberBills || h.memberBills.length <= 1) ? h.discount.applied : 0)
   const myPersonalDisc = Number(myBill?.personalDiscount || 0)
   const tax = myTotal * 7 / 107
   const subtotal = myTotal - tax
 
+  const myFood = myBill?.foodItems || h.memberFoodHistory?.[meUid] || h.foodItems?.filter(f => f.orderedBy?.uid === meUid) || (allMembers.length > 1 ? [] : (h.foodItems || []))
+
   const itemRows = []
   if (myGamePrice > 0) {
     itemRows.push(`<tr><td>${h.scriptTitle || 'เกม'}</td><td class="r">${myGamePrice.toFixed(2)}</td></tr>`)
   }
-  ;(myBill?.foodItems || h.foodItems || []).forEach(fi => {
+  myFood.forEach(fi => {
     const addStr = fi.addons?.length ? ` (${fi.addons.map(a => a.name||a).join(',')})` : ''
     itemRows.push(`<tr><td>${fi.name}${addStr} ×${fi.qty}</td><td class="r">${((fi.price||0)*fi.qty).toFixed(2)}</td></tr>`)
   })
@@ -256,11 +260,10 @@ export default function ProfilePage({ lineUser, onLogout, showPage, allGames = [
     return true
   }), [history, search, filterMonth])
 
-  // Total spent calculation
+  // Total spent calculation (คำนวณเฉพาะบิลเดี่ยวของตัวผู้เล่น ไม่รวมบิลรวมของเพื่อน)
   const totalSpent = useMemo(() => {
     return history.reduce((acc, h) => {
-      const myBill = h.memberBills?.find(m => m.uid === lineUser?.uid)
-      return acc + (myBill?.total ?? h.grandTotal ?? 0)
+      return acc + getMemberSingleBill(h, lineUser?.uid)
     }, 0)
   }, [history, lineUser?.uid])
 
@@ -1792,8 +1795,9 @@ const PROFILE_GENRE_MAP = {
                       const allMembers = h.members || []
                       const paidAt = h.paidAt?.toDate?.()
                       const expanded = !!expandedMap[h.id]
-                      const myTotal = myBill?.total ?? h.grandTotal ?? 0
-                      const hasFood = (myBill?.foodItems?.length > 0 || (h.foodItems?.length > 0))
+                      const myTotal = getMemberSingleBill(h, lineUser.uid)
+                      const myFoodItems = myBill?.foodItems || h.memberFoodHistory?.[lineUser.uid] || h.foodItems?.filter(f => f.orderedBy?.uid === lineUser.uid) || (allMembers.length > 1 ? [] : (h.foodItems || []))
+                      const hasFood = myFoodItems.length > 0
                       const discAmt = h.discount?.applied || 0
                       const gameCover = getGameCover(h)
 
@@ -1981,7 +1985,7 @@ const PROFILE_GENRE_MAP = {
                               {(myBill?.gamePrice !== undefined || h.gameUnitPrice > 0 || (h.gameTotal || 0) > 0) && (
                                 <div style={{ display: 'flex', justifyContent: 'space-between', padding: '3px 0' }}>
                                   <span>ค่าเล่นเกม</span>
-                                  <span>฿{(myBill?.gamePrice ?? h.gameUnitPrice ?? (h.gameTotal || 0)).toLocaleString()}</span>
+                                  <span>฿{(myBill?.gamePrice ?? (h.gameUnitPrice > 0 ? h.gameUnitPrice : (allMembers.length > 1 ? Math.round((h.gameTotal || 0) / allMembers.length) : (h.gameTotal || 0)))).toLocaleString()}</span>
                                 </div>
                               )}
 
@@ -1990,7 +1994,7 @@ const PROFILE_GENRE_MAP = {
                                   <div style={{ fontSize: 11, fontWeight: 700, color: INK_3, textTransform: 'uppercase' }}>
                                     อาหาร & เครื่องดื่ม
                                   </div>
-                                  {(myBill?.foodItems || h.foodItems || []).map((f, fi) => (
+                                  {myFoodItems.map((f, fi) => (
                                     <div key={fi} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
                                       <span>{f.name} × {f.qty}</span>
                                       <span>฿{((f.price || 0) * f.qty).toLocaleString()}</span>

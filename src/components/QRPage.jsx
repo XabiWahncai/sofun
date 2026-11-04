@@ -7,6 +7,7 @@ import { db } from '../firebase'
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc } from 'firebase/firestore'
 import { ACHIEVEMENTS, ACHIEVEMENTS_BY_RARITY, RARITY } from '../constants/achievements'
 import { convertImageUrl } from '../utils/imageUrl'
+import { getMemberSingleBill } from '../utils/billing'
 
 
 // ── Achievement Theme Profiles ───────────────────────────────────────────────
@@ -320,8 +321,7 @@ export default function QRPage({ lineUser, allGames = [], hasActiveOrder = false
   const memberIdTag = `SF-${String(lineUser.uid || '').slice(-6).toUpperCase()}`
   const qrUrl = `${window.location.origin}/?scan=${lineUser.uid}`
   const totalSpent = history.reduce((acc, h) => {
-    const myBill = h.memberBills?.find(m => m.uid === lineUser.uid)
-    return acc + (myBill?.total ?? h.grandTotal ?? 0)
+    return acc + getMemberSingleBill(h, lineUser.uid)
   }, 0)
 
   return (
