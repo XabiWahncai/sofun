@@ -11984,3 +11984,53 @@ body { background: var(--cream) !important; }
 }
 
 
+
+
+/* ── Google Translate Silent Seamless Integration ─────────── */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner-frame,
+#goog-gt-tt,
+.goog-te-balloon-frame,
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+  visibility: hidden !important;
+}
+body {
+  top: 0px !important;
+  position: static !important;
+}
+.skiptranslate:not(.goog-te-combo) {
+  display: none !important;
+}
+font {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+.lang-toggle-btn span:not(.lang-sep) {
+  cursor: pointer;
+  transition: color 0.15s, opacity 0.15s;
+}
+.lang-toggle-btn span:not(.lang-sep):hover {
+  color: var(--red, #e50914) !important;
+  opacity: 1 !important;
+}
+
+
+/* ── Loy Krathong Danmaku Marquee (Fly from Left to Right) ── */
+@keyframes danmakuFloatLeftToRight {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(calc(100vw + 80px));
+  }
+}
+@-webkit-keyframes danmakuFloatLeftToRight {
+  0% {
+    -webkit-transform: translateX(-100%);
+  }
+  100% {
+    -webkit-transform: translateX(calc(100vw + 80px));
+  }
+}

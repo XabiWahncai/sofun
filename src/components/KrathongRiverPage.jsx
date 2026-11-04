@@ -100,6 +100,98 @@ const getRandomLane = () => {
   return 0             // ระยะ 5 ไกลสุด (25%)
 }
 
+// ── Default fallback blessings (Zero unicode emojis, 100% font/text) ──
+const DEFAULT_DANMAKU_WISHES = [
+  { id: 'def-1', name: 'คุณสมชาย', wish: 'ขอให้สุขภาพแข็งแรง การงานเจริญรุ่งเรืองตลอดปี' },
+  { id: 'def-2', name: 'น้องมินต์', wish: 'ขอให้ครอบครัวมีความสุข ปราศจากโรคภัยไข้เจ็บ' },
+  { id: 'def-3', name: 'Art & Team', wish: 'ขอขมาพระแม่คงคา ร่วมสืบสานประเพณีไทย' },
+  { id: 'def-4', name: 'พี่กอล์ฟ', wish: 'ขอให้ค้าขายร่ำรวย เงินทองไหลมาเทมา เฮงๆ ปังๆ' },
+  { id: 'def-5', name: 'น้องฟ้าใส', wish: 'ขอให้สอบติด ได้เกรดดีๆ และพบเจอแต่มิตรแท้' },
+  { id: 'def-6', name: 'ชาว SOFUN CLUB', wish: 'ขอให้ค่ำคืนนี้เต็มไปด้วยรอยยิ้มและความอบอุ่น' },
+  { id: 'def-7', name: 'คุณแพรว', wish: 'ขอให้พบเจอแต่ความสุข สมหวังในทุกสิ่งที่ปรารถนา' },
+  { id: 'def-8', name: 'กัลยาณมิตร', wish: 'ขอให้ชีวิตสว่างไสวดั่งแสงเทียนในคืนวันเพ็ญ' },
+]
+
+// 8 vertical tracks with 8px gap (> 3px) so text never collides or overlaps
+const DANMAKU_TRACKS = [
+  { id: 't0', top: 6,   speed: 23, initialDelay: -4 },
+  { id: 't1', top: 42,  speed: 27, initialDelay: -12 },
+  { id: 't2', top: 78,  speed: 21, initialDelay: -2 },
+  { id: 't3', top: 114, speed: 25, initialDelay: -17 },
+  { id: 't4', top: 150, speed: 29, initialDelay: -8 },
+  { id: 't5', top: 186, speed: 22, initialDelay: -14 },
+  { id: 't6', top: 222, speed: 26, initialDelay: -5 },
+  { id: 't7', top: 258, speed: 24, initialDelay: -19 },
+]
+
+function DanmakuSkyTrack({ top, speed, initialDelay, wishes, trackIndex }) {
+  const [index, setIndex] = useState(() => (trackIndex * 2) % Math.max(1, wishes.length))
+
+  const handleIteration = () => {
+    if (wishes.length > 0) {
+      setIndex((prev) => (prev + 1) % wishes.length)
+    }
+  }
+
+  const currentWish = wishes[index % Math.max(1, wishes.length)]
+  if (!currentWish) return null
+
+  const displayName = currentWish.name || 'ผู้ร่วมลอยกระทง'
+  const displayWish = currentWish.wish || 'ขอพรพระแม่คงคา'
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: `${top}px`,
+        left: 0,
+        height: '28px',
+        whiteSpace: 'nowrap',
+        pointerEvents: 'none',
+        willChange: 'transform',
+        animation: `danmakuFloatLeftToRight ${speed}s linear ${initialDelay}s infinite`,
+        WebkitAnimation: `danmakuFloatLeftToRight ${speed}s linear ${initialDelay}s infinite`,
+      }}
+      onAnimationIteration={handleIteration}
+    >
+      <div style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '6px',
+        background: 'rgba(10, 18, 38, 0.72)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        border: '1px solid rgba(254, 240, 138, 0.35)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(245, 158, 11, 0.2)',
+        borderRadius: '20px',
+        padding: '3px 14px',
+        height: '28px',
+        boxSizing: 'border-box',
+        lineHeight: '20px',
+      }}>
+        <span style={{
+          color: '#fef08a',
+          fontWeight: 800,
+          fontSize: '12.5px',
+          textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+          letterSpacing: '0.01em',
+        }}>
+          {displayName}:
+        </span>
+        <span style={{
+          color: '#ffffff',
+          fontWeight: 600,
+          fontSize: '12.5px',
+          textShadow: '0 1px 3px rgba(0,0,0,0.85)',
+          letterSpacing: '0.01em',
+        }}>
+          {displayWish}
+        </span>
+      </div>
+    </div>
+  )
+}
+
 export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
   const containerRef = useRef(null)
   const krathongUrl = typeof window !== 'undefined' && window.location.origin
@@ -108,6 +200,22 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
 
   // Firestore Krathongs state (Real data only, zero mockups)
   const [firestoreKrathongs, setFirestoreKrathongs] = useState([])
+
+  // Active wishes pool for sky Danmaku marquee
+  const activeWishes = useMemo(() => {
+    const list = firestoreKrathongs
+      .filter((k) => k.wish && k.wish.trim())
+      .map((k) => ({
+        id: k.id,
+        name: k.name || 'ผู้ร่วมลอยกระทง',
+        wish: k.wish,
+      }))
+    if (list.length === 0) return DEFAULT_DANMAKU_WISHES
+    if (list.length < DEFAULT_DANMAKU_WISHES.length) {
+      return [...list, ...DEFAULT_DANMAKU_WISHES.slice(list.length)]
+    }
+    return list
+  }, [firestoreKrathongs])
   const [activeWishIds, setActiveWishIds] = useState(() => new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [showMyKrathongs, setShowMyKrathongs] = useState(false)
@@ -275,13 +383,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
             }
           })
 
-          // If user didn't specify a recent one, open the first krathong's wish so river is immediately interactive
-          setActiveWishIds((prev) => {
-            if (prev.size === 0 && items.length > 0) {
-              return new Set([items[0].id])
-            }
-            return prev
-          })
+
 
           isInitialLoadRef.current = false
         }
@@ -529,6 +631,29 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         transform: `translate3d(${parallaxRef.current.currentX * -14}px, ${parallaxRef.current.currentY * -6}px, 0)`,
         transition: 'transform 0.05s ease-out',
       }} />
+
+      {/* ── Layer 2.5: Floating Blessings Marquee (Danmaku ในท้องฟ้า ลอยจากซ้ายไปขวา) ── */}
+      <div style={{
+        position: 'absolute',
+        top: '64px',
+        left: 0,
+        right: 0,
+        bottom: '345px',
+        overflow: 'hidden',
+        pointerEvents: 'none',
+        zIndex: 3,
+      }}>
+        {DANMAKU_TRACKS.map((track, trackIdx) => (
+          <DanmakuSkyTrack
+            key={track.id}
+            top={track.top}
+            speed={track.speed}
+            initialDelay={track.initialDelay}
+            wishes={activeWishes}
+            trackIndex={trackIdx}
+          />
+        ))}
+      </div>
 
       {/* ── Riverside Embankment Railing & Seam Barrier (รั้วกั้นริมตลิ่ง) ── */}
       <div style={{
@@ -1172,100 +1297,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         })}
       </div>
 
-      {/* ── Layer 5: Wish Modal Cards (Centered above Krathong with Pointer Caret) ── */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
-        height: '340px',
-        zIndex: 35,
-        pointerEvents: 'none',
-      }}>
-        {Array.from(activeWishIds).map((id) => {
-          const k = firestoreKrathongs.find((item) => item.id === id)
-          if (!k) return null
-          const pos = krathongPositionsRef.current.get(k.id)
-          if (!pos) return null
-
-          const lane = pos.lane !== undefined ? pos.lane % 5 : (k.lane !== undefined ? k.lane % 5 : 2)
-          const cfg = LANE_CONFIG[lane] || LANE_CONFIG[2]
-          const laneBottom = cfg.bottom
-          const laneScale = (k.scale || 0.85) * cfg.scaleMult * 1.5
-
-          const timeSec = performance.now() / 1000
-          const bobFreq = k.bobFreq || 1.4
-          const bobAmp = k.bobAmp || 4
-          const offsetY = Math.sin(timeSec * bobFreq + pos.bobOffset) * bobAmp
-
-          // Calculate real-time unscaled position over the Krathong with parallax:
-          const pX = parallaxRef.current.currentX || 0
-          const bubbleX = (pos.x + (pX * (cfg.parallaxShift || 20))) + 65
-          const bubbleBottom = laneBottom + offsetY + (105 * laneScale) + 12
-
-          return (
-            <div
-              key={`wish-${k.id}`}
-              onClick={(e) => {
-                e.stopPropagation()
-                toggleWish(k.id)
-              }}
-              style={{
-                position: 'absolute',
-                left: `${bubbleX}px`,
-                bottom: `${bubbleBottom}px`,
-                transform: 'translateX(-50%)',
-                pointerEvents: 'auto',
-                zIndex: 35,
-                animation: 'bubbleAppear 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
-                cursor: 'pointer',
-              }}
-            >
-              {/* Translucent Frosted Glass Card: Pure Wish Text Only, Fixed Readable Font */}
-              <div style={{
-                background: 'rgba(15, 23, 42, 0.75)',
-                backdropFilter: 'blur(10px)',
-                WebkitBackdropFilter: 'blur(10px)',
-                border: '1.5px solid rgba(254, 240, 138, 0.45)',
-                borderRadius: '12px',
-                padding: '10px 18px',
-                width: 'max-content',
-                maxWidth: 'min(280px, 85vw)',
-                boxShadow: '0 8px 24px rgba(0, 0, 0, 0.65), 0 0 16px rgba(245, 158, 11, 0.25)',
-                position: 'relative',
-                textAlign: 'center',
-              }}>
-                {/* Downward Pointer Triangle */}
-                <div style={{
-                  position: 'absolute',
-                  bottom: '-6px',
-                  left: '50%',
-                  transform: 'translateX(-50%) rotate(45deg)',
-                  width: '10px',
-                  height: '10px',
-                  background: 'rgba(15, 23, 42, 0.85)',
-                  borderRight: '1.5px solid rgba(254, 240, 138, 0.45)',
-                  borderBottom: '1.5px solid rgba(254, 240, 138, 0.45)',
-                }} />
-
-                {/* Wish Text: Unscaled, Clear and Legible at any distance */}
-                <div style={{
-                  fontSize: '13.5px',
-                  fontWeight: 700,
-                  color: '#ffffff',
-                  lineHeight: 1.5,
-                  wordBreak: 'break-word',
-                  textShadow: '0 2px 4px rgba(0, 0, 0, 0.95)',
-                  letterSpacing: '0.01em',
-                }}>
-                  {k.wish}
-                </div>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-
       {/* ── Top Navigation & HUD Controls ──────────────────── */}
       <div style={{
         position: 'absolute',
@@ -1575,6 +1606,22 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
       />
 
       <style>{`
+        @keyframes danmakuFloatLeftToRight {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(calc(100vw + 80px));
+          }
+        }
+        @-webkit-keyframes danmakuFloatLeftToRight {
+          0% {
+            -webkit-transform: translateX(-100%);
+          }
+          100% {
+            -webkit-transform: translateX(calc(100vw + 80px));
+          }
+        }
         @keyframes waveScrollLeft {
           0% { transform: translate3d(0, 0, 0); }
           100% { transform: translate3d(-1440px, 0, 0); }

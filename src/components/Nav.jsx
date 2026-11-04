@@ -17,7 +17,7 @@ export default function Nav({
   bookingEnabled = false,
 }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
-  const { lang, toggle, t } = useLang()
+  const { lang, setLang, toggle, t } = useLang()
   const effectiveAdmin = isAdmin !== undefined ? isAdmin : lineUser?.role === 'admin'
 
   const handleNav = (page) => {
@@ -44,23 +44,20 @@ export default function Nav({
           <button className={`nav-btn${currentPage === 'games'  ? ' active' : ''}`} onClick={() => handleNav('games')}>
             {t('nav', 'scripts')}
           </button>
-          <button className={`nav-btn${currentPage === 'loykrathong' ? ' active' : ''}`} onClick={() => handleNav('loykrathong')} style={{ color: '#d97706', fontWeight: 700 }}>
-            <i className="fas fa-water" style={{ marginRight: '5px', fontSize: '11px' }} />ลอยกระทง
-          </button>
           {bookingEnabled && (
             <>
               <button className={`nav-btn${currentPage === 'party'  ? ' active' : ''}`} onClick={() => handleNav('party')}>
                 <i className="fas fa-users" style={{ marginRight: '5px', fontSize: '11px' }} />{t('nav', 'party')}
               </button>
               <button className={`nav-btn${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
-                <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />จอง
+                <i className="fas fa-calendar-check" style={{ marginRight: '5px', fontSize: '11px' }} />{t('nav', 'booking')}
               </button>
             </>
           )}
           {lineUser && !effectiveAdmin ? (
             hasActiveOrder ? (
               <button className={`nav-btn${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
-                <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />สั่งอาหาร
+                <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />{t('nav', 'order')}
               </button>
             ) : (
               <button className={`nav-btn${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
@@ -71,7 +68,7 @@ export default function Nav({
             <>
               {hasActiveOrder && (
                 <button className={`nav-btn${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
-                  <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />สั่งอาหาร
+                  <i className="fas fa-utensils" style={{ marginRight: '5px', fontSize: '11px' }} />{t('nav', 'order')}
                 </button>
               )}
               <button className={`nav-btn${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
@@ -88,11 +85,26 @@ export default function Nav({
 
           {/* Language toggle */}
           <button className="lang-toggle-btn" onClick={toggle} title="Switch language">
-            <span className={lang === 'th' ? 'lang-active' : ''}>TH</span>
+            <span
+              className={lang === 'th' ? 'lang-active' : ''}
+              onClick={(e) => { e.stopPropagation(); setLang('th') }}
+            >
+              TH
+            </span>
             <span className="lang-sep">|</span>
-            <span className={lang === 'en' ? 'lang-active' : ''}>EN</span>
+            <span
+              className={lang === 'en' ? 'lang-active' : ''}
+              onClick={(e) => { e.stopPropagation(); setLang('en') }}
+            >
+              EN
+            </span>
             <span className="lang-sep">|</span>
-            <span className={lang === 'zh' ? 'lang-active' : ''}>中</span>
+            <span
+              className={lang === 'zh' ? 'lang-active' : ''}
+              onClick={(e) => { e.stopPropagation(); setLang('zh') }}
+            >
+              中
+            </span>
           </button>
 
           {lineUser ? (
@@ -112,7 +124,7 @@ export default function Nav({
                     <div className="nav-user-menu-sub">{t('nav', 'lineMember')}</div>
                   </div>
                   <button className="nav-user-menu-item" onClick={() => handleNav('profile')}>
-                    <i className="fas fa-id-card" /> {lang === 'th' ? 'โปรไฟล์ของฉัน' : lang === 'zh' ? '我的资料' : 'My Profile'}
+                    <i className="fas fa-id-card" /> {t('nav', 'myProfile')}
                   </button>
                   {bookingEnabled && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
@@ -120,14 +132,14 @@ export default function Nav({
                     </button>
                   )}
                   <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
-                    <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
+                    <i className="fas fa-qrcode" /> {t('nav', 'myQr')}
                   </button>
                   <button className="nav-user-menu-item" onClick={() => handleNav('loykrathong')}>
                     <i className="fas fa-water" style={{ color: '#d97706' }} /> ลอยกระทงออนไลน์
                   </button>
                   {hasActiveOrder && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('order')}>
-                      <i className="fas fa-utensils" /> สั่งอาหาร
+                      <i className="fas fa-utensils" /> {t('nav', 'order')}
                     </button>
                   )}
                   <button className="nav-user-menu-item logout" onClick={() => { onLogout(); setUserMenuOpen(false) }}>
@@ -163,7 +175,7 @@ export default function Nav({
                 <span>{soundMuted ? 'ปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
               </button>
               <button className="nav-admin-btn" onClick={() => handleNav('random')} style={{ background: 'rgba(200,160,80,0.15)', borderColor: '#c8a050', color: '#c8a050' }}>
-                <i className="fas fa-dharmachakra" /> วงล้อ
+                <i className="fas fa-dharmachakra" /> {t('nav', 'wheel')}
               </button>
               <button className="nav-admin-btn" onClick={() => handleNav('admin')}>
                 <i className="fas fa-cog" /> Admin
@@ -187,8 +199,27 @@ export default function Nav({
           )}
 
           {/* mobile lang toggle */}
-          <button className="lang-toggle-btn lang-toggle-mobile" onClick={toggle}>
-            {lang === 'th' ? 'EN' : lang === 'en' ? '中' : 'TH'}
+          <button className="lang-toggle-btn lang-toggle-mobile" onClick={toggle} title="Switch language">
+            <span
+              className={lang === 'th' ? 'lang-active' : ''}
+              onClick={(e) => { e.stopPropagation(); setLang('th') }}
+            >
+              TH
+            </span>
+            <span className="lang-sep">|</span>
+            <span
+              className={lang === 'en' ? 'lang-active' : ''}
+              onClick={(e) => { e.stopPropagation(); setLang('en') }}
+            >
+              EN
+            </span>
+            <span className="lang-sep">|</span>
+            <span
+              className={lang === 'zh' ? 'lang-active' : ''}
+              onClick={(e) => { e.stopPropagation(); setLang('zh') }}
+            >
+              中
+            </span>
           </button>
 
           {lineUser ? (
@@ -204,7 +235,7 @@ export default function Nav({
                     <div className="nav-user-menu-sub">{t('nav', 'lineMember')}</div>
                   </div>
                   <button className="nav-user-menu-item" onClick={() => handleNav('profile')}>
-                    <i className="fas fa-id-card" /> {lang === 'th' ? 'โปรไฟล์ของฉัน' : lang === 'zh' ? '我的资料' : 'My Profile'}
+                    <i className="fas fa-id-card" /> {t('nav', 'myProfile')}
                   </button>
                   {bookingEnabled && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('party')}>
@@ -212,20 +243,20 @@ export default function Nav({
                     </button>
                   )}
                   <button className="nav-user-menu-item" onClick={() => handleNav('qr')}>
-                    <i className="fas fa-qrcode" /> {lang === 'th' ? 'QR ของฉัน' : 'My QR'}
+                    <i className="fas fa-qrcode" /> {t('nav', 'myQr')}
                   </button>
                   {hasActiveOrder && (
                     <button className="nav-user-menu-item" onClick={() => handleNav('order')}>
-                      <i className="fas fa-utensils" /> สั่งอาหาร
+                      <i className="fas fa-utensils" /> {t('nav', 'order')}
                     </button>
                   )}
                   {effectiveAdmin && (
                     <>
                       <button className="nav-user-menu-item" onClick={() => handleNav('random')}>
-                        <i className="fas fa-dharmachakra" /> วงล้อสุ่ม (Lucky Wheel)
+                        <i className="fas fa-dharmachakra" /> {t('nav', 'wheel')}
                       </button>
                       <button className="nav-user-menu-item" onClick={() => handleNav('handbook')}>
-                        <i className="fas fa-book-open" /> คู่มือ DM (DM Handbook)
+                        <i className="fas fa-book-open" /> {t('nav', 'handbook')}
                       </button>
                       <button className="nav-user-menu-item" onClick={() => handleNav('admin')}>
                         <i className="fas fa-cog" /> Admin
@@ -267,7 +298,7 @@ export default function Nav({
             </button>
             <button className={`bottom-nav-item${currentPage === 'booking' ? ' active' : ''}`} onClick={() => handleNav('booking')}>
               <i className="fas fa-calendar-check" />
-              <span>จอง</span>
+              <span>{t('nav', 'booking')}</span>
             </button>
           </>
         )}
@@ -275,7 +306,7 @@ export default function Nav({
           hasActiveOrder ? (
             <button className={`bottom-nav-item bottom-nav-order${currentPage === 'order' ? ' active' : ''}`} onClick={() => handleNav('order')}>
               <i className="fas fa-utensils" />
-              <span>สั่งอาหาร</span>
+              <span>{t('nav', 'order')}</span>
             </button>
           ) : (
             <button className={`bottom-nav-item${currentPage === 'qr' ? ' active' : ''}`} onClick={() => handleNav('qr')}>
@@ -304,7 +335,7 @@ export default function Nav({
               ? <img src={lineUser.avatar} alt="" className="bottom-nav-avatar" onError={e => { e.currentTarget.style.display='none' }} />
               : <i className="fas fa-user-circle" />
             }
-            <span>{lang === 'th' ? 'โปรไฟล์' : 'Profile'}</span>
+            <span>{t('nav', 'profile')}</span>
           </button>
         ) : (
           <button className="bottom-nav-item bottom-nav-login" onClick={onLogin} disabled={liffLoading}>
@@ -312,7 +343,7 @@ export default function Nav({
               ? <span className="spinner-sm" style={{ width: '18px', height: '18px' }} />
               : <i className="fab fa-line" />
             }
-            <span>{lang === 'th' ? 'เข้าสู่ระบบ' : 'Login'}</span>
+            <span>{t('nav', 'login')}</span>
           </button>
         )}
       </nav>

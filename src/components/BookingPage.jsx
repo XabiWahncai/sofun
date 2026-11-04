@@ -2033,7 +2033,7 @@ function CreateBookingModal({
 }
 
 
-// ── Deposit Payment & Slip Modal ──────────────────────────────────────────────
+// ── Deposit Payment & Slip Modal (Minimalist Netflix White & Red) ──────────────
 function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated }) {
   const [promptPayPhone, setPromptPayPhone] = useState('')
   const [accountName, setAccountName] = useState('')
@@ -2149,8 +2149,6 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   }
 
   const stepIndex = step === 'qr' ? 0 : step === 'upload' ? 1 : 2
-  const C = 'var(--curtain-crimson, #e50914)'
-  const INK = '#111827'
 
   return (
     <div
@@ -2162,242 +2160,450 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 'clamp(24px, 5vh, 48px) 16px',
-        background: 'rgba(15, 23, 42, 0.65)',
-        backdropFilter: 'blur(10px)',
+        padding: 'clamp(12px, 3vh, 24px) 16px',
+        background: 'rgba(0, 0, 0, 0.75)',
+        backdropFilter: 'blur(8px)',
         boxSizing: 'border-box',
       }}
     >
       <div
-        className="w-full sm:max-w-md flex flex-col overflow-hidden"
         style={{
+          width: '100%',
+          maxWidth: 420,
+          maxHeight: 'min(90dvh, 740px)',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 20,
+          overflow: 'hidden',
           background: '#ffffff',
-          color: INK,
-          borderRadius: 24,
-          maxHeight: 'min(86dvh, 760px)',
-          boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25)',
+          color: '#111827',
+          boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
           fontFamily: "'Sarabun', sans-serif",
+          boxSizing: 'border-box',
         }}
       >
-        {/* Drag handle */}
-        <div className="w-11 h-[5px] rounded-full mx-auto mt-4 mb-0 sm:hidden shrink-0" style={{ background: '#cbd5e1' }} />
-
-        {/* Header */}
-        <div className="flex items-start justify-between pt-7 pb-5 shrink-0" style={{ paddingLeft: 28, paddingRight: 28 }}>
-          <div className="min-w-0 flex-1">
-            {/* Step indicator eyebrow */}
-            <div className="flex items-center gap-3 mb-3">
-              <span className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: C }}>
-                ขั้นตอน {stepIndex + 1} / 3
+        {/* Header (Minimalist White & Red Netflix Style) */}
+        <div
+          style={{
+            padding: '20px 22px 14px',
+            borderBottom: '1px solid #F3F4F6',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 8,
+            flexShrink: 0,
+          }}
+        >
+          {/* Top Step Bar + Close Button */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              {[0, 1, 2].map(i => (
+                <div
+                  key={i}
+                  style={{
+                    height: 3,
+                    width: i === stepIndex ? 24 : 14,
+                    borderRadius: 2,
+                    background: i <= stepIndex ? '#E50914' : '#E5E7EB',
+                    transition: 'all 0.25s',
+                  }}
+                />
+              ))}
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  color: '#E50914',
+                  textTransform: 'uppercase',
+                  marginLeft: 4,
+                }}
+              >
+                ขั้นตอน {stepIndex + 1}/3
               </span>
-              <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
-              <div className="flex items-center gap-1.5">
-                {[0, 1, 2].map(i => (
-                  <div key={i} className="rounded-full"
-                    style={{
-                      width: i === stepIndex ? 20 : 6, height: 6,
-                      background: i <= stepIndex ? C : '#cbd5e1',
-                      transition: 'width 220ms',
-                    }}
-                  />
-                ))}
-              </div>
             </div>
-            <h3 className="font-black leading-[1.15] tracking-tight" style={{ color: INK, fontSize: 24 }}>
-              {step === 'qr' ? 'ชำระมัดจำ' : step === 'upload' ? 'ตรวจสอบสลิป' : 'ส่งสลิปสำเร็จ'}
+
+            {step !== 'done' && (
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: '50%',
+                  background: '#F3F4F6',
+                  color: '#6B7280',
+                  border: 'none',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = '#E5E7EB'; e.currentTarget.style.color = '#111827' }}
+                onMouseLeave={e => { e.currentTarget.style.background = '#F3F4F6'; e.currentTarget.style.color = '#6B7280' }}
+                title="ปิด"
+              >
+                <i className="fas fa-times" style={{ fontSize: 12 }} />
+              </button>
+            )}
+          </div>
+
+          <div>
+            <h3 style={{ fontSize: 20, fontWeight: 900, color: '#111827', margin: 0, letterSpacing: '-0.02em' }}>
+              {step === 'qr' ? 'ชำระเงินมัดจำ' : step === 'upload' ? 'ตรวจสอบสลิป' : 'ส่งสลิปสำเร็จ'}
             </h3>
-            <p className="text-[13px] mt-1.5 leading-snug truncate" style={{ color: '#64748b' }}>
-              {step === 'qr' ? `สแกน QR แล้วโอน · ${booking.gameName}` : step === 'upload' ? 'ตรวจความถูกต้องก่อนส่ง' : 'รอแอดมินยืนยัน'}
+            <p style={{ fontSize: 12, color: '#6B7280', margin: '3px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {step === 'qr' ? `สแกน QR แล้วโอน · ${booking.gameName || 'การจอง'}` : step === 'upload' ? 'ตรวจความถูกต้องก่อนส่งยืนยัน' : 'ระบบได้รับสลิปเรียบร้อยแล้ว'}
             </p>
           </div>
-          {step !== 'done' && (
-            <button
-              onClick={onClose}
-              className="w-10 h-10 rounded-full flex items-center justify-center transition-all shrink-0 ml-4"
-              style={{ background: '#f5f1ef', color: '#64748b', marginTop: 2 }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.color = '#64748b' }}
-            >
-              <i className="fas fa-times text-sm" />
-            </button>
-          )}
         </div>
 
-        {/* ── QR Step ── */}
+        {/* ── STEP 1: QR Payment ── */}
         {step === 'qr' && (
-          <div className="overflow-y-auto flex-1 flex flex-col" style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 28, gap: 24, background: '#fdfbfa' }}>
+          <div
+            style={{
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              padding: '16px 22px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              boxSizing: 'border-box',
+            }}
+          >
             {promptPayPhone ? (
               <>
-                {/* Amount hero */}
-                <div className="flex items-end justify-between" style={{ padding: '18px 20px', borderRadius: 16, background: `${C}0a`, border: `1px solid ${C}22` }}>
-                  <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em]" style={{ color: '#64748b', marginBottom: 4 }}>ยอดต่อคน</p>
-                    <p className="font-black leading-none" style={{ color: C, fontSize: 36, letterSpacing: '-0.02em' }}>฿{amount.toLocaleString()}</p>
+                {/* Summary Strip (Minimalist White & Red) */}
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    borderRadius: 12,
+                    background: '#FAFAFA',
+                    border: '1px solid #E5E7EB',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {booking.gameName || 'การจอง'}
+                    </div>
+                    <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                      {booking.date ? fmtDate(booking.date) : ''} {booking.time ? `· ${booking.time} น.` : ''}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[11px]" style={{ color: '#64748b', lineHeight: 1.4 }}>
-                      {booking.date ? fmtDate(booking.date) : ''}
-                    </p>
-                    {booking.time && (
-                      <p className="font-black mt-1" style={{ fontSize: 15, color: INK, fontFamily: "'JetBrains Mono', ui-monospace, monospace", letterSpacing: '0.02em' }}>{booking.time} น.</p>
-                    )}
+                  <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 12 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', textTransform: 'uppercase' }}>ยอดมัดจำ</div>
+                    <div style={{ fontSize: 24, fontWeight: 900, color: '#E50914', lineHeight: 1.1 }}>
+                      ฿{amount.toLocaleString()}
+                    </div>
                   </div>
                 </div>
 
-                {/* QR code card */}
-                <div className="flex flex-col items-center" style={{ gap: 14 }}>
-                  <div style={{
-                    padding: 20, borderRadius: 20,
+                {/* QR Showcase Card */}
+                <div
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    padding: '16px 14px',
+                    borderRadius: 16,
                     background: '#ffffff',
-                    border: '1px solid #e2e8f0',
-                    boxShadow: '0 12px 32px #e2e8f0',
-                  }}>
-                    <QRCodeCanvas id="dp-deposit-qr-canvas" value={qrPayload} size={200} bgColor="#ffffff" fgColor={INK} level="M" includeMargin={true} />
+                    border: '1px solid #E5E7EB',
+                    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.03)',
+                    boxSizing: 'border-box',
+                    gap: 10,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: 12,
+                      borderRadius: 12,
+                      background: '#ffffff',
+                      border: '1px solid #E5E7EB',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <QRCodeCanvas
+                      id="dp-deposit-qr-canvas"
+                      value={qrPayload}
+                      size={170}
+                      bgColor="#ffffff"
+                      fgColor="#111827"
+                      level="M"
+                      includeMargin={false}
+                    />
                   </div>
-                  <div className="text-center">
-                    <span className="inline-block text-[10px] font-black uppercase tracking-[0.16em] px-2.5 py-0.5 rounded-full mb-1.5" style={{ background: `${C}12`, color: C }}>
-                      บัญชีโอนมัดจำ
-                    </span>
-                    <p className="font-black tracking-wider" style={{ fontSize: 17, color: INK, fontFamily: "'JetBrains Mono', ui-monospace, monospace" }}>
+
+                  <div style={{ textAlign: 'center' }}>
+                    <div
+                      style={{
+                        display: 'inline-block',
+                        fontSize: 10,
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.08em',
+                        color: '#E50914',
+                        background: '#FEF2F2',
+                        border: '1px solid #FCA5A5',
+                        padding: '1px 8px',
+                        borderRadius: 12,
+                        marginBottom: 4,
+                      }}
+                    >
+                      บัญชีโอนมัดจำ (พร้อมเพย์)
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 800,
+                        color: '#111827',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        letterSpacing: '0.04em',
+                      }}
+                    >
                       {promptPayPhone}
-                    </p>
+                    </div>
                     {(accountName || bankName) && (
-                      <p className="text-[12px] mt-1 font-medium" style={{ color: '#4b5563' }}>
-                        {accountName}{bankName ? ` (${bankName})` : ''}
-                      </p>
+                      <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                        {accountName} {bankName ? `(${bankName})` : ''}
+                      </div>
                     )}
                   </div>
+
                   <button
                     type="button"
                     onClick={saveQR}
-                    className="flex items-center justify-center font-bold transition-all"
                     style={{
-                      gap: 8, height: 40, padding: '0 18px', borderRadius: 999,
-                      background: '#ffffff', color: INK,
-                      border: '1px solid #cbd5e1',
-                      fontSize: 12.5, fontFamily: "'Sarabun', sans-serif", cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      height: 32,
+                      padding: '0 14px',
+                      borderRadius: 20,
+                      background: '#F3F4F6',
+                      color: '#111827',
+                      border: '1px solid #E5E7EB',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#f5f1ef'; e.currentTarget.style.borderColor = '#94a3b8' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#cbd5e1' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#E5E7EB'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#F3F4F6'}
                   >
-                    <i className="fas fa-download" style={{ fontSize: 11 }} />
+                    <i className="fas fa-download" style={{ fontSize: 10 }} />
                     <span>บันทึกรูป QR</span>
                   </button>
                 </div>
 
-                {/* Instructions */}
-                <ol className="flex flex-col" style={{ gap: 10 }}>
-                  {[
-                    'สแกน QR ผ่านแอปธนาคาร',
-                    `โอน ฿${amount.toLocaleString()} แล้วบันทึกสลิป`,
-                    'กดปุ่มด้านล่างเพื่อแนบสลิป',
-                  ].map((txt, i) => (
-                    <li key={i} className="flex items-center" style={{ gap: 12, padding: '10px 14px', borderRadius: 12, background: '#ffffff', border: '1px solid #f1f5f9' }}>
-                      <span className="flex items-center justify-center font-black shrink-0"
-                        style={{ width: 24, height: 24, borderRadius: 999, background: `${C}10`, color: C, fontSize: 11 }}>
-                        {i + 1}
-                      </span>
-                      <span className="text-[13px]" style={{ color: '#374151', lineHeight: 1.5 }}>{txt}</span>
-                    </li>
-                  ))}
-                </ol>
-
-                {/* Upload CTA */}
-                <label
-                  className="w-full font-black flex items-center justify-center transition-all cursor-pointer"
+                {/* Minimal 3 Steps Bar */}
+                <div
                   style={{
-                    gap: 10, height: 56, borderRadius: 16,
-                    background: C, color: '#fff',
-                    fontSize: 15, letterSpacing: '0.01em',
-                    boxShadow: `0 10px 28px ${C}3f`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    background: '#FAFAFA',
+                    border: '1px solid #F3F4F6',
+                    fontSize: 11,
+                    color: '#6B7280',
+                    gap: 6,
                   }}
                 >
-                  <i className="fas fa-image" />
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#FEF2F2', color: '#E50914', fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>1</span>
+                    สแกน QR
+                  </span>
+                  <span style={{ color: '#D1D5DB' }}>·</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#FEF2F2', color: '#E50914', fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
+                    โอน ฿{amount.toLocaleString()}
+                  </span>
+                  <span style={{ color: '#D1D5DB' }}>·</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#FEF2F2', color: '#E50914', fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
+                    แนบสลิป
+                  </span>
+                </div>
+
+                {/* Primary CTA Button (Netflix Red) */}
+                <label
+                  style={{
+                    width: '100%',
+                    height: 48,
+                    borderRadius: 12,
+                    background: '#E50914',
+                    color: '#ffffff',
+                    fontSize: 14,
+                    fontWeight: 800,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
+                    transition: 'all 0.15s',
+                    boxSizing: 'border-box',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
+                >
+                  <i className="fas fa-receipt" style={{ fontSize: 15 }} />
                   <span>โอนแล้ว — แนบสลิปที่นี่</span>
-                  <input type="file" accept="image/*" onChange={handleFileSelect} className="hidden" />
+                  <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
                 </label>
               </>
             ) : (
-              <div className="flex flex-col items-center gap-4 py-12 text-center">
-                <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#f5f1ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <i className="fas fa-qrcode" style={{ fontSize: 30, color: '#94a3b8' }} />
-                </div>
-                <div>
-                  <p className="font-black text-[15px]" style={{ color: INK }}>ยังไม่ได้ตั้งค่าบัญชี</p>
-                  <p className="text-[13px] mt-1" style={{ color: '#64748b', maxWidth: 260 }}>ติดต่อแอดมินเพื่อรับข้อมูลการโอนเงิน</p>
-                </div>
-                <button onClick={onClose} className="font-bold" style={{ marginTop: 6, height: 44, padding: '0 24px', borderRadius: 12, background: '#f5f1ef', color: INK, border: 'none', cursor: 'pointer', fontSize: 13.5, fontFamily: "'Sarabun', sans-serif" }}>
-                  ปิด
-                </button>
+              <div style={{ textAlign: 'center', padding: '32px 16px', color: '#6B7280' }}>
+                <i className="fas fa-exclamation-circle" style={{ fontSize: 24, color: '#E50914', marginBottom: 8, display: 'block' }} />
+                <div style={{ fontWeight: 700, color: '#111827', fontSize: 14 }}>ยังไม่ได้ตั้งค่าบัญชีรับเงิน</div>
+                <div style={{ fontSize: 12, marginTop: 4 }}>กรุณาติดต่อแอดมินเพื่อขอเลขที่บัญชี</div>
               </div>
             )}
           </div>
         )}
 
-        {/* ── Upload / Preview Step ── */}
+        {/* ── STEP 2: Upload / Preview ── */}
         {step === 'upload' && (
-          <div className="overflow-y-auto flex-1 flex flex-col" style={{ paddingLeft: 28, paddingRight: 28, paddingBottom: 28, gap: 18, background: '#fdfbfa' }}>
-            {/* Amount reminder */}
-            <div className="flex items-center" style={{ gap: 12, padding: '14px 18px', borderRadius: 16, background: `${C}0a`, border: `1px solid ${C}22` }}>
-              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${C}14`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className="fas fa-receipt" style={{ color: C, fontSize: 14 }} />
-              </div>
-              <div>
-                <div className="text-[11px] font-bold" style={{ color: '#64748b' }}>ยอดที่ต้องชำระ</div>
-                <div className="font-black" style={{ fontSize: 18, color: C, lineHeight: 1.1 }}>฿{amount.toLocaleString()}</div>
-              </div>
+          <div
+            style={{
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              padding: '16px 22px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* Slip Preview Frame */}
+            <div
+              style={{
+                borderRadius: 14,
+                overflow: 'hidden',
+                background: '#0F1012',
+                border: '1px solid #E5E7EB',
+                maxHeight: 260,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                position: 'relative',
+              }}
+            >
+              {slipPreview ? (
+                <img
+                  src={slipPreview}
+                  alt="สลิปโอนเงิน"
+                  style={{ maxHeight: 260, width: 'auto', objectFit: 'contain' }}
+                />
+              ) : (
+                <div style={{ padding: 40, color: '#9CA3AF', fontSize: 13 }}>
+                  <i className="fas fa-image" style={{ fontSize: 28, display: 'block', marginBottom: 8 }} />
+                  ไม่พบรูปภาพสลิป
+                </div>
+              )}
             </div>
 
-            {/* Slip preview */}
-            {slipPreview && (
-              <div className="overflow-hidden flex items-center justify-center"
-                style={{ borderRadius: 16, border: '1px solid #e2e8f0', background: '#f5f1ef', maxHeight: 320 }}>
-                <img src={slipPreview} alt="slip" className="w-full object-contain" style={{ maxHeight: 320 }} />
-              </div>
-            )}
+            {/* Change Slip Link */}
+            <div style={{ textAlign: 'center' }}>
+              <label
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#E50914',
+                  cursor: 'pointer',
+                }}
+              >
+                <i className="fas fa-sync-alt" style={{ fontSize: 10 }} />
+                <span>เลือกรูปสลิปใหม่</span>
+                <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
+              </label>
+            </div>
 
-            <p className="text-center text-[12px]" style={{ color: '#64748b' }}>
-              ตรวจสอบความถูกต้องของสลิปก่อนกดยืนยัน
-            </p>
+            {/* Amount Check Note */}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 14px',
+                borderRadius: 10,
+                background: '#FAFAFA',
+                border: '1px solid #E5E7EB',
+                fontSize: 12,
+              }}
+            >
+              <span style={{ color: '#6B7280', fontWeight: 600 }}>ยอดมัดจำที่ต้องตรวจสอบ</span>
+              <strong style={{ color: '#E50914', fontSize: 15, fontWeight: 900 }}>
+                ฿{amount.toLocaleString()}
+              </strong>
+            </div>
 
-            {/* Action row */}
-            <div className="flex" style={{ gap: 10, marginTop: 4 }}>
+            {/* Action Row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
               <button
                 type="button"
-                onClick={() => { setSlipFile(null); setSlipPreview(''); setStep('qr') }}
-                className="flex items-center justify-center shrink-0 transition-all"
+                onClick={() => setStep('qr')}
+                disabled={uploading}
                 style={{
-                  width: 56, height: 56, borderRadius: 14,
-                  background: '#faf7f5', color: 'rgba(26,26,26,0.6)',
-                  border: 'none', cursor: 'pointer',
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: '#F3F4F6',
+                  border: '1px solid #E5E7EB',
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: uploading ? 'wait' : 'pointer',
+                  flexShrink: 0,
+                  transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { e.currentTarget.style.background = '#ebe4e1'; e.currentTarget.style.color = INK }}
-                onMouseLeave={e => { e.currentTarget.style.background = '#faf7f5'; e.currentTarget.style.color = 'rgba(26,26,26,0.6)' }}
+                title="ย้อนกลับ"
               >
-                <i className="fas fa-arrow-left text-sm" />
+                <i className="fas fa-arrow-left" style={{ fontSize: 13 }} />
               </button>
+
               <button
                 type="button"
                 disabled={uploading}
                 onClick={handleSubmit}
-                className="flex-1 font-black flex items-center justify-center transition-all"
                 style={{
-                  gap: 10, height: 56, borderRadius: 14,
-                  background: uploading ? '#f0ebe9' : C,
-                  color: uploading ? '#94a3b8' : '#fff',
-                  border: 'none', cursor: uploading ? 'wait' : 'pointer',
-                  fontSize: 15, letterSpacing: '0.01em',
-                  boxShadow: uploading ? 'none' : `0 10px 28px ${C}3f`,
+                  flex: 1,
+                  height: 44,
+                  borderRadius: 12,
+                  background: uploading ? '#9CA3AF' : '#E50914',
+                  color: '#ffffff',
+                  fontSize: 14,
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
+                  border: 'none',
+                  cursor: uploading ? 'wait' : 'pointer',
+                  boxShadow: uploading ? 'none' : '0 4px 14px rgba(229, 9, 20, 0.35)',
+                  transition: 'all 0.15s',
                 }}
+                onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = '#B80710' }}
+                onMouseLeave={e => { if (!uploading) e.currentTarget.style.background = '#E50914' }}
               >
                 {uploading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: '#94a3b8', borderTopColor: INK }} />
-                    <span>กำลังส่ง...</span>
-                  </>
+                  <span>กำลังส่งสลิป...</span>
                 ) : (
                   <>
-                    <i className="fas fa-paper-plane text-xs" />
+                    <i className="fas fa-paper-plane" style={{ fontSize: 12 }} />
                     <span>ยืนยันส่งสลิป</span>
                   </>
                 )}
@@ -2406,51 +2612,111 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
           </div>
         )}
 
-        {/* ── Done Step ── */}
+        {/* ── STEP 3: Done Confirmation ── */}
         {step === 'done' && (
-          <div className="overflow-y-auto flex-1 flex flex-col items-center text-center" style={{ padding: '12px 28px 32px', gap: 20, background: '#fdfbfa' }}>
-            {/* Check circle */}
-            <div className="relative flex items-center justify-center" style={{ width: 96, height: 96 }}>
-              <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: `${C}0c` }} />
-              <div style={{ position: 'absolute', inset: 12, borderRadius: '50%', background: `${C}1a` }} />
-              <div style={{ position: 'absolute', inset: 22, borderRadius: '50%', background: C, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: `0 12px 28px ${C}48` }}>
-                <i className="fas fa-check" style={{ color: '#fff', fontSize: 22 }} />
-              </div>
+          <div
+            style={{
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              padding: '24px 22px 24px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              textAlign: 'center',
+              gap: 16,
+              boxSizing: 'border-box',
+            }}
+          >
+            {/* Success Icon */}
+            <div
+              style={{
+                width: 64,
+                height: 64,
+                borderRadius: '50%',
+                background: '#FEF2F2',
+                border: '2px solid #FCA5A5',
+                color: '#E50914',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 26,
+                boxShadow: '0 8px 20px rgba(229, 9, 20, 0.2)',
+              }}
+            >
+              <i className="fas fa-check" />
             </div>
 
             <div>
-              <h4 className="font-black" style={{ fontSize: 22, color: INK, letterSpacing: '-0.02em' }}>ส่งสลิปสำเร็จ</h4>
-              <p className="text-[13px] mt-2" style={{ color: 'rgba(26,26,26,0.6)', maxWidth: 280, lineHeight: 1.55 }}>
-                แอดมินจะตรวจสอบและยืนยันภายใน 24 ชม. ระบบจะแจ้งผลทาง LINE
+              <h4 style={{ fontSize: 20, fontWeight: 900, color: '#111827', margin: '0 0 6px' }}>
+                ส่งสลิปมัดจำสำเร็จ
+              </h4>
+              <p style={{ fontSize: 12.5, color: '#6B7280', margin: 0, lineHeight: 1.55, maxWidth: 280 }}>
+                ระบบ EasySlip และทีมงานจะตรวจสอบและยืนยันสถานะการจองให้คุณโดยเร็วที่สุด
               </p>
             </div>
 
-            {/* Booking recap */}
-            <div className="w-full flex items-center text-left"
-              style={{ gap: 14, padding: '14px 18px', borderRadius: 16, background: '#ffffff', border: '1px solid #e2e8f0' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 10, background: `${C}10`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className="fas fa-calendar-check" style={{ color: C, fontSize: 15 }} />
+            {/* Recap Card */}
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                textAlign: 'left',
+                gap: 12,
+                padding: '12px 16px',
+                borderRadius: 12,
+                background: '#FAFAFA',
+                border: '1px solid #E5E7EB',
+                boxSizing: 'border-box',
+              }}
+            >
+              <div
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 10,
+                  background: '#FEF2F2',
+                  color: '#E50914',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                  fontSize: 14,
+                }}
+              >
+                <i className="fas fa-calendar-check" />
               </div>
-              <div className="min-w-0 flex-1">
-                <p className="font-black truncate" style={{ fontSize: 14, color: INK }}>{booking.gameName}</p>
-                <p className="mt-0.5 text-[12px]" style={{ color: '#64748b' }}>
-                  {booking.date ? fmtDate(booking.date) : ''}{booking.time ? ` · ${booking.time} น.` : ''}
-                </p>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {booking.gameName || 'การจอง'}
+                </div>
+                <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
+                  {booking.date ? fmtDate(booking.date) : ''} {booking.time ? `· ${booking.time} น.` : ''} · ฿{amount.toLocaleString()}
+                </div>
               </div>
             </div>
 
             <button
+              type="button"
               onClick={onClose}
-              className="w-full font-black transition-all"
               style={{
-                height: 56, borderRadius: 16,
-                background: C, color: '#fff', border: 'none', cursor: 'pointer',
-                fontSize: 15, letterSpacing: '0.01em',
-                boxShadow: `0 10px 28px ${C}3f`,
-                marginTop: 4,
+                width: '100%',
+                height: 46,
+                borderRadius: 12,
+                background: '#111827',
+                color: '#ffffff',
+                fontSize: 13.5,
+                fontWeight: 800,
+                border: 'none',
+                cursor: 'pointer',
+                transition: 'all 0.15s',
+                marginTop: 6,
               }}
+              onMouseEnter={e => e.currentTarget.style.background = '#000000'}
+              onMouseLeave={e => e.currentTarget.style.background = '#111827'}
             >
-              เสร็จสิ้น
+              เสร็จสิ้น / ปิดหน้าต่าง
             </button>
           </div>
         )}
@@ -2460,6 +2726,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
     </div>
   )
 }
+
 
 // ── Booking Detail & Party Lounge Modal ───────────────────────────────────────
 export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }) {
@@ -2517,12 +2784,6 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
 
     return () => { cancelled = true }
   }, [booking?.id, booking?.members, booking?.joinRequests, booking?.leaderId])
-
-  const addedDays = paidCount * 3
-  const playDateObj = booking.date ? new Date(`${booking.date}T${booking.time || '12:00'}:00`) : null
-  const maxCapDate = playDateObj ? new Date(playDateObj.getTime() - 24 * 3600000) : null
-  const maxCapStr = maxCapDate ? fmtDateTime(maxCapDate.toISOString()) : ''
-  const deadlineStr = booking.depositDeadline ? fmtDateTime(booking.depositDeadline) : ''
 
   const handleRequestJoin = async () => {
     if (!lineUser) { showToast('กรุณาเข้าสู่ระบบก่อน', 'error'); return }
@@ -2661,42 +2922,51 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
     showToast('คัดลอกลิงก์แล้ว')
   }
 
-  const C = 'var(--curtain-crimson, #e50914)'
-  const INK = '#111827'
-
+  // ── Restricted Locked View ────────────────────────────────────────────────
   if (isLockedRestricted) {
     return (
       <div
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        style={{ background: 'rgba(15, 23, 42, 0.65)', backdropFilter: 'blur(10px)' }}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
+          boxSizing: 'border-box',
+        }}
         onClick={e => e.target === e.currentTarget && onClose()}
       >
         <div
           style={{
-            background: '#ffffff',
-            borderRadius: 24,
-            padding: '36px 28px',
-            maxWidth: 420,
             width: '100%',
+            maxWidth: 400,
+            borderRadius: 20,
+            background: '#ffffff',
+            border: '1px solid #E5E7EB',
+            padding: '32px 24px',
             textAlign: 'center',
-            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.35)',
             fontFamily: "'Sarabun', sans-serif",
-            border: '1px solid rgba(0, 0, 0, 0.08)',
+            boxSizing: 'border-box',
           }}
         >
           <div
             style={{
-              width: 60,
-              height: 60,
-              borderRadius: 20,
-              background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-              color: C,
+              width: 54,
+              height: 54,
+              borderRadius: 16,
+              background: '#FEF2F2',
+              color: '#E50914',
+              border: '1px solid #FCA5A5',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 26,
-              margin: '0 auto 18px',
-              border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
+              fontSize: 22,
+              margin: '0 auto 16px',
             }}
           >
             <i className="fas fa-lock" />
@@ -2705,25 +2975,26 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
           <span
             style={{
               display: 'inline-block',
-              fontSize: 11,
+              fontSize: 10.5,
               fontWeight: 800,
-              letterSpacing: '0.08em',
               textTransform: 'uppercase',
-              color: C,
-              background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-              padding: '3px 10px',
+              letterSpacing: '0.08em',
+              color: '#E50914',
+              background: '#FEF2F2',
+              padding: '3px 12px',
               borderRadius: 20,
+              border: '1px solid #FECACA',
               marginBottom: 12,
             }}
           >
             LOCKED ROOM · ล็อกห้องแล้ว
           </span>
 
-          <h3 style={{ fontSize: 20, fontWeight: 900, color: INK, margin: '0 0 10px', letterSpacing: '-0.01em' }}>
+          <h3 style={{ fontSize: 18, fontWeight: 900, color: '#111827', margin: '0 0 8px' }}>
             ห้องนี้ถูกล็อกแล้ว
           </h3>
 
-          <p style={{ fontSize: 13.5, color: '#64748b', lineHeight: 1.6, margin: '0 0 24px' }}>
+          <p style={{ fontSize: 12.5, color: '#6B7280', lineHeight: 1.6, margin: '0 0 24px' }}>
             ปาร์ตี้นี้ได้รับการยืนยันและล็อกห้องเรียบร้อยแล้ว เฉพาะ<strong>สมาชิกในตี้</strong> หรือ <strong>แอดมิน</strong> เท่านั้นที่สามารถเข้าดูรายละเอียดได้
           </p>
 
@@ -2732,18 +3003,18 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
             onClick={onClose}
             style={{
               width: '100%',
-              padding: '12px',
+              padding: '11px',
               borderRadius: 12,
-              background: INK,
+              background: '#111827',
               color: '#ffffff',
-              fontSize: 13.5,
+              fontSize: 13,
               fontWeight: 700,
               border: 'none',
               cursor: 'pointer',
               transition: 'background 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = '#1f2937' }}
-            onMouseLeave={e => { e.currentTarget.style.background = INK }}
+            onMouseEnter={e => e.currentTarget.style.background = '#000000'}
+            onMouseLeave={e => e.currentTarget.style.background = '#111827'}
           >
             เข้าใจแล้ว / ปิดหน้าต่าง
           </button>
@@ -2762,336 +3033,338 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 'clamp(16px, 3.5vh, 32px) 16px',
-          background: 'rgba(15, 23, 42, 0.65)',
-          backdropFilter: 'blur(10px)',
+          padding: 'clamp(12px, 3.5vh, 28px) 16px',
+          background: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(8px)',
           boxSizing: 'border-box',
         }}
         onClick={e => e.target === e.currentTarget && onClose()}
       >
         <div
-          className="w-full sm:max-w-xl overflow-hidden flex flex-col"
           style={{
+            width: '100%',
+            maxWidth: 520,
+            maxHeight: 'min(90dvh, 820px)',
+            display: 'flex',
+            flexDirection: 'column',
+            borderRadius: 22,
+            overflow: 'hidden',
             background: '#ffffff',
-            color: INK,
-            borderRadius: 24,
-            maxHeight: 'min(88dvh, 820px)',
-            boxShadow: '0 25px 60px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.04)',
+            boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08)',
             fontFamily: "'Sarabun', sans-serif",
+            boxSizing: 'border-box',
           }}
         >
-          {/* Mobile drag handle */}
-          <div className="w-11 h-[5px] rounded-full mx-auto mt-2.5 mb-0 sm:hidden shrink-0 z-20 relative" style={{ background: 'rgba(255,255,255,0.35)' }} />
-
-          {/* ── 1. CINEMATIC HERO HEADER (Pinned Shrink-0) ── */}
+          {/* ── 1. CINEMATIC NETFLIX BILLBOARD HEADER ── */}
           <div
-            className="relative overflow-hidden shrink-0 select-none"
             style={{
-              background: '#0d1117',
-              minHeight: 'clamp(195px, 28vw, 240px)',
-              borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+              position: 'relative',
+              width: '100%',
+              minHeight: 220,
+              background: '#141414',
+              overflow: 'hidden',
+              flexShrink: 0,
             }}
           >
-            {/* Ambient game backdrop */}
+            {/* Ambient Backdrop Poster */}
             {imgSrc ? (
               <img
                 src={imgSrc}
-                aria-hidden
-                alt=""
-                className="absolute inset-0 w-full h-full object-cover"
+                alt={booking.gameName}
                 style={{
-                  filter: 'blur(20px) brightness(0.4) saturate(1.4)',
-                  transform: 'scale(1.18)',
-                  opacity: 0.65,
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  objectFit: 'cover',
+                  objectPosition: 'center 20%',
+                  filter: 'brightness(0.68) saturate(1.15)',
                 }}
               />
             ) : (
               <div
-                className="absolute inset-0"
                 style={{
-                  background: 'linear-gradient(135deg, #111827 0%, #1e293b 100%)',
+                  position: 'absolute',
+                  inset: 0,
+                  background: 'linear-gradient(135deg, #1f1f1f 0%, #0d0d0d 100%)',
                 }}
               />
             )}
 
-            {/* Dynamic Room Accent Glow */}
+            {/* Room Accent Glow */}
             <div
-              className="absolute inset-0"
               style={{
-                background: `radial-gradient(ellipse 65% 60% at 85% 15%, ${rc}44 0%, transparent 68%)`,
+                position: 'absolute',
+                inset: 0,
+                background: `radial-gradient(ellipse 70% 60% at 85% 20%, ${rc}40 0%, transparent 70%)`,
               }}
             />
 
-            {/* Cinematic dark vignette & bottom shadow */}
+            {/* Netflix Dark Vignette Overlay */}
             <div
-              className="absolute inset-0"
               style={{
-                background:
-                  'linear-gradient(180deg, rgba(13,17,23,0.3) 0%, rgba(13,17,23,0.65) 55%, #0d1117 100%)',
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(180deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 35%, rgba(15,15,15,0.85) 85%, #141414 100%)',
               }}
             />
-
-            {/* Content Container */}
-            <div
-              className="relative z-10 h-full flex items-end gap-4 sm:gap-5 pt-11 pb-5 px-5 sm:px-6"
-              style={{ minHeight: 'clamp(195px, 28vw, 240px)' }}
-            >
-              {/* Poster 3D thumbnail */}
-              {imgSrc && (
-                <div
-                  className="shrink-0 self-end"
-                  style={{ width: 'clamp(82px, 18vw, 104px)' }}
-                >
-                  <div
-                    className="overflow-hidden"
-                    style={{
-                      aspectRatio: '2/3',
-                      borderRadius: 14,
-                      boxShadow: '0 18px 36px -8px rgba(0,0,0,0.7), 0 0 0 1.5px rgba(255,255,255,0.18)',
-                      background: '#161b22',
-                    }}
-                  >
-                    <img
-                      src={imgSrc}
-                      alt={booking.gameName}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* Title & Metadata block */}
-              <div className="flex-1 min-w-0 pb-1">
-                <div className="flex items-center gap-2 flex-wrap mb-1.5">
-                  <StatusBadge status={booking.status} />
-                  {booking.room && (
-                    <span
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '2px 9px',
-                        borderRadius: '20px',
-                        fontSize: '10px',
-                        fontWeight: 700,
-                        background: `${rc}26`,
-                        color: '#ffffff',
-                        border: `1px solid ${rc}66`,
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      <span
-                        style={{
-                          width: '5px',
-                          height: '5px',
-                          borderRadius: '50%',
-                          background: rc,
-                          boxShadow: `0 0 6px ${rc}`,
-                        }}
-                      />
-                      {booking.room}
-                    </span>
-                  )}
-                </div>
-
-                <h2
-                  className="font-black leading-[1.15] tracking-tight text-white drop-shadow-md"
-                  style={{ fontSize: 'clamp(20px, 4.6vw, 26px)', textShadow: '0 2px 8px rgba(0,0,0,0.5)' }}
-                >
-                  {booking.gameName || 'การจองห้อง'}
-                </h2>
-
-                {/* Sleek meta pill tags */}
-                <div className="flex items-center gap-2 mt-2 flex-wrap">
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '3px 9px',
-                      borderRadius: '999px',
-                      background: 'rgba(255, 255, 255, 0.12)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: 'rgba(255, 255, 255, 0.95)',
-                      fontSize: '11.5px',
-                      fontWeight: 600,
-                      backdropFilter: 'blur(8px)',
-                    }}
-                  >
-                    <i className="fas fa-calendar-alt text-[10px]" style={{ color: '#ef4444' }} />
-                    <span>{fmtDate(booking.date)}</span>
-                  </div>
-
-                  {booking.time && (
-                    <div
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '5px',
-                        padding: '3px 9px',
-                        borderRadius: '999px',
-                        background: 'rgba(255, 255, 255, 0.12)',
-                        border: '1px solid rgba(255, 255, 255, 0.15)',
-                        color: 'rgba(255, 255, 255, 0.95)',
-                        fontSize: '11.5px',
-                        fontWeight: 700,
-                        backdropFilter: 'blur(8px)',
-                      }}
-                    >
-                      <i className="fas fa-clock text-[10px]" style={{ color: '#fbbf24' }} />
-                      <span>{booking.time} น.</span>
-                    </div>
-                  )}
-
-                  <div
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      padding: '3px 9px',
-                      borderRadius: '999px',
-                      background: 'rgba(255, 255, 255, 0.12)',
-                      border: '1px solid rgba(255, 255, 255, 0.15)',
-                      color: 'rgba(255, 255, 255, 0.95)',
-                      fontSize: '11.5px',
-                      fontWeight: 600,
-                      backdropFilter: 'blur(8px)',
-                    }}
-                  >
-                    <i className="fas fa-coins text-[10px]" style={{ color: '#10b981' }} />
-                    <span>มัดจำ ฿{booking.depositAmount || 0} / คน</span>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             {/* Close Button */}
             <button
               type="button"
               onClick={onClose}
-              className="absolute top-4 right-4 z-20 w-9 h-9 rounded-full flex items-center justify-center transition-all"
               style={{
-                background: 'rgba(0, 0, 0, 0.45)',
+                position: 'absolute',
+                top: 14,
+                right: 18,
+                zIndex: 10,
+                width: 32,
+                height: 32,
+                borderRadius: '50%',
+                background: 'rgba(0, 0, 0, 0.65)',
+                backdropFilter: 'blur(8px)',
                 border: '1px solid rgba(255, 255, 255, 0.2)',
-                color: 'rgba(255, 255, 255, 0.85)',
-                backdropFilter: 'blur(12px)',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 cursor: 'pointer',
+                transition: 'all 0.2s',
               }}
+              title="ปิดหน้าต่าง"
               onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.75)'
-                e.currentTarget.style.color = '#ffffff'
+                e.currentTarget.style.background = 'rgba(229, 9, 20, 0.85)'
+                e.currentTarget.style.borderColor = '#E50914'
               }}
               onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.45)'
-                e.currentTarget.style.color = 'rgba(255, 255, 255, 0.85)'
+                e.currentTarget.style.background = 'rgba(0, 0, 0, 0.65)'
+                e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
               }}
-              title="ปิด"
             >
-              <i className="fas fa-times text-xs" />
+              <i className="fas fa-times" style={{ fontSize: 13 }} />
             </button>
+
+            {/* Billboard Content: Title & Metadata Chips */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 20,
+                right: 20,
+                bottom: 16,
+                zIndex: 10,
+              }}
+            >
+
+
+              <h2
+                style={{
+                  fontSize: 'clamp(20px, 4.2vw, 26px)',
+                  fontWeight: 900,
+                  color: '#ffffff',
+                  lineHeight: 1.2,
+                  margin: '0 0 8px',
+                  textShadow: '0 2px 8px rgba(0,0,0,0.85)',
+                  wordBreak: 'break-word',
+                }}
+              >
+                {booking.gameName || 'การจองห้อง'}
+              </h2>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11.5,
+                    fontWeight: 600,
+                    color: 'rgba(255, 255, 255, 0.95)',
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    padding: '3px 9px',
+                    borderRadius: 6,
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  <i className="fas fa-calendar-alt" style={{ color: '#E50914', fontSize: 10 }} />
+                  {fmtDate(booking.date)}
+                </span>
+
+                {booking.time && (
+                  <span
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 5,
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      color: 'rgba(255, 255, 255, 0.95)',
+                      background: 'rgba(0, 0, 0, 0.5)',
+                      padding: '3px 9px',
+                      borderRadius: 6,
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                    }}
+                  >
+                    <i className="fas fa-clock" style={{ color: '#FBBF24', fontSize: 10 }} />
+                    {booking.time} น.
+                  </span>
+                )}
+
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    color: '#34D399',
+                    background: 'rgba(0, 0, 0, 0.5)',
+                    padding: '3px 9px',
+                    borderRadius: 6,
+                    border: '1px solid rgba(255, 255, 255, 0.15)',
+                  }}
+                >
+                  <i className="fas fa-coins" style={{ fontSize: 10 }} />
+                  มัดจำ ฿{booking.depositAmount || 0} / คน
+                </span>
+              </div>
+            </div>
           </div>
 
-          {/* ── 2. SCROLLABLE BODY (Netflix Squad Experience) ── */}
+          {/* ── 2. SCROLLABLE MINIMALIST WHITE BODY ── */}
           <div
-            className="overflow-y-auto flex-1 flex flex-col"
-            style={{ padding: '20px clamp(18px, 3.5vw, 26px)', gap: 16 }}
+            style={{
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              flex: 1,
+              padding: '18px 20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 14,
+              background: '#ffffff',
+              boxSizing: 'border-box',
+              width: '100%',
+            }}
           >
-            {/* Status Case: Locked (Room fully secured 100%) */}
+            {/* Status Case: Locked (100% Complete) */}
             {isLocked && (
               <div
-                className="p-4 rounded-2xl flex items-center gap-3.5 border"
                 style={{
-                  background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
-                  borderColor: '#86efac',
-                  boxShadow: '0 4px 14px rgba(22, 163, 74, 0.08)',
+                  padding: '14px 16px',
+                  borderRadius: 14,
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  boxSizing: 'border-box',
+                  width: '100%',
                 }}
               >
                 <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: '#16a34a', color: '#ffffff', boxShadow: '0 4px 12px rgba(22, 163, 74, 0.3)' }}
+                  style={{
+                    width: 38,
+                    height: 38,
+                    borderRadius: 10,
+                    background: '#059669',
+                    color: '#ffffff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    flexShrink: 0,
+                    fontSize: 14,
+                  }}
                 >
-                  <i className="fas fa-lock text-base" />
+                  <i className="fas fa-lock" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black text-[14.5px] text-emerald-950">ล็อกห้องสำเร็จแล้ว (สิทธิ์สมบูรณ์ 100%)</span>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase tracking-wider">
-                      LOCKED
-                    </span>
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: '#065F46' }}>
+                    ล็อกห้องสำเร็จแล้ว (สิทธิ์สมบูรณ์ 100%)
                   </div>
-                  <p className="text-[12px] mt-1 text-emerald-800 leading-relaxed font-medium">
-                    ชำระมัดจำครบ {paidCount}/{maxMembers} คนเรียบร้อยแล้ว ล็อกห้อง <strong>{booking.room || 'ที่เลือก'}</strong> วันที่ <strong>{fmtDate(booking.date)}</strong> เวลา <strong>{booking.time} น.</strong> สำหรับปาร์ตี้ของคุณ
-                  </p>
+                  <div style={{ fontSize: 11.5, color: '#047857', marginTop: 2, lineHeight: 1.5 }}>
+                    ชำระมัดจำครบ {paidCount}/{maxMembers} คนเรียบร้อยแล้ว ล็อกห้อง <strong>{booking.room || 'ที่เลือก'}</strong> สำหรับปาร์ตี้ของคุณ
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Status Case: Confirmed (Active deposit window - Room NOT yet locked) */}
+            {/* Status Case: Confirmed (Active Payment Window) */}
             {!isLocked && booking.status === 'confirmed' && (
               <div
-                className="rounded-2xl border overflow-hidden"
                 style={{
                   background: '#ffffff',
-                  borderColor: isUrgent ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)' : 'rgba(0, 0, 0, 0.08)',
-                  boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+                  border: isUrgent ? '1px solid #FCA5A5' : '1px solid #E5E7EB',
+                  borderRadius: 14,
+                  padding: '14px 16px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.03)',
+                  boxSizing: 'border-box',
+                  width: '100%',
                 }}
               >
-                {/* Top countdown bar */}
-                <div
-                  className="px-4 py-3 flex items-center justify-between gap-3 border-b"
-                  style={{
-                    background: isUrgent ? '#fef2f2' : '#f8fafc',
-                    borderColor: 'rgba(0, 0, 0, 0.06)',
-                  }}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div
-                      className="w-2.5 h-2.5 rounded-full animate-pulse shrink-0"
-                      style={{ background: isUrgent ? C : '#f59e0b' }}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      style={{
+                        width: 7,
+                        height: 7,
+                        borderRadius: '50%',
+                        background: isUrgent ? '#E50914' : '#F59E0B',
+                        display: 'inline-block',
+                      }}
                     />
-                    <span className="font-black text-[13px] truncate" style={{ color: isUrgent ? C : INK }}>
+                    <span style={{ fontSize: 13, fontWeight: 800, color: isUrgent ? '#E50914' : '#111827' }}>
                       {countdown ? `เหลือเวลาชำระอีก ${countdown}` : 'เปิดรับการชำระมัดจำ'}
                     </span>
                   </div>
                   <span
-                    className="text-[10.5px] font-black px-2.5 py-1 rounded-full shrink-0"
                     style={{
-                      background: isUrgent ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.1)' : 'rgba(0, 0, 0, 0.06)',
-                      color: isUrgent ? C : '#4b5563',
-                      border: `1px solid ${isUrgent ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.25)' : 'rgba(0, 0, 0, 0.08)'}`,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 20,
+                      background: isUrgent ? '#FEF2F2' : '#F3F4F6',
+                      color: isUrgent ? '#E50914' : '#4B5563',
+                      border: isUrgent ? '1px solid #FECACA' : '1px solid #E5E7EB',
                     }}
                   >
                     {isUrgent ? 'ใกล้หมดเวลา' : `ยังขาดอีก ${remainingToLock} คน`}
                   </span>
                 </div>
 
-                {/* Progress details */}
-                <div className="p-4 flex flex-col gap-3">
-                  <div className="flex items-center justify-between text-[12.5px]">
-                    <span className="font-bold" style={{ color: INK }}>
-                      ความคืบหน้าการล็อกห้อง: <strong style={{ color: C }}>{paidCount}</strong> / {maxMembers} คน
+                {/* Netflix Red Scrubber Progress Bar */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+                    <span style={{ color: '#4B5563', fontWeight: 600 }}>
+                      ความคืบหน้าการล็อกห้อง: <strong style={{ color: '#E50914', fontWeight: 800 }}>{paidCount}</strong> / {maxMembers} คน
                     </span>
-                    <span className="font-black" style={{ color: C }}>
-                      {paidPct}%
-                    </span>
+                    <span style={{ color: '#E50914', fontWeight: 800 }}>{paidPct}%</span>
                   </div>
-
-                  {/* Netflix Red high-contrast progress bar */}
-                  <div className="h-2.5 rounded-full overflow-hidden" style={{ background: '#f1f5f9' }}>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: 6,
+                      borderRadius: 999,
+                      background: '#F1F3F5',
+                      overflow: 'hidden',
+                    }}
+                  >
                     <div
-                      className="h-full rounded-full transition-all duration-700"
                       style={{
-                        width: `${Math.min(100, Math.max(0, paidPct))}%`,
-                        background: `linear-gradient(90deg, ${C} 0%, #ff3344 100%)`,
-                        boxShadow: '0 0 10px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.4)',
+                        width: `${paidPct}%`,
+                        height: '100%',
+                        borderRadius: 999,
+                        background: '#E50914',
+                        transition: 'width 0.4s ease',
                       }}
                     />
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-between text-[11px] font-medium" style={{ color: '#64748b' }}>
-                    <span>มัดจำ ฿{booking.depositAmount || 0} / คน</span>
-                    <span>จ่ายครบ {maxMembers} คน ล็อกห้องอัตโนมัติทันที</span>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#6B7280', flexWrap: 'wrap', gap: 4 }}>
+                  <span>มัดจำ ฿{booking.depositAmount || 0} / คน</span>
+                  <span>ชำระครบ {maxMembers} คน ล็อกห้องอัตโนมัติทันที</span>
                 </div>
               </div>
             )}
@@ -3099,20 +3372,40 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
             {/* Status Case: Collapsed */}
             {booking.status === 'collapsed' && (
               <div
-                className="p-4 rounded-2xl border flex items-center justify-between gap-3"
-                style={{ background: '#fef2f2', borderColor: '#fecaca', color: '#dc2626' }}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 14,
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  color: '#991B1B',
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
               >
-                <div className="flex items-center gap-3 text-[13px] font-bold">
-                  <i className="fas fa-exclamation-triangle shrink-0" />
-                  <span>หมดเวลาชำระมัดจำ — ปาร์ตี้ล่มเนื่องจากชำระไม่ครบตามกำหนด</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700 }}>
+                  <i className="fas fa-exclamation-triangle" style={{ color: '#E50914', flexShrink: 0 }} />
+                  <span>หมดเวลาชำระมัดจำ — ปาร์ตี้ล่มเนื่องจากชำระไม่ครบ</span>
                 </div>
                 {isLeader && (
                   <button
                     type="button"
                     onClick={handleCloseBooking}
                     disabled={closing}
-                    className="font-bold text-xs shrink-0 transition-opacity hover:opacity-85"
-                    style={{ padding: '7px 14px', borderRadius: 999, background: C, color: '#fff', border: 'none', cursor: 'pointer' }}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: 8,
+                      background: '#E50914',
+                      color: '#ffffff',
+                      fontSize: 11.5,
+                      fontWeight: 800,
+                      border: 'none',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
                   >
                     {closing ? 'กำลังปิด...' : 'ปิดตี้'}
                   </button>
@@ -3123,59 +3416,89 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
             {/* Status Case: Pending Admin Confirmation */}
             {booking.status === 'pending' && (
               <div
-                className="p-4 rounded-2xl border flex items-center gap-3.5"
-                style={{ background: '#fffbeb', borderColor: '#fde68a', color: '#92400e' }}
+                style={{
+                  padding: '12px 16px',
+                  borderRadius: 14,
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
               >
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
-                  style={{ background: '#fef3c7', color: '#b45309', border: '1px solid #fde68a' }}
-                >
-                  <i className="fas fa-hourglass-half text-sm" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="font-black text-[13.5px]">รอแอดมินยืนยันรอบการจอง</div>
-                  <div className="text-[11.5px] mt-0.5 text-amber-700 leading-relaxed font-medium">
-                    เมื่อแอดมินยืนยันตี้แล้ว ระบบจะเริ่มเปิดรับการชำระมัดจำและนับเวลา 3 วันแรกทันที
-                  </div>
+                <i className="fas fa-hourglass-half" style={{ color: '#D97706', fontSize: 16, flexShrink: 0 }} />
+                <div style={{ fontSize: 12, color: '#92400E' }}>
+                  <strong style={{ display: 'block', fontSize: 13, color: '#78350F' }}>รอแอดมินยืนยันรอบการจอง</strong>
+                  เมื่อแอดมินยืนยันตี้แล้ว ระบบจะเริ่มเปิดรับการชำระมัดจำทันที
                 </div>
               </div>
             )}
 
-            {/* Join requests (Leader view) */}
+            {/* Join Requests (Leader View) */}
             {isLeader && (booking.joinRequests?.length > 0) && (
               <div
-                className="p-4 rounded-2xl border"
-                style={{ background: '#f8fafc', borderColor: '#e2e8f0' }}
+                style={{
+                  padding: '14px 16px',
+                  borderRadius: 14,
+                  background: '#F9FAFB',
+                  border: '1px solid #E5E7EB',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 10,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
               >
-                <div className="flex items-center gap-2 mb-3">
-                  <i className="fas fa-bell text-[11px]" style={{ color: C }} />
-                  <span className="text-[11px] font-black uppercase tracking-[0.15em]" style={{ color: C }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="fas fa-bell" style={{ color: '#E50914', fontSize: 11 }} />
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#E50914', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     คำขอเข้าร่วม ({booking.joinRequests.length})
                   </span>
                 </div>
-                <div className="flex flex-col gap-2">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {booking.joinRequests.map(req => {
                     const reqProf = memberProfiles[req.uid]
                     const reqAvatar = req.avatar || reqProf?.pictureUrl || reqProf?.avatar || ''
                     const reqName = req.name || reqProf?.nickname || reqProf?.firstname || reqProf?.name || 'ผู้ขอเข้าร่วม'
-
                     return (
                       <div
                         key={req.uid}
-                        className="flex items-center justify-between gap-3"
-                        style={{ padding: '10px 12px', borderRadius: 12, background: '#ffffff', border: '1px solid #e2e8f0' }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: 10,
+                          padding: '8px 12px',
+                          borderRadius: 10,
+                          background: '#ffffff',
+                          border: '1px solid #E5E7EB',
+                          boxSizing: 'border-box',
+                          width: '100%',
+                        }}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <MemberAvatar src={reqAvatar} name={reqName} size={36} />
-                          <span className="text-sm font-bold truncate" style={{ color: INK }}>{reqName}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                          <MemberAvatar src={reqAvatar} name={reqName} size={32} />
+                          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {reqName}
+                          </span>
                         </div>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
                           <button
                             type="button"
                             onClick={() => handleApproveRequest(req)}
                             disabled={approvingUid === req.uid}
-                            className="font-bold text-xs transition-opacity hover:opacity-90"
-                            style={{ padding: '6px 14px', borderRadius: 999, background: C, color: '#fff', border: 'none', cursor: 'pointer' }}
+                            style={{
+                              padding: '5px 12px',
+                              borderRadius: 6,
+                              background: '#E50914',
+                              color: '#ffffff',
+                              fontSize: 11.5,
+                              fontWeight: 700,
+                              border: 'none',
+                              cursor: 'pointer',
+                            }}
                           >
                             {approvingUid === req.uid ? '...' : 'รับ'}
                           </button>
@@ -3183,10 +3506,18 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                             type="button"
                             onClick={() => handleRejectRequest(req)}
                             disabled={rejectingUid === req.uid}
-                            className="font-bold text-xs transition-colors"
-                            style={{ padding: '6px 14px', borderRadius: 999, background: '#f1f5f9', color: '#64748b', border: '1px solid #e2e8f0', cursor: 'pointer' }}
+                            style={{
+                              padding: '5px 10px',
+                              borderRadius: 6,
+                              background: '#F3F4F6',
+                              color: '#4B5563',
+                              fontSize: 11.5,
+                              fontWeight: 600,
+                              border: '1px solid #E5E7EB',
+                              cursor: 'pointer',
+                            }}
                           >
-                            ปฏิเสธ
+                            {rejectingUid === req.uid ? '...' : 'ปฏิเสธ'}
                           </button>
                         </div>
                       </div>
@@ -3196,459 +3527,498 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               </div>
             )}
 
-            {/* ── Squad Roster (Netflix Cast Grid) ── */}
-            <div className="flex flex-col gap-2.5">
-              <div className="flex items-center justify-between pt-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[12px] font-black uppercase tracking-[0.14em]" style={{ color: INK }}>
-                    ผู้เล่นในตี้
-                  </span>
-                  <span
-                    className="text-[11px] font-bold px-2 py-0.5 rounded-full"
-                    style={{ background: 'rgba(0, 0, 0, 0.06)', color: '#4b5563' }}
-                  >
-                    {total}/{maxMembers} คน
+            {/* ── Members / Cast Section (Single-Column, Full-Width, Never Clips) ── */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: '#111827' }}>สมาชิกในตี้</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '1px 8px', borderRadius: 12, background: '#F3F4F6', color: '#4B5563' }}>
+                    {total} / {maxMembers} คน
                   </span>
                 </div>
-                <div className="flex items-center gap-3 text-[11px] font-medium" style={{ color: '#64748b' }}>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: '#16a34a' }} /> ชำระแล้ว
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: '#6B7280' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} /> ชำระแล้ว
                   </span>
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full" style={{ background: '#cbd5e1' }} /> ยังไม่ชำระ
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#D1D5DB' }} /> ยังไม่ชำระ
                   </span>
                 </div>
               </div>
 
-              {/* 2-Column Responsive Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                {/* Active Member Cards */}
-                {(booking.members || []).map((m, idx) => {
-                  const mProf = memberProfiles[m.uid || m.id]
-                  const mAvatar = m.avatar || mProf?.pictureUrl || mProf?.avatar || ''
-                  const mName = m.name || mProf?.nickname || mProf?.firstname || mProf?.name || 'สมาชิก'
-                  const isMemLeader = m.uid === booking.leaderId
+              {/* Active Member Cards */}
+              {(booking.members || []).map((m, idx) => {
+                const mProf = memberProfiles[m.uid || m.id]
+                const mAvatar = m.avatar || mProf?.pictureUrl || mProf?.avatar || ''
+                const mName = m.name || mProf?.nickname || mProf?.firstname || mProf?.name || 'สมาชิก'
+                const isMemLeader = m.uid === booking.leaderId
 
-                  return (
-                    <div
-                      key={m.uid || m.id || idx}
-                      className="group flex items-center justify-between gap-2.5 transition-all"
-                      style={{
-                        padding: '10px 12px',
-                        borderRadius: 14,
-                        background: '#ffffff',
-                        border: '1px solid rgba(0, 0, 0, 0.08)',
-                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.02)',
-                      }}
-                    >
-                      <div
-                        className="flex items-center gap-2.5 min-w-0 flex-1 cursor-pointer"
-                        onClick={() => openProfile(m.uid || m.id)}
-                        title="ดูโปรไฟล์"
-                      >
-                        <MemberAvatar
-                          src={mAvatar}
-                          name={mName}
-                          size={38}
-                          imgStyle={
-                            m.paidDeposit
-                              ? { outline: '2px solid #16a34a', outlineOffset: 1.5 }
-                              : m.slipStatus === 'pending_verification'
-                                ? { outline: '2px solid #f59e0b', outlineOffset: 1.5 }
-                                : { outline: '1.5px solid rgba(0, 0, 0, 0.08)', outlineOffset: 1.5 }
-                          }
-                          badge={
-                            isMemLeader ? (
-                              <div
-                                className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center shadow-sm"
-                                style={{ background: C, border: '1.5px solid #ffffff' }}
-                                title="หัวหน้าปาร์ตี้"
-                              >
-                                <i className="fas fa-crown text-[6px] text-white" />
-                              </div>
-                            ) : null
-                          }
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-[13px] font-bold truncate leading-tight" style={{ color: INK }}>
-                              {mName}
-                            </span>
-                            {isMemLeader && (
-                              <span
-                                className="text-[9px] font-black uppercase tracking-wider shrink-0"
-                                style={{
-                                  padding: '1px 5px',
-                                  borderRadius: 4,
-                                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-                                  color: C,
-                                }}
-                              >
-                                หัวหน้า
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-[10.5px] mt-0.5 truncate font-medium" style={{ color: '#64748b' }}>
-                            {m.paidDeposit
-                              ? 'ยืนยันมัดจำแล้ว'
-                              : m.slipStatus === 'pending_verification'
-                                ? 'รอตรวจสอบสลิป'
-                                : 'รอชำระมัดจำ'}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Right side status badge & slip */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        {m.slipUrl && (
-                          <a
-                            href={m.slipUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-7 h-7 overflow-hidden block rounded-lg border border-slate-200 transition-opacity hover:opacity-80"
-                            title="ดูสลิป"
-                          >
-                            <img src={m.slipUrl} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          </a>
-                        )}
-                        <span
-                          className="text-[10px] font-black tracking-tight"
-                          style={{
-                            padding: '3px 8px',
-                            borderRadius: 999,
-                            background: m.paidDeposit
-                              ? '#dcfce7'
-                              : m.slipStatus === 'pending_verification'
-                                ? '#fef3c7'
-                                : '#f1f5f9',
-                            color: m.paidDeposit
-                              ? '#15803d'
-                              : m.slipStatus === 'pending_verification'
-                                ? '#b45309'
-                                : '#64748b',
-                            border: `1px solid ${
-                              m.paidDeposit
-                                ? '#bbf7d0'
-                                : m.slipStatus === 'pending_verification'
-                                  ? '#fde68a'
-                                  : '#e2e8f0'
-                            }`,
-                            whiteSpace: 'nowrap',
-                          }}
-                        >
-                          {m.paidDeposit ? (
-                            <>
-                              <i className="fas fa-check mr-1 text-[8px]" />
-                              จ่ายแล้ว
-                            </>
-                          ) : m.slipStatus === 'pending_verification' ? (
-                            <>
-                              <i className="fas fa-clock mr-1 text-[8px]" />
-                              รอตรวจ
-                            </>
-                          ) : (
-                            'ยังไม่จ่าย'
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  )
-                })}
-
-                {/* Compact Empty Seats in same grid */}
-                {Array.from({ length: Math.max(0, maxMembers - total) }).map((_, i) => (
+                return (
                   <div
-                    key={`empty-seat-${i}`}
-                    className="flex items-center justify-between gap-2.5 transition-all select-none"
+                    key={m.uid || m.id || idx}
                     style={{
-                      padding: '10px 12px',
-                      borderRadius: 14,
-                      background: 'rgba(248, 250, 252, 0.7)',
-                      border: '1.5px dashed rgba(203, 213, 225, 0.85)',
-                      minHeight: 58,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      padding: '10px 14px',
+                      borderRadius: 12,
+                      background: '#ffffff',
+                      border: '1px solid #E5E7EB',
+                      boxSizing: 'border-box',
+                      width: '100%',
+                      boxShadow: '0 1px 3px rgba(0, 0, 0, 0.02)',
                     }}
                   >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div
-                        className="w-[38px] h-[38px] rounded-full flex items-center justify-center shrink-0"
-                        style={{
-                          background: '#f1f5f9',
-                          border: '1px dashed #cbd5e1',
-                          color: '#94a3b8',
-                        }}
-                      >
-                        <i className="fas fa-user-plus text-[11px]" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-[12.5px] font-bold truncate" style={{ color: '#64748b' }}>
-                          ที่นั่งว่าง #{total + i + 1}
+                    <div
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1, cursor: 'pointer' }}
+                      onClick={() => openProfile(m.uid || m.id)}
+                      title="ดูโปรไฟล์"
+                    >
+                      <MemberAvatar
+                        src={mAvatar}
+                        name={mName}
+                        size={38}
+                        imgStyle={
+                          m.paidDeposit
+                            ? { outline: '2px solid #10B981', outlineOffset: 1.5 }
+                            : m.slipStatus === 'pending_verification'
+                              ? { outline: '2px solid #F59E0B', outlineOffset: 1.5 }
+                              : { outline: '1px solid #E5E7EB', outlineOffset: 1.5 }
+                        }
+                        badge={
+                          isMemLeader ? (
+                            <div
+                              style={{
+                                position: 'absolute',
+                                top: -3,
+                                right: -3,
+                                width: 15,
+                                height: 15,
+                                borderRadius: '50%',
+                                background: '#E50914',
+                                color: '#ffffff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                border: '1.5px solid #ffffff',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+                              }}
+                              title="หัวหน้าปาร์ตี้"
+                            >
+                              <i className="fas fa-crown" style={{ fontSize: 6 }} />
+                            </div>
+                          ) : null
+                        }
+                      />
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {mName}
+                          </span>
+                          {isMemLeader && (
+                            <span
+                              style={{
+                                fontSize: 9.5,
+                                fontWeight: 800,
+                                padding: '1px 6px',
+                                borderRadius: 4,
+                                background: '#FEF2F2',
+                                color: '#E50914',
+                                border: '1px solid #FCA5A5',
+                                letterSpacing: '0.02em',
+                                flexShrink: 0,
+                              }}
+                            >
+                              หัวหน้า
+                            </span>
+                          )}
                         </div>
-                        <div className="text-[10px] font-medium" style={{ color: '#94a3b8' }}>
-                          เปิดรับผู้เล่น
+                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
+                          {m.paidDeposit
+                            ? 'ยืนยันมัดจำแล้ว'
+                            : m.slipStatus === 'pending_verification'
+                              ? 'รอตรวจสอบสลิป'
+                              : 'รอชำระมัดจำ'}
                         </div>
                       </div>
                     </div>
-                    <span
-                      className="text-[9.5px] font-bold px-2 py-0.5 rounded-full shrink-0"
+
+                    {/* Status Pill on Right */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {m.slipUrl && (
+                        <a
+                          href={m.slipUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            border: '1px solid #E5E7EB',
+                            display: 'block',
+                          }}
+                          title="ดูสลิป"
+                        >
+                          <img src={m.slipUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" />
+                        </a>
+                      )}
+                      <span
+                        style={{
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          padding: '3px 9px',
+                          borderRadius: 20,
+                          whiteSpace: 'nowrap',
+                          background: m.paidDeposit
+                            ? '#ECFDF5'
+                            : m.slipStatus === 'pending_verification'
+                              ? '#FFFBEB'
+                              : '#F3F4F6',
+                          color: m.paidDeposit
+                            ? '#059669'
+                            : m.slipStatus === 'pending_verification'
+                              ? '#D97706'
+                              : '#6B7280',
+                          border: m.paidDeposit
+                            ? '1px solid #A7F3D0'
+                            : m.slipStatus === 'pending_verification'
+                              ? '1px solid #FDE68A'
+                              : '1px solid #E5E7EB',
+                        }}
+                      >
+                        {m.paidDeposit ? (
+                          <>
+                            <i className="fas fa-check" style={{ marginRight: 4, fontSize: 9 }} />
+                            จ่ายแล้ว
+                          </>
+                        ) : m.slipStatus === 'pending_verification' ? (
+                          <>
+                            <i className="fas fa-clock" style={{ marginRight: 4, fontSize: 9 }} />
+                            รอตรวจ
+                          </>
+                        ) : (
+                          'ยังไม่จ่าย'
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                )
+              })}
+
+              {/* Empty Seats */}
+              {Array.from({ length: Math.max(0, maxMembers - total) }).map((_, i) => (
+                <div
+                  key={`empty-seat-${i}`}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '9px 14px',
+                    borderRadius: 12,
+                    background: '#FAFAFA',
+                    border: '1px dashed #D1D5DB',
+                    boxSizing: 'border-box',
+                    width: '100%',
+                    color: '#9CA3AF',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <div
                       style={{
-                        background: '#f1f5f9',
-                        color: '#94a3b8',
-                        border: '1px solid #e2e8f0',
+                        width: 32,
+                        height: 32,
+                        borderRadius: '50%',
+                        background: '#ffffff',
+                        border: '1px solid #E5E7EB',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        color: '#9CA3AF',
                       }}
                     >
-                      ว่าง
-                    </span>
+                      <i className="fas fa-plus" />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: '#6B7280' }}>
+                        ที่นั่งว่าง #{total + i + 1}
+                      </span>
+                      <span style={{ fontSize: 10.5, color: '#9CA3AF', marginLeft: 6 }}>
+                        เปิดรับผู้เล่น
+                      </span>
+                    </div>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* ── Compact 2x2 Rules Brief ── */}
-            <div className="flex flex-col gap-2 pt-1">
-              <div className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-[0.14em]" style={{ color: '#64748b' }}>
-                <i className="fas fa-shield-alt text-[10px]" style={{ color: C }} />
-                <span>เงื่อนไขการจอง &amp; กติกาการล็อกห้อง</span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <div
-                  className="p-3 rounded-xl border flex items-start gap-2.5"
-                  style={{ background: '#f8fafc', borderColor: 'rgba(0, 0, 0, 0.06)' }}
-                >
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
+                  <span
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: '#ffffff',
+                      color: '#9CA3AF',
+                      border: '1px solid #E5E7EB',
+                    }}
                   >
-                    <i className="fas fa-lock text-xs" />
-                  </div>
-                  <div className="min-w-0 flex-1 text-[11.5px] leading-snug">
-                    <strong className="block text-[12px] font-bold" style={{ color: INK }}>ล็อกห้อง 100%</strong>
-                    <span style={{ color: '#4b5563' }}>เมื่อชำระมัดจำครบ {maxMembers} คน ระบบล็อกห้องทันที</span>
-                  </div>
-                </div>
-
-                <div
-                  className="p-3 rounded-xl border flex items-start gap-2.5"
-                  style={{ background: '#f8fafc', borderColor: 'rgba(0, 0, 0, 0.06)' }}
-                >
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
-                  >
-                    <i className="fas fa-user-clock text-xs" />
-                  </div>
-                  <div className="min-w-0 flex-1 text-[11.5px] leading-snug">
-                    <strong className="block text-[12px] font-bold" style={{ color: INK }}>ขยายเวลา +3 วัน</strong>
-                    <span style={{ color: '#4b5563' }}>ทุก 1 คนที่ชำระสำเร็จ ระบบขยายเวลาให้ทั้งตี้อีก +3 วัน</span>
-                  </div>
-                </div>
-
-                <div
-                  className="p-3 rounded-xl border flex items-start gap-2.5"
-                  style={{ background: '#f8fafc', borderColor: 'rgba(0, 0, 0, 0.06)' }}
-                >
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
-                  >
-                    <i className="fas fa-calendar-check text-xs" />
-                  </div>
-                  <div className="min-w-0 flex-1 text-[11.5px] leading-snug">
-                    <strong className="block text-[12px] font-bold" style={{ color: INK }}>กำหนดรอบแรก 3 วัน</strong>
-                    <span style={{ color: '#4b5563' }}>เริ่มนับเวลาชำระมัดจำทันทีหลังจากแอดมินยืนยันตี้</span>
-                  </div>
-                </div>
-
-                <div
-                  className="p-3 rounded-xl border flex items-start gap-2.5"
-                  style={{ background: '#f8fafc', borderColor: 'rgba(0, 0, 0, 0.06)' }}
-                >
-                  <div
-                    className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)', color: C }}
-                  >
-                    <i className="fas fa-hourglass-end text-xs" />
-                  </div>
-                  <div className="min-w-0 flex-1 text-[11.5px] leading-snug">
-                    <strong className="block text-[12px] font-bold" style={{ color: INK }}>ปิดรับก่อนเล่น 1 วัน</strong>
-                    <span style={{ color: '#4b5563' }}>เดดไลน์สิ้นสุดไม่เกิน 24 ชม. ก่อนวันเริ่มเล่นจริง</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Admin note */}
-            {booking.adminNote && (
-              <div
-                className="p-3 rounded-xl border flex items-start gap-2.5"
-                style={{ background: '#f8fafc', borderColor: '#e2e8f0', color: '#334155', fontSize: '12px' }}
-              >
-                <i className="fas fa-comment-alt text-xs mt-0.5 shrink-0" style={{ color: C }} />
-                <div className="min-w-0 flex-1">
-                  <span className="font-black text-[10px] uppercase tracking-wider block mb-0.5" style={{ color: C }}>
-                    โน้ตจากแอดมิน
+                    ว่าง
                   </span>
-                  <span>{booking.adminNote}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* ── Minimalist Booking Terms & Rules ── */}
+            <div
+              style={{
+                background: '#ffffff',
+                border: '1px solid #E5E7EB',
+                borderRadius: 14,
+                padding: '14px 16px',
+                boxSizing: 'border-box',
+                width: '100%',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                <i className="fas fa-shield-alt" style={{ color: '#E50914', fontSize: 12 }} />
+                <span style={{ fontSize: 12, fontWeight: 800, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  เงื่อนไขการจองและล็อกห้อง
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
+                  <i className="fas fa-calendar-plus" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#111827' }}>ขยายเวลา +3 วัน/คน:</strong> ทุกครั้งที่สมาชิกชำระมัดจำ ระบบจะขยายเวลาให้ตี้อัตโนมัติ
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
+                  <i className="fas fa-lock" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#111827' }}>ล็อกห้องอัตโนมัติ:</strong> เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องถาวรทันที
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
+                  <i className="fas fa-clock" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#111827' }}>กำหนดปิดรับ:</strong> ปิดรับชำระมัดจำไม่เกิน 24 ชั่วโมงก่อนวันเริ่มเล่นจริง
+                  </div>
                 </div>
               </div>
-            )}
+
+              {booking.adminNote && (
+                <div
+                  style={{
+                    marginTop: 10,
+                    paddingTop: 10,
+                    borderTop: '1px solid #F3F4F6',
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    gap: 8,
+                    fontSize: 11.5,
+                    color: '#4B5563',
+                  }}
+                >
+                  <i className="fas fa-comment-alt" style={{ color: '#E50914', fontSize: 11, marginTop: 2, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#E50914', fontSize: 11, textTransform: 'uppercase', display: 'block', marginBottom: 2 }}>
+                      โน้ตจากแอดมิน
+                    </strong>
+                    <span>{booking.adminNote}</span>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
-
-          {/* ── 3. PINNED ACTION BAR FOOTER (Shrink-0) ── */}
+          {/* ── 3. PINNED NETFLIX ACTION FOOTER ── */}
           <div
-            className="shrink-0 flex flex-col"
             style={{
               background: '#ffffff',
-              borderTop: '1px solid rgba(0, 0, 0, 0.08)',
-              padding: '14px clamp(18px, 3.5vw, 26px) max(14px, env(safe-area-inset-bottom, 14px))',
-              gap: 10,
-              boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.04)',
+              borderTop: '1px solid #E5E7EB',
+              padding: '14px 20px max(14px, env(safe-area-inset-bottom, 14px))',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              boxShadow: '0 -4px 16px rgba(0, 0, 0, 0.04)',
+              flexShrink: 0,
+              boxSizing: 'border-box',
+              width: '100%',
             }}
           >
-            {/* Join */}
+            {/* Join CTA */}
             {!isMember && !myRequest && lineUser && ['confirmed', 'pending'].includes(booking.status) && total < (booking.maxMembers || 99) && (
               <button
                 type="button"
                 onClick={handleRequestJoin}
                 disabled={joining}
-                className="w-full font-black flex items-center justify-center gap-2.5 transition-all"
                 style={{
-                  height: 50,
-                  borderRadius: 14,
-                  fontSize: 15,
-                  letterSpacing: '0.01em',
-                  background: C,
+                  width: '100%',
+                  height: 48,
+                  borderRadius: 12,
+                  background: '#E50914',
                   color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: 14,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 8,
                   border: 'none',
                   cursor: joining ? 'wait' : 'pointer',
-                  boxShadow: '0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)',
+                  boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
+                  transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => { if (!joining) e.currentTarget.style.background = '#b80710' }}
-                onMouseLeave={e => { if (!joining) e.currentTarget.style.background = C }}
+                onMouseEnter={e => { if (!joining) e.currentTarget.style.background = '#B80710' }}
+                onMouseLeave={e => { if (!joining) e.currentTarget.style.background = '#E50914' }}
               >
                 {joining ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>กำลังส่งคำขอ...</span>
-                  </>
+                  <span>กำลังส่งคำขอ...</span>
                 ) : (
                   <>
-                    <i className="fas fa-user-plus text-sm" />
+                    <i className="fas fa-user-plus" />
                     <span>ขอเข้าร่วมปาร์ตี้</span>
                   </>
                 )}
               </button>
             )}
 
-            {/* Pending join badge */}
+            {/* Pending Request Badge */}
             {!isMember && myRequest && lineUser && (
               <div
-                className="font-bold text-center text-[13px] flex items-center justify-center gap-2"
                 style={{
-                  padding: '12px 16px',
-                  borderRadius: 14,
-                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.06)',
-                  border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
-                  color: C,
+                  padding: '11px 16px',
+                  borderRadius: 12,
+                  background: '#FEF2F2',
+                  border: '1px solid #FCA5A5',
+                  color: '#DC2626',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                 }}
               >
-                <i className="fas fa-clock text-xs" />
-                <span>คุณได้ส่งคำขอแล้ว — รอหัวปาร์ตี้อนุมัติ</span>
+                <i className="fas fa-clock" />
+                <span>ส่งคำขอเข้าร่วมแล้ว — รอหัวปาร์ตี้อนุมัติ</span>
               </div>
             )}
 
-            {/* Pay deposit button */}
+            {/* Pay Deposit CTA */}
             {isMember && booking.status === 'confirmed' && !myMember?.paidDeposit && myMember?.slipStatus !== 'pending_verification' && (
-              <div className="flex flex-col gap-1.5">
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
                   type="button"
                   onClick={() => setShowDepositPay(true)}
-                  className="w-full font-black flex items-center justify-center gap-2.5 transition-all"
                   style={{
-                    height: 52,
-                    borderRadius: 14,
-                    fontSize: 15,
-                    letterSpacing: '0.01em',
-                    background: C,
+                    width: '100%',
+                    height: 48,
+                    borderRadius: 12,
+                    background: '#E50914',
                     color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)',
+                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
+                    transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#b80710'}
-                  onMouseLeave={e => e.currentTarget.style.background = C}
+                  onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
                 >
-                  <i className="fas fa-qrcode text-base" />
+                  <i className="fas fa-qrcode" style={{ fontSize: 16 }} />
                   <span>จ่ายมัดจำ ฿{booking.depositAmount || 0} / แนบสลิป</span>
                 </button>
-                <div className="text-[11px] text-center font-medium" style={{ color: '#64748b' }}>
+                <span style={{ fontSize: 10.5, textAlign: 'center', color: '#6B7280' }}>
                   ชำระแล้วจะช่วยขยายเวลาให้ตี้ +3 วัน และเมื่อครบ {maxMembers} คน ระบบจะล็อกห้องทันที
-                </div>
-              </div>
-            )}
-
-            {/* Already paid deposit confirmation */}
-            {isMember && myMember?.paidDeposit && (
-              <div
-                className="flex items-center justify-center gap-2"
-                style={{
-                  padding: '12px 16px',
-                  borderRadius: 14,
-                  background: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
-                  color: '#15803d',
-                }}
-              >
-                <i className="fas fa-check-circle" />
-                <span className="text-[13px] font-black">
-                  {isLocked
-                    ? 'คุณชำระมัดจำแล้ว — ล็อกห้องเรียบร้อย 100%'
-                    : `คุณชำระมัดจำแล้ว (รอเพื่อนในตี้อีก ${remainingToLock} คนเพื่อล็อกห้อง)`}
                 </span>
               </div>
             )}
 
-            {/* Slip submitted */}
-            {isMember && myMember?.slipStatus === 'pending_verification' && !myMember?.paidDeposit && (
+            {/* Paid Status */}
+            {isMember && myMember?.paidDeposit && (
               <div
-                className="flex items-center gap-3"
                 style={{
-                  padding: '12px 16px',
-                  borderRadius: 14,
-                  background: '#fffbeb',
-                  border: '1px solid #fde68a',
-                  color: '#92400e',
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  color: '#065F46',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                 }}
               >
-                <i className="fas fa-hourglass-half text-sm text-amber-600 shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="font-black text-[13.5px]">ส่งสลิปแล้ว — รอแอดมินตรวจสอบ</div>
-                  <div className="text-[11.5px] text-amber-700">แอดมินจะแจ้งผลทาง LINE</div>
+                <i className="fas fa-check-circle" style={{ color: '#10B981' }} />
+                <span>
+                  {isLocked
+                    ? 'คุณชำระมัดจำแล้ว — ล็อกห้องเรียบร้อย 100%'
+                    : `คุณชำระมัดจำแล้ว (รอเพื่อนในตี้อีก ${remainingToLock} คน)`}
+                </span>
+              </div>
+            )}
+
+            {/* Slip Submitted Pending */}
+            {isMember && myMember?.slipStatus === 'pending_verification' && !myMember?.paidDeposit && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  background: '#FFFBEB',
+                  border: '1px solid #FDE68A',
+                  color: '#92400e',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                }}
+              >
+                <i className="fas fa-hourglass-half" style={{ color: '#D97706', fontSize: 14 }} />
+                <div>
+                  <div>ส่งสลิปแล้ว — รอแอดมินตรวจสอบ</div>
+                  <div style={{ fontSize: 10.5, fontWeight: 500, color: '#B45309' }}>แอดมินจะแจ้งผลทาง LINE</div>
                 </div>
               </div>
             )}
 
-            {/* Secondary row */}
-            <div className="flex items-center gap-2.5">
+            {/* Secondary Action Row: Share, Leave, Close */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <button
                 type="button"
                 onClick={handleShare}
-                className="flex-1 font-bold flex items-center justify-center gap-2 transition-all"
                 style={{
-                  height: 44,
-                  borderRadius: 12,
-                  fontSize: 13,
-                  background: '#f1f5f9',
-                  color: copied ? C : INK,
-                  border: '1px solid #e2e8f0',
+                  flex: 1,
+                  minWidth: 0,
+                  height: 40,
+                  borderRadius: 10,
+                  background: '#F3F4F6',
+                  border: '1px solid #E5E7EB',
+                  color: copied ? '#E50914' : '#111827',
+                  fontSize: 12.5,
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 6,
                   cursor: 'pointer',
+                  transition: 'all 0.15s',
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#e2e8f0'}
-                onMouseLeave={e => e.currentTarget.style.background = '#f1f5f9'}
+                onMouseEnter={e => e.currentTarget.style.background = '#E5E7EB'}
+                onMouseLeave={e => e.currentTarget.style.background = '#F3F4F6'}
               >
-                <i className={`fas fa-${copied ? 'check' : 'share-alt'}`} />
-                <span>{copied ? 'คัดลอกลิงก์แล้ว' : `แชร์ชวนเพื่อน (${total}/${maxMembers})`}</span>
+                <i className={`fas fa-${copied ? 'check' : 'share-alt'}`} style={{ color: copied ? '#10B981' : 'inherit' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {copied ? 'คัดลอกลิงก์แล้ว' : `แชร์ชวนเพื่อน (${total}/${maxMembers})`}
+                </span>
               </button>
 
               {isMember && !isLeader && (
@@ -3656,19 +4026,25 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   type="button"
                   onClick={handleLeave}
                   disabled={leaving}
-                  className="font-bold flex items-center justify-center gap-2 transition-all"
                   style={{
-                    height: 44,
-                    padding: '0 16px',
-                    borderRadius: 12,
-                    fontSize: 13,
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    border: '1px solid #fecaca',
+                    height: 40,
+                    padding: '0 14px',
+                    borderRadius: 10,
+                    background: '#FEF2F2',
+                    border: '1px solid #FCA5A5',
+                    color: '#DC2626',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
                     cursor: leaving ? 'wait' : 'pointer',
+                    flexShrink: 0,
+                    transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
                 >
                   <i className="fas fa-sign-out-alt" />
                   <span>ออกจากตี้</span>
@@ -3680,19 +4056,25 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   type="button"
                   onClick={handleCloseBooking}
                   disabled={closing}
-                  className="font-bold flex items-center justify-center gap-2 transition-all"
                   style={{
-                    height: 44,
-                    padding: '0 16px',
-                    borderRadius: 12,
-                    fontSize: 13,
-                    background: '#fef2f2',
-                    color: '#dc2626',
-                    border: '1px solid #fecaca',
+                    height: 40,
+                    padding: '0 14px',
+                    borderRadius: 10,
+                    background: '#FEF2F2',
+                    border: '1px solid #FCA5A5',
+                    color: '#DC2626',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
                     cursor: closing ? 'wait' : 'pointer',
+                    flexShrink: 0,
+                    transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#fee2e2'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#fef2f2'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
                 >
                   <i className="fas fa-times-circle" />
                   <span>{closing ? 'กำลังปิด...' : 'ปิดตี้'}</span>
@@ -3904,28 +4286,7 @@ export default function BookingPage({
       >
         <div style={{ maxWidth: 1320, margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* Tag */}
             <div>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 7,
-                  padding: '4px 12px',
-                  borderRadius: 20,
-                  background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-                  border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
-                  color: 'var(--curtain-crimson, #e50914)',
-                  fontSize: 11,
-                  fontWeight: 800,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  marginBottom: 12,
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--curtain-crimson, #e50914)' }} />
-                SOFUN CLUB THAILAND · SCRIPT MURDER BOOKING
-              </div>
 
               {/* Title + CTA row */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
@@ -3974,33 +4335,7 @@ export default function BookingPage({
                 </button>
               </div>
 
-              {/* Stats pills */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
-                {[
-                  { icon: 'fas fa-door-open', label: '4 ห้องมาตรฐานพร้อมระบบเสียง & แสง' },
-                  { icon: 'fas fa-scroll', label: '40+ แฟ้มคดี Script Murder ลิขสิทธิ์แปลไทย' },
-                  { icon: 'fas fa-calendar-check', label: `${upcomingCount} รอบเล่นในระบบ` },
-                ].map((stat, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      padding: '5px 12px',
-                      borderRadius: 10,
-                      background: '#f8fafc',
-                      border: '1px solid rgba(0, 0, 0, 0.06)',
-                      fontSize: 12,
-                      fontWeight: 700,
-                      color: '#4b5563',
-                    }}
-                  >
-                    <i className={stat.icon} style={{ color: 'var(--curtain-crimson, #e50914)', fontSize: 11 }} />
-                    <span>{stat.label}</span>
-                  </div>
-                ))}
-              </div>
+
             </div>
           </div>
         </div>

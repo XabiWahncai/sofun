@@ -1753,12 +1753,13 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
             </div>
 
             {/* PNG Download & Saved Krathong Actions */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
+            <div style={{ marginBottom: '10px' }}>
               <button
                 type="button"
                 disabled={downloadingCard}
                 onClick={() => handleDownloadCardPng(releasedKrathong)}
                 style={{
+                  width: '100%',
                   background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.25) 0%, rgba(217, 119, 6, 0.35) 100%)',
                   border: '1px solid rgba(254, 240, 138, 0.55)',
                   color: '#fef08a',
@@ -1776,28 +1777,6 @@ export default function KrathongDrawPage({ showPage, lineUser, showToast }) {
               >
                 <i className="fas fa-id-card" />
                 {downloadingCard ? 'กำลังสร้างการ์ด...' : 'บันทึกการ์ด (PNG)'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleDownloadRawPng(releasedKrathong)}
-                style={{
-                  background: 'rgba(255, 255, 255, 0.08)',
-                  border: '1px solid rgba(255, 255, 255, 0.18)',
-                  color: '#ffffff',
-                  borderRadius: '12px',
-                  padding: '9px 10px',
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '5px',
-                }}
-              >
-                <i className="fas fa-image" />
-                บันทึกรูปกระทง (PNG)
               </button>
             </div>
 
