@@ -18,7 +18,7 @@ const TEXT_MUTED = '#4b5563';
 const TEXT_LIGHT = '#9ca3af';
 const BORDER_CLR = 'rgba(0, 0, 0, 0.08)';
 
-import { convertImageUrl, extractDriveId, toOptimizedUrl } from '../utils/imageUrl';
+import { convertImageUrl, extractDriveId, toOptimizedUrl, handleImageLoadError } from '../utils/imageUrl';
 
 /* Difficulty Badge */
 function DiffBadge({ d }) {
@@ -127,6 +127,8 @@ function HomeNetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEn
           alt={game.title}
           loading="lazy"
           decoding="async"
+          referrerPolicy="no-referrer"
+          onError={e => handleImageLoadError(e, game.image || game.coverUrl, 400)}
           style={{
             width: '100%',
             height: '100%',
@@ -1069,7 +1071,7 @@ export default function HomePage({ allGames = [], allParties = [], showPage, sho
                 }}
               >
                 {heroImg
-                  ? <img src={heroImg} alt="" aria-hidden fetchpriority="high" decoding="async" style={{ width:'100%', height:'100%', objectFit:'cover', opacity: heroVisible ? 1 : 0, transition:'opacity .65s ease' }} />
+                  ? <img src={heroImg} alt="" aria-hidden fetchpriority="high" decoding="async" referrerPolicy="no-referrer" onError={e => handleImageLoadError(e, heroCustomCover || heroGame?.image || heroGame?.coverUrl, 1000)} style={{ width:'100%', height:'100%', objectFit:'cover', opacity: heroVisible ? 1 : 0, transition:'opacity .65s ease' }} />
                   : <div style={{ width:'100%', height:'100%', background:'linear-gradient(145deg,#1a1a2e,#0f3460)', display:'flex', alignItems:'center', justifyContent:'center' }}>
                       <i className="fas fa-user-secret" style={{ fontSize:80, color:'rgba(255,255,255,.12)' }} />
                     </div>

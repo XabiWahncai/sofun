@@ -20,7 +20,7 @@ const BORDER_SUBTLE= 'rgba(255,255,255,0.08)'
 const BORDER_FOCUS = 'rgba(255,255,255,0.22)'
 
 /* ── Image Helpers ─────────────────────────────────────────────────── */
-import { convertImageUrl } from '../utils/imageUrl'
+import { convertImageUrl, handleImageLoadError, toFallbackUrl } from '../utils/imageUrl'
 
 /* ── Difficulty Badge Helper ───────────────────────────────────────── */
 function diffConfig(level) {
@@ -125,6 +125,8 @@ function CharacterModal({ character, onClose }) {
             <img
               src={imgSrc}
               alt={character.name}
+              referrerPolicy="no-referrer"
+              onError={e => handleImageLoadError(e, character.image, 800)}
               style={{ width: '100%', height: '100%', objectFit: 'cover' }}
             />
           ) : (
@@ -177,6 +179,8 @@ function RelatedCard({ game, showDetail }) {
             src={imgSrc}
             alt={game.title}
             loading="lazy"
+            referrerPolicy="no-referrer"
+            onError={e => handleImageLoadError(e, game.image, 420)}
             style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.4s ease-out' }}
             className="dp-netflix-card-img"
           />
@@ -528,6 +532,8 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                 src={bannerImgSrc}
                 alt={game.title}
                 fetchpriority="high"
+                referrerPolicy="no-referrer"
+                onError={e => handleImageLoadError(e, game.image, 1400)}
                 style={{
                   position: 'absolute', inset: 0, width: '100%', height: '100%',
                   objectFit: 'cover', objectPosition: 'center 20%',
@@ -896,6 +902,8 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                               src={charImg}
                               alt={char.name}
                               loading="lazy"
+                              referrerPolicy="no-referrer"
+                              onError={e => handleImageLoadError(e, char.image, 340)}
                               style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.35s ease' }}
                               className="dp-char-poster"
                             />

@@ -19,7 +19,7 @@ const BORDER_SUBTLE = 'rgba(0,0,0,0.08)'
 const BORDER_FOCUS  = 'rgba(0,0,0,0.2)'
 
 /* ── Image CDN Helper ──────────────────────────────────────────────── */
-import { toOptimizedUrl as getCleanImgUrl } from '../utils/imageUrl'
+import { toOptimizedUrl as getCleanImgUrl, handleImageLoadError } from '../utils/imageUrl'
 
 /* ── Difficulty Badge Helper ───────────────────────────────────────── */
 function getDifficultyBadge(level) {
@@ -575,6 +575,8 @@ function NetflixPosterCard({ game, showDetail, showPage, isPlayed, bookingEnable
           alt={game.title}
           loading="lazy"
           decoding="async"
+          referrerPolicy="no-referrer"
+          onError={e => handleImageLoadError(e, game.image, 400)}
           className="netflix-card-img"
           style={{
             width: '100%',
