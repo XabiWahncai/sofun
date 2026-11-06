@@ -290,3 +290,28 @@ export function handleImageLoadError(event, originalUrl, width = 600) {
     img.src = '/logo.png'
   }
 }
+
+/**
+ * Dedicated error handler for character portraits and member avatars.
+ * Never falls back to /logo.png.
+ * Step 0: Tries native thumbnail endpoint (works if user has Google session cookies)
+ * Step 1: Hides the broken img element cleanly so the sleek underlying silhouette placeholder displays.
+ */
+export function handleCharacterImageError(event, originalUrl, width = 340) {
+  if (!event || !event.currentTarget) return
+  const img = event.currentTarget
+  const step = Number(img.dataset.failStep || 0)
+
+  if (step === 0) {
+    img.dataset.failStep = '1'
+    const driveId = extractDriveId(originalUrl)
+    if (driveId) {
+      img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
+      return
+    }
+  }
+
+  // Final fallback: hide img cleanly so underlying avatar/placeholder icon shows
+  img.dataset.failStep = '2'
+  img.style.display = 'none'
+}

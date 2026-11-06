@@ -20,7 +20,7 @@ const BORDER_SUBTLE= 'rgba(255,255,255,0.08)'
 const BORDER_FOCUS = 'rgba(255,255,255,0.22)'
 
 /* ── Image Helpers ─────────────────────────────────────────────────── */
-import { convertImageUrl, handleImageLoadError, toFallbackUrl } from '../utils/imageUrl'
+import { convertImageUrl, handleImageLoadError, handleCharacterImageError, toFallbackUrl } from '../utils/imageUrl'
 
 /* ── Difficulty Badge Helper ───────────────────────────────────────── */
 function diffConfig(level) {
@@ -121,20 +121,20 @@ function CharacterModal({ character, onClose }) {
         </button>
 
         <div style={{ aspectRatio: '3/4', width: '100%', background: '#111', overflow: 'hidden', position: 'relative' }}>
-          {imgSrc ? (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: TEXT_SUBTLE, gap: 10, background: 'linear-gradient(145deg, #1e1e22, #101012)' }}>
+            <i className="fas fa-user-secret" style={{ fontSize: 52, opacity: 0.5 }} />
+            <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>ไม่มีรูปตัวละคร</span>
+          </div>
+          {imgSrc && (
             <img
               src={imgSrc}
               alt={character.name}
               referrerPolicy="no-referrer"
-              onError={e => handleImageLoadError(e, character.image, 800)}
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+              onError={e => handleCharacterImageError(e, character.image, 800)}
+              style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }}
             />
-          ) : (
-            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_SUBTLE }}>
-              <i className="fas fa-user-secret" style={{ fontSize: 48 }} />
-            </div>
           )}
-          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(22,22,22,1) 0%, rgba(22,22,22,0.2) 40%, transparent 70%)' }} />
+          <div style={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to top, rgba(22,22,22,1) 0%, rgba(22,22,22,0.2) 40%, transparent 70%)' }} />
         </div>
 
         <div style={{ padding: '20px 24px 26px' }}>
@@ -897,23 +897,22 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                         onClick={() => setSelectedCharacter(char)}
                       >
                         <div style={{ aspectRatio: '2/3', overflow: 'hidden', position: 'relative', background: '#181818' }}>
-                          {charImg ? (
+                          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_SUBTLE, background: 'linear-gradient(145deg, #1f1f23, #121214)' }}>
+                            <i className="fas fa-user-secret" style={{ fontSize: 36, opacity: 0.5 }} />
+                          </div>
+                          {charImg && (
                             <img
                               src={charImg}
                               alt={char.name}
                               loading="lazy"
                               referrerPolicy="no-referrer"
-                              onError={e => handleImageLoadError(e, char.image, 340)}
-                              style={{ width: '100%', height: '100%', objectFit: 'cover', transition: 'transform 0.35s ease' }}
+                              onError={e => handleCharacterImageError(e, char.image, 340)}
+                              style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'cover', zIndex: 1, transition: 'transform 0.35s ease' }}
                               className="dp-char-poster"
                             />
-                          ) : (
-                            <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: TEXT_SUBTLE }}>
-                              <i className="fas fa-user" style={{ fontSize: 32 }} />
-                            </div>
                           )}
-                          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.15) 50%, transparent 80%)' }} />
-                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '12px 10px 10px' }}>
+                          <div style={{ position: 'absolute', inset: 0, zIndex: 2, pointerEvents: 'none', background: 'linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.15) 50%, transparent 80%)' }} />
+                          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 3, padding: '12px 10px 10px' }}>
                             <p style={{ fontSize: 12.5, fontWeight: 800, color: '#ffffff', lineHeight: 1.25, marginBottom: char.role ? 2 : 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {char.name}
                             </p>
