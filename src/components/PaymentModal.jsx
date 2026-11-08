@@ -116,7 +116,9 @@ export default function PaymentModal({
       const myFood = orderArr
         .filter(x => x.orderedBy?.uid === m?.uid)
         .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
-      const myBaseGame = m?.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)
+      const myBaseGame = (m?.customGamePrice !== undefined && m?.customGamePrice !== '' && m?.customGamePrice !== null && !isNaN(Number(m?.customGamePrice)))
+        ? Math.max(0, Number(m.customGamePrice))
+        : (m?.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit))
       const isMemberDiscounted = (propDiscountEffectiveIds || []).includes(m?.uid)
       const myDisc = isMemberDiscounted ? (propDiscountPerDiscounted || 0) : 0
       bill = Math.max(0, myBaseGame + myFood + sharedFoodPerMember - (Number(m?.personalDiscount) || 0) - myDisc)
@@ -143,7 +145,12 @@ export default function PaymentModal({
   }
 
   const rawFoodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
-  const rawGameTotal = sessionMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)), 0)
+  const rawGameTotal = sessionMembers.reduce((sum, m) => {
+    const base = (m?.customGamePrice !== undefined && m?.customGamePrice !== '' && m?.customGamePrice !== null && !isNaN(Number(m?.customGamePrice)))
+      ? Math.max(0, Number(m.customGamePrice))
+      : (m?.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit))
+    return sum + base
+  }, 0)
   const rawTotal = propRawTotal ?? (rawFoodTotal + rawGameTotal)
 
   const effectiveTotalDiscount = propTotalDiscount || discountTotal || 0
@@ -297,7 +304,12 @@ export default function PaymentModal({
             name: m.name,
             character: m.character || '',
             avatar: m.avatar || '',
-            gamePrice: m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit),
+            gamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null && !isNaN(Number(m.customGamePrice)))
+              ? Number(m.customGamePrice)
+              : (m.unpaidDeposit ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)),
+            customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null && !isNaN(Number(m.customGamePrice)))
+              ? Number(m.customGamePrice)
+              : null,
             foodItems: [...mFood, ...mSharedFood],
             discount: mDisc,
             promoName: session.promoName || '',
@@ -337,8 +349,9 @@ export default function PaymentModal({
   // Active member breakdown values
   const memberFood = activeMemberObj ? orderArr.filter(x => x.orderedBy?.uid === activeMemberObj.uid) : []
   const isUnpaidDep = activeMemberObj ? Boolean(activeMemberObj.unpaidDeposit) : false
+  const memberHasCustomPrice = activeMemberObj?.customGamePrice !== undefined && activeMemberObj?.customGamePrice !== '' && activeMemberObj?.customGamePrice !== null && !isNaN(Number(activeMemberObj?.customGamePrice))
   const memberGameFee = activeMemberObj
-    ? (isUnpaidDep ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit))
+    ? (memberHasCustomPrice ? Math.max(0, Number(activeMemberObj.customGamePrice)) : (isUnpaidDep ? (propGameFullPrice ?? gameFull) : (propGameUnitPay ?? gameUnit)))
     : 0
   const isDisc = activeMemberObj ? (propDiscountEffectiveIds || []).includes(activeMemberObj.uid) : false
   const memberDisc = isDisc ? (propDiscountPerDiscounted || 0) : 0
@@ -502,11 +515,11 @@ export default function PaymentModal({
                   </div>
 
                   {/* Game Fee */}
-                  {memberGameFee > 0 && (
+                  {(memberGameFee > 0 || memberHasCustomPrice) && (
                     <div className="pay-summary-row">
                       <span>
                         <i className="fas fa-scroll" style={{ color: '#c62419', marginRight: 5 }} />
-                        {selectedGame?.title || 'ค่าเกม'}{isUnpaidDep ? ' (ราคาเต็ม)' : ''}
+                        {selectedGame?.title || 'ค่าเกม'}{memberHasCustomPrice ? ' (ปรับราคาเฉพาะคน)' : (isUnpaidDep ? ' (ราคาเต็ม)' : '')}
                       </span>
                       <span>฿{fmtCurrency(memberGameFee)}</span>
                     </div>
@@ -521,7 +534,7 @@ export default function PaymentModal({
                       <span>฿{fmtCurrency((x.totalPrice || 0) * (x.qty || 1))}</span>
                     </div>
                   ))}
-                  {memberFood.length === 0 && memberGameFee <= 0 && (
+                  {memberFood.length === 0 && memberGameFee <= 0 && !memberHasCustomPrice && (
                     <div style={{ fontSize: 12, color: '#999', padding: '4px 0' }}>ไม่มีรายการอาหารหรือค่าเกม</div>
                   )}
 

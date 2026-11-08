@@ -871,7 +871,12 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
     ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (normalGameFee + (Number(selectedGame.deposit) || 0)))
     : normalGameFee
 
-  const getMemberGameFee = (m) => (m?.unpaidDeposit ? fullGameFee : normalGameFee)
+  const getMemberGameFee = (m) => {
+    if (m?.customGamePrice !== undefined && m?.customGamePrice !== '' && m?.customGamePrice !== null && !isNaN(Number(m?.customGamePrice))) {
+      return Math.max(0, Number(m.customGamePrice))
+    }
+    return m?.unpaidDeposit ? fullGameFee : normalGameFee
+  }
 
   const orderMembers = activeOrder?.members || []
   const numMembers = orderMembers.length || 1
@@ -1278,7 +1283,9 @@ export default function MemberOrderPage({ lineUser, activeOrder, showToast, allG
                 <div className="mo-bill-row game">
                   <span className="mo-bill-row-name">
                     <i className="fas fa-scroll" style={{ marginRight: 5 }} />{activeOrder.scriptTitle || 'ค่าเกม'}
-                    {me?.unpaidDeposit ? ' (ราคาเต็ม)' : (numMembers > 1 ? ` · คนละ ฿${fmtCurrency(normalGameFee)}` : '')}
+                    {me?.customGamePrice !== undefined && me?.customGamePrice !== '' && me?.customGamePrice !== null && !isNaN(Number(me?.customGamePrice))
+                      ? ' (ปรับราคาพิเศษ)'
+                      : (me?.unpaidDeposit ? ' (ราคาเต็ม)' : (numMembers > 1 ? ` · คนละ ฿${fmtCurrency(normalGameFee)}` : ''))}
                   </span>
                   <span className="mo-bill-row-price">฿{fmtCurrency(myGameFee)}</span>
                 </div>

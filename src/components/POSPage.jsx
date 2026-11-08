@@ -398,6 +398,8 @@ export default function POSPage({
   }, [npcDropOpen])
   const [mobilePanel, setMobilePanel] = useState('members') // 'members' | 'menu' | 'order' — mobile only
   const [expandedMembers, setExpandedMembers] = useState(() => new Set())
+  const [repriceOpenUids, setRepriceOpenUids] = useState(() => new Set())
+  const [repriceDrafts, setRepriceDrafts] = useState({})
   const [editingUnlocked, setEditingUnlocked] = useState(false)
   const [confirmCloseSession, setConfirmCloseSession] = useState(null)
   const [isPrimaryPrinter, setIsPrimaryPrinter] = useState(() => {
@@ -741,7 +743,12 @@ export default function POSPage({
       const gFullPrice = g
         ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
         : gUnitPay
-      const newGamePrice = newMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gFullPrice : gUnitPay), 0)
+      const newGamePrice = newMembers.reduce((sum, m) => {
+        if (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null && !isNaN(Number(m.customGamePrice))) {
+          return sum + Math.max(0, Number(m.customGamePrice))
+        }
+        return sum + (m.unpaidDeposit ? gFullPrice : gUnitPay)
+      }, 0)
       const fTotal = (session.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
       const dMode = session.discountMode || 'perPerson'
       const dRaw = Number(session.discount) || 0
@@ -760,6 +767,7 @@ export default function POSPage({
         personalDiscount: Number(m.personalDiscount) || 0,
         personalDiscountNote: m.personalDiscountNote || '',
         unpaidDeposit: Boolean(m.unpaidDeposit),
+        ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
       }))
 
       if (session.confirmedOrderId) {
@@ -1004,7 +1012,7 @@ export default function POSPage({
       if (Array.isArray(data.members) && data.members.length > 0) {
         const curMembers = activeSession?.members || []
         const isMembersDiff = data.members.length !== curMembers.length ||
-          data.members.some((m, idx) => !curMembers[idx] || curMembers[idx].uid !== m.uid || curMembers[idx].name !== m.name)
+          data.members.some((m, idx) => !curMembers[idx] || curMembers[idx].uid !== m.uid || curMembers[idx].name !== m.name || curMembers[idx].customGamePrice !== m.customGamePrice || curMembers[idx].unpaidDeposit !== m.unpaidDeposit || curMembers[idx].personalDiscount !== m.personalDiscount)
         if (isMembersDiff) {
           updateActive({ members: data.members })
         }
@@ -1022,8 +1030,14 @@ export default function POSPage({
   const gameFullPrice = selectedGame
     ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (gameUnitPay + (Number(selectedGame.deposit) || 0)))
     : gameUnitPay
+  const getMemberGamePrice = (m, unitPay = gameUnitPay, fullPrice = gameFullPrice) => {
+    if (m?.customGamePrice !== undefined && m?.customGamePrice !== '' && m?.customGamePrice !== null && !isNaN(Number(m?.customGamePrice))) {
+      return Math.max(0, Number(m.customGamePrice))
+    }
+    return m?.unpaidDeposit ? fullPrice : unitPay
+  }
   const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
-  const gamePrice = sessionMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gameFullPrice : gameUnitPay), 0)
+  const gamePrice = sessionMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
   const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
   const discountRaw = Number(activeSession?.discount) || 0
   // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
@@ -1056,7 +1070,7 @@ export default function POSPage({
     const myFood = orderArr
       .filter(x => x.orderedBy?.uid === m.uid)
       .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
-    const myBaseGame = m.unpaidDeposit ? gameFullPrice : gameUnitPay
+    const myBaseGame = getMemberGamePrice(m)
     const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
     let myDisc = 0
     if (isMemberDiscounted) {
@@ -1107,6 +1121,7 @@ export default function POSPage({
           personalDiscount: Number(m.personalDiscount) || 0,
           personalDiscountNote: m.personalDiscountNote || '',
           unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
         }))
 
         const payloadKey = JSON.stringify({
@@ -1125,7 +1140,7 @@ export default function POSPage({
           discountMemberIds: discountMemberIdsRaw,
           promoName: activeSession.promoName || '',
           grandTotal,
-          members: membersPayload.map(m => ({ uid: m.uid, pd: m.personalDiscount, pdn: m.personalDiscountNote, ud: m.unpaidDeposit, ch: m.character })),
+          members: membersPayload.map(m => ({ uid: m.uid, pd: m.personalDiscount, pdn: m.personalDiscountNote, ud: m.unpaidDeposit, ch: m.character, cgp: m.customGamePrice })),
         })
 
         if (lastSyncedOrderRef.current === payloadKey) return
@@ -1301,6 +1316,7 @@ export default function POSPage({
             personalDiscount: Number(m.personalDiscount) || 0,
             personalDiscountNote: m.personalDiscountNote || '',
             unpaidDeposit: Boolean(m.unpaidDeposit),
+            ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
           })),
           discount: discountRaw,
           discountMode,
@@ -1324,6 +1340,7 @@ export default function POSPage({
         personalDiscount: Number(m.personalDiscount) || 0,
         personalDiscountNote: m.personalDiscountNote || '',
         unpaidDeposit: Boolean(m.unpaidDeposit),
+        ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
       }))
       const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
       updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
@@ -1348,6 +1365,7 @@ export default function POSPage({
         personalDiscount: Number(m.personalDiscount) || 0,
         personalDiscountNote: m.personalDiscountNote || '',
         unpaidDeposit: Boolean(m.unpaidDeposit),
+        ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
       }))
       updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
         members: membersPayload,
@@ -1357,6 +1375,75 @@ export default function POSPage({
         promoName: activeSession.promoName || '',
         updatedAt: serverTimestamp(),
       }).catch(err => console.warn('Failed to sync personal discount note to orders:', err))
+    }
+  }
+
+  const toggleReprice = (uid, currentVal) => {
+    setRepriceOpenUids(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) {
+        next.delete(uid)
+      } else {
+        next.add(uid)
+        setRepriceDrafts(d => ({ ...d, [uid]: (currentVal !== undefined && currentVal !== null) ? String(currentVal) : '' }))
+      }
+      return next
+    })
+  }
+
+  const setMemberCustomPrice = async (uid, val) => {
+    const isReset = val === '' || val === null || val === undefined
+    const parsedPrice = isReset ? null : Math.max(0, Number(val) || 0)
+    const updatedMembers = activeSession.members.map(m => {
+      if (m.uid !== uid) return m
+      if (isReset) {
+        const { customGamePrice, ...rest } = m
+        return rest
+      }
+      return { ...m, customGamePrice: parsedPrice }
+    })
+
+    updateActive({ members: updatedMembers })
+    showToast(
+      isReset
+        ? 'รีเซ็ตราคาเกมเป็นราคาปกติแล้ว'
+        : `ปรับราคาเกมเฉพาะคนเป็น ฿${fmtCurrency(parsedPrice)} เรียบร้อยแล้ว`
+    )
+
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      try {
+        const membersPayload = updatedMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+        }))
+        const newGamePrice = updatedMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
+        const dMode = activeSession.discountMode || 'perPerson'
+        const rawD = Number(activeSession.discount) || 0
+        const selIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+        const effIds = selIds.length > 0
+          ? selIds.filter(id => updatedMembers.some(mm => mm.uid === id))
+          : updatedMembers.map(mm => mm.uid)
+        const nD = effIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? rawD : rawD * nD) : 0
+        const totalPersonal = updatedMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          gameTotal: newGamePrice,
+          discount: rawD,
+          discountMode: dMode,
+          discountMemberIds: selIds,
+          promoName: activeSession.promoName || '',
+          grandTotal: Math.max(0, foodTotal + newGamePrice - totD - totalPersonal),
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync order on setMemberCustomPrice:', err)
+      }
     }
   }
 
@@ -1380,8 +1467,9 @@ export default function POSPage({
           personalDiscount: Number(m.personalDiscount) || 0,
           personalDiscountNote: m.personalDiscountNote || '',
           unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
         }))
-        const newGamePrice = updatedMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gameFullPrice : gameUnitPay), 0)
+        const newGamePrice = updatedMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
         const dMode = activeSession.discountMode || 'perPerson'
         const rawD = Number(activeSession.discount) || 0
         const selIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
@@ -1416,6 +1504,7 @@ export default function POSPage({
       personalDiscount: Number(m.personalDiscount) || 0,
       personalDiscountNote: m.personalDiscountNote || '',
       unpaidDeposit: Boolean(m.unpaidDeposit),
+      ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
     }))
     const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
     await updateDoc(doc(db, 'orders', orderId), {
@@ -1438,7 +1527,7 @@ export default function POSPage({
         const gFullPrice = g
           ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
           : gUnitPay
-        const newGamePrice = newMembers.reduce((sum, m) => sum + (m.unpaidDeposit ? gFullPrice : gUnitPay), 0)
+        const newGamePrice = newMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
         const fTotal = (activeSession.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
         const dMode = activeSession.discountMode || 'perPerson'
         const dRaw = Number(activeSession.discount) || 0
@@ -1457,6 +1546,7 @@ export default function POSPage({
           personalDiscount: Number(m.personalDiscount) || 0,
           personalDiscountNote: m.personalDiscountNote || '',
           unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
         }))
 
         await updateDoc(doc(db, 'orders', orderId), {
@@ -1989,12 +2079,13 @@ export default function POSPage({
             name: m.name,
             character: m.character || '',
             avatar: m.avatar || '',
-            gamePrice: m.unpaidDeposit ? gameFullPrice : gameUnitPay,
+            gamePrice: getMemberGamePrice(m),
             foodItems: [...mFood, ...mSharedFood],
             discount: mDisc,
             promoName: activeSession.promoName || '',
             personalDiscount: Number(m.personalDiscount) || 0,
             personalDiscountNote: m.personalDiscountNote || '',
+            customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? Number(m.customGamePrice) : null,
             total: mBillTotal,
           }
         })
@@ -2114,6 +2205,7 @@ export default function POSPage({
           personalDiscount: Number(m.personalDiscount) || 0,
           personalDiscountNote: m.personalDiscountNote || '',
           unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
         })),
         memberUids: s.members.map(m => m.uid),
         scriptId: s.scriptId,
@@ -3093,7 +3185,25 @@ export default function POSPage({
                     <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <div className="pos-member-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name || 'ไม่ระบุ'}</span>
-                        {m.unpaidDeposit && (
+                        {m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              borderRadius: 6,
+                              background: '#fef2f2',
+                              color: '#c62419',
+                              border: '1px solid #fecaca',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            title={`ปรับราคาเกมเฉพาะคน: ฿${fmtCurrency(m.customGamePrice)}`}
+                          >
+                            <i className="fas fa-tags" style={{ fontSize: 8 }} /> ปรับราคา ฿{fmtCurrency(m.customGamePrice)}
+                          </span>
+                        ) : m.unpaidDeposit ? (
                           <span
                             style={{
                               fontSize: 10,
@@ -3111,7 +3221,7 @@ export default function POSPage({
                           >
                             <i className="fas fa-circle-exclamation" style={{ fontSize: 8 }} /> ราคาเต็ม ฿{fmtCurrency(gameFullPrice)}
                           </span>
-                        )}
+                        ) : null}
                         {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.easyslipPending && (
                           <span
                             className="pos-member-pending-badge"
@@ -3212,9 +3322,18 @@ export default function POSPage({
                       {/* Breakdown summary */}
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 3, fontSize: 11.5, color: 'rgba(26,26,26,0.6)', background: '#faf7f5', padding: '8px 12px', borderRadius: 10 }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                          <span>{m.unpaidDeposit ? 'ค่าเกม (ราคาเต็ม)' : 'ค่าเกม / คน'}</span>
-                          <span style={{ fontWeight: m.unpaidDeposit ? 700 : 400, color: m.unpaidDeposit ? '#b45309' : 'inherit' }}>
-                            ฿{fmtCurrency(m.unpaidDeposit ? gameFullPrice : gameUnitPay)}
+                          <span>
+                            {m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null
+                              ? 'ค่าเกม (ปรับราคาเฉพาะคน)'
+                              : (m.unpaidDeposit ? 'ค่าเกม (ราคาเต็ม)' : 'ค่าเกม / คน')}
+                          </span>
+                          <span style={{
+                            fontWeight: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) || m.unpaidDeposit ? 700 : 400,
+                            color: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null)
+                              ? '#c62419'
+                              : (m.unpaidDeposit ? '#b45309' : 'inherit'),
+                          }}>
+                            ฿{fmtCurrency(getMemberGamePrice(m))}
                           </span>
                         </div>
                         {myFoodTotal > 0 && (
@@ -3269,6 +3388,191 @@ export default function POSPage({
                             />
                           </div>
                         </div>
+                      )}
+
+                      {/* Reprice section (ปรับราคาเกมเฉพาะคน) */}
+                      {!isLocked ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => toggleReprice(m.uid, m.customGamePrice)}
+                            style={{
+                              padding: '9px 12px',
+                              borderRadius: 10,
+                              background: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? '#fef2f2' : '#ffffff',
+                              border: `1.5px solid ${(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? '#fca5a5' : 'rgba(26,26,26,0.14)'}`,
+                              color: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? '#c62419' : '#1a1a1a',
+                              cursor: 'pointer',
+                              fontSize: 12,
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 7,
+                              fontFamily: "'Sarabun', sans-serif",
+                              transition: 'all 0.15s ease',
+                              boxShadow: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? '0 1px 4px rgba(239, 68, 68, 0.12)' : 'none',
+                            }}
+                          >
+                            <i className="fas fa-tags" style={{ fontSize: 12, color: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? '#c62419' : '#64748b' }} />
+                            {(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? (
+                              <span>ปรับราคาเกมเฉพาะคน: ฿{fmtCurrency(m.customGamePrice)} · <span style={{ textDecoration: 'underline', fontWeight: 600 }}>{repriceOpenUids.has(m.uid) ? 'ปิดกล่องแก้ไข' : 'แตะเพื่อเปลี่ยน/รีเซ็ต'}</span></span>
+                            ) : (
+                              <span>{repriceOpenUids.has(m.uid) ? 'ปิดกล่องปรับราคา (Reprice)' : 'ปรับราคาเกมเฉพาะคน (Reprice)'}</span>
+                            )}
+                          </button>
+
+                          {repriceOpenUids.has(m.uid) && (
+                            <div style={{
+                              background: '#ffffff',
+                              border: '1.5px solid rgba(198,36,25,0.25)',
+                              borderRadius: 10,
+                              padding: '10px 12px',
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 8,
+                              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                            }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.6)' }}>
+                                  เปลี่ยนราคาเกมที่ต้องจ่าย (เฉพาะลูกค้ารายนี้)
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleReprice(m.uid)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(26,26,26,0.4)', fontSize: 12, padding: 2 }}
+                                >
+                                  <i className="fas fa-times" />
+                                </button>
+                              </div>
+
+                              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                                <div style={{ position: 'relative', flex: 1 }}>
+                                  <span style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'rgba(26,26,26,0.45)', fontSize: 13, fontWeight: 700 }}>฿</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder={`ราคาเดิม ฿${fmtCurrency(m.unpaidDeposit ? gameFullPrice : gameUnitPay)}`}
+                                    value={repriceDrafts[m.uid] !== undefined ? repriceDrafts[m.uid] : (m.customGamePrice ?? '')}
+                                    onChange={e => setRepriceDrafts(prev => ({ ...prev, [m.uid]: e.target.value }))}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        const val = repriceDrafts[m.uid] !== undefined ? repriceDrafts[m.uid] : (m.customGamePrice ?? '')
+                                        setMemberCustomPrice(m.uid, val)
+                                        toggleReprice(m.uid)
+                                      }
+                                    }}
+                                    autoFocus
+                                    style={{
+                                      width: '100%',
+                                      padding: '7px 10px 7px 24px',
+                                      borderRadius: 8,
+                                      border: '1.5px solid rgba(26,26,26,0.18)',
+                                      fontSize: 13,
+                                      fontWeight: 700,
+                                      color: '#1a1a1a',
+                                      fontFamily: "'Sarabun', sans-serif",
+                                      outline: 'none',
+                                      boxSizing: 'border-box',
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const val = repriceDrafts[m.uid] !== undefined ? repriceDrafts[m.uid] : (m.customGamePrice ?? '')
+                                    setMemberCustomPrice(m.uid, val)
+                                    toggleReprice(m.uid)
+                                  }}
+                                  style={{
+                                    padding: '7px 14px',
+                                    borderRadius: 8,
+                                    background: '#c62419',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    fontFamily: "'Sarabun', sans-serif",
+                                    flexShrink: 0,
+                                  }}
+                                >
+                                  บันทึก
+                                </button>
+                                {(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setMemberCustomPrice(m.uid, null)
+                                      toggleReprice(m.uid)
+                                    }}
+                                    style={{
+                                      padding: '7px 10px',
+                                      borderRadius: 8,
+                                      background: 'rgba(26,26,26,0.06)',
+                                      color: 'rgba(26,26,26,0.7)',
+                                      border: 'none',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      fontFamily: "'Sarabun', sans-serif",
+                                      flexShrink: 0,
+                                    }}
+                                    title="รีเซ็ตกลับเป็นราคาเกมปกติ"
+                                  >
+                                    รีเซ็ต
+                                  </button>
+                                )}
+                              </div>
+
+                              {/* Quick Presets */}
+                              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+                                <span style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>ราคาด่วน:</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRepriceDrafts(prev => ({ ...prev, [m.uid]: '0' }))
+                                    setMemberCustomPrice(m.uid, '0')
+                                    toggleReprice(m.uid)
+                                  }}
+                                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', border: '1px solid rgba(26,26,26,0.1)', cursor: 'pointer', color: '#374151', fontFamily: "'Sarabun', sans-serif", fontWeight: 600 }}
+                                >
+                                  ฿0 (ฟรี)
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setRepriceDrafts(prev => ({ ...prev, [m.uid]: String(gameUnitPay) }))
+                                    setMemberCustomPrice(m.uid, String(gameUnitPay))
+                                    toggleReprice(m.uid)
+                                  }}
+                                  style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', border: '1px solid rgba(26,26,26,0.1)', cursor: 'pointer', color: '#374151', fontFamily: "'Sarabun', sans-serif", fontWeight: 600 }}
+                                >
+                                  ฿{fmtCurrency(gameUnitPay)} (ราคาปกติ)
+                                </button>
+                                {gameFullPrice !== gameUnitPay && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRepriceDrafts(prev => ({ ...prev, [m.uid]: String(gameFullPrice) }))
+                                      setMemberCustomPrice(m.uid, String(gameFullPrice))
+                                      toggleReprice(m.uid)
+                                    }}
+                                    style={{ fontSize: 11, padding: '2px 8px', borderRadius: 6, background: '#f3f4f6', border: '1px solid rgba(26,26,26,0.1)', cursor: 'pointer', color: '#374151', fontFamily: "'Sarabun', sans-serif", fontWeight: 600 }}
+                                  >
+                                    ฿{fmtCurrency(gameFullPrice)} (ราคาเต็ม)
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) && (
+                          <div style={{ padding: '7px 12px', borderRadius: 8, background: '#fef2f2', border: '1px solid #fecaca', color: '#c62419', fontSize: 11.5, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <i className="fas fa-tags" /> ปรับราคาเกมเฉพาะคน: ฿{fmtCurrency(m.customGamePrice)}
+                          </div>
+                        )
                       )}
 
                       {/* Unpaid deposit toggle button */}
@@ -4133,9 +4437,11 @@ export default function POSPage({
                   {gameUnitPay > 0 ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
                       <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>
-                        {activeSession.members.some(m => m.unpaidDeposit)
-                          ? `ค่าเกม (${activeSession.members.filter(m => !m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameUnitPay)} + ${activeSession.members.filter(m => m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameFullPrice)})`
-                          : `฿${fmtCurrency(gameUnitPay)} × ${activeSession.members.length} คน`}
+                        {activeSession.members.some(m => m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null)
+                          ? `ค่าเกม (${activeSession.members.length} คน · ปรับราคาเฉพาะคน)`
+                          : activeSession.members.some(m => m.unpaidDeposit)
+                            ? `ค่าเกม (${activeSession.members.filter(m => !m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameUnitPay)} + ${activeSession.members.filter(m => m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameFullPrice)})`
+                            : `฿${fmtCurrency(gameUnitPay)} × ${activeSession.members.length} คน`}
                       </span>
                       <span style={{ fontSize: 16, fontWeight: 900, color: '#c62419' }}>฿{fmtCurrency(gamePrice)}</span>
                     </div>
