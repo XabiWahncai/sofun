@@ -512,6 +512,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [newTaskRoom, setNewTaskRoom] = useState(BUILDING_FLOORS[0].rooms[0])
   const [newTaskMaxAssignedCount, setNewTaskMaxAssignedCount] = useState(3)
   const [taskFloorFilter, setTaskFloorFilter] = useState('all')
+  const [crewFloorFilter, setCrewFloorFilter] = useState('all')
+  const [crewFloorViewMode, setCrewFloorViewMode] = useState('cards')
   const [editingTask, setEditingTask] = useState(null)
 
   const [newSabTitle, setNewSabTitle] = useState('')
@@ -3317,80 +3319,445 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       </button>
                     </div>
                   </div>
-                </div>
 
-                {/* Admin Player List (Minimalist Cards) */}
-                <div className="au-card" style={{ padding: 18 }}>
+                  {/* Floor Filter Bar */}
                   <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))',
+                    marginTop: 14,
+                    paddingTop: 14,
+                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
                     gap: 10,
                   }}>
-                    {allPlayersList.map(p => {
-                      const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'));
-                      const roleLabel = p.role === 'impostor' ? 'ร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'ดี'));
-                      const completedTasks = (p.tasks || []).filter(t => t.verified).length;
-                      const totalTasks = (p.tasks || []).length;
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 800, color: '#80d8ff' }}>
+                        <i className="fas fa-layer-group" />
+                        <span>ฟิลเตอร์ดูตามชั้นภารกิจ (FLOOR FILTER):</span>
+                      </div>
 
-                      return (
-                        <div
-                          key={p.uid}
-                          onClick={() => setSelectedPlayerModal(p.uid)}
-                          style={{
-                            padding: '10px 12px',
-                            borderRadius: 14,
-                            background: 'rgba(255,255,255,0.03)',
-                            border: `1.5px solid ${p.isAlive ? (p.role === 'impostor' ? 'rgba(229,57,53,0.5)' : '#1f2c42') : 'rgba(255,82,82,0.3)'}`,
-                            opacity: p.isAlive ? 1 : 0.6,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 10,
-                            cursor: 'pointer',
-                            transition: 'transform 0.15s, background 0.15s, border-color 0.15s',
-                            position: 'relative',
-                          }}
-                          title="คลิกเพื่อจัดการบทบาทและตรวจภารกิจ"
-                        >
-                          <div style={{ position: 'relative', flexShrink: 0 }}>
-                            <AmongUsVisor role={p.role} isAlive={p.isAlive} size={34} color={p.color || null} />
-                            {!p.isAlive && (
-                              <div style={{
-                                position: 'absolute', top: -2, right: -4,
-                                background: '#e53935', color: '#fff', fontSize: 9,
-                                fontWeight: 900, borderRadius: 10, padding: '1px 4px',
-                                lineHeight: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                      {crewFloorFilter !== 'all' && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setCrewFloorViewMode('cards')}
+                            style={{
+                              padding: '4px 10px', borderRadius: 8,
+                              background: crewFloorViewMode === 'cards' ? '#0288d1' : 'rgba(255,255,255,0.06)',
+                              color: '#fff',
+                              border: `1px solid ${crewFloorViewMode === 'cards' ? '#40c4ff' : 'rgba(255,255,255,0.15)'}`,
+                              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 5,
+                            }}
+                          >
+                            <i className="fas fa-th-large" />
+                            <span>การ์ดผู้เล่น</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCrewFloorViewMode('tasks')}
+                            style={{
+                              padding: '4px 10px', borderRadius: 8,
+                              background: crewFloorViewMode === 'tasks' ? '#0288d1' : 'rgba(255,255,255,0.06)',
+                              color: '#fff',
+                              border: `1px solid ${crewFloorViewMode === 'tasks' ? '#40c4ff' : 'rgba(255,255,255,0.15)'}`,
+                              fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 5,
+                            }}
+                          >
+                            <i className="fas fa-list-check" />
+                            <span>สรุปตามภารกิจในชั้น</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Filter Buttons */}
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        onClick={() => setCrewFloorFilter('all')}
+                        style={{
+                          padding: '7px 12px', borderRadius: 10,
+                          background: crewFloorFilter === 'all' ? '#0288d1' : 'rgba(255,255,255,0.05)',
+                          color: '#fff',
+                          border: `1.5px solid ${crewFloorFilter === 'all' ? '#40c4ff' : 'rgba(255,255,255,0.1)'}`,
+                          fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        <i className="fas fa-users" />
+                        <span>ทั้งหมด ({allPlayersList.length} คน)</span>
+                      </button>
+
+                      {BUILDING_FLOORS.map(b => {
+                        const floorNum = b.floor;
+                        const playersOnFloor = allPlayersList.filter(p => (p.tasks || []).some(t => (Number(t.floor) || 1) === floorNum));
+                        const floorTasks = allPlayersList.flatMap(p => (p.tasks || []).filter(t => (Number(t.floor) || 1) === floorNum));
+                        const completedOnFloor = floorTasks.filter(t => t.verified).length;
+                        const isSelected = crewFloorFilter === floorNum;
+
+                        return (
+                          <button
+                            key={floorNum}
+                            type="button"
+                            onClick={() => setCrewFloorFilter(isSelected ? 'all' : floorNum)}
+                            style={{
+                              padding: '7px 12px', borderRadius: 10,
+                              background: isSelected ? '#e65100' : 'rgba(255,255,255,0.05)',
+                              color: '#fff',
+                              border: `1.5px solid ${isSelected ? '#ff9800' : 'rgba(255,255,255,0.1)'}`,
+                              fontSize: 11.5, fontWeight: 800, cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 6,
+                              transition: 'all 0.15s ease',
+                            }}
+                          >
+                            <i className="fas fa-building" />
+                            <span>{b.label}</span>
+                            <span style={{
+                              fontSize: 10, padding: '1px 6px', borderRadius: 6,
+                              background: isSelected ? 'rgba(0,0,0,0.35)' : 'rgba(255,255,255,0.1)',
+                              color: isSelected ? '#fff' : '#ffa726', fontWeight: 800,
+                            }}>
+                              {playersOnFloor.length} คน
+                            </span>
+                            {floorTasks.length > 0 && (
+                              <span style={{
+                                fontSize: 10,
+                                color: completedOnFloor === floorTasks.length ? '#69f0ae' : 'rgba(255,255,255,0.6)',
+                                fontWeight: 700,
                               }}>
-                                ตาย
+                                ({completedOnFloor}/{floorTasks.length})
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Active Floor Banner */}
+                {crewFloorFilter !== 'all' && (() => {
+                  const currentFloorObj = BUILDING_FLOORS.find(b => b.floor === crewFloorFilter);
+                  const floorPlayers = allPlayersList.filter(p => (p.tasks || []).some(t => (Number(t.floor) || 1) === crewFloorFilter));
+                  const floorTasks = allPlayersList.flatMap(p => (p.tasks || []).filter(t => (Number(t.floor) || 1) === crewFloorFilter));
+                  const completedOnFloor = floorTasks.filter(t => t.verified).length;
+
+                  return (
+                    <div style={{
+                      padding: '12px 16px', borderRadius: 14,
+                      background: 'linear-gradient(135deg, rgba(230,81,0,0.18) 0%, rgba(20,28,42,0.95) 100%)',
+                      border: '1.5px solid #ff9800',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      flexWrap: 'wrap', gap: 10,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: 10, background: '#e65100', color: '#fff',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900,
+                          boxShadow: '0 4px 10px rgba(230,81,0,0.4)',
+                        }}>
+                          {crewFloorFilter}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: 14, fontWeight: 900, color: '#fff' }}>
+                            {currentFloorObj?.label || `ชั้น ${crewFloorFilter}`} · ห้อง: <span style={{ color: '#ffd54f' }}>{currentFloorObj?.rooms?.join(', ') || '-'}</span>
+                          </div>
+                          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.75)', marginTop: 2 }}>
+                            ผู้เล่นที่มีภารกิจชั้นนี้: <strong style={{ color: '#ffb74d' }}>{floorPlayers.length} คน</strong> · ทำเสร็จแล้ว: <strong style={{ color: '#81c784' }}>{completedOnFloor}/{floorTasks.length} ภารกิจ</strong>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCrewFloorFilter('all')}
+                        style={{
+                          padding: '6px 12px', borderRadius: 8, background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.15)', color: '#fff', fontSize: 11,
+                          fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5,
+                        }}
+                      >
+                        <i className="fas fa-times" />
+                        <span>ล้างฟิลเตอร์ (ดูทั้งหมด)</span>
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {/* Content: Mode "tasks" (Grouped by Floor Tasks) */}
+                {crewFloorFilter !== 'all' && crewFloorViewMode === 'tasks' ? (
+                  <div className="au-card" style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {(() => {
+                      const poolTasksOnFloor = (gameDoc.taskPool || []).filter(t => (Number(t.floor) || 1) === crewFloorFilter);
+                      if (poolTasksOnFloor.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: 24, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
+                            ไม่มีภารกิจที่กำหนดไว้ในชั้นนี้ในคลังภารกิจ
+                          </div>
+                        );
+                      }
+
+                      return poolTasksOnFloor.map(taskItem => {
+                        const assignedPlayers = allPlayersList.filter(p => (p.tasks || []).some(t => t.poolTaskId === taskItem.id || t.title === taskItem.title));
+
+                        return (
+                          <div
+                            key={taskItem.id}
+                            style={{
+                              padding: 14, borderRadius: 14,
+                              background: 'rgba(255,255,255,0.03)',
+                              border: '1px solid rgba(255,255,255,0.08)',
+                              display: 'flex', flexDirection: 'column', gap: 10,
+                            }}
+                          >
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 8 }}>
+                              <div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span style={{ fontSize: 14, fontWeight: 800, color: '#fff' }}>{taskItem.title}</span>
+                                  <span style={{
+                                    fontSize: 10.5, padding: '2px 8px', borderRadius: 6,
+                                    background: 'rgba(100, 181, 246, 0.15)', color: '#64b5f6', fontWeight: 700,
+                                  }}>
+                                    {taskItem.room || 'โซนหน้า'}
+                                  </span>
+                                </div>
+                                {taskItem.desc && (
+                                  <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>
+                                    {taskItem.desc}
+                                  </div>
+                                )}
+                              </div>
+                              <div style={{ fontSize: 11.5, color: '#ffb74d', fontWeight: 800 }}>
+                                ผู้เล่นที่ได้รับภารกิจนี้: {assignedPlayers.length} คน
+                              </div>
+                            </div>
+
+                            {/* List of players assigned to this task */}
+                            {assignedPlayers.length === 0 ? (
+                              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', fontStyle: 'italic', paddingLeft: 4 }}>
+                                ยังไม่มีผู้เล่นที่สุ่มได้ภารกิจนี้
+                              </div>
+                            ) : (
+                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 8 }}>
+                                {assignedPlayers.map(p => {
+                                  const pTask = (p.tasks || []).find(t => t.poolTaskId === taskItem.id || t.title === taskItem.title);
+                                  const isVerified = pTask?.verified;
+                                  const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'));
+
+                                  return (
+                                    <div
+                                      key={p.uid}
+                                      onClick={() => setSelectedPlayerModal(p.uid)}
+                                      style={{
+                                        padding: '9px 12px', borderRadius: 10,
+                                        background: isVerified ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255,255,255,0.04)',
+                                        border: `1px solid ${isVerified ? 'rgba(76, 175, 80, 0.3)' : 'rgba(255,255,255,0.1)'}`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                                        cursor: 'pointer',
+                                      }}
+                                      title="คลิกเพื่อเปิดข้อมูลผู้เล่น"
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                                        <AmongUsVisor role={p.role} isAlive={p.isAlive} size={28} color={p.color || null} />
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                            {p.name}
+                                          </div>
+                                          <div style={{ fontSize: 10, color: roleColor, fontWeight: 800 }}>
+                                            {p.role === 'impostor' ? 'ร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'ดี'))}
+                                            {!p.isAlive && ' · ตาย'}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {isVerified ? (
+                                        <span style={{ fontSize: 10.5, color: '#81c784', fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3, flexShrink: 0 }}>
+                                          <i className="fas fa-check-circle" /> ผ่านแล้ว
+                                        </span>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (pTask) verifyTask(p.uid, pTask.id);
+                                          }}
+                                          style={{
+                                            padding: '4px 10px', borderRadius: 6,
+                                            background: '#2e7d32', color: '#fff', border: 'none',
+                                            fontSize: 10.5, fontWeight: 800, cursor: 'pointer',
+                                            flexShrink: 0, boxShadow: '0 2px 5px rgba(46,125,50,0.4)',
+                                          }}
+                                        >
+                                          ตรวจผ่าน
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
-                          <div style={{ minWidth: 0, flex: 1 }}>
-                            <div style={{
-                              fontSize: 13, fontWeight: 700, color: '#fff',
-                              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                            }}>
-                              {p.name}
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
-                              <span style={{ fontSize: 10.5, color: roleColor, fontWeight: 800 }}>
-                                {roleLabel}
-                              </span>
-                              {totalTasks > 0 && (
-                                <span style={{
-                                  fontSize: 9.5,
-                                  color: completedTasks === totalTasks ? '#81c784' : '#ffa726',
-                                  fontWeight: 700,
-                                }}>
-                                  {completedTasks}/{totalTasks}
-                                </span>
-                              )}
-                            </div>
+                        );
+                      });
+                    })()}
+                  </div>
+                ) : (
+                  /* Content: Mode "cards" (Filtered Player Cards) */
+                  <div className="au-card" style={{ padding: 18 }}>
+                    {(() => {
+                      const displayedPlayers = crewFloorFilter === 'all'
+                        ? allPlayersList
+                        : allPlayersList.filter(p => (p.tasks || []).some(t => (Number(t.floor) || 1) === crewFloorFilter));
+
+                      if (displayedPlayers.length === 0) {
+                        return (
+                          <div style={{ textAlign: 'center', padding: '36px 16px', color: 'rgba(255,255,255,0.45)', fontSize: 13 }}>
+                            <i className="fas fa-search" style={{ fontSize: 24, marginBottom: 8, display: 'block', opacity: 0.5 }} />
+                            ไม่มีผู้เล่นคนไหนได้รับภารกิจใน {BUILDING_FLOORS.find(b => b.floor === crewFloorFilter)?.label || `ชั้น ${crewFloorFilter}`}
                           </div>
+                        );
+                      }
+
+                      return (
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: crewFloorFilter === 'all'
+                            ? 'repeat(auto-fill, minmax(130px, 1fr))'
+                            : 'repeat(auto-fill, minmax(210px, 1fr))',
+                          gap: 10,
+                        }}>
+                          {displayedPlayers.map(p => {
+                            const roleColor = p.role === 'impostor' ? '#e53935' : (p.role === 'dodo' ? '#ab47bc' : (p.role === 'sheriff' ? '#fbc02d' : '#29b6f6'));
+                            const roleLabel = p.role === 'impostor' ? 'ร้าย' : (p.role === 'dodo' ? 'โดโด้' : (p.role === 'sheriff' ? 'นายอำเภอ' : 'ดี'));
+                            const completedTasks = (p.tasks || []).filter(t => t.verified).length;
+                            const totalTasks = (p.tasks || []).length;
+                            const floorTasksForPlayer = crewFloorFilter !== 'all'
+                              ? (p.tasks || []).filter(t => (Number(t.floor) || 1) === crewFloorFilter)
+                              : [];
+
+                            return (
+                              <div
+                                key={p.uid}
+                                onClick={() => setSelectedPlayerModal(p.uid)}
+                                style={{
+                                  padding: '10px 12px',
+                                  borderRadius: 14,
+                                  background: 'rgba(255,255,255,0.03)',
+                                  border: `1.5px solid ${p.isAlive ? (p.role === 'impostor' ? 'rgba(229,57,53,0.5)' : '#1f2c42') : 'rgba(255,82,82,0.3)'}`,
+                                  opacity: p.isAlive ? 1 : 0.6,
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 6,
+                                  cursor: 'pointer',
+                                  transition: 'transform 0.15s, background 0.15s, border-color 0.15s',
+                                  position: 'relative',
+                                }}
+                                title="คลิกเพื่อจัดการบทบาทและตรวจภารกิจ"
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                                    <AmongUsVisor role={p.role} isAlive={p.isAlive} size={34} color={p.color || null} />
+                                    {!p.isAlive && (
+                                      <div style={{
+                                        position: 'absolute', top: -2, right: -4,
+                                        background: '#e53935', color: '#fff', fontSize: 9,
+                                        fontWeight: 900, borderRadius: 10, padding: '1px 4px',
+                                        lineHeight: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                                      }}>
+                                        ตาย
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{
+                                      fontSize: 13, fontWeight: 700, color: '#fff',
+                                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                    }}>
+                                      {p.name}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, flexWrap: 'wrap' }}>
+                                      <span style={{ fontSize: 10.5, color: roleColor, fontWeight: 800 }}>
+                                        {roleLabel}
+                                      </span>
+                                      {totalTasks > 0 && (
+                                        <span style={{
+                                          fontSize: 9.5,
+                                          color: completedTasks === totalTasks ? '#81c784' : '#ffa726',
+                                          fontWeight: 700,
+                                        }}>
+                                          {completedTasks}/{totalTasks}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* When filtered by floor: Show specific mission on this floor */}
+                                {crewFloorFilter !== 'all' && floorTasksForPlayer.length > 0 && (
+                                  <div style={{
+                                    marginTop: 4, paddingTop: 6,
+                                    borderTop: '1px solid rgba(255,255,255,0.08)',
+                                    display: 'flex', flexDirection: 'column', gap: 4,
+                                  }}>
+                                    {floorTasksForPlayer.map(t => (
+                                      <div
+                                        key={t.id}
+                                        style={{
+                                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                          gap: 6, padding: '4px 6px', borderRadius: 6,
+                                          background: t.verified ? 'rgba(76,175,80,0.08)' : 'rgba(255,255,255,0.04)',
+                                          border: `1px solid ${t.verified ? 'rgba(76,175,80,0.25)' : 'rgba(255,255,255,0.06)'}`,
+                                        }}
+                                      >
+                                        <div style={{ minWidth: 0, flex: 1 }}>
+                                          <div style={{
+                                            fontSize: 11, fontWeight: 700,
+                                            color: t.verified ? '#81c784' : '#fff',
+                                            whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                                          }}>
+                                            <i className={`fas fa-${t.verified ? 'check-circle' : 'dot-circle'}`} style={{ color: t.verified ? '#4caf50' : '#ffa726', marginRight: 4, fontSize: 9 }} />
+                                            {t.title}
+                                          </div>
+                                          <div style={{ fontSize: 9.5, color: '#64b5f6', marginTop: 1 }}>
+                                            {t.room || 'โซนหน้า'}
+                                          </div>
+                                        </div>
+
+                                        {t.verified ? (
+                                          <span style={{ fontSize: 9.5, color: '#81c784', fontWeight: 800, flexShrink: 0 }}>
+                                            ผ่าน
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              verifyTask(p.uid, t.id);
+                                            }}
+                                            style={{
+                                              padding: '3px 8px', borderRadius: 6,
+                                              background: '#2e7d32', color: '#fff', border: 'none',
+                                              fontSize: 9.5, fontWeight: 800, cursor: 'pointer',
+                                              flexShrink: 0, boxShadow: '0 2px 4px rgba(46,125,50,0.3)',
+                                            }}
+                                            title="กดตรวจผ่านภารกิจนี้ทันที"
+                                          >
+                                            ผ่าน
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       );
-                    })}
+                    })()}
                   </div>
-                </div>
+                )}
               </div>
             )}
 
