@@ -580,12 +580,101 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     return unsub
   }, [])
 
-  // Sync current user's player name
+  // ── Helper: Randomize 3 Tasks for a Player across unique floors ──
+  const generateThreeTasksForPlayer = useCallback((playerUid, pool = (gameDoc?.taskPool || DEFAULT_TASKS_POOL)) => {
+    const tasksByFloor = {}
+    ;(pool || DEFAULT_TASKS_POOL).forEach(t => {
+      const f = Number(t.floor) || 1
+      if (!tasksByFloor[f]) tasksByFloor[f] = []
+      tasksByFloor[f].push(t)
+    })
+    const availableFloors = Object.keys(tasksByFloor).map(Number)
+    if (availableFloors.length === 0) return []
+
+    const shuffledFloors = [...availableFloors].sort(() => 0.5 - Math.random())
+    const chosenFloors = shuffledFloors.slice(0, 3)
+    while (chosenFloors.length < 3 && availableFloors.length > 0) {
+      chosenFloors.push(availableFloors[Math.floor(Math.random() * availableFloors.length)])
+    }
+
+    const assignedTasks = chosenFloors.map(f => {
+      const floorTasks = tasksByFloor[f] || []
+      if (floorTasks.length === 0) return null
+      return floorTasks[Math.floor(Math.random() * floorTasks.length)]
+    }).filter(Boolean)
+
+    assignedTasks.sort((a, b) => (Number(a.floor) || 1) - (Number(b.floor) || 1))
+
+    return assignedTasks.map((t, idx) => ({
+      id: `${playerUid}_t${idx + 1}_${Date.now()}_${Math.random().toString(36).substring(2, 5)}`,
+      poolTaskId: t.id,
+      title: t.title,
+      desc: t.desc,
+      floor: Number(t.floor) || 1,
+      room: t.room || 'โซนหน้า',
+      verified: false,
+      verifiedAt: null,
+    }))
+  }, [gameDoc?.taskPool])
+
+  // Sync current user's player name and persist session
   useEffect(() => {
     if (gameDoc?.players && myUid && gameDoc.players[myUid]) {
-      setMyName(gameDoc.players[myUid].name || '')
+      const p = gameDoc.players[myUid]
+      setMyName(p.name || '')
+      if (p.name) localStorage.setItem('allofus_player_name', p.name)
+      if (lineUser?.uid && !p.lineUid) {
+        updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          [`players.${myUid}.lineUid`]: lineUser.uid,
+        }).catch(() => {})
+      }
     }
-  }, [gameDoc?.players, myUid])
+  }, [gameDoc?.players, myUid, lineUser?.uid])
+
+  // Auto-reconnect player session via lineUser.uid or cached player name if local ID was lost
+  useEffect(() => {
+    if (!gameDoc?.players) return
+    const playersList = Object.values(gameDoc.players)
+    if (playersList.length === 0) return
+
+    // If myUid is missing or invalid, attempt automatic recovery
+    if (!myUid || !gameDoc.players[myUid]) {
+      // 1. Try matching by lineUser.uid
+      if (lineUser?.uid) {
+        const matchByLine = playersList.find(p => p.lineUid && p.lineUid === lineUser.uid)
+        if (matchByLine) {
+          setMyUid(matchByLine.uid)
+          localStorage.setItem('allofus_player_uid', matchByLine.uid)
+          localStorage.setItem('allofus_player_name', matchByLine.name)
+          return
+        }
+      }
+
+      // 2. Try matching by cached player name
+      const cachedName = localStorage.getItem('allofus_player_name')
+      if (cachedName) {
+        const matchByName = playersList.find(p => p.name?.toLowerCase().trim() === cachedName.toLowerCase().trim())
+        if (matchByName) {
+          setMyUid(matchByName.uid)
+          localStorage.setItem('allofus_player_uid', matchByName.uid)
+          return
+        }
+      }
+    }
+  }, [gameDoc?.players, myUid, lineUser?.uid])
+
+  // Auto-heal: If playing and player has no tasks assigned, generate 3 tasks
+  useEffect(() => {
+    if (gameDoc?.status === 'playing' && myUid && me && (!me.tasks || me.tasks.length === 0)) {
+      const generated = generateThreeTasksForPlayer(myUid, gameDoc.taskPool || DEFAULT_TASKS_POOL)
+      if (generated.length > 0) {
+        updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          [`players.${myUid}.tasks`]: generated,
+          [`players.${myUid}.role`]: me.role || 'crewmate',
+        }).catch(() => {})
+      }
+    }
+  }, [gameDoc?.status, myUid, me?.tasks])
 
   // ── 4. High-Precision Local Countdown Timers ─────────────
   useEffect(() => {
@@ -845,7 +934,58 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }
 
-  // Direct join game by entering name and choosing character color
+  // Admin joins the game directly as a player
+  const handleAdminJoinGame = async () => {
+    const adminName = lineUser?.name || 'Game Master'
+    const currentPlayers = gameDoc?.players || {}
+    const usedColors = new Set(Object.values(currentPlayers).map(p => (p.color || '').toLowerCase()))
+    const freeColor = TWENTY_PLAYER_COLORS.find(c => !usedColors.has(c.hex.toLowerCase()))?.hex || TWENTY_PLAYER_COLORS[0].hex
+    const newUid = 'admin_' + Date.now().toString(36)
+    const newTasks = generateThreeTasksForPlayer(newUid)
+
+    setMyUid(newUid)
+    localStorage.setItem('allofus_player_uid', newUid)
+    localStorage.setItem('allofus_player_name', adminName)
+
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        [`players.${newUid}`]: {
+          uid: newUid,
+          lineUid: lineUser?.uid || '',
+          name: adminName,
+          avatar: lineUser?.avatar || '',
+          role: 'crewmate',
+          color: freeColor,
+          isAlive: true,
+          tasks: newTasks,
+          ready: true,
+          isAdminPlayer: true,
+          joinedAt: Date.now(),
+        }
+      })
+      setIsAdminView(false)
+      showToast(`เข้าร่วมเกมในชื่อ ${adminName} เรียบร้อย!`, 'success')
+    } catch (e) {
+      showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Self-heal / Request 3 tasks if player entered game with empty tasks
+  const handleAssignMyTasks = async () => {
+    if (!myUid || !gameDoc) return
+    const tasks = generateThreeTasksForPlayer(myUid)
+    try {
+      await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+        [`players.${myUid}.tasks`]: tasks,
+        [`players.${myUid}.role`]: me?.role || 'crewmate',
+      })
+      showToast('รับภารกิจเรียบร้อยแล้ว!', 'success')
+    } catch (e) {
+      showToast('รับภารกิจล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  // Direct join game by entering name or reconnecting to existing character
   const handleDirectJoin = async () => {
     const trimmed = (directJoinName || '').trim()
     if (!trimmed) {
@@ -853,11 +993,22 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       return
     }
     const currentPlayers = gameDoc?.players || {}
-    const nameTaken = Object.values(currentPlayers).some(
+    const existingPlayer = Object.values(currentPlayers).find(
       p => p.name?.toLowerCase().trim() === trimmed.toLowerCase()
     )
-    if (nameTaken) {
-      showToast('ชื่อนี้มีผู้เล่นคนอื่นใช้แล้วในห้อง กรุณาใช้ชื่ออื่น', 'error')
+
+    // Reconnection: If player with this name already exists in room, reconnect them immediately
+    if (existingPlayer) {
+      setMyUid(existingPlayer.uid)
+      localStorage.setItem('allofus_player_uid', existingPlayer.uid)
+      localStorage.setItem('allofus_player_name', existingPlayer.name)
+      if (lineUser?.uid && !existingPlayer.lineUid) {
+        updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+          [`players.${existingPlayer.uid}.lineUid`]: lineUser.uid,
+        }).catch(() => {})
+      }
+      setDirectJoinName('')
+      showToast(`เชื่อมต่อสำเร็จ ยินดีต้อนรับกลับ ${existingPlayer.name}!`, 'success')
       return
     }
 
@@ -872,23 +1023,30 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const newUid = 'p_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6)
     setMyUid(newUid)
     localStorage.setItem('allofus_player_uid', newUid)
+    localStorage.setItem('allofus_player_name', trimmed)
+
+    const isPlaying = gameDoc?.status === 'playing'
+    const newTasks = isPlaying ? generateThreeTasksForPlayer(newUid) : []
+
     try {
       await setDoc(doc(db, 'all_of_us_games', 'active_game'), {
         players: {
           [newUid]: {
             uid: newUid,
+            lineUid: lineUser?.uid || '',
             name: trimmed,
-            avatar: '',
+            avatar: lineUser?.avatar || '',
             role: 'crewmate',
             color: chosenColor,
             isAlive: true,
-            tasks: [],
+            tasks: newTasks,
             ready: true,
+            joinedAt: Date.now(),
           }
         }
       }, { merge: true })
       setDirectJoinName('')
-      showToast(`ยินดีต้อนรับ ${trimmed} เข้าสู่ยาน The Skeld`)
+      showToast(`ยินดีต้อนรับ ${trimmed} เข้าสู่ยาน The Skeld`, 'success')
     } catch (e) {
       showToast('เข้าร่วมเกมล้มเหลว: ' + e.message, 'error')
     }
@@ -1151,24 +1309,34 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
 
   // Admin starts the game: assigns roles randomly then distributes 3 tasks per player
   const handleStartGame = async () => {
-    if (allPlayersList.length === 0) {
+    // 1. Fetch fresh players directly from Firestore so no late-registered players are dropped
+    let livePlayers = { ...(gameDoc?.players || {}) }
+    try {
+      const freshSnap = await getDoc(doc(db, 'all_of_us_games', 'active_game'))
+      if (freshSnap.exists() && freshSnap.data()?.players) {
+        livePlayers = { ...livePlayers, ...freshSnap.data().players }
+      }
+    } catch (err) {
+      console.warn('Using local cache for starting game:', err)
+    }
+
+    const currentPlayersList = Object.entries(livePlayers).map(([key, val]) => ({
+      uid: val.uid || key,
+      ...val,
+    }))
+
+    if (currentPlayersList.length === 0) {
       showToast('ยังไม่มีผู้เล่นในล็อบบี้', 'error')
       return
     }
-    const pool = gameDoc.taskPool || DEFAULT_TASKS_POOL
-    if (pool.length < 3) {
-      showToast('ต้องมีภารกิจในคลังอย่างน้อย 3 ภารกิจ', 'error')
+
+    const pool = (gameDoc?.taskPool && gameDoc.taskPool.length > 0) ? gameDoc.taskPool : DEFAULT_TASKS_POOL
+    if (pool.length === 0) {
+      showToast('ไม่พบภารกิจในคลัง กรุณาเพิ่มภารกิจก่อนเริ่มเกม', 'error')
       return
     }
 
-    const totalPoolCapacity = pool.reduce((sum, t) => sum + (Number(t.maxAssignedCount) || 3), 0)
-    const requiredSlots = allPlayersList.length * 3
-    if (totalPoolCapacity < requiredSlots) {
-      showToast(`โควตาภารกิจในคลังไม่เพียงพอ (${totalPoolCapacity}/${requiredSlots} ตำแหน่ง) กรุณาเพิ่มภารกิจหรือปรับโควตาภารกิจ`, 'error')
-      return
-    }
-
-    // Group tasks by floor to guarantee 3 unique floors
+    // Group tasks by floor to attempt unique floors
     const tasksByFloor = {}
     pool.forEach(t => {
       const f = Number(t.floor) || 1
@@ -1177,20 +1345,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     })
     const availableFloors = Object.keys(tasksByFloor).map(Number)
 
-    if (availableFloors.length < 3) {
-      showToast('ต้องมีภารกิจในคลังอย่างน้อย 3 ชั้นที่แตกต่างกัน (เพื่อให้สุ่มได้ชั้นไม่ซ้ำกัน)', 'error')
-      return
-    }
-
     const durationMins = gameDoc.gameDurationMinutes || 20
     const durationSecs = durationMins * 60
 
     // ── Scalable Role Distribution based on Player Count ──
-    // • 8 – 9 players: Impostors 1-2 (Admin choice, default 1), Sheriff 1, Dodo 1, remainder Crewmates
-    // • 10 – 12 players: Impostors 2, Sheriff 1, Dodo 1, remainder Crewmates
-    // • 13 – 15 players: Impostors 3, Sheriff 1, Dodo 1, remainder Crewmates
-    // • < 8 players (testing/few players): Impostors 1, Sheriff 1 (if >=3), Dodo 1 (if >=4), remainder Crewmates
-    const n = allPlayersList.length
+    const n = currentPlayersList.length
     let targetImpostors = 1
     if (n >= 13) {
       targetImpostors = 3
@@ -1205,28 +1364,28 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const targetSheriff = n >= 3 ? 1 : 0
 
     // Randomize all players freshly on game start so roles are unpredictable every round
-    const shuffledPool = [...allPlayersList].sort(() => Math.random() - 0.5)
+    const shuffledPool = [...currentPlayersList].sort(() => Math.random() - 0.5)
     const assignedRoles = {}
 
-    // 1. Assign Impostors (3 for 15 players)
+    // 1. Assign Impostors
     for (let i = 0; i < targetImpostors && shuffledPool.length > 0; i++) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'impostor'
     }
 
-    // 2. Assign Dodo (1 for 15 players)
+    // 2. Assign Dodo
     for (let i = 0; i < targetDodo && shuffledPool.length > 0; i++) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'dodo'
     }
 
-    // 3. Assign Sheriff (1 for 15 players)
+    // 3. Assign Sheriff
     for (let i = 0; i < targetSheriff && shuffledPool.length > 0; i++) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'sheriff'
     }
 
-    // 4. All remaining players are Crewmates (10 players for 15 total)
+    // 4. All remaining players are Crewmates
     while (shuffledPool.length > 0) {
       const p = shuffledPool.pop()
       assignedRoles[p.uid] = 'crewmate'
@@ -1236,7 +1395,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     const usedColors = new Set()
     const playersNeedColor = []
 
-    allPlayersList.forEach(p => {
+    currentPlayersList.forEach(p => {
       const c = (p.color || '').toLowerCase()
       const isValidColor = TWENTY_PLAYER_COLORS.some(tc => tc.hex.toLowerCase() === c)
       if (isValidColor && !usedColors.has(c)) {
@@ -1252,7 +1411,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       .sort(() => Math.random() - 0.5)
 
     const finalColorMap = {}
-    allPlayersList.forEach(p => {
+    currentPlayersList.forEach(p => {
       const c = (p.color || '').toLowerCase()
       if (usedColors.has(c) && !playersNeedColor.includes(p.uid)) {
         finalColorMap[p.uid] = p.color
@@ -1262,46 +1421,46 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       finalColorMap[uid] = availableColors[idx] || TWENTY_PLAYER_COLORS[idx % TWENTY_PLAYER_COLORS.length].hex
     })
 
-    // Randomize 3 tasks with unique floors for each player while respecting maxAssignedCount
+    // Randomize 3 tasks for each player
     const taskAssignedCounts = {}
-    const updatedPlayers = { ...gameDoc.players }
+    const updatedPlayers = { ...livePlayers }
 
     // Shuffle player processing order to ensure unbiased task distribution
-    const playersToAssign = [...allPlayersList].sort(() => 0.5 - Math.random())
+    const playersToAssign = [...currentPlayersList].sort(() => 0.5 - Math.random())
 
     playersToAssign.forEach(p => {
-      // Calculate remaining capacity per floor to keep load evenly distributed
-      const floorCapacities = availableFloors.map(floorNum => {
-        const floorTasks = tasksByFloor[floorNum] || []
-        const remainingSlots = floorTasks.reduce((sum, t) => {
-          const assigned = taskAssignedCounts[t.id] || 0
-          const cap = Number(t.maxAssignedCount) || 3
-          return sum + Math.max(0, cap - assigned)
-        }, 0)
-        return { floorNum, remainingSlots }
-      }).filter(fc => fc.remainingSlots > 0)
+      let chosenFloors = []
+      if (availableFloors.length >= 3) {
+        const floorCapacities = availableFloors.map(floorNum => {
+          const floorTasks = tasksByFloor[floorNum] || []
+          const remainingSlots = floorTasks.reduce((sum, t) => {
+            const assigned = taskAssignedCounts[t.id] || 0
+            const cap = Number(t.maxAssignedCount) || 3
+            return sum + Math.max(0, cap - assigned)
+          }, 0)
+          return { floorNum, remainingSlots }
+        }).filter(fc => fc.remainingSlots > 0)
 
-      // Sort floors by remaining capacity descending with slight random jitter for variety
-      floorCapacities.sort((a, b) => (b.remainingSlots + Math.random() * 0.8) - (a.remainingSlots + Math.random() * 0.8))
-
-      let chosenFloors = floorCapacities.slice(0, 3).map(fc => fc.floorNum)
-      if (chosenFloors.length < 3) {
-        const otherFloors = availableFloors.filter(f => !chosenFloors.includes(f)).sort(() => 0.5 - Math.random())
-        chosenFloors = [...chosenFloors, ...otherFloors.slice(0, 3 - chosenFloors.length)]
+        floorCapacities.sort((a, b) => (b.remainingSlots + Math.random() * 0.8) - (a.remainingSlots + Math.random() * 0.8))
+        chosenFloors = floorCapacities.slice(0, 3).map(fc => fc.floorNum)
+        if (chosenFloors.length < 3) {
+          const otherFloors = availableFloors.filter(f => !chosenFloors.includes(f)).sort(() => 0.5 - Math.random())
+          chosenFloors = [...chosenFloors, ...otherFloors.slice(0, 3 - chosenFloors.length)]
+        }
+      } else if (availableFloors.length > 0) {
+        chosenFloors = [availableFloors[0], availableFloors[0], availableFloors[0]]
       }
 
-      // Pick 1 task from each chosen floor (strictly enforcing maxAssignedCount)
       const assignedTasks = chosenFloors.map(floorNum => {
-        const floorTasks = tasksByFloor[floorNum] || []
+        const floorTasks = tasksByFloor[floorNum] || pool
         const eligibleTasks = floorTasks.filter(t => (taskAssignedCounts[t.id] || 0) < (Number(t.maxAssignedCount) || 3))
 
         let selectedTask
         if (eligibleTasks.length > 0) {
           selectedTask = eligibleTasks[Math.floor(Math.random() * eligibleTasks.length)]
         } else {
-          // Fallback: pick task with lowest assignment count on this floor
           const sortedByUsage = [...floorTasks].sort((a, b) => (taskAssignedCounts[a.id] || 0) - (taskAssignedCounts[b.id] || 0))
-          selectedTask = sortedByUsage[0] || floorTasks[0]
+          selectedTask = sortedByUsage[0] || floorTasks[0] || pool[0]
         }
 
         if (selectedTask) {
@@ -1310,11 +1469,10 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         return selectedTask
       }).filter(Boolean)
 
-      // Sort by floor ascending for clean player roadmap
       assignedTasks.sort((a, b) => (Number(a.floor) || 1) - (Number(b.floor) || 1))
 
       const assigned = assignedTasks.map((t, idx) => ({
-        id: `${p.uid}_t${idx + 1}_${Date.now()}`,
+        id: `${p.uid}_t${idx + 1}_${Date.now()}_${idx}`,
         poolTaskId: t.id,
         title: t.title,
         desc: t.desc,
@@ -1350,7 +1508,11 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         winner: null,
         winReason: '',
       })
-      showToast('เริ่มเกมแล้ว! แจกภารกิจเรียบร้อย')
+      showToast('เริ่มเกมแล้ว! แจกภารกิจเรียบร้อย', 'success')
+      if (myUid && updatedPlayers[myUid]) {
+        // Automatically switch playing admin into player game HUD
+        setIsAdminView(false)
+      }
     } catch (e) {
       showToast('เริ่มเกมล้มเหลว: ' + e.message, 'error')
     }
@@ -2100,13 +2262,13 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               style={{
                 padding: '6px 12px',
                 fontSize: 11,
-                background: isAdminView ? '#c51111' : '#1e293b',
+                background: isAdminView ? '#0288d1' : '#c51111',
                 color: '#fff',
-                borderBottom: `3.5px solid ${isAdminView ? '#7a0813' : '#0f172a'}`,
+                borderBottom: `3.5px solid ${isAdminView ? '#01579b' : '#7a0813'}`,
               }}
             >
-              <i className="fas fa-crown" style={{ fontSize: 10, color: isAdminView ? '#fff' : '#ffd54f' }} />
-              <span>{isAdminView ? 'จอกรรมการ' : 'สลับแอดมิน'}</span>
+              <i className={isAdminView ? 'fas fa-gamepad' : 'fas fa-crown'} style={{ fontSize: 10, color: isAdminView ? '#80d8ff' : '#ffd54f' }} />
+              <span>{isAdminView ? 'สลับไปจอผู้เล่น' : 'สลับจอกรรมการ'}</span>
             </button>
           )}
 
@@ -2509,6 +2671,38 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               />
             </div>
 
+            {/* Matching existing character notice */}
+            {(() => {
+              const trimmed = (directJoinName || '').trim().toLowerCase()
+              const matchingPlayer = trimmed ? Object.values(gameDoc?.players || {}).find(p => p.name?.toLowerCase().trim() === trimmed) : null
+              if (matchingPlayer) {
+                return (
+                  <div style={{
+                    background: 'rgba(76, 175, 80, 0.15)',
+                    border: '1.5px solid #4caf50',
+                    borderRadius: 12,
+                    padding: '10px 14px',
+                    marginBottom: 16,
+                    textAlign: 'left',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                  }}>
+                    <AmongUsVisor color={matchingPlayer.color || '#29b6f6'} size={28} isAlive={matchingPlayer.isAlive} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 900, color: '#81c784' }}>
+                        พบตัวละครของคุณในเกมแล้ว ({matchingPlayer.name})
+                      </div>
+                      <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                        แตะปุ่มด้านล่างเพื่อเชื่อมต่อและเข้าหน้าเกมต่อทันที
+                      </div>
+                    </div>
+                  </div>
+                )
+              }
+              return null
+            })()}
+
             <button
               type="button"
               onClick={handleDirectJoin}
@@ -2522,9 +2716,64 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 borderRadius: 14,
               }}
             >
-              <i className="fas fa-rocket" style={{ marginRight: 8 }} />
-              เข้าร่วมภารกิจ (JOIN CREW)
+              {(() => {
+                const trimmed = (directJoinName || '').trim().toLowerCase()
+                const isReconnect = trimmed && Object.values(gameDoc?.players || {}).some(p => p.name?.toLowerCase().trim() === trimmed)
+                return (
+                  <>
+                    <i className={isReconnect ? 'fas fa-sign-in-alt' : 'fas fa-rocket'} style={{ marginRight: 8 }} />
+                    <span>{isReconnect ? 'เชื่อมต่อกลับสู่ตัวละครเดิม (RECONNECT)' : 'เข้าร่วมภารกิจ (JOIN CREW)'}</span>
+                  </>
+                )
+              })()}
             </button>
+
+            {/* Quick Re-join chips for existing players in room */}
+            {allPlayersList.length > 0 && (
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'left' }}>
+                <div style={{ fontSize: 12, fontWeight: 900, color: '#80d8ff', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="fas fa-users" />
+                  <span>หรือแตะชื่อของคุณเพื่อเข้าสู่เกมต่อ (QUICK RE-JOIN)</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.5)', marginBottom: 10 }}>
+                  หากหลุดจากเกม หรือหน้าจอโหลดใหม่ สามารถแตะชื่อเดิมของคุณเพื่อกลับเข้าเกมทันที
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {allPlayersList.map(p => (
+                    <button
+                      key={p.uid}
+                      type="button"
+                      onClick={() => {
+                        setMyUid(p.uid)
+                        localStorage.setItem('allofus_player_uid', p.uid)
+                        localStorage.setItem('allofus_player_name', p.name)
+                        if (lineUser?.uid && !p.lineUid) {
+                          updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
+                            [`players.${p.uid}.lineUid`]: lineUser.uid,
+                          }).catch(() => {})
+                        }
+                        showToast(`ยินดีต้อนรับกลับ ${p.name}!`, 'success')
+                      }}
+                      className="au-btn au-btn-dark"
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 12px',
+                        borderRadius: 10,
+                        fontSize: 12,
+                        border: `1.5px solid ${p.color || '#384d6b'}`,
+                        background: 'rgba(10, 15, 24, 0.85)',
+                      }}
+                    >
+                      <AmongUsVisor color={p.color || '#80d8ff'} size={20} isAlive={p.isAlive} />
+                      <span style={{ fontWeight: 800, color: '#fff' }}>{p.name}</span>
+                      <i className="fas fa-arrow-right" style={{ fontSize: 9, color: 'rgba(255,255,255,0.4)', marginLeft: 2 }} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -2533,6 +2782,50 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         {/* ─────────────────────────────────────────────────────────── */}
         {isAdminView && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+            {/* In-Game HUD Quick Switcher Banner for GM */}
+            {gameDoc.status === 'playing' && (
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(41, 182, 246, 0.18) 0%, rgba(13, 71, 161, 0.28) 100%)',
+                border: '2px solid #29b6f6',
+                borderRadius: 16,
+                padding: '12px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 12,
+                    background: 'rgba(41, 182, 246, 0.2)',
+                    border: '1.5px solid #29b6f6',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: '#29b6f6', fontSize: 17,
+                  }}>
+                    <i className="fas fa-gamepad" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13.5, fontWeight: 900, color: '#fff' }}>
+                      เกมกำลังเล่นอยู่ (GAME IN PROGRESS)
+                    </div>
+                    <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)', marginTop: 2 }}>
+                      {me ? `คุณลงทะเบียนเป็นผู้เล่น "${me.name}" แล้ว` : 'คุณอยู่ในโหมดจอกรรมการ'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={me ? () => setIsAdminView(false) : handleAdminJoinGame}
+                  className="au-btn au-btn-blue"
+                  style={{ padding: '8px 14px', fontSize: 12, fontWeight: 900, whiteSpace: 'nowrap' }}
+                >
+                  <i className="fas fa-play-circle" style={{ marginRight: 6 }} />
+                  <span>{me ? 'เข้าสู่หน้าจอเกม' : 'ร่วมเล่นเป็นผู้เล่น'}</span>
+                </button>
+              </div>
+            )}
 
             {/* Admin Menubar (4 Tabs) */}
             <div style={{
@@ -5190,8 +5483,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                 ))}
 
                 {(me.tasks || []).length === 0 && (
-                  <div style={{ padding: '16px 0', textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
-                    ยังไม่มีภารกิจ รอแอดมินแจกภารกิจ
+                  <div style={{ padding: '16px 0', textAlign: 'center' }}>
+                    <div style={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, marginBottom: 10 }}>
+                      ยังไม่มีภารกิจของคุณในระบบ
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleAssignMyTasks}
+                      className="au-btn au-btn-blue"
+                      style={{ padding: '8px 16px', fontSize: 12 }}
+                    >
+                      <i className="fas fa-clipboard-check" style={{ marginRight: 6 }} />
+                      <span>กดรับภารกิจ (สุ่ม 3 ภารกิจ 3 ชั้น)</span>
+                    </button>
                   </div>
                 )}
               </div>
