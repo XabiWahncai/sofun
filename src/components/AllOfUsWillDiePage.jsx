@@ -4845,44 +4845,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
               </div>
             </div>
 
-            {/* Peace Period Alert Banner (if Kill Cooldown is Active) */}
-            {killCooldownSec > 0 && isAlive && (
-              <div style={{
-                background: 'rgba(255, 152, 0, 0.15)',
-                border: '2px solid #ff9800',
-                borderRadius: 14,
-                padding: '10px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                boxShadow: '0 4px 16px rgba(255, 152, 0, 0.25)',
-              }}>
-                <i className="fas fa-shield-alt" style={{ color: '#ffb74d', fontSize: 16 }} />
-                <div style={{ flex: 1, fontSize: 11.5, color: '#ffe082', lineHeight: 1.4 }}>
-                  <strong>ช่วงเวลาห้ามฆ่า (Peace Period):</strong> เหลืออีก <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 13, color: '#fff' }}>{killCooldownSec}</span> วินาที — ห้ามทุกคนกระทำการกำจัดหรือสั่งยิง
-                </div>
-              </div>
-            )}
-
-            {/* Emergency Meeting Cooldown Alert Banner */}
-            {emergencyCooldownSec > 0 && isAlive && (
-              <div style={{
-                background: 'rgba(239, 83, 80, 0.15)',
-                border: '2px solid #ef5350',
-                borderRadius: 14,
-                padding: '10px 14px',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                boxShadow: '0 4px 16px rgba(239, 83, 80, 0.25)',
-              }}>
-                <i className="fas fa-bullhorn" style={{ color: '#ff7961', fontSize: 16 }} />
-                <div style={{ flex: 1, fontSize: 11.5, color: '#ffcdd2', lineHeight: 1.4 }}>
-                  <strong>ห้าม EMERGENCY MEETING:</strong> คูลดาวน์เหลืออีก <span style={{ fontFamily: 'monospace', fontWeight: 900, fontSize: 13, color: '#fff' }}>{emergencyCooldownSec}</span> วินาที — ห้ามกดปุ่มเรียกประชุมฉุกเฉิน
-                </div>
-              </div>
-            )}
-
             {/* ─── SECRET ROLE CARD: HOLD TO REVEAL ─── */}
             {(revealedRole || holdRevealed) ? (
               <div
