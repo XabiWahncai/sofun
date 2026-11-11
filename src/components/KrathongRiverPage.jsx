@@ -622,7 +622,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         left: '-30px',
         right: '-30px',
         bottom: '340px',
-        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
+        backgroundImage: "url('/loykrathong-bg.webp')",
         backgroundSize: 'cover',
         backgroundPosition: 'center bottom',
         backgroundRepeat: 'no-repeat',

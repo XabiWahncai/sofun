@@ -41,7 +41,7 @@ export default function LoyKrathongHubPage({ showPage, lineUser }) {
         left: 0,
         right: 0,
         height: '380px',
-        backgroundImage: "url('/loykrathong-bg.webp'), url('/loykrathong-bg.png')",
+        backgroundImage: "url('/loykrathong-bg.webp')",
         backgroundSize: 'cover',
         backgroundPosition: 'center bottom',
         backgroundRepeat: 'no-repeat',
