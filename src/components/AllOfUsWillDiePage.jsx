@@ -513,6 +513,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   const [killCooldownSec, setKillCooldownSec] = useState(0)
   const [emergencyCooldownSec, setEmergencyCooldownSec] = useState(0)
   const [selectedVoteTarget, setSelectedVoteTarget] = useState(null)
+  const [manualEjectUid, setManualEjectUid] = useState('')
+  const isConcludingVotingRef = useRef(false)
   const [showRolePicker, setShowRolePicker] = useState(false)
   const [selectedPlayerModal, setSelectedPlayerModal] = useState(null)
   const [revealedRole, setRevealedRole] = useState(false)
@@ -1693,57 +1695,117 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
   }
 
   // Conclude voting and evaluate result
-  const concludeVoting = async () => {
-    if (!gameDoc?.meeting) return
-    const votes = gameDoc.meeting.votes || {}
-    const counts = {}
-
-    Object.values(votes).forEach(target => {
-      counts[target] = (counts[target] || 0) + 1
-    })
-
-    // Find candidate with max votes
-    let highestVoteCount = 0
-    let electedTarget = null
-    let isTie = false
-
-    Object.entries(counts).forEach(([target, count]) => {
-      if (count > highestVoteCount) {
-        highestVoteCount = count
-        electedTarget = target
-        isTie = false
-      } else if (count === highestVoteCount) {
-        isTie = true
-      }
-    })
-
-    const updatedPlayers = { ...gameDoc.players }
-    let eliminatedUid = null
-    let eliminatedRole = null
-    let dodoWon = false
-    let outcomeText = ''
-
-    if (isTie || !electedTarget || electedTarget === 'skip') {
-      outcomeText = isTie ? 'คะแนนโหวตเสมอกัน ไม่มีใครถูกขับออก' : 'เสียงส่วนใหญ่เลือก SKIP ไม่มีใครถูกขับออก'
-    } else {
-      eliminatedUid = electedTarget
-      const victim = updatedPlayers[eliminatedUid]
-      if (victim) {
-        eliminatedRole = victim.role
-        updatedPlayers[eliminatedUid] = { ...victim, isAlive: false }
-
-        if (victim.role === 'dodo') {
-          dodoWon = true
-          outcomeText = `${victim.name} คือโดโด้! ที่ประชุมโหวตโดโด้ออกตามเป้าหมาย ทำให้ฝ่ายโดโด้ชนะเกมทันที!`
-        } else if (victim.role === 'impostor') {
-          outcomeText = `${victim.name} ถูกขับออกจากยาน! ผู้เล่นคนนี้คือคนร้าย!`
-        } else {
-          outcomeText = `${victim.name} ถูกขับออกจากยาน! ผู้เล่นคนนี้ไม่ใช่คนร้าย...`
-        }
-      }
-    }
+  const concludeVoting = async (manualEliminateUid = null) => {
+    if (isConcludingVotingRef.current) return
+    isConcludingVotingRef.current = true
 
     try {
+      // 1. Fetch fresh document directly from Firestore to ensure all latest votes are included
+      const snap = await getDoc(doc(db, 'all_of_us_games', 'active_game'))
+      if (!snap.exists()) return
+      const currentData = snap.data()
+      if (currentData.status !== 'meeting_voting' && currentData.status !== 'meeting_discussion' && currentData.status !== 'meeting_result' && !manualEliminateUid) {
+        return
+      }
+
+      const votes = currentData.meeting?.votes || {}
+      const counts = {}
+
+      Object.values(votes).forEach(target => {
+        if (target) {
+          counts[target] = (counts[target] || 0) + 1
+        }
+      })
+
+      // Find candidate(s) with max votes
+      let highestVoteCount = 0
+      const topCandidates = []
+
+      Object.entries(counts).forEach(([target, count]) => {
+        if (count > highestVoteCount) {
+          highestVoteCount = count
+          topCandidates.length = 0
+          topCandidates.push(target)
+        } else if (count === highestVoteCount) {
+          topCandidates.push(target)
+        }
+      })
+
+      let electedTarget = null
+      let isTie = false
+
+      if (manualEliminateUid) {
+        electedTarget = manualEliminateUid
+        isTie = false
+      } else if (topCandidates.length === 1) {
+        electedTarget = topCandidates[0]
+        isTie = false
+      } else if (topCandidates.length > 1) {
+        // Genuine tie between multiple candidates
+        isTie = true
+        electedTarget = null
+      } else {
+        // No votes cast at all
+        electedTarget = 'skip'
+        isTie = false
+      }
+
+      const updatedPlayers = { ...(currentData.players || {}) }
+      let eliminatedUid = null
+      let eliminatedRole = null
+      let dodoWon = false
+      let outcomeText = ''
+
+      if (isTie) {
+        const tiedNames = topCandidates.map(t => {
+          if (t === 'skip') return 'SKIP VOTE'
+          const p = updatedPlayers[t] || Object.values(updatedPlayers).find(x => x.uid === t || x.name === t)
+          return p ? p.name : t
+        }).join(' และ ')
+        outcomeText = `คะแนนโหวตเสมอกัน (${tiedNames}) ไม่มีใครถูกขับออกจากยาน`
+      } else if (!electedTarget || electedTarget === 'skip') {
+        outcomeText = 'เสียงส่วนใหญ่เลือก SKIP ไม่มีใครถูกขับออกจากยาน'
+      } else {
+        eliminatedUid = electedTarget
+        // Robust lookup for victim key in updatedPlayers
+        let victimKey = eliminatedUid
+        let victim = updatedPlayers[victimKey]
+        if (!victim) {
+          const found = Object.entries(updatedPlayers).find(([k, p]) => k === eliminatedUid || p.uid === eliminatedUid || p.name === eliminatedUid)
+          if (found) {
+            victimKey = found[0]
+            victim = found[1]
+          }
+        }
+
+        if (victim) {
+          eliminatedRole = victim.role || 'crewmate'
+          eliminatedUid = victimKey
+          updatedPlayers[victimKey] = { ...victim, isAlive: false }
+
+          if (victim.role === 'dodo') {
+            dodoWon = true
+            outcomeText = `${victim.name} คือโดโด้! ที่ประชุมโหวตโดโด้ออกตามเป้าหมาย ทำให้ฝ่ายโดโด้ชนะเกมทันที!`
+          } else if (victim.role === 'impostor') {
+            outcomeText = `${victim.name} ถูกขับออกจากยาน! ผู้เล่นคนนี้คือคนร้าย!`
+          } else {
+            outcomeText = `${victim.name} ถูกขับออกจากยาน! ผู้เล่นคนนี้ไม่ใช่คนร้าย...`
+          }
+        } else {
+          outcomeText = `ผู้เล่น ${eliminatedUid} ถูกขับออกจากยาน!`
+        }
+      }
+
+      const resultPayload = {
+        eliminatedUid,
+        eliminatedRole,
+        outcomeText,
+        dodoWon,
+        isTie,
+        electedTarget,
+        voteCounts: counts,
+      }
+
       if (dodoWon) {
         // Dodo instant win!
         await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
@@ -1754,7 +1816,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
           gameTimerRunning: false,
           killCooldownUntil: 0,
           emergencyCooldownUntil: 0,
-          'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: true, isTie: false, electedTarget, voteCounts: counts },
+          'meeting.result': resultPayload,
         })
       } else {
         // Check if all impostors eliminated
@@ -1771,8 +1833,8 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             winReason: 'โหวตคนร้ายออกหมดแล้ว! ฝ่ายคนดีเป็นผู้ชนะ!',
             gameTimerRunning: false,
             killCooldownUntil: 0,
-          emergencyCooldownUntil: 0,
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
+            emergencyCooldownUntil: 0,
+            'meeting.result': resultPayload,
           })
         } else if (remainingImpostors.length >= remainingCrew.length && remainingImpostors.length > 0) {
           // Impostors win!
@@ -1783,21 +1845,25 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
             winReason: `จำนวนคนร้าย (${remainingImpostors.length} คน) เท่ากับหรือมากกว่าฝ่ายคนดีและโดโด้ (${remainingCrew.length} คน) แล้ว! ฝ่ายคนร้ายชนะทันที!`,
             gameTimerRunning: false,
             killCooldownUntil: 0,
-          emergencyCooldownUntil: 0,
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
+            emergencyCooldownUntil: 0,
+            'meeting.result': resultPayload,
           })
         } else {
           // Move to meeting result screen
           await updateDoc(doc(db, 'all_of_us_games', 'active_game'), {
             status: 'meeting_result',
             players: updatedPlayers,
-            'meeting.result': { eliminatedUid, eliminatedRole, outcomeText, dodoWon: false, isTie, electedTarget, voteCounts: counts },
+            'meeting.result': resultPayload,
           })
         }
       }
       showToast('สรุปผลการโหวตเรียบร้อย')
     } catch (e) {
       showToast('สรุปผลโหวตล้มเหลว: ' + e.message, 'error')
+    } finally {
+      setTimeout(() => {
+        isConcludingVotingRef.current = false
+      }, 1000)
     }
   }
 
@@ -5874,7 +5940,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                               </span>
                             )}
 
-                            {/* Vote Confirmation Checkmark Button (Only for living players) */}
+                            {/* Vote Confirmation Button (Only for living players) */}
                             {!isTargetDead && isSelected && gameDoc.status === 'meeting_voting' && isAlive && !gameDoc.meeting?.votes?.[myUid] && (
                               <button
                                 type="button"
@@ -5884,15 +5950,19 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                                   setSelectedVoteTarget(null)
                                 }}
                                 className="au-btn au-btn-green"
-                                style={{ width: 32, height: 32, borderRadius: 8, padding: 0 }}
+                                style={{ padding: '6px 12px', borderRadius: 8, fontSize: 11.5, fontWeight: 900, display: 'inline-flex', alignItems: 'center', gap: 5 }}
                                 title="ยืนยันโหวตคนนี้"
                               >
-                                <i className="fas fa-check" />
+                                <i className="fas fa-check" /> ยืนยันโหวต
                               </button>
                             )}
 
                             {/* Checkmark if current player voted for this target */}
-                            {hasMyVote && <i className="fas fa-check-circle" style={{ color: '#ff5252', fontSize: 16 }} />}
+                            {hasMyVote && (
+                              <span style={{ fontSize: 11, fontWeight: 900, color: '#4caf50', background: 'rgba(76,175,80,0.18)', padding: '3px 8px', borderRadius: 6, border: '1px solid #4caf50', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                <i className="fas fa-check-circle" /> โหวตแล้ว
+                              </span>
+                            )}
                           </div>
                         </div>
                       )
@@ -6066,12 +6136,70 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                       </div>
                     )}
 
+                    {/* Admin Override: If a vote skipped by mistake or tie, GM can manually eject the intended player */}
+                    {hasAdminPerm && (
+                      <div style={{
+                        marginTop: 24,
+                        padding: '12px 16px',
+                        background: 'rgba(255, 255, 255, 0.04)',
+                        borderRadius: 12,
+                        border: '1px dashed rgba(255, 255, 255, 0.18)',
+                        maxWidth: 380,
+                        width: '100%',
+                      }}>
+                        <div style={{ fontSize: 11.5, fontWeight: 900, color: '#ffd54f', marginBottom: 8, letterSpacing: '0.04em' }}>
+                          <i className="fas fa-user-shield" style={{ marginRight: 6 }} />
+                          GM OVERRIDE: บังคับขับผู้เล่นออกตามมติห้อง
+                        </div>
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
+                          <select
+                            value={manualEjectUid}
+                            onChange={(e) => setManualEjectUid(e.target.value)}
+                            style={{
+                              flex: 1,
+                              background: '#0d131d',
+                              color: '#fff',
+                              border: '1px solid #1f2c42',
+                              borderRadius: 8,
+                              padding: '8px 10px',
+                              fontSize: 12,
+                              fontFamily: "'Sarabun', sans-serif",
+                            }}
+                          >
+                            <option value="">-- เลือกผู้เล่นที่จะขับออก --</option>
+                            {Object.entries(gameDoc.players || {})
+                              .filter(([_, p]) => p.isAlive)
+                              .map(([uid, p]) => (
+                                <option key={uid} value={uid}>
+                                  {p.name} ({p.role})
+                                </option>
+                              ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!manualEjectUid}
+                            onClick={() => {
+                              if (manualEjectUid && window.confirm(`ยืนยันขับ ${gameDoc.players?.[manualEjectUid]?.name} ออกจากยานทันที?`)) {
+                                concludeVoting(manualEjectUid)
+                                setManualEjectUid('')
+                              }
+                            }}
+                            className="au-btn au-btn-red"
+                            style={{ padding: '8px 14px', fontSize: 11.5, whiteSpace: 'nowrap' }}
+                          >
+                            <i className="fas fa-eject" style={{ marginRight: 4 }} />
+                            ขับออก
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {hasAdminPerm && (
                       <button
                         type="button"
                         onClick={handleResumeGame}
                         className="au-btn au-btn-green"
-                        style={{ marginTop: 32, padding: '14px 32px', fontSize: 14 }}
+                        style={{ marginTop: 24, padding: '14px 32px', fontSize: 14 }}
                       >
                         <i className="fas fa-play" style={{ marginRight: 8 }} />
                         เล่นเกมต่อ (เวลาเดินต่อ)
