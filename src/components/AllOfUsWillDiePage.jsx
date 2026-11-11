@@ -400,22 +400,6 @@ export function AmongUsVisor({ role = 'crewmate', isAlive = true, size = 38, col
           <i className="fas fa-ghost" />
         </div>
       )}
-
-      {/* Sheriff Golden Star Pin */}
-      {isAlive && role === 'sheriff' && (
-        <i
-          className="fas fa-star"
-          style={{
-            position: 'absolute',
-            top: -2,
-            right: -2,
-            fontSize: Math.max(9, Math.round(size * 0.3)),
-            color: '#ffd54f',
-            textShadow: '0 0 3px rgba(0,0,0,0.8)',
-            pointerEvents: 'none',
-          }}
-        />
-      )}
     </div>
   )
 }
