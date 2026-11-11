@@ -781,7 +781,7 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
         }
 
         // Conclude votes when time hits 0 OR when all living players have cast their votes
-        if (gameDoc.status === 'meeting_voting' && hasAdminPerm) {
+        if (gameDoc.status === 'meeting_voting' && hasAdminPerm && !isConcludingVotingRef.current && !gameDoc.meeting?.result) {
           const livingPlayers = Object.values(gameDoc.players || {}).filter(p => p.isAlive)
           const allVoted = livingPlayers.length > 0 && livingPlayers.every(p => Boolean(gameDoc.meeting?.votes?.[p.uid]))
           if (meetRem === 0 || allVoted) {
@@ -1704,8 +1704,15 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       const snap = await getDoc(doc(db, 'all_of_us_games', 'active_game'))
       if (!snap.exists()) return
       const currentData = snap.data()
-      if (currentData.status !== 'meeting_voting' && currentData.status !== 'meeting_discussion' && currentData.status !== 'meeting_result' && !manualEliminateUid) {
-        return
+
+      // If not manual override, only conclude if currently voting or in discussion and result not yet produced
+      if (!manualEliminateUid) {
+        if (currentData.status !== 'meeting_voting' && currentData.status !== 'meeting_discussion') {
+          return
+        }
+        if (currentData.meeting?.result) {
+          return
+        }
       }
 
       const votes = currentData.meeting?.votes || {}
@@ -6020,11 +6027,16 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
                   {hasAdminPerm && (
                     <button
                       type="button"
-                      onClick={concludeVoting}
+                      disabled={isConcludingVotingRef.current || gameDoc.status === 'meeting_result' || !!gameDoc.meeting?.result}
+                      onClick={() => concludeVoting()}
                       className="au-btn au-btn-red"
-                      style={{ width: '100%', padding: '12px', fontSize: 13 }}
+                      style={{
+                        width: '100%', padding: '12px', fontSize: 13,
+                        opacity: (isConcludingVotingRef.current || gameDoc.status === 'meeting_result' || !!gameDoc.meeting?.result) ? 0.6 : 1,
+                        cursor: (isConcludingVotingRef.current || gameDoc.status === 'meeting_result' || !!gameDoc.meeting?.result) ? 'not-allowed' : 'pointer',
+                      }}
                     >
-                      สรุปผลโหวตทันที
+                      <i className="fas fa-poll" style={{ marginRight: 6 }} /> สรุปผลโหวตทันที
                     </button>
                   )}
                 </div>
