@@ -42,13 +42,14 @@ export default class ErrorBoundary extends React.Component {
             <i className="fas fa-exclamation-triangle" />
           </div>
           <h2 style={{ fontSize: '18px', fontWeight: 800, margin: '0 0 8px', color: '#1a1a1a' }}>
-            เกิดข้อผิดพลาดในการแสดงผล POS
+            {this.props.title ? `เกิดข้อผิดพลาดในการแสดงผล ${this.props.title}` : 'เกิดข้อผิดพลาดในการแสดงผล'}
           </h2>
           <p style={{ fontSize: '13px', color: '#666', maxWidth: '380px', margin: '0 0 20px', lineHeight: 1.6 }}>
             {this.state.error?.message || 'ระบบเกิดข้อผิดพลาดชั่วคราว'}
           </p>
           <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center' }}>
             <button
+              type="button"
               onClick={() => {
                 this.setState({ hasError: false, error: null })
                 window.location.reload()
@@ -64,7 +65,26 @@ export default class ErrorBoundary extends React.Component {
                 cursor: 'pointer',
               }}
             >
-              <i className="fas fa-redo" style={{ marginRight: '6px' }} /> โหลดใหม่อีกครั้ง
+              โหลดหน้านี้ใหม่
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                this.setState({ hasError: false, error: null })
+                window.location.href = '/'
+              }}
+              style={{
+                padding: '10px 18px',
+                borderRadius: '10px',
+                background: '#f3f4f6',
+                color: '#374151',
+                border: '1px solid rgba(26,26,26,0.15)',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+              }}
+            >
+              กลับหน้าหลัก
             </button>
             <button
               onClick={() => {
