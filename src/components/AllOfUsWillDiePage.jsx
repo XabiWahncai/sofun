@@ -543,6 +543,33 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
     }
   }, [hasAdminPerm])
 
+  // ── Derived Player Information ──────────────────────────
+  const me = (gameDoc?.players && myUid) ? gameDoc.players[myUid] : null
+  const myRole = me?.role || 'crewmate'
+  const isAlive = me?.isAlive !== false
+  const allPlayersList = useMemo(() => {
+    return Object.entries(gameDoc?.players || {}).map(([key, val]) => ({
+      uid: val.uid || key,
+      ...val,
+    }))
+  }, [gameDoc?.players])
+
+  // Total Task Progress Calculation (Impostor and Dodo tasks are excluded from progress)
+  const { totalTasksCount, completedTasksCount, progressPercent } = useMemo(() => {
+    let total = 0
+    let completed = 0
+    allPlayersList.forEach(p => {
+      // Exclude Impostor and Dodo tasks from progress and victory condition
+      if (p.role === 'impostor' || p.role === 'dodo') return
+      (p.tasks || []).forEach(t => {
+        total++
+        if (t.verified) completed++
+      })
+    })
+    const pct = total > 0 ? Math.round((completed / total) * 100) : 0
+    return { totalTasksCount: total, completedTasksCount: completed, progressPercent: pct }
+  }, [allPlayersList])
+
   // ── 1. Listen to Game State Document in Realtime ─────────
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'all_of_us_games', 'active_game'), snap => {
@@ -832,33 +859,6 @@ export default function AllOfUsWillDiePage({ lineUser, firebaseUser, isAdmin: is
       stopSabotageAlarm()
     }
   }, [])
-
-  // ── Derived Player Information ──────────────────────────
-  const me = (gameDoc?.players && myUid) ? gameDoc.players[myUid] : null
-  const myRole = me?.role || 'crewmate'
-  const isAlive = me?.isAlive !== false
-  const allPlayersList = useMemo(() => {
-    return Object.entries(gameDoc?.players || {}).map(([key, val]) => ({
-      uid: val.uid || key,
-      ...val,
-    }))
-  }, [gameDoc?.players])
-
-  // Total Task Progress Calculation (Impostor and Dodo tasks are excluded from progress)
-  const { totalTasksCount, completedTasksCount, progressPercent } = useMemo(() => {
-    let total = 0
-    let completed = 0
-    allPlayersList.forEach(p => {
-      // Exclude Impostor and Dodo tasks from progress and victory condition
-      if (p.role === 'impostor' || p.role === 'dodo') return
-      (p.tasks || []).forEach(t => {
-        total++
-        if (t.verified) completed++
-      })
-    })
-    const pct = total > 0 ? Math.round((completed / total) * 100) : 0
-    return { totalTasksCount: total, completedTasksCount: completed, progressPercent: pct }
-  }, [allPlayersList])
 
   // Auto-check Crewmate win condition on 100% tasks before time runs out
   useEffect(() => {

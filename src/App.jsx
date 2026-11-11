@@ -812,18 +812,48 @@ export default function App() {
         />
       )}
 
-      {currentPage === 'home' && <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} promoSettings={promoSettings} />}
-      {currentPage === 'games' && <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
-      {currentPage === 'detail' && <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />}
-      {currentPage === 'party' && <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} onLogin={handleLineLogin} showToast={showToast} />}
-      {currentPage === 'profile' && <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} allGames={allGames} />}
-      {currentPage === 'qr' && <QRPage lineUser={lineUser} allGames={allGames} hasActiveOrder={!!activeMemberOrder} showPage={showPage} />}
-      {currentPage === 'order' && activeMemberOrder && (
-        <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} allGames={allGames} showPage={showPage} />
+      {currentPage === 'home' && (
+        <ErrorBoundary title="หน้าหลัก" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <HomePage allGames={allGames} allParties={allParties} showPage={showPage} showDetail={showDetail} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} promoSettings={promoSettings} />
+        </ErrorBoundary>
       )}
-      {currentPage === 'adminscan' && isEffectiveAdmin && <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />}
+      {currentPage === 'games' && (
+        <ErrorBoundary title="รายการเกม" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <GamesPage allGames={allGames} showDetail={showDetail} showPage={showPage} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'detail' && (
+        <ErrorBoundary title="รายละเอียดเกม" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <DetailPage id={detailId} showPage={showPage} showDetail={showDetail} allGames={allGames} lineUser={lineUser} bookingEnabled={bookingEnabled} showToast={showToast} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'party' && (
+        <ErrorBoundary title="ตี้บอร์ดเกม" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <PartyPage user={lineUser} allGames={allGames} parties={allParties} highlightPartyId={highlightPartyId} onLogin={handleLineLogin} showToast={showToast} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'profile' && (
+        <ErrorBoundary title="โปรไฟล์ผู้ใช้" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <ProfilePage lineUser={lineUser} onLogout={handleLogout} showPage={showPage} allGames={allGames} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'qr' && (
+        <ErrorBoundary title="QR Code" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <QRPage lineUser={lineUser} allGames={allGames} hasActiveOrder={!!activeMemberOrder} showPage={showPage} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'order' && activeMemberOrder && (
+        <ErrorBoundary title="สั่งอาหาร/เครื่องดื่ม" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <MemberOrderPage lineUser={lineUser} activeOrder={activeMemberOrder} showToast={showToast} allGames={allGames} showPage={showPage} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'adminscan' && isEffectiveAdmin && (
+        <ErrorBoundary title="สแกนเช็คอิน" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />
+        </ErrorBoundary>
+      )}
       {currentPage === 'pos' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="ระบบ POS" isPos resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           {isEffectiveAdmin ? (
             <POSPage
               initialUid={scanUid}
@@ -913,10 +943,18 @@ export default function App() {
           )}
         </ErrorBoundary>
       )}
-      {currentPage === 'booking' && <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} initialGameId={bookingGameId} />}
-      {currentPage === 'random' && <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} allGames={allGames} />}
+      {currentPage === 'booking' && (
+        <ErrorBoundary title="จองโต๊ะ" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <BookingPage lineUser={lineUser} allGames={allGames} showToast={showToast} onLogin={handleLineLogin} initialGameId={bookingGameId} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'random' && (
+        <ErrorBoundary title="วงล้อสุ่มเกม" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <RandomWheelPage lineUser={lineUser} showToast={showToast} showPage={showPage} allGames={allGames} />
+        </ErrorBoundary>
+      )}
       {currentPage === 'allofuswilldie' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="เกม All Of Us Will Die" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <AllOfUsWillDiePage
             lineUser={lineUser}
             firebaseUser={firebaseUser}
@@ -927,7 +965,7 @@ export default function App() {
         </ErrorBoundary>
       )}
       {currentPage === 'handbook' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="คู่มือเกม" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <HandbookPage
             lineUser={lineUser}
             isEffectiveAdmin={isEffectiveAdmin}
@@ -941,22 +979,22 @@ export default function App() {
         </ErrorBoundary>
       )}
       {currentPage === 'loykrathong' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="ลอยกระทง" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <LoyKrathongHubPage showPage={showPage} lineUser={lineUser} />
         </ErrorBoundary>
       )}
       {currentPage === 'krathong' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="วาดกระทง" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <KrathongDrawPage showPage={showPage} lineUser={lineUser} showToast={showToast} />
         </ErrorBoundary>
       )}
       {currentPage === 'river' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="แม่น้ำกระทง" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <KrathongRiverPage showPage={showPage} lineUser={lineUser} showToast={showToast} />
         </ErrorBoundary>
       )}
       {currentPage === 'rehistory' && (
-        <ErrorBoundary>
+        <ErrorBoundary title="ประวัติการเล่น" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <RehistoryPage
             lineUser={lineUser}
             allGames={allGames}
@@ -967,21 +1005,25 @@ export default function App() {
         </ErrorBoundary>
       )}
       {currentPage === 'admin' && (
-        <AdminPage
-          showToast={showToast}
-          openModal={() => { setEditingGame(null); setModalOpen(true) }}
-          openEdit={(g) => { setEditingGame(g); setModalOpen(true) }}
-          allGames={allGames}
-          allParties={allParties}
-        />
+        <ErrorBoundary title="ระบบจัดการ Admin" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <AdminPage
+            showToast={showToast}
+            openModal={() => { setEditingGame(null); setModalOpen(true) }}
+            openEdit={(g) => { setEditingGame(g); setModalOpen(true) }}
+            allGames={allGames}
+            allParties={allParties}
+          />
+        </ErrorBoundary>
       )}
 
       {modalOpen && (
-        <GameModal
-          editingGame={editingGame}
-          onClose={() => setModalOpen(false)}
-          showToast={showToast}
-        />
+        <ErrorBoundary title="หน้าต่างเกม" onReset={() => setModalOpen(false)}>
+          <GameModal
+            editingGame={editingGame}
+            onClose={() => setModalOpen(false)}
+            showToast={showToast}
+          />
+        </ErrorBoundary>
       )}
 
       {showRegister && liffProfile && (
