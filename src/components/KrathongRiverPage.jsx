@@ -231,9 +231,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
     { id: 'lan-4', x: 82, y: 18, size: 26, speed: 0.25 },
     { id: 'lan-5', x: 92, y: 42, size: 18, speed: 0.18 },
   ])
-  const [soundEnabled, setSoundEnabled] = useState(false)
-  const audioCtxRef = useRef(null)
-  const bgAudioRef = useRef(null)
 
   // Real-time animation positions & Parallax tracking
   const krathongPositionsRef = useRef(new Map())
@@ -465,102 +462,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
     }
     setSkyLanterns((prev) => [...prev, newLan])
     if (showToast) showToast('ปล่อยโคมลอยขึ้นสู่ฟากฟ้าแล้ว')
-  }
-
-  // ── Web Audio Ambient Sound ──────────────────────────────
-    // ── Cleanup background audio on unmount ───────────────────
-  useEffect(() => {
-    return () => {
-      if (bgAudioRef.current) {
-        try {
-          bgAudioRef.current.pause()
-        } catch {}
-      }
-      if (audioCtxRef.current) {
-        try {
-          audioCtxRef.current.close()
-        } catch {}
-        audioCtxRef.current = null
-      }
-    }
-  }, [])
-
-  const toggleSound = () => {
-    if (soundEnabled) {
-      if (bgAudioRef.current) {
-        try {
-          bgAudioRef.current.pause()
-        } catch (err) {
-          console.warn('Audio pause error:', err)
-        }
-      }
-      if (audioCtxRef.current) {
-        try {
-          audioCtxRef.current.close()
-        } catch {}
-        audioCtxRef.current = null
-      }
-      setSoundEnabled(false)
-      if (showToast) showToast('ปิดเสียงดนตรีและสายน้ำแล้ว')
-    } else {
-      // Play Background Loy Krathong Ranad Music
-      if (bgAudioRef.current) {
-        try {
-          bgAudioRef.current.volume = 0.8
-          const playPromise = bgAudioRef.current.play()
-          if (playPromise !== undefined) {
-            playPromise.catch((err) => {
-              console.warn('Audio play failed:', err)
-            })
-          }
-        } catch (err) {
-          console.warn('Audio play failed:', err)
-        }
-      }
-      // Start Gentle River Water Web Audio (Pink Noise)
-      try {
-        const AudioContext = window.AudioContext || window.webkitAudioContext
-        const ctx = new AudioContext()
-        audioCtxRef.current = ctx
-
-        const bufferSize = ctx.sampleRate * 2
-        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-        const output = noiseBuffer.getChannelData(0)
-        let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0
-        for (let i = 0; i < bufferSize; i++) {
-          const white = Math.random() * 2 - 1
-          b0 = 0.99886 * b0 + white * 0.0555179
-          b1 = 0.99332 * b1 + white * 0.0750759
-          b2 = 0.96900 * b2 + white * 0.1538520
-          b3 = 0.86650 * b3 + white * 0.3104856
-          b4 = 0.55000 * b4 + white * 0.5329522
-          b5 = -0.7616 * b5 - white * 0.0168980
-          output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.02
-          b6 = white * 0.115926
-        }
-
-        const whiteNoise = ctx.createBufferSource()
-        whiteNoise.buffer = noiseBuffer
-        whiteNoise.loop = true
-
-        const filter = ctx.createBiquadFilter()
-        filter.type = 'lowpass'
-        filter.frequency.setValueAtTime(320, ctx.currentTime)
-
-        const gainNode = ctx.createGain()
-        gainNode.gain.setValueAtTime(0.22, ctx.currentTime)
-
-        whiteNoise.connect(filter)
-        filter.connect(gainNode)
-        gainNode.connect(ctx.destination)
-        whiteNoise.start()
-      } catch (err) {
-        console.warn('Audio context init failed:', err)
-      }
-
-      setSoundEnabled(true)
-      if (showToast) showToast('กำลังเล่น: เพลงรำวงวันลอยกระทง (ระนาดเอก)')
-    }
   }
 
   // Filtered search
@@ -1385,7 +1286,7 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
           </button>
         </div>
 
-        {/* Right: QR Code to /Krathong & Sound Toggle Button */}
+        {/* Right: QR Code to /Krathong */}
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', pointerEvents: 'auto' }}>
           {/* QR Code Link Card to /Krathong (2x Enlarged: size 232px) */}
           <div
@@ -1433,49 +1334,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
               />
             </div>
           </div>
-
-          {/* Sound / Music Toggle Button */}
-          <button
-            type="button"
-            onClick={toggleSound}
-            title={soundEnabled ? 'ปิดเพลงรำวงวันลอยกระทง' : 'เปิดเพลงรำวงวันลอยกระทง (ระนาดเอก)'}
-            style={{
-              background: soundEnabled
-                ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.35) 0%, rgba(217, 119, 6, 0.45) 100%)'
-                : 'rgba(15, 23, 42, 0.78)',
-              border: soundEnabled
-                ? '1px solid rgba(254, 240, 138, 0.65)'
-                : '1px solid rgba(255, 255, 255, 0.18)',
-              color: soundEnabled ? '#fef08a' : '#ffffff',
-              borderRadius: '12px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontSize: '12px',
-              fontWeight: 700,
-              backdropFilter: 'blur(10px)',
-              WebkitBackdropFilter: 'blur(10px)',
-              height: '42px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              boxShadow: soundEnabled
-                ? '0 0 15px rgba(245, 158, 11, 0.4), 0 2px 8px rgba(0, 0, 0, 0.4)'
-                : '0 2px 8px rgba(0, 0, 0, 0.3)',
-              transition: 'all 0.2s ease',
-            }}
-          >
-            <i
-              className={`fas ${soundEnabled ? 'fa-volume-high' : 'fa-music'}`}
-              style={{
-                fontSize: '13px',
-                color: soundEnabled ? '#fde047' : '#94a3b8',
-                animation: soundEnabled ? 'musicNotePulse 1.8s ease-in-out infinite' : 'none',
-              }}
-            />
-            <span style={{ whiteSpace: 'nowrap', fontSize: '11px' }}>
-              {soundEnabled ? 'ปิดเพลงลอยกระทง' : 'เปิดเพลงลอยกระทง'}
-            </span>
-          </button>
         </div>
       </div>
 
@@ -1596,15 +1454,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         )}
       </div>
 
-      {/* Background Loy Krathong Ranad Music Audio Element */}
-      <audio
-        ref={bgAudioRef}
-        src="/loykrathong-music.mp3"
-        preload="auto"
-        loop
-        playsInline
-      />
-
       <style>{`
         @keyframes danmakuFloatLeftToRight {
           0% {
@@ -1658,10 +1507,6 @@ export default function KrathongRiverPage({ showPage, lineUser, showToast }) {
         @keyframes bubbleAppear {
           0% { transform: translateX(-50%) translateY(8px) scale(0.92); opacity: 0; }
           100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
-        }
-        @keyframes musicNotePulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.22) rotate(6deg); }
         }
         @keyframes fireworkBurst {
           0% { transform: scale(0.2); opacity: 0; }
