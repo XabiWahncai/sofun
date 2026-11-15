@@ -89,6 +89,34 @@ const NETFLIX_BOOKING_CSS = `
   .booking-mobile-nav {
     display: none;
   }
+  .booking-hero-section {
+    padding: 36px 24px 28px;
+  }
+  .booking-hero-title {
+    font-family: 'Bebas Neue', 'Sarabun', sans-serif;
+    font-weight: 900;
+    font-size: clamp(24px, 4.2vw, 48px);
+    color: #111827;
+    letter-spacing: 0.01em;
+    line-height: 1.15;
+    margin: 0 0 10px;
+    text-transform: uppercase;
+    text-wrap: balance;
+  }
+  .booking-hero-desc {
+    font-size: 13.5px;
+    color: #4b5563;
+    line-height: 1.7;
+    margin: 0;
+    max-width: 680px;
+    text-wrap: pretty;
+  }
+  .booking-main-container {
+    max-width: 1320px;
+    margin: 0 auto;
+    padding: 24px 20px 64px;
+  }
+
   @media (max-width: 960px) {
     .booking-mobile-nav {
       display: flex;
@@ -135,6 +163,24 @@ const NETFLIX_BOOKING_CSS = `
     .booking-col-left.mobile-hidden,
     .booking-col-right.mobile-hidden {
       display: none !important;
+    }
+  }
+
+  @media (max-width: 640px) {
+    .booking-hero-section {
+      padding: 20px 16px 16px !important;
+    }
+    .booking-hero-title {
+      font-size: clamp(18px, 5.2vw, 24px) !important;
+      line-height: 1.25 !important;
+      margin-bottom: 6px !important;
+    }
+    .booking-hero-desc {
+      font-size: 12px !important;
+      line-height: 1.55 !important;
+    }
+    .booking-main-container {
+      padding: 14px 12px 56px !important;
     }
   }
 
@@ -4842,41 +4888,33 @@ export default function BookingPage({
 
       {/* ── Redesigned Clean White Header ──────────────────────────────────── */}
       <section
+        className="booking-hero-section"
         style={{
           position: 'relative',
           overflow: 'hidden',
           background: '#ffffff',
           borderBottom: '1px solid rgba(0, 0, 0, 0.08)',
-          padding: '40px 24px 36px',
         }}
       >
         <div style={{ maxWidth: 1320, margin: '0 auto', position: 'relative', zIndex: 1 }}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
 
               {/* Title row */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
-                <div>
+                <div style={{ width: '100%', maxWidth: 780 }}>
                   <h1
-                    style={{
-                      fontFamily: "'Bebas Neue', sans-serif",
-                      fontWeight: 900,
-                      fontSize: 'clamp(32px, 4.5vw, 52px)',
-                      color: '#111827',
-                      letterSpacing: '0.02em',
-                      lineHeight: 1.05,
-                      margin: '0 0 10px',
-                      textTransform: 'uppercase',
-                    }}
+                    className="booking-hero-title"
                   >
-                    จองรอบเกม <span style={{ color: 'var(--curtain-crimson, #e50914)' }}>& ตารางห้องสืบคดี</span>
+                    จองรอบเกม <span style={{ color: 'var(--curtain-crimson, #e50914)', display: 'inline-block' }}>& ตารางห้องสืบคดี</span>
                   </h1>
-                  <p style={{ fontSize: 13.5, color: '#4b5563', lineHeight: 1.7, margin: 0, maxWidth: 680 }}>
+                  <p
+                    className="booking-hero-desc"
+                  >
                     จองรอบเล่นเกม Script Murder ที่ Sofun Club Thailand เช็คตารางห้องว่างแบบเรียลไทม์ หรือเปิดปาร์ตี้ใหม่เพื่อชวนเพื่อนร่วมไขปริศนา
                   </p>
                 </div>
               </div>
-
 
             </div>
           </div>
@@ -4885,11 +4923,7 @@ export default function BookingPage({
 
       {/* ── Main Two-Column Calendar Layout ───────────────────────────────── */}
       <main
-        style={{
-          maxWidth: 1320,
-          margin: '0 auto',
-          padding: '28px 20px 64px',
-        }}
+        className="booking-main-container"
       >
         {/* ── Mobile Tab Navigation Bar ───────────────────────────────── */}
         <div className="booking-mobile-nav" role="tablist" aria-label="แถบสลับหน้าจองรอบเกม">
