@@ -11,7 +11,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore'
 import { db } from '../firebase'
-import { convertImageUrl } from '../utils/imageUrl'
+import { convertImageUrl, handleCharacterImageError } from '../utils/imageUrl'
 import { isSpecialEventGame, isSpecialEventHistory, isSpecialEventId } from '../utils/achievementTierSync'
 
 const fmtThaiDate = (v) => {
@@ -729,7 +729,7 @@ export default function RehistoryPage({
                               alt={char.name}
                               className="rehistory-modal-char-photo"
                               loading="lazy"
-                              onError={(e) => { e.currentTarget.style.display = 'none' }}
+                              onError={(e) => handleCharacterImageError(e, char.image || char.imageDriveUrl || char.imagePreview, 340)}
                             />
                           ) : (
                             <div className="rehistory-modal-char-ph">

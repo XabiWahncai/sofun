@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import DecemberSeventhHandbook from './handbook/seventh-december/DecemberSeventhApp'
-import { convertImageUrl } from '../utils/imageUrl'
+import { convertImageUrl, handleCharacterImageError } from '../utils/imageUrl'
 import {
   BookOpen,
   Shield,
@@ -362,6 +362,8 @@ function GameHandbookDetail({ game, onBack, showDetail }) {
                             alt={char.name || `ตัวละคร ${idx + 1}`}
                             className="w-full h-full object-cover"
                             loading="lazy"
+                            referrerPolicy="no-referrer"
+                            onError={e => handleCharacterImageError(e, char.image, 160)}
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-zinc-500 font-bold text-xs">

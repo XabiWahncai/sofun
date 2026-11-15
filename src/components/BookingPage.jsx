@@ -2044,6 +2044,18 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   const [slipPreview, setSlipPreview] = useState('')
   const [uploading, setUploading] = useState(false)
 
+  // Prevent background scrolling / rubber-banding on mobile while modal is open
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow
+    const origTouchAction = document.body.style.touchAction
+    document.body.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
+    return () => {
+      document.body.style.overflow = origOverflow
+      document.body.style.touchAction = origTouchAction
+    }
+  }, [])
+
   useEffect(() => {
     getDoc(doc(db, 'settings', 'payment')).then(snap => {
       if (snap.exists()) {
@@ -2163,9 +2175,11 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 'clamp(12px, 3vh, 24px) 16px',
+        padding: 'clamp(8px, 2.5vh, 20px) 12px',
         background: 'rgba(0, 0, 0, 0.75)',
         backdropFilter: 'blur(8px)',
+        overscrollBehavior: 'contain',
+        touchAction: 'none',
         boxSizing: 'border-box',
       }}
     >
@@ -2183,6 +2197,8 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
           boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(0, 0, 0, 0.08)',
           fontFamily: "'Sarabun', sans-serif",
           boxSizing: 'border-box',
+          overscrollBehavior: 'contain',
+          touchAction: 'pan-y',
           position: 'relative',
         }}
       >
@@ -2360,6 +2376,12 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#4B5563', lineHeight: 1.5 }}>
+                  <i className="fas fa-ban" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#991B1B' }}>ไม่คืนเงินมัดจำ:</strong> เงินมัดจำไม่สามารถขอรับเงินคืนหรือโอนสิทธิ์ได้ทุกกรณี หากยกเลิกการเล่นหรือไม่มาตามนัดหมาย
+                  </div>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#4B5563', lineHeight: 1.5 }}>
                   <i className="fas fa-calendar-plus" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
                   <div>
@@ -3081,6 +3103,18 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
 
   const [memberProfiles, setMemberProfiles] = useState({})
 
+  // Lock body scroll while modal is active to prevent background shifting
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow
+    const origTouchAction = document.body.style.touchAction
+    document.body.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
+    return () => {
+      document.body.style.overflow = origOverflow
+      document.body.style.touchAction = origTouchAction
+    }
+  }, [])
+
   useEffect(() => {
     if (!booking?.members?.length && !booking?.joinRequests?.length && !booking?.leaderId) return
     const uids = [
@@ -3356,9 +3390,11 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          padding: 'clamp(12px, 3.5vh, 28px) 16px',
+          padding: 'clamp(8px, 2.5vh, 20px) 12px',
           background: 'rgba(0, 0, 0, 0.75)',
           backdropFilter: 'blur(8px)',
+          overscrollBehavior: 'contain',
+          touchAction: 'none',
           boxSizing: 'border-box',
         }}
         onClick={e => e.target === e.currentTarget && onClose()}
@@ -3366,15 +3402,17 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
         <div
           style={{
             width: '100%',
-            maxWidth: 520,
-            maxHeight: 'min(90dvh, 820px)',
+            maxWidth: 480,
+            maxHeight: 'min(92dvh, 780px)',
             display: 'flex',
             flexDirection: 'column',
-            borderRadius: 22,
+            borderRadius: 20,
             overflow: 'hidden',
             background: '#ffffff',
             boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.08)',
             fontFamily: "'Sarabun', sans-serif",
+            overscrollBehavior: 'contain',
+            touchAction: 'pan-y',
             boxSizing: 'border-box',
           }}
         >
@@ -3383,7 +3421,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
             style={{
               position: 'relative',
               width: '100%',
-              minHeight: 220,
+              height: 'clamp(115px, 18vh, 150px)',
               background: '#141414',
               overflow: 'hidden',
               flexShrink: 0,
@@ -3438,11 +3476,11 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               onClick={onClose}
               style={{
                 position: 'absolute',
-                top: 14,
-                right: 18,
+                top: 10,
+                right: 12,
                 zIndex: 10,
-                width: 32,
-                height: 32,
+                width: 30,
+                height: 30,
                 borderRadius: '50%',
                 background: 'rgba(0, 0, 0, 0.65)',
                 backdropFilter: 'blur(8px)',
@@ -3464,28 +3502,26 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.2)'
               }}
             >
-              <i className="fas fa-times" style={{ fontSize: 13 }} />
+              <i className="fas fa-times" style={{ fontSize: 12 }} />
             </button>
 
             {/* Billboard Content: Title & Metadata Chips */}
             <div
               style={{
                 position: 'absolute',
-                left: 20,
-                right: 20,
-                bottom: 16,
+                left: 16,
+                right: 16,
+                bottom: 12,
                 zIndex: 10,
               }}
             >
-
-
               <h2
                 style={{
-                  fontSize: 'clamp(20px, 4.2vw, 26px)',
+                  fontSize: 'clamp(16px, 3.8vw, 20px)',
                   fontWeight: 900,
                   color: '#ffffff',
                   lineHeight: 1.2,
-                  margin: '0 0 8px',
+                  margin: '0 0 6px',
                   textShadow: '0 2px 8px rgba(0,0,0,0.85)',
                   wordBreak: 'break-word',
                 }}
@@ -3493,22 +3529,22 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                 {booking.gameName || 'การจองห้อง'}
               </h2>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
                 <span
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 5,
-                    fontSize: 11.5,
+                    gap: 4,
+                    fontSize: 10.5,
                     fontWeight: 600,
                     color: 'rgba(255, 255, 255, 0.95)',
                     background: 'rgba(0, 0, 0, 0.5)',
-                    padding: '3px 9px',
+                    padding: '2px 8px',
                     borderRadius: 6,
                     border: '1px solid rgba(255, 255, 255, 0.15)',
                   }}
                 >
-                  <i className="fas fa-calendar-alt" style={{ color: '#E50914', fontSize: 10 }} />
+                  <i className="fas fa-calendar-alt" style={{ color: '#E50914', fontSize: 9.5 }} />
                   {fmtDate(booking.date)}
                 </span>
 
@@ -3517,17 +3553,17 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 5,
-                      fontSize: 11.5,
+                      gap: 4,
+                      fontSize: 10.5,
                       fontWeight: 700,
                       color: 'rgba(255, 255, 255, 0.95)',
                       background: 'rgba(0, 0, 0, 0.5)',
-                      padding: '3px 9px',
+                      padding: '2px 8px',
                       borderRadius: 6,
                       border: '1px solid rgba(255, 255, 255, 0.15)',
                     }}
                   >
-                    <i className="fas fa-clock" style={{ color: '#FBBF24', fontSize: 10 }} />
+                    <i className="fas fa-clock" style={{ color: '#FBBF24', fontSize: 9.5 }} />
                     {booking.time} น.
                   </span>
                 )}
@@ -3536,17 +3572,17 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
-                    gap: 5,
-                    fontSize: 11.5,
+                    gap: 4,
+                    fontSize: 10.5,
                     fontWeight: 700,
                     color: '#34D399',
                     background: 'rgba(0, 0, 0, 0.5)',
-                    padding: '3px 9px',
+                    padding: '2px 8px',
                     borderRadius: 6,
                     border: '1px solid rgba(255, 255, 255, 0.15)',
                   }}
                 >
-                  <i className="fas fa-coins" style={{ fontSize: 10 }} />
+                  <i className="fas fa-coins" style={{ fontSize: 9.5 }} />
                   มัดจำ ฿{booking.depositAmount || 0} / คน
                 </span>
               </div>
@@ -3559,11 +3595,14 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               overflowY: 'auto',
               overflowX: 'hidden',
               flex: 1,
-              padding: '18px 20px',
+              padding: '14px 16px',
               display: 'flex',
               flexDirection: 'column',
-              gap: 14,
+              gap: 12,
               background: '#ffffff',
+              overscrollBehavior: 'contain',
+              WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
               boxSizing: 'border-box',
               width: '100%',
             }}
@@ -3683,11 +3722,6 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                       }}
                     />
                   </div>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#6B7280', flexWrap: 'wrap', gap: 4 }}>
-                  <span>มัดจำ ฿{booking.depositAmount || 0} / คน</span>
-                  <span>ชำระครบ {maxMembers} คน ล็อกห้องอัตโนมัติทันที</span>
                 </div>
               </div>
             )}
@@ -3859,14 +3893,6 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                     {total} / {maxMembers} คน
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 11, color: '#6B7280' }}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981' }} /> ชำระแล้ว
-                  </span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#D1D5DB' }} /> ยังไม่ชำระ
-                  </span>
-                </div>
               </div>
 
               {/* Active Member Cards */}
@@ -3956,13 +3982,6 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                               หัวหน้า
                             </span>
                           )}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
-                          {m.paidDeposit
-                            ? 'ยืนยันมัดจำแล้ว'
-                            : m.slipStatus === 'pending_verification'
-                              ? 'รอตรวจสอบสลิป'
-                              : 'รอชำระมัดจำ'}
                         </div>
                       </div>
                     </div>
@@ -4109,6 +4128,12 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
+                  <i className="fas fa-ban" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                  <div>
+                    <strong style={{ color: '#991B1B' }}>ไม่คืนเงินมัดจำ:</strong> เงินมัดจำไม่สามารถขอรับเงินคืนหรือโอนสิทธิ์ได้ทุกกรณี หากยกเลิกการเล่นหรือไม่มาตามนัดหมาย
+                  </div>
+                </div>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
                   <i className="fas fa-calendar-plus" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
                   <div>
@@ -4257,8 +4282,8 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
                   <i className="fas fa-qrcode" style={{ fontSize: 16 }} />
                   <span>จ่ายมัดจำ ฿{booking.depositAmount || 0} / แนบสลิป</span>
                 </button>
-                <span style={{ fontSize: 10.5, textAlign: 'center', color: '#6B7280' }}>
-                  ชำระแล้วจะช่วยขยายเวลาให้ตี้ +3 วัน และเมื่อครบ {maxMembers} คน ระบบจะล็อกห้องทันที
+                <span style={{ fontSize: 10.5, textAlign: 'center', color: '#DC2626', fontWeight: 600 }}>
+                  * ไม่คืนเงินมัดจำทุกกรณี · โปรดแนบสลิปในเว็บนี้หลังโอน
                 </span>
               </div>
             )}

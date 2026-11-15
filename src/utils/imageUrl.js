@@ -253,7 +253,8 @@ export function convertImageUrl(url, width = 600, options = {}) {
  * Robust cascading image error handler:
  * Step 0 (Local cover failed): Falls back to Google Edge CDN
  * Step 1 (Edge CDN failed): Falls back to Google Drive native thumbnail
- * Step 2 (Thumbnail failed): Falls back to /logo.png
+ * Step 2 (Google Drive failed): Falls back to Cloudflare-backed image proxy (wsrv.nl)
+ * Step 3 (All failed): Falls back to /logo.png
  *
  * @param {Event} event - The img onError event
  * @param {string} originalUrl - The original raw image URL or Drive ID
@@ -263,29 +264,31 @@ export function handleImageLoadError(event, originalUrl, width = 600) {
   if (!event || !event.currentTarget) return
   const img = event.currentTarget
   const step = Number(img.dataset.failStep || 0)
+  const driveId = extractDriveId(originalUrl)
 
   // Step 0: If current src is a local /covers/ path that failed, try Google Edge CDN
-  if (step === 0 && img.src && img.src.includes('/covers/')) {
+  if (step === 0 && img.src && img.src.includes('/covers/') && driveId) {
     img.dataset.failStep = '1'
-    const driveId = extractDriveId(originalUrl)
-    if (driveId) {
-      img.src = `https://lh3.googleusercontent.com/d/${driveId}=w${width}-rw`
-      return
-    }
+    img.src = `https://lh3.googleusercontent.com/d/${driveId}=w${width}-rw`
+    return
   }
 
   // Step 1: If Google Edge CDN failed, try native thumbnail endpoint
-  if (step <= 1) {
+  if (step <= 1 && driveId) {
     img.dataset.failStep = '2'
-    const driveId = extractDriveId(originalUrl)
-    if (driveId) {
-      img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
-      return
-    }
+    img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
+    return
   }
 
-  // Step 2: Final fallback to logo
-  img.dataset.failStep = '3'
+  // Step 2: If Google Drive failed, try Cloudflare-backed proxy (wsrv.nl)
+  if (step <= 2 && driveId) {
+    img.dataset.failStep = '3'
+    img.src = `https://wsrv.nl/?url=https://drive.google.com/thumbnail?id=${driveId}%26sz=w${width}&output=webp`
+    return
+  }
+
+  // Step 3: Final fallback to logo (only when all remote sources fail)
+  img.dataset.failStep = '4'
   if (img.src && !img.src.includes('logo.png')) {
     img.src = '/logo.png'
   }
@@ -295,23 +298,38 @@ export function handleImageLoadError(event, originalUrl, width = 600) {
  * Dedicated error handler for character portraits and member avatars.
  * Never falls back to /logo.png.
  * Step 0: Tries native thumbnail endpoint (works if user has Google session cookies)
- * Step 1: Hides the broken img element cleanly so the sleek underlying silhouette placeholder displays.
+ * Step 1: Tries Cloudflare-backed CDN proxy (wsrv.nl) - universally reachable, bypasses ISP/Google blocks
+ * Step 2: Tries secondary weserv image proxy
+ * Step 3: Hides the broken img element cleanly so the sleek underlying silhouette placeholder displays.
  */
 export function handleCharacterImageError(event, originalUrl, width = 340) {
   if (!event || !event.currentTarget) return
   const img = event.currentTarget
   const step = Number(img.dataset.failStep || 0)
+  const driveId = extractDriveId(originalUrl)
 
-  if (step === 0) {
+  // Step 0: Try native Google Drive thumbnail
+  if (step === 0 && driveId) {
     img.dataset.failStep = '1'
-    const driveId = extractDriveId(originalUrl)
-    if (driveId) {
-      img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
-      return
-    }
+    img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
+    return
+  }
+
+  // Step 1: Try Cloudflare-backed image CDN (wsrv.nl)
+  if (step <= 1 && driveId) {
+    img.dataset.failStep = '2'
+    img.src = `https://wsrv.nl/?url=https://drive.google.com/thumbnail?id=${driveId}%26sz=w${width}&output=webp`
+    return
+  }
+
+  // Step 2: Try secondary weserv endpoint
+  if (step <= 2 && driveId) {
+    img.dataset.failStep = '3'
+    img.src = `https://images.weserv.nl/?url=https://drive.google.com/uc?id=${driveId}&w=${width}&output=webp`
+    return
   }
 
   // Final fallback: hide img cleanly so underlying avatar/placeholder icon shows
-  img.dataset.failStep = '2'
+  img.dataset.failStep = '4'
   img.style.display = 'none'
 }
