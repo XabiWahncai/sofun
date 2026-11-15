@@ -7,8 +7,31 @@ export const resolveGameImageUrl = (url, w = 900) => {
   return toOptimizedUrl(url, w)
 }
 
+/**
+ * Safely parses the authoritative player count for a game.
+ * If the admin explicitly provided a number in `game.players` (e.g. "2", "2 คน", "4-6"),
+ * that number takes precedence over residual character items.
+ * If `game.players` is not specified, it falls back to `game.characters?.length || 6`.
+ */
+export function parseGamePlayerCount(game) {
+  if (!game) return 6
+  const s = String(game.players || '').trim()
+  if (s) {
+    const nums = s.match(/\d+/g)?.map(Number) || []
+    if (nums.length > 0) return Math.max(...nums)
+  }
+  if (Array.isArray(game.characters) && game.characters.length > 0) {
+    return game.characters.length
+  }
+  return 6
+}
+
 export const getGamePlayerText = (game) => {
   if (!game) return ''
+  const s = String(game.players || '').trim()
+  if (s) {
+    return s.includes('คน') ? s : `${s} คน`
+  }
   if (Array.isArray(game.characters) && game.characters.length > 0) {
     const male = game.characters.filter(c => c.gender === 'male' || c.gender === 'ชาย').length
     const female = game.characters.filter(c => c.gender === 'female' || c.gender === 'หญิง').length
@@ -16,7 +39,6 @@ export const getGamePlayerText = (game) => {
     if (male || female) countText += ` (ชาย ${male} / หญิง ${female})`
     return countText
   }
-  if (game.players) return String(game.players)
   if (game.minPlayers && game.maxPlayers) {
     return game.minPlayers === game.maxPlayers ? `${game.minPlayers} คน` : `${game.minPlayers}-${game.maxPlayers} คน`
   }

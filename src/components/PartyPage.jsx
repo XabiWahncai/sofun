@@ -8,6 +8,7 @@ import {
   query, orderBy, limit, where
 } from 'firebase/firestore'
 import { BookingDetailModal, isRoomLocked, canViewBookingDetail, getPublicGameName } from './BookingPage'
+import { parseGamePlayerCount } from '../utils/bookingHelper'
 import { useOpenProfile } from '../UserProfileContext'
 
 import { convertImageUrl } from '../utils/imageUrl'
@@ -734,10 +735,11 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
 }
 
 /* ── BOOKING PARTY CARD ── */
-function BookingPartyCard({ booking, user, onRequestJoin, onOpen }) {
+function BookingPartyCard({ booking, allGames = [], user, onRequestJoin, onOpen }) {
   const openProfile = useOpenProfile()
   const members     = booking.members || []
-  const maxMembers  = booking.maxMembers || 0
+  const matchedGame = allGames?.find(g => g.id === booking.gameId || g._id === booking.gameId)
+  const maxMembers  = matchedGame ? parseGamePlayerCount(matchedGame) : (booking.maxMembers || 0)
   const isMember    = members.some(m => m.uid === user?.uid || m.id === user?.uid)
   const isLeader    = booking.leaderId === user?.uid
   const isAdmin     = user?.role === 'admin' || user?.isAdmin
@@ -1149,7 +1151,11 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
     : filtered
 
   const bookingItems = filter === 'open'
-    ? bookings.filter(b => b.status === 'confirmed' && (b.members?.length || 0) < b.maxMembers)
+    ? bookings.filter(b => {
+        const mg = allGames?.find(g => g.id === b.gameId || g._id === b.gameId)
+        const max = mg ? parseGamePlayerCount(mg) : (b.maxMembers || 0)
+        return b.status === 'confirmed' && (b.members?.length || 0) < max
+      })
     : bookings
 
   const allItems = [
@@ -1297,6 +1303,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
                 ? <BookingPartyCard
                     key={item.id}
                     booking={item}
+                    allGames={allGames}
                     user={user}
                     onRequestJoin={handleBookingRequestJoin}
                     onOpen={() => {
@@ -1337,6 +1344,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
       {detailBooking && (
         <BookingDetailModal
           booking={bookings.find(b => b.id === detailBooking.id) || detailBooking}
+          allGames={allGames}
           lineUser={user}
           onClose={() => setDetailBooking(null)}
           showToast={showToast}

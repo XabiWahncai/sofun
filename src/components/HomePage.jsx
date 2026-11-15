@@ -67,8 +67,13 @@ function parsePlayerCount(str) {
 
 function getGamePlayerCount(g) {
   if (!g) return 0;
+  const s = String(g.players || '').trim();
+  if (s) {
+    const nums = s.match(/\d+/g)?.map(Number) || [];
+    if (nums.length > 0) return Math.max(...nums);
+  }
   if (Array.isArray(g.characters) && g.characters.length > 0) return g.characters.length;
-  return parsePlayerCount(g.players) || 6;
+  return 6;
 }
 
 /* Netflix Poster Card */

@@ -7,6 +7,7 @@ import { verifySlipDirect, viewSlipImage } from '../utils/slipVerifier'
 import { QRCodeSVG, QRCodeCanvas } from 'qrcode.react'
 import { db, storage, appFunctions } from '../firebase'
 import { useOpenProfile } from '../UserProfileContext'
+import { parseGamePlayerCount } from '../utils/bookingHelper'
 
 // ── Room Constants & Palette ───────────────────────────────────────────────────
 const ALL_ROOMS = [
@@ -1034,10 +1035,11 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
 }
 
 // ── Netflix Clean White Booking Card Component ────────────────────────────────
-function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
+function BookingCard({ booking, allGames = [], lineUser, onOpen, onCloseBooking }) {
+  const matchedGame = allGames?.find(g => g.id === booking.gameId || g._id === booking.gameId)
   const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
   const total = booking.members?.length || 0
-  const max = booking.maxMembers || total || 1
+  const max = matchedGame ? parseGamePlayerCount(matchedGame) : (booking.maxMembers || total || 1)
   const isLeader = booking.leaderId === lineUser?.uid
   const pendingRequests = booking.joinRequests?.length || 0
   const isLocked = isRoomLocked(booking)
@@ -1291,15 +1293,18 @@ function BookingCard({ booking, lineUser, onOpen, onCloseBooking }) {
   )
 }
 // ── Helper to calculate player range ──────────────────────────────────────────
-function getGamePlayerRange(g) {
+export function getGamePlayerRange(g) {
+  if (!g) return { min: 6, max: 6 }
+  const s = String(g.players || '').trim()
+  if (s) {
+    const nums = s.match(/\d+/g)?.map(Number) || []
+    if (nums.length === 1) return { min: nums[0], max: nums[0] }
+    if (nums.length > 1) return { min: Math.min(...nums), max: Math.max(...nums) }
+  }
   if (Array.isArray(g.characters) && g.characters.length > 0) {
     return { min: g.characters.length, max: g.characters.length }
   }
-  const s = String(g.players || '').trim()
-  const nums = s.match(/\d+/g)?.map(Number) || []
-  if (nums.length === 0) return { min: 6, max: 6 }
-  if (nums.length === 1) return { min: nums[0], max: nums[0] }
-  return { min: Math.min(...nums), max: Math.max(...nums) }
+  return { min: 6, max: 6 }
 }
 
 // ── Create Booking Modal ───────────────────────────────────────────────────────
@@ -1396,7 +1401,7 @@ function CreateBookingModal({
 
     setSubmitting(true)
     try {
-      const maxMembers = selectedGame.characters?.length || parseInt(selectedGame.players) || 6
+      const maxMembers = parseGamePlayerCount(selectedGame)
       await addDoc(collection(db, 'bookings'), {
         gameId: selectedGame.id,
         gameName: selectedGame.title || '',
@@ -1802,7 +1807,7 @@ function CreateBookingModal({
                       {selectedGame.title}
                     </h4>
                     <span style={{ fontSize: '11px', color: '#6b7280' }}>
-                      {selectedGame.characters?.length || selectedGame.players || 6} คน · มัดจำ ฿{selectedGame.deposit || 0}/คน
+                      {parseGamePlayerCount(selectedGame)} คน · มัดจำ ฿{selectedGame.deposit || 0}/คน
                     </span>
                   </div>
                   <button
@@ -2034,7 +2039,7 @@ function CreateBookingModal({
 
 
 // ── Deposit Payment & Slip Modal (Minimalist Netflix White & Red) ──────────────
-function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated }) {
+function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showToast, onUpdated }) {
   const [promptPayPhone, setPromptPayPhone] = useState('')
   const [accountName, setAccountName] = useState('')
   const [bankName, setBankName] = useState('')
@@ -2043,6 +2048,9 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
   const [slipFile, setSlipFile] = useState(null)
   const [slipPreview, setSlipPreview] = useState('')
   const [uploading, setUploading] = useState(false)
+
+  const matchedGame = allGames?.find(g => g.id === booking.gameId || g._id === booking.gameId)
+  const maxMembers = matchedGame ? parseGamePlayerCount(matchedGame) : (booking.maxMembers || 6)
 
   // Prevent background scrolling / rubber-banding on mobile while modal is open
   useEffect(() => {
@@ -2161,7 +2169,6 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
     }
   }
 
-  const maxMembers = booking.maxMembers || 6
   const STEPS = ['terms', 'qr', 'upload', 'done']
   const stepIndex = Math.max(0, STEPS.indexOf(step))
 
@@ -3074,7 +3081,7 @@ function DepositPaymentModal({ booking, lineUser, onClose, showToast, onUpdated 
 
 
 // ── Booking Detail & Party Lounge Modal ───────────────────────────────────────
-export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUpdated }) {
+export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, showToast, onUpdated }) {
   const openProfile = useOpenProfile()
   const [joining, setJoining] = useState(false)
   const [leaving, setLeaving] = useState(false)
@@ -3084,7 +3091,42 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
   const [rejectingUid, setRejectingUid] = useState(null)
   const [showDepositPay, setShowDepositPay] = useState(false)
 
-  const maxMembers = booking.maxMembers || 6
+  // Dynamically resolve current game to guarantee maxMembers reflects latest game settings
+  const [matchedGame, setMatchedGame] = useState(() => {
+    if (booking?.gameId && Array.isArray(allGames) && allGames.length > 0) {
+      return allGames.find(g => g.id === booking.gameId || g._id === booking.gameId) || null
+    }
+    return null
+  })
+
+  useEffect(() => {
+    if (matchedGame || !booking?.gameId) return
+    getDoc(doc(db, 'scripts', booking.gameId)).then(snap => {
+      if (snap.exists()) {
+        setMatchedGame({ id: snap.id, ...snap.data() })
+      }
+    }).catch(() => {})
+  }, [booking?.gameId, matchedGame])
+
+  const resolvedMaxMembers = matchedGame ? parseGamePlayerCount(matchedGame) : (booking.maxMembers || 6)
+  const maxMembers = resolvedMaxMembers || 6
+
+  // Auto-sync booking document in Firestore if game's player count was updated
+  useEffect(() => {
+    if (!booking?.id || !resolvedMaxMembers || booking.maxMembers === resolvedMaxMembers) return
+    const bRef = doc(db, 'bookings', booking.id)
+    const payload = { maxMembers: resolvedMaxMembers, updatedAt: serverTimestamp() }
+    const paid = booking.members?.filter(m => m.paidDeposit).length || 0
+    if (paid >= resolvedMaxMembers && booking.status === 'confirmed') {
+      payload.status = 'locked'
+    }
+    updateDoc(bRef, payload).then(() => {
+      if (onUpdated) onUpdated()
+    }).catch(err => {
+      console.warn('Auto-sync booking maxMembers failed:', err)
+    })
+  }, [booking?.id, booking?.maxMembers, resolvedMaxMembers, booking?.members, booking?.status, onUpdated])
+
   const total = booking.members?.length || 0
   const paidCount = booking.members?.filter(m => m.paidDeposit).length || 0
   const isMember = booking.members?.some(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
@@ -4436,6 +4478,7 @@ export function BookingDetailModal({ booking, lineUser, onClose, showToast, onUp
       {showDepositPay && (
         <DepositPaymentModal
           booking={booking}
+          allGames={allGames}
           lineUser={lineUser}
           onClose={() => setShowDepositPay(false)}
           showToast={showToast}
@@ -4859,6 +4902,7 @@ export default function BookingPage({
                       <BookingCard
                         key={b.id}
                         booking={b}
+                        allGames={allGames}
                         lineUser={lineUser}
                         onOpen={openDetail}
                         onCloseBooking={handleCloseBookingFromList}
@@ -5054,6 +5098,7 @@ export default function BookingPage({
       {detailBooking && (
         <BookingDetailModal
           booking={detailBooking}
+          allGames={allGames}
           lineUser={lineUser}
           onClose={closeDetail}
           showToast={showToast}

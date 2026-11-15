@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { db, storage } from '../firebase'
-import { collection, addDoc, updateDoc, doc, serverTimestamp } from 'firebase/firestore'
+import { collection, addDoc, updateDoc, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore'
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage'
 
 import { convertImageUrl, toOptimizedUrl } from '../utils/imageUrl'
+import { parseGamePlayerCount } from '../utils/bookingHelper'
 
 const ALL_ROOMS = [
   { name: 'Waiting Area 1', icon: 'fa-couch' },
@@ -287,6 +288,25 @@ export default function GameModal({ editingGame, onClose, showToast }) {
       }
       if (editingGame) {
         await updateDoc(doc(db, 'scripts', editingGame.id), data)
+        // Automatically synchronize active bookings for this game with the new player count & title
+        try {
+          const gameMax = parseGamePlayerCount(data)
+          const bQuery = query(collection(db, 'bookings'), where('gameId', '==', editingGame.id))
+          const bSnap = await getDocs(bQuery)
+          for (const bDoc of bSnap.docs) {
+            const bData = bDoc.data()
+            if (['confirmed', 'pending'].includes(bData.status)) {
+              const bPayload = { maxMembers: gameMax, gameName: data.title, updatedAt: serverTimestamp() }
+              const paid = bData.members?.filter(m => m.paidDeposit).length || 0
+              if (paid >= gameMax && bData.status === 'confirmed') {
+                bPayload.status = 'locked'
+              }
+              await updateDoc(bDoc.ref, bPayload)
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Booking sync error upon game update:', syncErr)
+        }
         showToast('อัปเดตสคริปต์สำเร็จ')
       } else {
         data.createdAt = serverTimestamp()

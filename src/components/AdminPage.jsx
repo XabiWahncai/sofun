@@ -20,6 +20,7 @@ import DmRecommendationsTab from './DmRecommendationsTab'
 import { toOptimizedUrl as convertImg, convertImageUrl } from '../utils/imageUrl'
 import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSecurityEvent } from '../utils/security'
 import { syncMemberTierAchievements } from '../utils/achievementTierSync'
+import { parseGamePlayerCount } from '../utils/bookingHelper'
 
 /* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
@@ -7296,7 +7297,7 @@ function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
         leaderName: adminUser?.name || 'Admin Block',
         leaderAvatar: '',
         members: [],
-        maxMembers: selectedGame?.players ? (parseInt(selectedGame.players) || 0) : 0,
+        maxMembers: selectedGame ? parseGamePlayerCount(selectedGame) : 0,
         depositAmount: 0,
         depositDeadline: '',
         confirmedAt: new Date().toISOString(),
