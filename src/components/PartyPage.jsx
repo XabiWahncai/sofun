@@ -608,124 +608,201 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
       overflow: 'hidden', display: 'flex', flexDirection: 'column',
       boxShadow: hasPending ? '0 0 0 2px var(--crimson-500), 0 2px 8px rgba(0,0,0,0.07)' : '0 1px 4px rgba(0,0,0,0.07)',
       transition: 'box-shadow 0.15s, transform 0.15s',
-    }}>
+      cursor: 'pointer',
+    }}
+    onClick={() => onDetail(party)}
+    onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)' }}
+    onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = hasPending ? '0 0 0 2px var(--crimson-500), 0 2px 8px rgba(0,0,0,0.07)' : '0 1px 4px rgba(0,0,0,0.07)' }}
+    >
       {/* Image */}
-      <div onClick={() => onDetail(party)} className="party-card-img" style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+      <div className="party-card-img" style={{ position: 'relative', height: '135px', overflow: 'hidden', flexShrink: 0, background: '#0f172a' }}>
         {party.gameImage
           ? <img src={convertImageUrl(party.gameImage)} alt={party.gameName} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className="fas fa-theater-masks" style={{ fontSize: '36px', color: 'var(--text-tertiary)' }} />
+          : <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1e293b, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <i className="fas fa-masks-theater" style={{ fontSize: '32px', color: '#64748b' }} />
             </div>
         }
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 40%, rgba(0,0,0,0.45))' }} />
-        <span style={{ position: 'absolute', top: '10px', right: '10px', padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, color: '#fff', background: statusBg }}>
-          {statusLabel}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 40%, rgba(15,23,42,0.7) 100%)' }} />
+        <span style={{ position: 'absolute', top: '8px', right: '8px', padding: '3px 9px', borderRadius: '99px', fontSize: '10.5px', fontWeight: 800, color: '#fff', background: isClosed ? '#0f172a' : isFull ? '#b91c1c' : '#10b981', boxShadow: '0 2px 6px rgba(0,0,0,0.2)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+          {!isClosed && !isFull && <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#fff', display: 'inline-block' }} />}
+          <span>{statusLabel}</span>
         </span>
         {hasPending && (
-          <span style={{ position: 'absolute', top: '10px', left: '10px', padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, color: '#fff', background: 'var(--crimson-500)' }}>
+          <span style={{ position: 'absolute', top: '8px', left: '8px', padding: '3px 8px', borderRadius: '6px', fontSize: '10px', fontWeight: 800, color: '#fff', background: '#e50914', boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}>
             {party.pendingRequests.length} คนรอ
           </span>
         )}
       </div>
 
       {/* Body */}
-      <div className="party-card-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+      <div className="party-card-body" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, background: '#ffffff' }}>
 
-        {/* Date/time - primary */}
-        <div onClick={() => onDetail(party)} style={{ cursor: 'pointer' }}>
-          <div className="party-card-date" style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <i className="fas fa-calendar-alt" style={{ color: 'var(--crimson-500)', fontSize: '12px' }} />
-            {party.date ? formatDate(party.date) : 'ยังไม่กำหนดวัน'}
-          </div>
+        {/* 1. Game Title (Hero) */}
+        <div
+          className="party-card-gamename"
+          style={{
+            fontSize: '14.5px',
+            fontWeight: 800,
+            color: '#0f172a',
+            lineHeight: 1.25,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em',
+          }}
+          title={party.gameName}
+        >
+          {party.gameName || 'ไม่ระบุชื่อเกม'}
+        </div>
+
+        {/* 2. Schedule Tag (Date & Time) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#e50914', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 700, flexShrink: 0 }}>
+            <i className="fas fa-calendar-day" style={{ fontSize: '10.5px' }} />
+            {party.date ? formatDate(party.date) : 'ยังไม่ระบุวัน'}
+          </span>
           {party.time && (
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px', paddingLeft: '19px' }}>
-              <i className="fas fa-clock" style={{ marginRight: '4px', fontSize: '11px' }} />{party.time}
-            </div>
+            <>
+              <span style={{ color: '#cbd5e1', flexShrink: 0 }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#64748b', flexShrink: 0 }}>
+                <i className="fas fa-clock" style={{ fontSize: '10px' }} />
+                {party.time} น.
+              </span>
+            </>
           )}
         </div>
 
-        {/* Game name */}
-        <div onClick={() => onDetail(party)} className="party-card-gamename" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer' }}>
-          {party.gameName || 'ไม่ระบุเกม'}
-        </div>
-
-        {/* Owner */}
-        <div
-          onClick={e => { e.stopPropagation(); party.ownerId && openProfile(party.ownerId) }}
-          style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: party.ownerId ? 'pointer' : 'default' }}
-        >
-          {party.ownerAvatar
-            ? <img src={party.ownerAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-            : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <i className="fas fa-user" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
+        {/* 3. Owner & Note */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          <div
+            onClick={e => { e.stopPropagation(); party.ownerId && openProfile(party.ownerId) }}
+            style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flex: 1, cursor: party.ownerId ? 'pointer' : 'default' }}
+          >
+            {party.ownerAvatar ? (
+              <img src={party.ownerAvatar} style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #e2e8f0' }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
+            ) : (
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', color: '#64748b', fontWeight: 700 }}>
+                {(party.ownerName || '?')[0].toUpperCase()}
               </div>
-          }
-          <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{isOwner ? 'คุณ (หัวปาร์ตี้)' : party.ownerName}</span>
+            )}
+            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {isOwner ? 'คุณ (หัวตี้)' : (party.ownerName || 'หัวหน้าตี้')}
+            </span>
+          </div>
+
+          {party.note && (
+            <span style={{ fontSize: '10.5px', color: '#94a3b8', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '40%' }}>
+              "{party.note}"
+            </span>
+          )}
         </div>
 
-        {party.note && (
-          <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', fontStyle: 'italic' }}>"{party.note}"</div>
-        )}
-
-        {/* Members + progress */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-            <div style={{ display: 'flex' }}>
-              {(party.members || []).slice(0, 5).map((m, i) => (
+        {/* 4. Members + progress */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {(party.members || []).slice(0, 4).map((m, i) => (
                 <div
                   key={i} title={m.name}
                   onClick={e => { e.stopPropagation(); m.uid && openProfile(m.uid) }}
-                  style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
+                  style={{
+                    width: '22px', height: '22px', borderRadius: '50%', overflow: 'hidden',
+                    marginLeft: i === 0 ? 0 : '-5px', border: '1.5px solid #ffffff',
+                    background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '9.5px', fontWeight: 700, color: '#475569', boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    cursor: m.uid ? 'pointer' : 'default',
+                  }}
                 >
                   {m.avatar
                     ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-                    : <span>{(m.name || '?')[0]}</span>
+                    : <span>{(m.name || '?')[0].toUpperCase()}</span>
                   }
                 </div>
               ))}
-              {(party.members?.length || 0) > 5 && (
-                <div style={{ width: '24px', height: '24px', borderRadius: '50%', marginLeft: '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-tertiary)' }}>
-                  +{party.members.length - 5}
+              {(party.members?.length || 0) > 4 && (
+                <div style={{
+                  width: '22px', height: '22px', borderRadius: '50%', marginLeft: '-5px',
+                  border: '1.5px solid #ffffff', background: '#e2e8f0', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', fontSize: '9px', fontWeight: 800,
+                  color: '#64748b', boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                }}>
+                  +{party.members.length - 4}
                 </div>
               )}
             </div>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>{party.members?.length || 0}/{party.maxPlayers} คน</span>
+            <span style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a' }}>{party.members?.length || 0}/{party.maxPlayers} คน</span>
           </div>
-          <div style={{ height: '4px', borderRadius: '2px', background: 'var(--surface-sunken)' }}>
-            <div style={{ height: '100%', background: fillColor, width: '100%', transform: `scaleX(${fillPct / 100})`, transformOrigin: 'left center', transition: 'transform 0.3s ease-out' }} />
+          <div style={{ height: '4px', borderRadius: '99px', background: '#f1f5f9', overflow: 'hidden' }}>
+            <div style={{ height: '100%', background: isFull ? '#10b981' : 'linear-gradient(90deg, #e50914, #ff4d4f)', borderRadius: '99px', width: `${fillPct}%`, transition: 'width 0.3s ease' }} />
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ display: 'flex', gap: '8px', marginTop: 'auto', paddingTop: '2px' }}>
-          <button onClick={() => onDetail(party)} style={{ flex: 1, height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-primary)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-            <i className="fas fa-info-circle" style={{ marginRight: '5px' }} /> รายละเอียด
+        {/* 5. Actions */}
+        <div style={{ display: 'flex', gap: '6px', marginTop: 'auto', paddingTop: '2px' }}>
+          <button
+            onClick={e => { e.stopPropagation(); onDetail(party) }}
+            style={{
+              flex: 1, height: '34px', borderRadius: '8px', background: '#f8fafc',
+              color: '#334155', border: '1px solid #e2e8f0', cursor: 'pointer',
+              fontWeight: 700, fontSize: '11.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+            }}
+          >
+            <i className="fas fa-info-circle" style={{ fontSize: '10.5px' }} />
+            <span>รายละเอียด</span>
           </button>
 
           {!user ? (
-            <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '3px' }}>
-              <i className="fab fa-line" /> Login
+            <span style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '3px' }}>
+              <i className="fab fa-line" style={{ color: '#06c755' }} /> Login
             </span>
           ) : isOwner ? (
-            <button onClick={() => onDetail(party)} style={{ flex: 1, height: '36px', borderRadius: '8px', background: hasPending ? 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.08)' : 'var(--surface-sunken)', color: hasPending ? 'var(--crimson-500)' : 'var(--text-secondary)', border: hasPending ? '1px solid rgba(var(--crimson-500-rgb, 198, 36, 25),0.2)' : 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-              <i className="fas fa-crown" style={{ marginRight: '4px' }} />
-              {hasPending ? `${party.pendingRequests.length} คำขอ` : 'จัดการ'}
+            <button
+              onClick={e => { e.stopPropagation(); onDetail(party) }}
+              style={{
+                flex: 1, height: '34px', borderRadius: '8px',
+                background: hasPending ? '#fef2f2' : '#f8fafc',
+                color: hasPending ? '#dc2626' : '#334155',
+                border: hasPending ? '1px solid #fecaca' : '1px solid #e2e8f0',
+                cursor: 'pointer', fontWeight: 700, fontSize: '11.5px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+              }}
+            >
+              <i className="fas fa-crown" style={{ fontSize: '10px' }} />
+              <span>{hasPending ? `${party.pendingRequests.length} คำขอ` : 'จัดการ'}</span>
             </button>
           ) : isMember ? (
-            <button onClick={() => onLeave(party)} style={{ flex: 1, height: '36px', borderRadius: '8px', background: 'rgba(0,0,0,0.06)', color: 'var(--text-secondary)', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-              <i className="fas fa-sign-out-alt" style={{ marginRight: '4px' }} /> ออก
+            <button
+              onClick={e => { e.stopPropagation(); onLeave(party) }}
+              style={{
+                flex: 1, height: '34px', borderRadius: '8px', background: '#fef2f2',
+                color: '#dc2626', border: '1px solid #fee2e2', cursor: 'pointer',
+                fontWeight: 700, fontSize: '11.5px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+              }}
+            >
+              <i className="fas fa-sign-out-alt" style={{ fontSize: '10px' }} />
+              <span>ออก</span>
             </button>
           ) : myRequest ? (
-            <button disabled style={{ flex: 1, height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-secondary)', border: 'none', cursor: 'default', fontWeight: 600, fontSize: '12px' }}>
-              <i className="fas fa-hourglass-half" style={{ marginRight: '4px' }} /> รออนุมัติ
+            <button disabled style={{ flex: 1, height: '34px', borderRadius: '8px', background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a', cursor: 'default', fontWeight: 700, fontSize: '11.5px' }}>
+              <i className="fas fa-clock" style={{ marginRight: '4px', fontSize: '10px' }} /> รออนุมัติ
             </button>
           ) : isClosed ? (
-            <button disabled style={{ flex: 1, height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-tertiary)', border: 'none', cursor: 'default', fontWeight: 600, fontSize: '12px' }}>ปิดรับแล้ว</button>
+            <button disabled style={{ flex: 1, height: '34px', borderRadius: '8px', background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0', cursor: 'default', fontWeight: 700, fontSize: '11.5px' }}>ปิดรับแล้ว</button>
           ) : isFull ? (
-            <button disabled style={{ flex: 1, height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-tertiary)', border: 'none', cursor: 'default', fontWeight: 600, fontSize: '12px' }}>ที่นั่งเต็ม</button>
+            <button disabled style={{ flex: 1, height: '34px', borderRadius: '8px', background: '#f8fafc', color: '#94a3b8', border: '1px solid #e2e8f0', cursor: 'default', fontWeight: 700, fontSize: '11.5px' }}>ที่นั่งเต็ม</button>
           ) : (
-            <button onClick={() => onRequestJoin(party)} style={{ flex: 1, height: '36px', borderRadius: '8px', background: 'var(--crimson-500)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-              <i className="fas fa-user-plus" style={{ marginRight: '4px' }} /> ขอเข้าร่วม
+            <button
+              onClick={e => { e.stopPropagation(); onRequestJoin(party) }}
+              style={{
+                flex: 1, height: '34px', borderRadius: '8px',
+                background: 'linear-gradient(135deg, #e50914 0%, #b80710 100%)',
+                color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '11.5px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px',
+                boxShadow: '0 2px 6px rgba(229, 9, 20, 0.25)',
+              }}
+            >
+              <i className="fas fa-user-plus" style={{ fontSize: '10.5px' }} />
+              <span>ขอเข้าร่วม</span>
             </button>
           )}
         </div>
@@ -749,153 +826,418 @@ function BookingPartyCard({ booking, allGames = [], user, onRequestJoin, onOpen 
   const isLockedRestricted = isLocked && !canView
   const hasPending  = booking.joinRequests?.some(r => r.uid === user?.uid)
 
-  const statusBg    = isLockedRestricted ? 'rgba(15,23,42,0.85)' : (isLocked || isFull) ? 'rgba(var(--crimson-500-rgb, 198, 36, 25),0.85)' : 'rgba(0,0,0,0.55)'
+  const statusBg    = isLockedRestricted ? '#0f172a' : (isLocked || isFull) ? '#b91c1c' : '#10b981'
   const statusLabel = isLocked ? 'ล็อกห้องแล้ว' : isFull ? 'เต็มแล้ว' : 'เปิดรับ'
 
   const fillPct = maxMembers > 0 ? Math.min(100, (members.length / maxMembers) * 100) : 0
-  const fillColor = 'var(--crimson-500)'
 
   return (
     <div
       onClick={onOpen}
-      style={{ background: '#fff', borderRadius: '16px', border: '1px solid var(--border-default)', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', cursor: onOpen ? 'pointer' : 'default', transition: 'transform 0.18s, box-shadow 0.18s' }}
-      onMouseEnter={e => { if (onOpen) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.1)' } }}
-      onMouseLeave={e => { if (onOpen) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.07)' } }}
+      style={{
+        background: '#ffffff',
+        borderRadius: '16px',
+        border: '1px solid #e2e8f0',
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+        cursor: onOpen ? 'pointer' : 'default',
+        transition: 'transform 0.18s ease, box-shadow 0.18s ease',
+      }}
+      onMouseEnter={e => { if (onOpen) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 8px 24px rgba(0,0,0,0.08)' } }}
+      onMouseLeave={e => { if (onOpen) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.06)' } }}
     >
-      {/* Image */}
-      <div className="party-card-img" style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0 }}>
-        {!isLockedRestricted && booking.gameImage
-          ? <img src={convertImageUrl(booking.gameImage)} alt={booking.gameName} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-          : <div style={{ width: '100%', height: '100%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <i className={isLockedRestricted ? "fas fa-lock" : "fas fa-theater-masks"} style={{ fontSize: '36px', color: 'var(--text-tertiary)' }} />
-            </div>
-        }
-        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(transparent 40%, rgba(0,0,0,0.45))' }} />
-        <span style={{ position: 'absolute', top: '10px', right: '10px', padding: '3px 9px', borderRadius: '99px', fontSize: '11px', fontWeight: 700, color: '#fff', background: statusBg }}>
-          {statusLabel}
+      {/* Cover Image Header */}
+      <div className="party-card-img" style={{ position: 'relative', height: '135px', overflow: 'hidden', flexShrink: 0, background: '#0f172a' }}>
+        {!isLockedRestricted && booking.gameImage ? (
+          <img
+            src={convertImageUrl(booking.gameImage)}
+            alt={booking.gameName}
+            loading="lazy"
+            decoding="async"
+            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          />
+        ) : (
+          <div style={{ width: '100%', height: '100%', background: 'linear-gradient(135deg, #1e293b, #0f172a)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <i className={isLockedRestricted ? "fas fa-lock" : "fas fa-masks-theater"} style={{ fontSize: '32px', color: '#64748b' }} />
+          </div>
+        )}
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(0,0,0,0.15) 0%, transparent 40%, rgba(15,23,42,0.7) 100%)' }} />
+
+        {/* Top-Left: Type Badge */}
+        <span
+          style={{
+            position: 'absolute',
+            top: '8px',
+            left: '8px',
+            padding: '3px 8px',
+            borderRadius: '6px',
+            fontSize: '10px',
+            fontWeight: 800,
+            color: '#e50914',
+            background: 'rgba(255, 255, 255, 0.95)',
+            backdropFilter: 'blur(4px)',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '3px',
+          }}
+        >
+          <i className="fas fa-ticket-alt" style={{ fontSize: '8.5px' }} />
+          <span>จองห้อง</span>
         </span>
-        <span style={{ position: 'absolute', top: '10px', left: '10px', padding: '2px 7px', borderRadius: '5px', fontSize: '10px', fontWeight: 700, color: 'var(--crimson-500)', background: 'rgba(255,255,255,0.92)', border: '1px solid rgba(var(--crimson-500-rgb, 198, 36, 25),0.25)' }}>
-          จองห้อง
+
+        {/* Top-Right: Status Badge */}
+        <span
+          style={{
+            position: 'absolute',
+            top: '8px',
+            right: '8px',
+            padding: '3px 9px',
+            borderRadius: '99px',
+            fontSize: '10.5px',
+            fontWeight: 800,
+            color: '#ffffff',
+            background: statusBg,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          {!isLocked && !isFull && (
+            <span style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#ffffff', display: 'inline-block' }} />
+          )}
+          <span>{statusLabel}</span>
         </span>
+
+        {/* Bottom-Right on Image: Deposit Rate */}
+        {booking.depositAmount > 0 && !isLockedRestricted && (
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '8px',
+              right: '8px',
+              padding: '2px 8px',
+              borderRadius: '6px',
+              background: 'rgba(15, 23, 42, 0.85)',
+              backdropFilter: 'blur(4px)',
+              color: '#ffffff',
+              fontSize: '11px',
+              fontWeight: 800,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.25)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '3px',
+            }}
+          >
+            <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>มัดจำ</span>
+            <span style={{ color: '#f87171' }}>฿{booking.depositAmount}</span>
+            <span style={{ fontSize: '9px', color: '#94a3b8', fontWeight: 600 }}>/คน</span>
+          </div>
+        )}
       </div>
 
       {/* Body */}
-      <div className="party-card-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+      <div className="party-card-body" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, background: '#ffffff' }}>
 
-        {/* Date/time */}
-        <div>
-          <div className="party-card-date" style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <i className="fas fa-calendar-alt" style={{ color: 'var(--crimson-500)', fontSize: '12px' }} />
-            {booking.date ? formatDate(booking.date) : 'ยังไม่กำหนดวัน'}
-          </div>
+        {/* 1. Game Title (Hero) */}
+        <div
+          className="party-card-gamename"
+          style={{
+            fontSize: '14.5px',
+            fontWeight: 800,
+            color: '#0f172a',
+            lineHeight: 1.25,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            letterSpacing: '-0.01em',
+          }}
+          title={booking.gameName}
+        >
+          {isLockedRestricted ? 'ล็อกห้องแล้ว (ห้องส่วนตัว)' : (booking.gameName || 'ไม่ระบุชื่อเกม')}
+        </div>
+
+        {/* 2. Schedule Tag (Date & Time on one clean row) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', fontWeight: 600, color: '#475569', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span style={{ color: '#e50914', display: 'inline-flex', alignItems: 'center', gap: '3px', fontWeight: 700, flexShrink: 0 }}>
+            <i className="fas fa-calendar-day" style={{ fontSize: '10.5px' }} />
+            {booking.date ? formatDate(booking.date) : 'ยังไม่ระบุวัน'}
+          </span>
           {booking.time && (
-            <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '3px', paddingLeft: '19px' }}>
-              <i className="fas fa-clock" style={{ marginRight: '4px', fontSize: '11px' }} />{booking.time}
+            <>
+              <span style={{ color: '#cbd5e1', flexShrink: 0 }}>•</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px', color: '#64748b', flexShrink: 0 }}>
+                <i className="fas fa-clock" style={{ fontSize: '10px' }} />
+                {booking.time} น.
+              </span>
+            </>
+          )}
+        </div>
+
+        {/* 3. Host info & Deposit Countdown Tag */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+          {isLockedRestricted ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flex: 1 }}>
+              <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', color: '#64748b' }}>
+                <i className="fas fa-lock" />
+              </div>
+              <span style={{ fontSize: '11px', color: '#64748b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>ห้องส่วนตัว</span>
+            </div>
+          ) : (
+            <div
+              onClick={e => { e.stopPropagation(); booking.leaderId && openProfile(booking.leaderId) }}
+              style={{ display: 'flex', alignItems: 'center', gap: '5px', minWidth: 0, flex: 1, cursor: booking.leaderId ? 'pointer' : 'default' }}
+            >
+              {booking.leaderAvatar ? (
+                <img
+                  src={booking.leaderAvatar}
+                  style={{ width: '20px', height: '20px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '1px solid #e2e8f0' }}
+                  alt=""
+                  referrerPolicy="no-referrer"
+                  onError={e => e.currentTarget.style.display = 'none'}
+                />
+              ) : (
+                <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: '9px', color: '#64748b', fontWeight: 700 }}>
+                  {(booking.leaderName || '?')[0].toUpperCase()}
+                </div>
+              )}
+              <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {booking.leaderName || 'หัวหน้าตี้'}
+              </span>
+            </div>
+          )}
+
+          {!isLocked && booking.depositDeadline && (
+            <div
+              style={{
+                fontSize: '10px',
+                fontWeight: 700,
+                color: '#b45309',
+                background: '#fef3c7',
+                padding: '2px 6px',
+                borderRadius: '5px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '3px',
+                flexShrink: 0,
+              }}
+              title="เวลาที่เหลือก่อนหมดเขตชำระมัดจำ"
+            >
+              <i className="fas fa-hourglass-half" style={{ fontSize: '8.5px' }} />
+              <span>{formatCountdown(booking.depositDeadline)}</span>
             </div>
           )}
         </div>
 
-        {/* Game name */}
-        <div className="party-card-gamename" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
-          {isLockedRestricted ? 'ล็อกห้องแล้ว' : (booking.gameName || 'ไม่ระบุเกม')}
-        </div>
-
-        {/* Deposit countdown */}
-        {!isLocked && booking.depositDeadline && (
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-            <i className="fas fa-hourglass-half" style={{ fontSize: '11px' }} />
-            มัดจำ {formatCountdown(booking.depositDeadline)}
-          </div>
-        )}
-
-        {/* Leader */}
+        {/* 4. Members & Progress */}
         {isLockedRestricted ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-            <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <i className="fas fa-lock" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
-            </div>
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>ห้องส่วนตัว / ล็อกแล้ว</span>
-          </div>
-        ) : (
-          <div
-            onClick={e => { e.stopPropagation(); booking.leaderId && openProfile(booking.leaderId) }}
-            style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: booking.leaderId ? 'pointer' : 'default' }}
-          >
-            {booking.leaderAvatar
-              ? <img src={booking.leaderAvatar} style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} alt="" referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-              : <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <i className="fas fa-user" style={{ fontSize: '10px', color: 'var(--text-tertiary)' }} />
-                </div>
-            }
-            <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{booking.leaderName || 'ไม่ระบุหัวหน้า'}</span>
-          </div>
-        )}
-
-        {booking.depositAmount > 0 && !isLockedRestricted && (
-          <div style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>มัดจำ ฿{booking.depositAmount}/คน</div>
-        )}
-
-        {/* Members + progress */}
-        {isLockedRestricted ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '5px' }}>
-              <i className="fas fa-user-lock" /> เฉพาะสมาชิกในตี้
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 0' }}>
+            <span style={{ fontSize: '11px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <i className="fas fa-user-lock" style={{ fontSize: '10px' }} /> เฉพาะในตี้
             </span>
-            <span style={{ fontSize: '12px', fontWeight: 700, color: '#047857' }}>ล็อกแล้ว</span>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: '#059669' }}>ล็อกแล้ว</span>
           </div>
         ) : (
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <div style={{ display: 'flex' }}>
-                {members.slice(0, 5).map((m, i) => (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                {members.slice(0, 4).map((m, i) => (
                   <div
-                    key={i} title={m.name}
+                    key={i}
+                    title={m.name}
                     onClick={e => { e.stopPropagation(); m.uid && openProfile(m.uid) }}
-                    style={{ width: '24px', height: '24px', borderRadius: '50%', overflow: 'hidden', marginLeft: i === 0 ? 0 : '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 600, color: 'var(--text-secondary)', cursor: m.uid ? 'pointer' : 'default' }}
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      overflow: 'hidden',
+                      marginLeft: i === 0 ? 0 : '-5px',
+                      border: '1.5px solid #ffffff',
+                      background: '#f1f5f9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '9.5px',
+                      fontWeight: 700,
+                      color: '#475569',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                      cursor: m.uid ? 'pointer' : 'default',
+                    }}
                   >
-                    {m.avatar
-                      ? <img src={m.avatar} alt={m.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} referrerPolicy="no-referrer" onError={e => e.currentTarget.style.display = 'none'} />
-                      : <span>{(m.name || '?')[0]}</span>
-                    }
+                    {m.avatar ? (
+                      <img
+                        src={m.avatar}
+                        alt={m.name}
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        referrerPolicy="no-referrer"
+                        onError={e => e.currentTarget.style.display = 'none'}
+                      />
+                    ) : (
+                      <span>{(m.name || '?')[0].toUpperCase()}</span>
+                    )}
                   </div>
                 ))}
-                {members.length > 5 && (
-                  <div style={{ width: '24px', height: '24px', borderRadius: '50%', marginLeft: '-6px', border: '2px solid #fff', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '9px', color: 'var(--text-tertiary)' }}>
-                    +{members.length - 5}
+                {members.length > 4 && (
+                  <div
+                    style={{
+                      width: '22px',
+                      height: '22px',
+                      borderRadius: '50%',
+                      marginLeft: '-5px',
+                      border: '1.5px solid #ffffff',
+                      background: '#e2e8f0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '9px',
+                      fontWeight: 800,
+                      color: '#64748b',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                    }}
+                  >
+                    +{members.length - 4}
                   </div>
                 )}
               </div>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: 'var(--text-secondary)' }}>{members.length}/{maxMembers} คน</span>
+              <span style={{ fontSize: '11px', fontWeight: 800, color: '#0f172a' }}>
+                {members.length}/{maxMembers} คน
+              </span>
             </div>
-            <div style={{ height: '4px', borderRadius: '2px', background: 'var(--surface-sunken)' }}>
-              <div style={{ height: '100%', background: fillColor, width: '100%', transform: `scaleX(${fillPct / 100})`, transformOrigin: 'left center', transition: 'transform 0.3s ease-out' }} />
+            <div style={{ height: '4px', borderRadius: '99px', background: '#f1f5f9', overflow: 'hidden' }}>
+              <div
+                style={{
+                  height: '100%',
+                  background: isFull ? '#10b981' : 'linear-gradient(90deg, #e50914, #ff4d4f)',
+                  borderRadius: '99px',
+                  width: `${fillPct}%`,
+                  transition: 'width 0.3s ease',
+                }}
+              />
             </div>
           </div>
         )}
 
-        {/* Action */}
+        {/* 5. Action Button */}
         <div style={{ marginTop: 'auto', paddingTop: '2px' }}>
           {isLockedRestricted ? (
-            <button disabled style={{ width: '100%', height: '36px', borderRadius: '8px', background: 'rgba(15,23,42,0.06)', color: 'var(--text-tertiary)', border: '1px solid rgba(15,23,42,0.1)', cursor: 'not-allowed', fontWeight: 600, fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-              <i className="fas fa-lock" /> ล็อกห้องแล้ว (เฉพาะสมาชิก)
+            <button
+              disabled
+              style={{
+                width: '100%',
+                height: '34px',
+                borderRadius: '8px',
+                background: '#f8fafc',
+                color: '#94a3b8',
+                border: '1px solid #e2e8f0',
+                cursor: 'not-allowed',
+                fontWeight: 700,
+                fontSize: '11.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+              }}
+            >
+              <i className="fas fa-lock" style={{ fontSize: '10px' }} />
+              <span>ล็อกห้องแล้ว</span>
             </button>
           ) : !user ? (
-            <span style={{ fontSize: '12px', color: 'var(--text-tertiary)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <i className="fab fa-line" /> Login ก่อน
+            <span style={{ fontSize: '11.5px', color: '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', height: '34px' }}>
+              <i className="fab fa-line" style={{ color: '#06c755' }} /> Login ก่อนเข้าตี้
             </span>
           ) : isMember ? (
-            <button disabled style={{ width: '100%', height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-secondary)', border: 'none', cursor: 'default', fontWeight: 600, fontSize: '13px' }}>
-              <i className="fas fa-check" style={{ marginRight: '4px' }} /> อยู่แล้ว
+            <button
+              disabled
+              style={{
+                width: '100%',
+                height: '34px',
+                borderRadius: '8px',
+                background: '#ecfdf5',
+                color: '#059669',
+                border: '1px solid #a7f3d0',
+                cursor: 'default',
+                fontWeight: 700,
+                fontSize: '11.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+              }}
+            >
+              <i className="fas fa-check-circle" style={{ fontSize: '11px' }} />
+              <span>อยู่ในตี้แล้ว</span>
             </button>
           ) : hasPending ? (
-            <button disabled style={{ width: '100%', height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-secondary)', border: 'none', cursor: 'default', fontWeight: 600, fontSize: '12px' }}>
-              <i className="fas fa-hourglass-half" style={{ marginRight: '4px' }} /> รออนุมัติ
+            <button
+              disabled
+              style={{
+                width: '100%',
+                height: '34px',
+                borderRadius: '8px',
+                background: '#fffbeb',
+                color: '#b45309',
+                border: '1px solid #fde68a',
+                cursor: 'default',
+                fontWeight: 700,
+                fontSize: '11.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+              }}
+            >
+              <i className="fas fa-clock" style={{ fontSize: '10.5px' }} />
+              <span>รออนุมัติ</span>
             </button>
           ) : isLocked || isFull ? (
-            <button disabled style={{ width: '100%', height: '36px', borderRadius: '8px', background: 'var(--surface-sunken)', color: 'var(--text-tertiary)', border: 'none', cursor: 'default', fontWeight: 600, fontSize: '13px' }}>เต็มแล้ว</button>
+            <button
+              disabled
+              style={{
+                width: '100%',
+                height: '34px',
+                borderRadius: '8px',
+                background: '#f8fafc',
+                color: '#94a3b8',
+                border: '1px solid #e2e8f0',
+                cursor: 'default',
+                fontWeight: 700,
+                fontSize: '11.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+              }}
+            >
+              <span>{isLocked ? 'ล็อกห้องแล้ว' : 'ตี้เต็มแล้ว'}</span>
+            </button>
           ) : (
-            <button onClick={e => { e.stopPropagation(); onRequestJoin(booking) }} style={{ width: '100%', height: '36px', borderRadius: '8px', background: 'var(--crimson-500)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px' }}>
-              <i className="fas fa-user-plus" style={{ marginRight: '4px' }} /> ขอเข้าร่วม
+            <button
+              onClick={e => { e.stopPropagation(); onRequestJoin(booking) }}
+              style={{
+                width: '100%',
+                height: '34px',
+                borderRadius: '8px',
+                background: 'linear-gradient(135deg, #e50914 0%, #b80710 100%)',
+                color: '#ffffff',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: 700,
+                fontSize: '11.5px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '5px',
+                boxShadow: '0 2px 8px rgba(229, 9, 20, 0.25)',
+                transition: 'transform 0.15s ease',
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <i className="fas fa-user-plus" style={{ fontSize: '10.5px' }} />
+              <span>ขอเข้าร่วมตี้</span>
             </button>
           )}
         </div>
@@ -1251,23 +1593,15 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
             gap: 10px !important;
           }
           .party-card-img {
-            height: 120px !important;
+            height: 125px !important;
           }
           .party-card-body {
-            padding: 10px 10px !important;
+            padding: 10px !important;
             gap: 6px !important;
           }
-          .party-card-date {
-            font-size: 13px !important;
-          }
           .party-card-gamename {
-            font-size: 12px !important;
-            line-height: 1.3 !important;
-          }
-          .party-card-action-btn {
-            height: 32px !important;
-            font-size: 11.5px !important;
-            padding: 0 8px !important;
+            font-size: 13.5px !important;
+            line-height: 1.25 !important;
           }
         }
       `}</style>
