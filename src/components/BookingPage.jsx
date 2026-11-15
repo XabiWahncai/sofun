@@ -3277,6 +3277,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
     }
   }
 
+  // สุ่มเศษสตางค์ระหว่าง .01 ถึง .49 เพื่อป้องกันการใช้สลิปเดิมหลอกระบบ
+  const generateRandomSatang = () => (Math.floor(Math.random() * 49) + 1) / 100
+  const [randomSatang, setRandomSatang] = useState(generateRandomSatang)
+
   // Pre-select current user by default if unpaid
   const [selectedMembers, setSelectedMembers] = useState(() => {
     if (!isMyMemberPaid && myMemberUid) {
@@ -3287,8 +3291,11 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
   const [selectedEmptySeats, setSelectedEmptySeats] = useState([])
 
   const selectedCount = selectedMembers.length + selectedEmptySeats.length
-  const totalAmount = selectedCount * depositPerPerson
-  const amount = totalAmount
+  const baseDepositAmount = selectedCount * depositPerPerson
+  const totalAmount = baseDepositAmount
+  // ยอดโอนจริงที่สุ่มเศษสตางค์ (.01 - .49) เพื่อป้องกันการใช้สลิปเดิมหลอกระบบ
+  const totalPayAmount = baseDepositAmount > 0 ? Number((baseDepositAmount + randomSatang).toFixed(2)) : 0
+  const amount = totalPayAmount
 
   // Prevent background scrolling / rubber-banding on mobile while modal is open
   useEffect(() => {
@@ -3313,7 +3320,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
     })
   }, [])
 
-  const qrPayload = promptPayPhone && totalAmount > 0 ? buildPromptPayQR(promptPayPhone, totalAmount) : ''
+  const qrPayload = promptPayPhone && totalPayAmount > 0 ? buildPromptPayQR(promptPayPhone, totalPayAmount) : ''
 
   const toggleMember = (uid) => {
     setSelectedMembers(prev =>
@@ -3354,7 +3361,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
     try {
       const a = document.createElement('a')
       a.href = canvas.toDataURL('image/png')
-      a.download = `promptpay-${amount}-${booking.id}.png`
+      a.download = `promptpay-${totalPayAmount.toFixed(2)}-${booking.id}.png`
       a.click()
       showToast('บันทึก QR แล้ว')
     } catch (e) {
@@ -3394,17 +3401,22 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
 
   const handleSubmit = async () => {
     if (!slipFile) return
-    if (totalAmount <= 0) {
+    if (totalPayAmount <= 0) {
       showToast('กรุณาเลือกที่นั่งอย่างน้อย 1 ที่นั่งเพื่อชำระมัดจำ', 'error')
       return
     }
     setUploading(true)
     try {
       // 1. Direct EasySlip check on client (bypasses Firebase Storage & Cloud Functions)
-      const res = await verifySlipDirect(slipFile, totalAmount, { isDeposit: true })
+      const res = await verifySlipDirect(slipFile, totalPayAmount, { isDeposit: true })
 
       if (res.code === 'WRONG_RECEIVER') {
         showToast(res.msg || 'สลิปโอนไปยังบัญชีอื่น - กรุณาตรวจสอบและโอนใหม่', 'error')
+        return
+      }
+
+      if (res.code === 'AMOUNT_MISMATCH' || res.data?.error?.code === 'AMOUNT_MISMATCH') {
+        showToast(`ยอดเงินในสลิปไม่ตรงกับยอดที่ระบบกำหนด (ต้องโอน ฿${totalPayAmount.toFixed(2)})`, 'error')
         return
       }
 
@@ -3413,7 +3425,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
       const verifyData = res.verifyData ? {
         slipTransRef: res.verifyData.transRef || '',
         slipBank: res.verifyData.bank || '',
-      } : {}
+        slipAmount: totalPayAmount,
+      } : { slipAmount: totalPayAmount }
 
       // 2. Update booking in Firestore
       const bRef = doc(db, 'bookings', booking.id)
@@ -3757,25 +3770,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                       <i className="fas fa-users" style={{ fontSize: 10, color: '#64748B' }} />
                       {totalMembers}/{maxMembers} คน
                     </span>
-                  </div>
-                </div>
-
-                <div
-                  style={{
-                    textAlign: 'right',
-                    flexShrink: 0,
-                    background: '#FFFFFF',
-                    padding: '6px 12px',
-                    borderRadius: 10,
-                    border: '1px solid #E2E8F0',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
-                  }}
-                >
-                  <div style={{ fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
-                    มัดจำ/ที่นั่ง
-                  </div>
-                  <div style={{ fontSize: 16, fontWeight: 900, color: '#E50914', lineHeight: 1.1, marginTop: 2 }}>
-                    ฿{depositPerPerson.toLocaleString()}
+                    <span style={{ fontSize: 11, color: '#0F172A', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <i className="fas fa-coins" style={{ fontSize: 10, color: '#E50914' }} />
+                      มัดจำ ฿{depositPerPerson}/คน
+                    </span>
                   </div>
                 </div>
               </div>
@@ -3877,17 +3875,12 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
 
               {/* Section 1: Members in Party */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>
-                      สมาชิกในตี้
-                    </span>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', background: '#F1F5F9', padding: '1px 7px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
-                      {booking.members?.length || 0} คน
-                    </span>
-                  </div>
-                  <span style={{ fontSize: 11, color: '#64748B' }}>
-                    เลือกคนที่ต้องการชำระมัดจำแทน
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>
+                    สมาชิกในตี้
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B', background: '#F1F5F9', padding: '1px 7px', borderRadius: 10, border: '1px solid #E2E8F0' }}>
+                    {booking.members?.length || 0} คน
                   </span>
                 </div>
 
@@ -4106,17 +4099,12 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               {/* Section 2: Empty Seats (จ่ายเพิ่มเพื่อล็อกห้อง) */}
               {emptySeatCount > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>
-                        ที่นั่งว่างเพื่อล็อกห้อง
-                      </span>
-                      <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#ECFDF5', padding: '1px 7px', borderRadius: 10, border: '1px solid #A7F3D0' }}>
-                        ว่าง {emptySeatCount} ที่
-                      </span>
-                    </div>
-                    <span style={{ fontSize: 11, color: '#64748B' }}>
-                      เหมาจ่ายเพื่อขยายเวลา +3 วัน หรือล็อกห้อง
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>
+                      ที่นั่งว่างเพื่อล็อกห้อง
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#059669', background: '#ECFDF5', padding: '1px 7px', borderRadius: 10, border: '1px solid #A7F3D0' }}>
+                      ว่าง {emptySeatCount} ที่
                     </span>
                   </div>
 
@@ -4223,7 +4211,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                               </div>
                               <div style={{ fontSize: 11, color: '#059669', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
                                 <i className="fas fa-clock" style={{ fontSize: 9.5 }} />
-                                เหมาจ่ายเพื่อขยายเวลา +3 วัน หรือล็อกห้อง
+                                + ขยายเวลาตี้ 3 วัน
                               </div>
                             </div>
                           </div>
@@ -4304,7 +4292,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   onMouseEnter={e => { if (selectedCount > 0) e.currentTarget.style.background = '#B80710' }}
                   onMouseLeave={e => { if (selectedCount > 0) e.currentTarget.style.background = 'linear-gradient(135deg, #E50914 0%, #B80710 100%)' }}
                 >
-                  <span>ดำเนินการต่อไปหน้าเงื่อนไข (฿{totalAmount.toLocaleString()})</span>
+                  <span>ดำเนินการต่อไปหน้าเงื่อนไข</span>
                   <i className="fas fa-arrow-right" style={{ fontSize: 12 }} />
                 </button>
               </div>
@@ -4607,6 +4595,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                 <button
                   type="button"
                   onClick={() => {
+                    setRandomSatang(generateRandomSatang())
                     setShowTermsConfirm(false)
                     setStep('qr')
                   }}
@@ -4784,7 +4773,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                           ยอดมัดจำรวม ({selectedCount} ที่)
                         </div>
                         <div style={{ fontSize: 19, fontWeight: 900, color: '#E50914', lineHeight: 1.1, marginTop: 2 }}>
-                          ฿{totalAmount.toLocaleString()}
+                          ฿{totalPayAmount.toFixed(2)}
+                        </div>
+                        <div style={{ fontSize: 9.5, color: '#059669', fontWeight: 700, marginTop: 2 }}>
+                          สุ่มเศษสตางค์ป้องกันสลิปซ้ำ
                         </div>
                       </div>
                     </div>
@@ -4912,32 +4904,63 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     </div>
                   </div>
 
-                  {/* Save QR Button */}
-                  <button
-                    type="button"
-                    onClick={saveQR}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 7,
-                      height: 34,
-                      padding: '0 16px',
-                      borderRadius: 10,
-                      background: '#0F172A',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      fontSize: 11.5,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(15, 23, 42, 0.12)',
-                      transition: 'all 0.15s',
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#1E293B'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#0F172A'}
-                  >
-                    <i className="fas fa-arrow-down-to-line" style={{ fontSize: 11 }} />
-                    <span>บันทึกรูป QR Code</span>
-                  </button>
+                  {/* Save QR & Re-roll satang Button Row */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <button
+                      type="button"
+                      onClick={saveQR}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 7,
+                        height: 34,
+                        padding: '0 14px',
+                        borderRadius: 10,
+                        background: '#0F172A',
+                        color: '#FFFFFF',
+                        border: 'none',
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 6px rgba(15, 23, 42, 0.12)',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#1E293B'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#0F172A'}
+                    >
+                      <i className="fas fa-arrow-down-to-line" style={{ fontSize: 11 }} />
+                      <span>บันทึกรูป QR Code</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRandomSatang(generateRandomSatang())
+                        showToast('สุ่มเศษสตางค์ใหม่เรียบร้อย')
+                      }}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        height: 34,
+                        padding: '0 12px',
+                        borderRadius: 10,
+                        background: '#F8FAFC',
+                        color: '#475569',
+                        border: '1px solid #CBD5E1',
+                        fontSize: 11.5,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#E2E8F0'}
+                      onMouseLeave={e => e.currentTarget.style.background = '#F8FAFC'}
+                      title="สุ่มเศษสตางค์ใหม่เพื่อป้องกันสลิปซ้ำ"
+                    >
+                      <i className="fas fa-sync-alt" style={{ fontSize: 10.5 }} />
+                      <span>สุ่มยอดใหม่</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Minimal 3 Steps Flow Bar */}
@@ -4966,7 +4989,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', color: '#E50914', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       2
                     </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>โอน ฿{totalAmount.toLocaleString()}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>โอน ฿{totalPayAmount.toFixed(2)}</span>
                   </div>
 
                   <i className="fas fa-chevron-right" style={{ fontSize: 9, color: '#CBD5E1' }} />
@@ -4984,8 +5007,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   style={{
                     padding: '10px 14px',
                     borderRadius: 12,
-                    background: '#F0FDF4',
-                    border: '1px solid #BBF7D0',
+                    background: '#FFFBEB',
+                    border: '1px solid #FDE68A',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 10,
@@ -4996,8 +5019,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                       width: 26,
                       height: 26,
                       borderRadius: 8,
-                      background: '#DCFCE7',
-                      color: '#16A34A',
+                      background: '#FEF3C7',
+                      color: '#D97706',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -5007,8 +5030,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   >
                     <i className="fas fa-shield-alt" />
                   </div>
-                  <div style={{ fontSize: 11, color: '#166534', lineHeight: 1.45 }}>
-                    <strong style={{ color: '#14532D' }}>โอนเงินแล้ว:</strong> กดปุ่มแนบสลิปด้านล่างเพื่อให้ระบบ EasySlip ตรวจสอบและบันทึกยอดให้อัตโนมัติทันที
+                  <div style={{ fontSize: 11, color: '#92400E', lineHeight: 1.45 }}>
+                    <strong style={{ color: '#78350F' }}>สำคัญมาก:</strong> โอนยอดตรงตามจุดทศนิยม <strong>฿{totalPayAmount.toFixed(2)}</strong> เพื่อให้ระบบ EasySlip ตรวจสอบและบันทึกยอดให้อัตโนมัติทันที
                   </div>
                 </div>
 
@@ -5147,7 +5170,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                 </div>
               </div>
               <strong style={{ color: '#E50914', fontSize: 18, fontWeight: 900 }}>
-                ฿{totalAmount.toLocaleString()}
+                ฿{totalPayAmount.toFixed(2)}
               </strong>
             </div>
 
@@ -5293,7 +5316,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   {booking.gameName || 'การจอง'} ({selectedCount} ที่นั่ง)
                 </div>
                 <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
-                  {booking.date ? fmtDate(booking.date) : ''} {booking.time ? `· ${booking.time} น.` : ''} · ยอดรวม ฿{totalAmount.toLocaleString()}
+                  {booking.date ? fmtDate(booking.date) : ''} {booking.time ? `· ${booking.time} น.` : ''} · ยอดรวม ฿{totalPayAmount.toFixed(2)}
                 </div>
               </div>
             </div>
@@ -6032,12 +6055,6 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                     />
                   </div>
                 </div>
-
-                {/* Micro benefit reassurance */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748B' }}>
-                  <i className="fas fa-shield-alt" style={{ color: '#10B981', fontSize: 10 }} />
-                  <span>เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องอัตโนมัติทันที</span>
-                </div>
               </div>
             )}
 
@@ -6471,9 +6488,6 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                       <div>
                         <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>
                           ที่นั่งว่าง #{seatNum}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>
-                          เปิดรับผู้เล่น หรือเหมาจ่ายเพื่อล็อกห้อง
                         </div>
                       </div>
                     </div>
