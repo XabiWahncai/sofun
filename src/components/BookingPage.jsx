@@ -86,10 +86,55 @@ const NETFLIX_BOOKING_CSS = `
     gap: 24px;
     align-items: start;
   }
+  .booking-mobile-nav {
+    display: none;
+  }
   @media (max-width: 960px) {
+    .booking-mobile-nav {
+      display: flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 16px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+      gap: 6px;
+      position: sticky;
+      top: 64px;
+      z-index: 25;
+    }
+    .booking-mobile-tab-btn {
+      flex: 1;
+      height: 42px;
+      border: none;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      background: transparent;
+      color: #64748b;
+      transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .booking-mobile-tab-btn.active {
+      background: var(--curtain-crimson, #e50914);
+      color: #ffffff;
+      box-shadow: 0 3px 12px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28);
+    }
     .booking-two-col-grid {
       grid-template-columns: 1fr !important;
       gap: 20px !important;
+    }
+    .booking-col-left.mobile-hidden,
+    .booking-col-right.mobile-hidden {
+      display: none !important;
     }
   }
 
@@ -365,7 +410,7 @@ export function getEventTitle(b, user) {
   const locked = isRoomLocked(b)
   const canView = canViewBookingDetail(b, user)
   const roomName = b.room || 'ห้องเล่น'
-  const timeStr = b.time ? ` — ${b.time}` : ''
+  const timeStr = b.time ? ` - ${b.time}` : ''
 
   if (locked && !canView) {
     return `${roomName}${timeStr} (ล็อกห้องแล้ว)`
@@ -999,7 +1044,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               </div>
             ) : (
               <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>
-                ยังไม่มีรอบเล่นในวันนี้ — สามารถเปิดตี้แรกได้เลย
+                ยังไม่มีรอบเล่นในวันนี้ - สามารถเปิดตี้แรกได้เลย
               </div>
             )}
           </div>
@@ -1314,6 +1359,7 @@ function CreateBookingModal({
   lineUser,
   onLogin,
   onClose,
+  onSuccess,
   showToast,
   defaultDate = '',
   defaultGameId = '',
@@ -1432,6 +1478,7 @@ function CreateBookingModal({
         updatedAt: serverTimestamp(),
       })
       showToast('สร้างการจองสำเร็จ รอแอดมินยืนยัน')
+      if (onSuccess) onSuccess()
       onClose()
     } catch (e) {
       showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
@@ -2114,7 +2161,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
       const res = await verifySlipDirect(slipFile, amount, { isDeposit: true })
 
       if (res.code === 'WRONG_RECEIVER') {
-        showToast(res.msg || 'สลิปโอนไปยังบัญชีอื่น — กรุณาตรวจสอบและโอนใหม่', 'error')
+        showToast(res.msg || 'สลิปโอนไปยังบัญชีอื่น - กรุณาตรวจสอบและโอนใหม่', 'error')
         return
       }
 
@@ -2157,8 +2204,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
       await updateDoc(bRef, payload)
 
       if (verified) showToast('EasySlip ยืนยันสำเร็จ')
-      else if (res.code === 'QR_NOT_FOUND') showToast('บันทึกสลิปแล้ว — รอแอดมินยืนยัน (อ่าน QR ไม่สำเร็จ)')
-      else showToast('ส่งสลิปสำเร็จ — รอแอดมินตรวจสอบ')
+      else if (res.code === 'QR_NOT_FOUND') showToast('บันทึกสลิปแล้ว - รอแอดมินยืนยัน (อ่าน QR ไม่สำเร็จ)')
+      else showToast('ส่งสลิปสำเร็จ - รอแอดมินตรวจสอบ')
 
       setStep('done')
       onUpdated()
@@ -2808,7 +2855,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
                 >
                   <i className="fas fa-receipt" style={{ fontSize: 15 }} />
-                  <span>โอนแล้ว — แนบสลิปที่นี่</span>
+                  <span>โอนแล้ว - แนบสลิปที่นี่</span>
                   <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
                 </label>
               </>
@@ -3787,7 +3834,7 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, fontWeight: 700 }}>
                   <i className="fas fa-exclamation-triangle" style={{ color: '#E50914', flexShrink: 0 }} />
-                  <span>หมดเวลาชำระมัดจำ — ปาร์ตี้ล่มเนื่องจากชำระไม่ครบ</span>
+                  <span>หมดเวลาชำระมัดจำ - ปาร์ตี้ล่มเนื่องจากชำระไม่ครบ</span>
                 </div>
                 {isLeader && (
                   <button
@@ -4291,7 +4338,7 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                 }}
               >
                 <i className="fas fa-clock" />
-                <span>ส่งคำขอเข้าร่วมแล้ว — รอหัวปาร์ตี้อนุมัติ</span>
+                <span>ส่งคำขอเข้าร่วมแล้ว - รอหัวปาร์ตี้อนุมัติ</span>
               </div>
             )}
 
@@ -4350,7 +4397,7 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                 <i className="fas fa-check-circle" style={{ color: '#10B981' }} />
                 <span>
                   {isLocked
-                    ? 'คุณชำระมัดจำแล้ว — ล็อกห้องเรียบร้อย 100%'
+                    ? 'คุณชำระมัดจำแล้ว - ล็อกห้องเรียบร้อย 100%'
                     : `คุณชำระมัดจำแล้ว (รอเพื่อนในตี้อีก ${remainingToLock} คน)`}
                 </span>
               </div>
@@ -4374,7 +4421,7 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               >
                 <i className="fas fa-hourglass-half" style={{ color: '#D97706', fontSize: 14 }} />
                 <div>
-                  <div>ส่งสลิปแล้ว — รอแอดมินตรวจสอบ</div>
+                  <div>ส่งสลิปแล้ว - รอแอดมินตรวจสอบ</div>
                   <div style={{ fontSize: 10.5, fontWeight: 500, color: '#B45309' }}>แอดมินจะแจ้งผลทาง LINE</div>
                 </div>
               </div>
@@ -4508,6 +4555,13 @@ export default function BookingPage({
   const [detailBooking, setDetailBooking] = useState(null)
   const [calendarDate, setCalendarDate] = useState('')
   const [myBookingsTab, setMyBookingsTab] = useState('active')
+  const [mobileSection, setMobileSection] = useState(() => {
+    try {
+      const p = new URLSearchParams(window.location.search)
+      if (p.get('tab') === 'mylist') return 'mylist'
+    } catch {}
+    return 'calendar'
+  })
 
   useEffect(() => {
     const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'))
@@ -4679,7 +4733,7 @@ export default function BookingPage({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             <div>
 
-              {/* Title + CTA row */}
+              {/* Title row */}
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16 }}>
                 <div>
                   <h1
@@ -4700,30 +4754,6 @@ export default function BookingPage({
                     จองรอบเล่นเกม Script Murder ที่ Sofun Club Thailand เช็คตารางห้องว่างแบบเรียลไทม์ หรือเปิดปาร์ตี้ใหม่เพื่อชวนเพื่อนร่วมไขปริศนา
                   </p>
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => handleStartBooking(calendarDate || toDateStr(new Date()))}
-                  className="nfx-btn-primary"
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: 12,
-                    background: 'var(--curtain-crimson, #e50914)',
-                    color: '#ffffff',
-                    border: 'none',
-                    fontSize: 14,
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28)',
-                    flexShrink: 0,
-                  }}
-                >
-                  <i className="fas fa-plus" style={{ fontSize: 12 }} />
-                  สร้างการจองใหม่
-                </button>
               </div>
 
 
@@ -4740,10 +4770,52 @@ export default function BookingPage({
           padding: '28px 20px 64px',
         }}
       >
+        {/* ── Mobile Tab Navigation Bar ───────────────────────────────── */}
+        <div className="booking-mobile-nav" role="tablist" aria-label="แถบสลับหน้าจองรอบเกม">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileSection === 'calendar'}
+            className={`booking-mobile-tab-btn ${mobileSection === 'calendar' ? 'active' : ''}`}
+            onClick={() => setMobileSection('calendar')}
+          >
+            <i className="fas fa-calendar-alt" style={{ fontSize: 13 }} />
+            <span>ตารางห้อง & ปฏิทิน</span>
+          </button>
+
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mobileSection === 'mylist'}
+            className={`booking-mobile-tab-btn ${mobileSection === 'mylist' ? 'active' : ''}`}
+            onClick={() => setMobileSection('mylist')}
+          >
+            <i className="fas fa-bookmark" style={{ fontSize: 13 }} />
+            <span>การจองของฉัน (MY LIST)</span>
+            {activeMyBookings.length > 0 && (
+              <span
+                style={{
+                  fontSize: 10.5,
+                  fontWeight: 800,
+                  padding: '1px 6px',
+                  borderRadius: 10,
+                  background: mobileSection === 'mylist' ? '#ffffff' : 'var(--curtain-crimson, #e50914)',
+                  color: mobileSection === 'mylist' ? 'var(--curtain-crimson, #e50914)' : '#ffffff',
+                  minWidth: 16,
+                  textAlign: 'center',
+                  lineHeight: '14px',
+                }}
+              >
+                {activeMyBookings.length}
+              </span>
+            )}
+          </button>
+        </div>
+
         <div className="booking-two-col-grid">
 
           {/* ── Left Column: My Bookings or Guest VIP Pass ─────────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className={`booking-col-left ${mobileSection !== 'mylist' ? 'mobile-hidden' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             {lineUser ? (
               <div
                 style={{
@@ -5028,7 +5100,7 @@ export default function BookingPage({
           </div>
 
           {/* ── Right Column: Interactive Monthly Calendar ───────────────── */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
+          <div className={`booking-col-right ${mobileSection !== 'calendar' ? 'mobile-hidden' : ''}`} style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
             <div
               style={{
                 background: '#ffffff',
@@ -5084,6 +5156,7 @@ export default function BookingPage({
           defaultGameId={createBookingGameId}
           defaultTime={createBookingTime}
           defaultRoom={createBookingRoom}
+          onSuccess={() => setMobileSection('mylist')}
           onClose={() => {
             setShowCreate(false)
             setCreateBookingDate('')

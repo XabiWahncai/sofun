@@ -89,6 +89,7 @@ export default function App() {
   const [editingGame, setEditingGame] = useState(null)
   const [bookingGameId, setBookingGameId] = useState("")
   const [bookingEnabled, setBookingEnabled] = useState(false)
+  const [bookingLoaded, setBookingLoaded] = useState(false)
   const [promoSettings, setPromoSettings] = useState(() => {
     try {
       const cached = localStorage.getItem('sofun_cached_promo_settings')
@@ -107,12 +108,14 @@ export default function App() {
     const unsub = onSnapshot(doc(db, 'settings', 'booking'), snap => {
       const isEnabled = snap.exists() && snap.data().enabled === true
       setBookingEnabled(isEnabled)
+      setBookingLoaded(true)
       try {
         if (isEnabled) localStorage.setItem('sofun_booking_enabled', 'true')
         else localStorage.removeItem('sofun_booking_enabled')
       } catch {}
     }, err => {
       console.warn('Failed to listen to settings/booking in App:', err)
+      setBookingLoaded(true)
     })
     return unsub
   }, [])
@@ -642,7 +645,7 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!bookingEnabled && (currentPage === 'booking' || currentPage === 'party')) {
+    if (bookingLoaded && !bookingEnabled && (currentPage === 'booking' || currentPage === 'party')) {
       setCurrentPage('games')
       window.history.replaceState({ page: 'games' }, '', '/games')
       showToast('ระบบจองและปาร์ตี้ปิดให้บริการชั่วคราว นำทางไปหน้ารวมสคริปต์')
@@ -651,7 +654,7 @@ export default function App() {
         handleDirectLineBooking(targetGame, showToast)
       }
     }
-  }, [bookingEnabled, currentPage, bookingGameId, allGames, showToast])
+  }, [bookingLoaded, bookingEnabled, currentPage, bookingGameId, allGames, showToast])
 
   // ── Global POS sound alert state and controls ─────────────────────
   const [posSoundMuted, setPosSoundMuted] = useState(() => {
