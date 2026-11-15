@@ -3238,8 +3238,25 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
   const [slipFile, setSlipFile] = useState(null)
   const [slipPreview, setSlipPreview] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [copiedPhone, setCopiedPhone] = useState(false)
 
-  const matchedGame = allGames?.find(g => g.id === booking.gameId || g._id === booking.gameId)
+  // Dynamically resolve current game to guarantee maxMembers & posterSrc are always accurate
+  const [matchedGame, setMatchedGame] = useState(() => {
+    if (booking?.gameId && Array.isArray(allGames) && allGames.length > 0) {
+      return allGames.find(g => g.id === booking.gameId || g._id === booking.gameId) || null
+    }
+    return null
+  })
+
+  useEffect(() => {
+    if (matchedGame || !booking?.gameId) return
+    getDoc(doc(db, 'scripts', booking.gameId)).then(snap => {
+      if (snap.exists()) {
+        setMatchedGame({ id: snap.id, ...snap.data() })
+      }
+    }).catch(() => {})
+  }, [booking?.gameId, matchedGame])
+
   const maxMembers = matchedGame ? parseGamePlayerCount(matchedGame) : (booking.maxMembers || 6)
   const depositPerPerson = booking.depositAmount || 0
 
@@ -3344,6 +3361,22 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
       showToast('บันทึกไม่สำเร็จ: ' + e.message, 'error')
     }
   }
+
+  const copyPhone = () => {
+    if (!promptPayPhone) return
+    try {
+      navigator.clipboard.writeText(promptPayPhone)
+      setCopiedPhone(true)
+      showToast('คัดลอกหมายเลขพร้อมเพย์แล้ว')
+      setTimeout(() => setCopiedPhone(false), 2000)
+    } catch {
+      showToast('คัดลอกหมายเลขพร้อมเพย์แล้ว')
+    }
+  }
+
+  const formattedPhone = promptPayPhone.length === 10
+    ? promptPayPhone.replace(/(\d{3})(\d{3})(\d{4})/, '$1-$2-$3')
+    : (promptPayPhone.length === 13 ? promptPayPhone.replace(/(\d{1})(\d{4})(\d{5})(\d{2})(\d{1})/, '$1-$2-$3-$4-$5') : promptPayPhone)
 
   const handleFileSelect = (e) => {
     const file = e.target.files[0]
@@ -3473,7 +3506,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
     switch (step) {
       case 'select': return 'เลือกจ่ายเฉพาะของตัวเอง จ่ายให้เพื่อน หรือเหมาจ่ายล็อกห้อง'
       case 'terms': return 'โปรดอ่านข้อตกลงและเงื่อนไขการตรวจสอบสลิป'
-      case 'qr': return `สแกน QR แล้วโอน · ${booking.gameName || 'การจอง'}`
+      case 'qr': return 'สแกน QR PromptPay เพื่อยืนยันการจอง'
       case 'upload': return 'ตรวจความถูกต้องก่อนส่งยืนยัน'
       case 'done': return 'ระบบได้รับสลิปเรียบร้อยแล้ว'
       default: return ''
@@ -3530,77 +3563,60 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
         >
           {/* Top Step Bar + Close Button */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              {step === 'terms' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              {step !== 'select' && step !== 'done' && (
                 <button
                   type="button"
-                  onClick={() => setStep('select')}
+                  onClick={() => {
+                    if (step === 'terms') setStep('select')
+                    else if (step === 'qr') setStep('terms')
+                    else if (step === 'upload') setStep('qr')
+                  }}
                   style={{
-                    height: 24,
+                    height: 26,
                     padding: '0 8px',
-                    borderRadius: 6,
-                    background: '#F3F4F6',
-                    color: '#4B5563',
-                    border: 'none',
+                    borderRadius: 7,
+                    background: '#F1F5F9',
+                    color: '#475569',
+                    border: '1px solid #E2E8F0',
                     fontSize: 10.5,
                     fontWeight: 700,
                     display: 'flex',
                     alignItems: 'center',
                     gap: 4,
                     cursor: 'pointer',
-                    marginRight: 4,
+                    transition: 'all 0.15s',
                   }}
-                  title="ย้อนกลับไปเลือกที่นั่ง"
+                  onMouseEnter={e => { e.currentTarget.style.background = '#E2E8F0'; e.currentTarget.style.color = '#0F172A' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#F1F5F9'; e.currentTarget.style.color = '#475569' }}
+                  title="ย้อนกลับ"
                 >
-                  <i className="fas fa-arrow-left" style={{ fontSize: 9 }} />
-                  <span>เลือกที่นั่ง</span>
+                  <i className="fas fa-chevron-left" style={{ fontSize: 9 }} />
+                  <span>{step === 'terms' ? 'เลือกที่นั่ง' : (step === 'qr' ? 'เงื่อนไข' : 'QR Code')}</span>
                 </button>
               )}
-              {step === 'qr' && (
-                <button
-                  type="button"
-                  onClick={() => setStep('terms')}
-                  style={{
-                    height: 24,
-                    padding: '0 8px',
-                    borderRadius: 6,
-                    background: '#F3F4F6',
-                    color: '#4B5563',
-                    border: 'none',
-                    fontSize: 10.5,
-                    fontWeight: 700,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    cursor: 'pointer',
-                    marginRight: 4,
-                  }}
-                  title="ย้อนกลับไปดูเงื่อนไข"
-                >
-                  <i className="fas fa-arrow-left" style={{ fontSize: 9 }} />
-                  <span>เงื่อนไข</span>
-                </button>
-              )}
-              {[0, 1, 2, 3, 4].map(i => (
-                <div
-                  key={i}
-                  style={{
-                    height: 3,
-                    width: i === stepIndex ? 22 : 12,
-                    borderRadius: 2,
-                    background: i <= stepIndex ? '#E50914' : '#E5E7EB',
-                    transition: 'all 0.25s',
-                  }}
-                />
-              ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                {[0, 1, 2, 3, 4].map(i => (
+                  <div
+                    key={i}
+                    style={{
+                      height: 4,
+                      width: i === stepIndex ? 22 : 10,
+                      borderRadius: 2,
+                      background: i <= stepIndex ? '#E50914' : '#E2E8F0',
+                      transition: 'all 0.25s',
+                    }}
+                  />
+                ))}
+              </div>
               <span
                 style={{
                   fontSize: 10,
                   fontWeight: 800,
-                  letterSpacing: '0.08em',
+                  letterSpacing: '0.06em',
                   color: '#E50914',
                   textTransform: 'uppercase',
-                  marginLeft: 4,
+                  marginLeft: 2,
                 }}
               >
                 ขั้นตอน {stepIndex + 1}/5
@@ -4320,9 +4336,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     alignItems: 'center',
                     gap: 12,
                     padding: '12px 14px',
-                    borderRadius: 14,
-                    background: '#F8FAFC',
+                    borderRadius: 16,
+                    background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
                     border: '1px solid #E2E8F0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                     boxSizing: 'border-box',
                   }}
                 >
@@ -4332,9 +4349,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                       alt={booking.gameName || ''}
                       referrerPolicy="no-referrer"
                       style={{
-                        width: 48,
-                        height: 60,
-                        borderRadius: 8,
+                        width: 50,
+                        height: 66,
+                        borderRadius: 10,
                         objectFit: 'cover',
                         flexShrink: 0,
                         boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
@@ -4343,15 +4360,15 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   ) : (
                     <div
                       style={{
-                        width: 48,
-                        height: 60,
-                        borderRadius: 8,
+                        width: 50,
+                        height: 66,
+                        borderRadius: 10,
                         background: 'linear-gradient(135deg, #1E293B, #0F172A)',
                         color: '#94A3B8',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 20,
+                        fontSize: 22,
                         flexShrink: 0,
                       }}
                     >
@@ -4387,6 +4404,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                         </span>
                       )}
                     </div>
+                    <div style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 3 }}>
+                      ผู้ชำระ: <strong style={{ color: '#475569' }}>{lineUser?.displayName || lineUser?.name || 'คุณ'}</strong>
+                    </div>
                   </div>
 
                   <div
@@ -4394,16 +4414,16 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                       textAlign: 'right',
                       flexShrink: 0,
                       background: '#FFFFFF',
-                      padding: '6px 12px',
-                      borderRadius: 10,
+                      padding: '7px 12px',
+                      borderRadius: 12,
                       border: '1px solid #E2E8F0',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                     }}
                   >
                     <div style={{ fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
                       ยอดมัดจำรวม ({selectedCount} ที่)
                     </div>
-                    <div style={{ fontSize: 18, fontWeight: 900, color: '#E50914', lineHeight: 1.1, marginTop: 2 }}>
+                    <div style={{ fontSize: 19, fontWeight: 900, color: '#E50914', lineHeight: 1.1, marginTop: 2 }}>
                       ฿{totalAmount.toLocaleString()}
                     </div>
                   </div>
@@ -4414,43 +4434,44 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
             {/* General Booking & Lock Rules */}
             <div
               style={{
-                background: '#ffffff',
-                border: '1px solid #E5E7EB',
-                borderRadius: 14,
-                padding: '12px 14px',
+                background: '#FFFFFF',
+                border: '1px solid #E2E8F0',
+                borderRadius: 16,
+                padding: '14px 16px',
                 display: 'flex',
                 flexDirection: 'column',
-                gap: 8,
+                gap: 10,
+                boxShadow: '0 1px 4px rgba(0,0,0,0.02)',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 800, color: '#111827' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>
                 <i className="fas fa-file-contract" style={{ color: '#E50914' }} />
                 <span>เงื่อนไขการจองและล็อกห้อง</span>
               </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#4B5563', lineHeight: 1.5 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
                   <i className="fas fa-ban" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
                   <div>
                     <strong style={{ color: '#991B1B' }}>ไม่คืนเงินมัดจำ:</strong> เงินมัดจำไม่สามารถขอรับเงินคืนหรือโอนสิทธิ์ได้ทุกกรณี หากยกเลิกการเล่นหรือไม่มาตามนัดหมาย
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#4B5563', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
                   <i className="fas fa-calendar-plus" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#111827' }}>ขยายเวลา +3 วัน/คน:</strong> ทุกครั้งที่สมาชิกชำระมัดจำ ระบบจะขยายเวลาให้ตี้อัตโนมัติ
+                    <strong style={{ color: '#0F172A' }}>ขยายเวลา +3 วัน/คน:</strong> ทุกครั้งที่สมาชิกชำระมัดจำ ระบบจะขยายเวลาให้ตี้อัตโนมัติ
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#4B5563', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
                   <i className="fas fa-lock" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#111827' }}>ล็อกห้องอัตโนมัติ:</strong> เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องถาวรทันที
+                    <strong style={{ color: '#0F172A' }}>ล็อกห้องอัตโนมัติ:</strong> เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องถาวรทันที
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#4B5563', lineHeight: 1.5 }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
                   <i className="fas fa-clock" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#111827' }}>กำหนดปิดรับ:</strong> ปิดรับชำระมัดจำไม่เกิน 24 ชั่วโมงก่อนวันเริ่มเล่นจริง
+                    <strong style={{ color: '#0F172A' }}>กำหนดปิดรับ:</strong> ปิดรับชำระมัดจำไม่เกิน 24 ชั่วโมงก่อนวันเริ่มเล่นจริง
                   </div>
                 </div>
               </div>
@@ -4459,18 +4480,18 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
             {/* CRITICAL SLIP UPLOAD EMPHASIS (ย้ำชัดเจนว่าต้องอัพสลิปเข้าเว็บนี้) */}
             <div
               style={{
-                background: '#FEF2F2',
-                border: '1.5px solid #F87171',
-                borderRadius: 14,
-                padding: '12px 14px',
+                background: '#FFF5F5',
+                border: '1.5px solid #FCA5A5',
+                borderRadius: 16,
+                padding: '14px 16px',
                 display: 'flex',
                 flexDirection: 'column',
                 gap: 8,
-                boxShadow: '0 2px 10px rgba(220, 38, 38, 0.08)',
+                boxShadow: '0 2px 10px rgba(220, 38, 38, 0.06)',
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#DC2626', fontWeight: 900, fontSize: 12.5 }}>
-                <i className="fas fa-triangle-exclamation" style={{ fontSize: 15, flexShrink: 0 }} />
+                <i className="fas fa-triangle-exclamation" style={{ fontSize: 14, flexShrink: 0 }} />
                 <span>ข้อควรระวัง: ต้องอัปโหลดสลิปเข้าเว็บนี้เพื่อตรวจยอด</span>
               </div>
               <ul style={{ margin: 0, paddingLeft: 18, fontSize: 11.5, color: '#7F1D1D', lineHeight: 1.55, display: 'flex', flexDirection: 'column', gap: 5 }}>
@@ -4493,8 +4514,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               style={{
                 width: '100%',
                 height: 48,
-                borderRadius: 12,
-                background: '#E50914',
+                borderRadius: 14,
+                background: 'linear-gradient(135deg, #E50914 0%, #B80710 100%)',
                 color: '#ffffff',
                 fontSize: 14,
                 fontWeight: 800,
@@ -4504,16 +4525,22 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                 gap: 8,
                 border: 'none',
                 cursor: 'pointer',
-                boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
+                boxShadow: '0 4px 18px rgba(229, 9, 20, 0.35)',
                 transition: 'all 0.15s',
                 marginTop: 'auto',
                 boxSizing: 'border-box',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
-              onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
+              onMouseEnter={e => {
+                e.currentTarget.style.transform = 'translateY(-1px)'
+                e.currentTarget.style.boxShadow = '0 6px 22px rgba(229, 9, 20, 0.45)'
+              }}
+              onMouseLeave={e => {
+                e.currentTarget.style.transform = 'none'
+                e.currentTarget.style.boxShadow = '0 4px 18px rgba(229, 9, 20, 0.35)'
+              }}
             >
               <span>ตกลง / ยอมรับเงื่อนไข</span>
-              <i className="fas fa-arrow-right" style={{ fontSize: 13 }} />
+              <i className="fas fa-arrow-right" style={{ fontSize: 12, opacity: 0.85 }} />
             </button>
           </div>
         )}
@@ -4526,7 +4553,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               inset: 0,
               zIndex: 50,
               background: 'rgba(0, 0, 0, 0.65)',
-              backdropFilter: 'blur(4px)',
+              backdropFilter: 'blur(6px)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -4538,10 +4565,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               style={{
                 width: '100%',
                 maxWidth: 350,
-                background: '#ffffff',
-                borderRadius: 18,
-                padding: '22px 20px',
-                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.35)',
+                background: '#FFFFFF',
+                borderRadius: 20,
+                padding: '24px 22px',
+                boxShadow: '0 25px 60px rgba(0, 0, 0, 0.35)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
@@ -4552,11 +4579,11 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
             >
               <div
                 style={{
-                  width: 50,
-                  height: 50,
+                  width: 52,
+                  height: 52,
                   borderRadius: '50%',
                   background: '#FEF2F2',
-                  border: '2px solid #FCA5A5',
+                  border: '1.5px solid #FCA5A5',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -4568,10 +4595,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               </div>
 
               <div>
-                <h4 style={{ fontSize: 16, fontWeight: 900, color: '#111827', margin: 0 }}>
+                <h4 style={{ fontSize: 16.5, fontWeight: 900, color: '#0F172A', margin: 0, letterSpacing: '-0.01em' }}>
                   อ่านเงื่อนไขเรียบร้อยแล้วใช่ไหม?
                 </h4>
-                <p style={{ fontSize: 12, color: '#4B5563', margin: '8px 0 0', lineHeight: 1.55 }}>
+                <p style={{ fontSize: 12, color: '#475569', margin: '8px 0 0', lineHeight: 1.55 }}>
                   ย้ำชัดเจนอีกครั้ง: เมื่อสแกนโอนเงินแล้ว <strong style={{ color: '#E50914' }}>ต้องอัปโหลดสลิปเข้าสู่เว็บไซต์นี้</strong> เพื่อให้ระบบตรวจสอบและยืนยันยอดเงิน หากไม่แนบสลิปจะไม่ถือว่าชำระมัดจำ
                 </p>
               </div>
@@ -4585,9 +4612,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   }}
                   style={{
                     width: '100%',
-                    height: 46,
-                    borderRadius: 12,
-                    background: '#E50914',
+                    height: 48,
+                    borderRadius: 14,
+                    background: 'linear-gradient(135deg, #E50914 0%, #B80710 100%)',
                     color: '#ffffff',
                     fontSize: 13.5,
                     fontWeight: 800,
@@ -4596,15 +4623,21 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6,
-                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
-                    transition: 'background 0.15s',
+                    gap: 8,
+                    boxShadow: '0 4px 18px rgba(229, 9, 20, 0.35)',
+                    transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 6px 22px rgba(229, 9, 20, 0.45)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'none'
+                    e.currentTarget.style.boxShadow = '0 4px 18px rgba(229, 9, 20, 0.35)'
+                  }}
                 >
                   <i className="fas fa-qrcode" />
-                  <span>ตกลงอีกครั้งเพื่อไปหน้า QR Code</span>
+                  <span>ตกลงเพื่อไปหน้า QR Code</span>
                 </button>
 
                 <button
@@ -4614,11 +4647,11 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     width: '100%',
                     height: 38,
                     borderRadius: 12,
-                    background: '#F3F4F6',
-                    color: '#4B5563',
+                    background: '#F1F5F9',
+                    color: '#475569',
                     fontSize: 12,
                     fontWeight: 700,
-                    border: '1px solid #E5E7EB',
+                    border: '1px solid #E2E8F0',
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
@@ -4626,8 +4659,8 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     gap: 6,
                     transition: 'all 0.15s',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#E5E7EB'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#F3F4F6'}
+                  onMouseEnter={e => e.currentTarget.style.background = '#E2E8F0'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#F1F5F9'}
                 >
                   <i className="fas fa-arrow-left" style={{ fontSize: 10 }} />
                   <span>กลับไปอ่านเงื่อนไข</span>
@@ -4637,17 +4670,17 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
           </div>
         )}
 
-        {/* ── STEP 1: QR Payment ── */}
+        {/* ── STEP 1: QR Payment (Netflix Clean White VIP PromptPay Slip) ── */}
         {step === 'qr' && (
           <div
             style={{
               overflowY: 'auto',
               overflowX: 'hidden',
               flex: 1,
-              padding: '16px 22px 20px',
+              padding: '16px 20px 20px',
               display: 'flex',
               flexDirection: 'column',
-              gap: 14,
+              gap: 12,
               boxSizing: 'border-box',
             }}
           >
@@ -4663,9 +4696,10 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                         alignItems: 'center',
                         gap: 12,
                         padding: '12px 14px',
-                        borderRadius: 14,
-                        background: '#F8FAFC',
+                        borderRadius: 16,
+                        background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
                         border: '1px solid #E2E8F0',
+                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                         boxSizing: 'border-box',
                       }}
                     >
@@ -4675,9 +4709,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                           alt={booking.gameName || ''}
                           referrerPolicy="no-referrer"
                           style={{
-                            width: 48,
-                            height: 60,
-                            borderRadius: 8,
+                            width: 50,
+                            height: 66,
+                            borderRadius: 10,
                             objectFit: 'cover',
                             flexShrink: 0,
                             boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
@@ -4686,15 +4720,15 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                       ) : (
                         <div
                           style={{
-                            width: 48,
-                            height: 60,
-                            borderRadius: 8,
+                            width: 50,
+                            height: 66,
+                            borderRadius: 10,
                             background: 'linear-gradient(135deg, #1E293B, #0F172A)',
                             color: '#94A3B8',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontSize: 20,
+                            fontSize: 22,
                             flexShrink: 0,
                           }}
                         >
@@ -4730,6 +4764,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                             </span>
                           )}
                         </div>
+                        <div style={{ fontSize: 10.5, color: '#94A3B8', marginTop: 3 }}>
+                          ผู้ชำระ: <strong style={{ color: '#475569' }}>{lineUser?.displayName || lineUser?.name || 'คุณ'}</strong>
+                        </div>
                       </div>
 
                       <div
@@ -4737,16 +4774,16 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                           textAlign: 'right',
                           flexShrink: 0,
                           background: '#FFFFFF',
-                          padding: '6px 12px',
-                          borderRadius: 10,
+                          padding: '7px 12px',
+                          borderRadius: 12,
                           border: '1px solid #E2E8F0',
-                          boxShadow: '0 1px 3px rgba(0,0,0,0.03)',
+                          boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                         }}
                       >
                         <div style={{ fontSize: 9.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>
                           ยอดมัดจำรวม ({selectedCount} ที่)
                         </div>
-                        <div style={{ fontSize: 18, fontWeight: 900, color: '#E50914', lineHeight: 1.1, marginTop: 2 }}>
+                        <div style={{ fontSize: 19, fontWeight: 900, color: '#E50914', lineHeight: 1.1, marginTop: 2 }}>
                           ฿{totalAmount.toLocaleString()}
                         </div>
                       </div>
@@ -4754,27 +4791,49 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   )
                 })()}
 
-                {/* QR Showcase Card */}
+                {/* QR Showcase Card (PromptPay Clean VIP Card) */}
                 <div
                   style={{
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
                     padding: '16px 14px',
-                    borderRadius: 16,
-                    background: '#ffffff',
-                    border: '1px solid #E5E7EB',
-                    boxShadow: '0 2px 12px rgba(0, 0, 0, 0.03)',
+                    borderRadius: 18,
+                    background: '#FFFFFF',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 4px 18px rgba(0, 0, 0, 0.04)',
                     boxSizing: 'border-box',
-                    gap: 10,
+                    gap: 12,
                   }}
                 >
+                  {/* Official PromptPay Header Badge */}
+                  <div
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 7,
+                      padding: '5px 16px',
+                      borderRadius: 20,
+                      background: 'linear-gradient(135deg, #003D6B 0%, #002244 100%)',
+                      color: '#FFFFFF',
+                      fontSize: 11,
+                      fontWeight: 800,
+                      letterSpacing: '0.06em',
+                      boxShadow: '0 2px 8px rgba(0, 61, 107, 0.25)',
+                    }}
+                  >
+                    <i className="fas fa-qrcode" style={{ fontSize: 11, color: '#38BDF8' }} />
+                    <span>PROMPTPAY · พร้อมเพย์</span>
+                  </div>
+
+                  {/* QR Canvas Box */}
                   <div
                     style={{
                       padding: 12,
-                      borderRadius: 12,
-                      background: '#ffffff',
-                      border: '1px solid #E5E7EB',
+                      borderRadius: 14,
+                      background: '#FFFFFF',
+                      border: '1.5px solid #F1F5F9',
+                      boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.02), 0 2px 6px rgba(0,0,0,0.02)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -4783,124 +4842,174 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     <QRCodeCanvas
                       id="dp-deposit-qr-canvas"
                       value={qrPayload}
-                      size={170}
+                      size={180}
                       bgColor="#ffffff"
-                      fgColor="#111827"
+                      fgColor="#0F172A"
                       level="M"
                       includeMargin={false}
                     />
                   </div>
 
-                  <div style={{ textAlign: 'center' }}>
+                  {/* Account Name and Copyable PromptPay ID */}
+                  <div style={{ textAlign: 'center', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14.5, fontWeight: 800, color: '#0F172A' }}>
+                      <span>{accountName || 'กิตติพร กล้าหาญ'}</span>
+                      <i className="fas fa-check-circle" style={{ color: '#10B981', fontSize: 12 }} title="บัญชีได้รับการยืนยัน" />
+                    </div>
+
+                    <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                      {bankName ? bankName : 'บัญชีรับโอนมัดจำ SOFUN Club (สำหรับเทสระบบ)'}
+                    </div>
+
+                    {/* Copyable Phone Pill */}
                     <div
                       style={{
-                        display: 'inline-block',
-                        fontSize: 10,
-                        fontWeight: 800,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.08em',
-                        color: '#E50914',
-                        background: '#FEF2F2',
-                        border: '1px solid #FCA5A5',
-                        padding: '1px 8px',
-                        borderRadius: 12,
-                        marginBottom: 4,
+                        marginTop: 8,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        padding: '4px 6px 4px 12px',
+                        borderRadius: 10,
+                        background: '#F8FAFC',
+                        border: '1px solid #E2E8F0',
                       }}
                     >
-                      บัญชีโอนมัดจำ (พร้อมเพย์)
+                      <span
+                        style={{
+                          fontSize: 15,
+                          fontWeight: 800,
+                          color: '#0F172A',
+                          fontFamily: "'JetBrains Mono', monospace",
+                          letterSpacing: '0.04em',
+                        }}
+                      >
+                        {formattedPhone}
+                      </span>
+
+                      <button
+                        type="button"
+                        onClick={copyPhone}
+                        style={{
+                          height: 28,
+                          padding: '0 9px',
+                          borderRadius: 7,
+                          border: '1px solid #CBD5E1',
+                          background: copiedPhone ? '#DCFCE7' : '#FFFFFF',
+                          color: copiedPhone ? '#166534' : '#334155',
+                          fontSize: 10.5,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          transition: 'all 0.15s',
+                        }}
+                        title="คัดลอกหมายเลขพร้อมเพย์"
+                      >
+                        <i className={copiedPhone ? "fas fa-check" : "fas fa-copy"} style={{ fontSize: 10, color: copiedPhone ? '#16A34A' : '#64748B' }} />
+                        <span>{copiedPhone ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+                      </button>
                     </div>
-                    <div
-                      style={{
-                        fontSize: 15,
-                        fontWeight: 800,
-                        color: '#111827',
-                        fontFamily: "'JetBrains Mono', monospace",
-                        letterSpacing: '0.04em',
-                      }}
-                    >
-                      {promptPayPhone}
-                    </div>
-                    {(accountName || bankName) && (
-                      <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
-                        {accountName} {bankName ? `(${bankName})` : ''}
-                      </div>
-                    )}
                   </div>
 
+                  {/* Save QR Button */}
                   <button
                     type="button"
                     onClick={saveQR}
                     style={{
                       display: 'inline-flex',
                       alignItems: 'center',
-                      gap: 6,
-                      height: 32,
-                      padding: '0 14px',
-                      borderRadius: 20,
-                      background: '#F3F4F6',
-                      color: '#111827',
-                      border: '1px solid #E5E7EB',
+                      gap: 7,
+                      height: 34,
+                      padding: '0 16px',
+                      borderRadius: 10,
+                      background: '#0F172A',
+                      color: '#FFFFFF',
+                      border: 'none',
                       fontSize: 11.5,
                       fontWeight: 700,
                       cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(15, 23, 42, 0.12)',
                       transition: 'all 0.15s',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.background = '#E5E7EB'}
-                    onMouseLeave={e => e.currentTarget.style.background = '#F3F4F6'}
+                    onMouseEnter={e => e.currentTarget.style.background = '#1E293B'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#0F172A'}
                   >
-                    <i className="fas fa-download" style={{ fontSize: 10 }} />
-                    <span>บันทึกรูป QR</span>
+                    <i className="fas fa-arrow-down-to-line" style={{ fontSize: 11 }} />
+                    <span>บันทึกรูป QR Code</span>
                   </button>
                 </div>
 
-                {/* Minimal 3 Steps Bar */}
+                {/* Minimal 3 Steps Flow Bar */}
                 <div
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    padding: '8px 12px',
-                    borderRadius: 10,
-                    background: '#FAFAFA',
-                    border: '1px solid #F3F4F6',
-                    fontSize: 11,
-                    color: '#6B7280',
-                    gap: 6,
+                    padding: '9px 14px',
+                    borderRadius: 12,
+                    background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+                    border: '1px solid #E2E8F0',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
                   }}
                 >
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#FEF2F2', color: '#E50914', fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>1</span>
-                    สแกน QR
-                  </span>
-                  <span style={{ color: '#D1D5DB' }}>·</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#FEF2F2', color: '#E50914', fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>2</span>
-                    โอน ฿{amount.toLocaleString()}
-                  </span>
-                  <span style={{ color: '#D1D5DB' }}>·</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#FEF2F2', color: '#E50914', fontSize: 9, fontWeight: 900, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>3</span>
-                    แนบสลิป
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', color: '#E50914', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      1
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>สแกน QR</span>
+                  </div>
+
+                  <i className="fas fa-chevron-right" style={{ fontSize: 9, color: '#CBD5E1' }} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', color: '#E50914', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      2
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>โอน ฿{totalAmount.toLocaleString()}</span>
+                  </div>
+
+                  <i className="fas fa-chevron-right" style={{ fontSize: 9, color: '#CBD5E1' }} />
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{ width: 20, height: 20, borderRadius: '50%', background: '#FEF2F2', border: '1px solid #FECACA', color: '#E50914', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      3
+                    </div>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: '#1E293B' }}>แนบสลิป</span>
+                  </div>
                 </div>
 
-                {/* Important Reminder on QR Step */}
+                {/* Reassurance Notice */}
                 <div
                   style={{
-                    padding: '9px 12px',
-                    borderRadius: 10,
-                    background: '#FEF2F2',
-                    border: '1px solid #FECACA',
-                    color: '#991B1B',
-                    fontSize: 11,
-                    fontWeight: 700,
+                    padding: '10px 14px',
+                    borderRadius: 12,
+                    background: '#F0FDF4',
+                    border: '1px solid #BBF7D0',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: 6,
+                    gap: 10,
                   }}
                 >
-                  <i className="fas fa-exclamation-circle" style={{ color: '#E50914', fontSize: 13, flexShrink: 0 }} />
-                  <span>โอนเงินแล้ว อย่าลืมกดปุ่มแนบสลิปด้านล่างเพื่อให้เว็บตรวจยอดทันที</span>
+                  <div
+                    style={{
+                      width: 26,
+                      height: 26,
+                      borderRadius: 8,
+                      background: '#DCFCE7',
+                      color: '#16A34A',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                      fontSize: 12,
+                    }}
+                  >
+                    <i className="fas fa-shield-alt" />
+                  </div>
+                  <div style={{ fontSize: 11, color: '#166534', lineHeight: 1.45 }}>
+                    <strong style={{ color: '#14532D' }}>โอนเงินแล้ว:</strong> กดปุ่มแนบสลิปด้านล่างเพื่อให้ระบบ EasySlip ตรวจสอบและบันทึกยอดให้อัตโนมัติทันที
+                  </div>
                 </div>
 
                 {/* Primary CTA Button (Netflix Red) */}
@@ -4908,25 +5017,33 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   style={{
                     width: '100%',
                     height: 48,
-                    borderRadius: 12,
-                    background: '#E50914',
-                    color: '#ffffff',
+                    borderRadius: 14,
+                    background: 'linear-gradient(135deg, #E50914 0%, #B80710 100%)',
+                    color: '#FFFFFF',
                     fontSize: 14,
                     fontWeight: 800,
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 8,
+                    gap: 10,
                     cursor: 'pointer',
-                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
+                    boxShadow: '0 4px 18px rgba(229, 9, 20, 0.35)',
                     transition: 'all 0.15s',
                     boxSizing: 'border-box',
+                    border: 'none',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
-                  onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                    e.currentTarget.style.boxShadow = '0 6px 22px rgba(229, 9, 20, 0.45)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'none'
+                    e.currentTarget.style.boxShadow = '0 4px 18px rgba(229, 9, 20, 0.35)'
+                  }}
                 >
-                  <i className="fas fa-receipt" style={{ fontSize: 15 }} />
-                  <span>โอนแล้ว - แนบสลิปที่นี่</span>
+                  <i className="fas fa-file-invoice-dollar" style={{ fontSize: 16 }} />
+                  <span>โอนแล้ว · กดแนบสลิปที่นี่</span>
+                  <i className="fas fa-arrow-right" style={{ fontSize: 11, opacity: 0.85 }} />
                   <input type="file" accept="image/*" onChange={handleFileSelect} style={{ display: 'none' }} />
                 </label>
               </>
@@ -4947,35 +5064,36 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               overflowY: 'auto',
               overflowX: 'hidden',
               flex: 1,
-              padding: '16px 22px 20px',
+              padding: '16px 20px 20px',
               display: 'flex',
               flexDirection: 'column',
-              gap: 14,
+              gap: 12,
               boxSizing: 'border-box',
             }}
           >
             {/* Slip Preview Frame */}
             <div
               style={{
-                borderRadius: 14,
+                borderRadius: 16,
                 overflow: 'hidden',
-                background: '#0F1012',
-                border: '1px solid #E5E7EB',
-                maxHeight: 260,
+                background: '#0F172A',
+                border: '1px solid #E2E8F0',
+                maxHeight: 280,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 position: 'relative',
+                boxShadow: '0 4px 14px rgba(0,0,0,0.06)',
               }}
             >
               {slipPreview ? (
                 <img
                   src={slipPreview}
                   alt="สลิปโอนเงิน"
-                  style={{ maxHeight: 260, width: 'auto', objectFit: 'contain' }}
+                  style={{ maxHeight: 280, width: 'auto', objectFit: 'contain' }}
                 />
               ) : (
-                <div style={{ padding: 40, color: '#9CA3AF', fontSize: 13 }}>
+                <div style={{ padding: 40, color: '#94A3B8', fontSize: 13, textAlign: 'center' }}>
                   <i className="fas fa-image" style={{ fontSize: 28, display: 'block', marginBottom: 8 }} />
                   ไม่พบรูปภาพสลิป
                 </div>
@@ -4993,6 +5111,11 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   fontWeight: 700,
                   color: '#E50914',
                   cursor: 'pointer',
+                  padding: '6px 14px',
+                  borderRadius: 20,
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  transition: 'all 0.15s',
                 }}
               >
                 <i className="fas fa-sync-alt" style={{ fontSize: 10 }} />
@@ -5007,32 +5130,40 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                padding: '10px 14px',
-                borderRadius: 10,
-                background: '#FAFAFA',
-                border: '1px solid #E5E7EB',
+                padding: '12px 16px',
+                borderRadius: 14,
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
+                border: '1px solid #E2E8F0',
                 fontSize: 12,
               }}
             >
-              <span style={{ color: '#6B7280', fontWeight: 600 }}>ยอดมัดจำที่ต้องตรวจสอบ</span>
-              <strong style={{ color: '#E50914', fontSize: 15, fontWeight: 900 }}>
-                ฿{amount.toLocaleString()}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, background: '#FEF2F2', color: '#E50914', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                  <i className="fas fa-receipt" />
+                </div>
+                <div>
+                  <div style={{ color: '#0F172A', fontWeight: 800, fontSize: 13 }}>ยอดมัดจำที่ต้องตรวจสอบ</div>
+                  <div style={{ color: '#64748B', fontSize: 11 }}>ตรวจสอบความถูกต้องก่อนกดส่งยืนยัน</div>
+                </div>
+              </div>
+              <strong style={{ color: '#E50914', fontSize: 18, fontWeight: 900 }}>
+                ฿{totalAmount.toLocaleString()}
               </strong>
             </div>
 
             {/* Action Row */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
               <button
                 type="button"
                 onClick={() => setStep('qr')}
                 disabled={uploading}
                 style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 12,
-                  background: '#F3F4F6',
-                  border: '1px solid #E5E7EB',
-                  color: '#111827',
+                  width: 48,
+                  height: 48,
+                  borderRadius: 14,
+                  background: '#F1F5F9',
+                  border: '1px solid #E2E8F0',
+                  color: '#334155',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -5040,9 +5171,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   flexShrink: 0,
                   transition: 'all 0.15s',
                 }}
-                title="ย้อนกลับ"
+                title="ย้อนกลับไปดู QR Code"
               >
-                <i className="fas fa-arrow-left" style={{ fontSize: 13 }} />
+                <i className="fas fa-chevron-left" style={{ fontSize: 13 }} />
               </button>
 
               <button
@@ -5051,9 +5182,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                 onClick={handleSubmit}
                 style={{
                   flex: 1,
-                  height: 44,
-                  borderRadius: 12,
-                  background: uploading ? '#9CA3AF' : '#E50914',
+                  height: 48,
+                  borderRadius: 14,
+                  background: uploading ? '#94A3B8' : 'linear-gradient(135deg, #E50914 0%, #B80710 100%)',
                   color: '#ffffff',
                   fontSize: 14,
                   fontWeight: 800,
@@ -5063,18 +5194,18 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                   gap: 8,
                   border: 'none',
                   cursor: uploading ? 'wait' : 'pointer',
-                  boxShadow: uploading ? 'none' : '0 4px 14px rgba(229, 9, 20, 0.35)',
+                  boxShadow: uploading ? 'none' : '0 4px 18px rgba(229, 9, 20, 0.35)',
                   transition: 'all 0.15s',
                 }}
                 onMouseEnter={e => { if (!uploading) e.currentTarget.style.background = '#B80710' }}
-                onMouseLeave={e => { if (!uploading) e.currentTarget.style.background = '#E50914' }}
+                onMouseLeave={e => { if (!uploading) e.currentTarget.style.background = 'linear-gradient(135deg, #E50914 0%, #B80710 100%)' }}
               >
                 {uploading ? (
-                  <span>กำลังส่งสลิป...</span>
+                  <span>กำลังส่งและตรวจสอบสลิป...</span>
                 ) : (
                   <>
-                    <i className="fas fa-paper-plane" style={{ fontSize: 12 }} />
-                    <span>ยืนยันส่งสลิป</span>
+                    <i className="fas fa-paper-plane" style={{ fontSize: 13 }} />
+                    <span>ยืนยันส่งสลิปเพื่อตรวจยอด</span>
                   </>
                 )}
               </button>
@@ -5089,7 +5220,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               overflowY: 'auto',
               overflowX: 'hidden',
               flex: 1,
-              padding: '24px 22px 24px',
+              padding: '28px 22px 24px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -5101,27 +5232,27 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
             {/* Success Icon */}
             <div
               style={{
-                width: 64,
-                height: 64,
+                width: 68,
+                height: 68,
                 borderRadius: '50%',
-                background: '#FEF2F2',
-                border: '2px solid #FCA5A5',
-                color: '#E50914',
+                background: '#F0FDF4',
+                border: '2px solid #86EFAC',
+                color: '#16A34A',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: 26,
-                boxShadow: '0 8px 20px rgba(229, 9, 20, 0.2)',
+                fontSize: 28,
+                boxShadow: '0 8px 24px rgba(22, 163, 74, 0.2)',
               }}
             >
               <i className="fas fa-check" />
             </div>
 
             <div>
-              <h4 style={{ fontSize: 20, fontWeight: 900, color: '#111827', margin: '0 0 6px' }}>
+              <h4 style={{ fontSize: 20, fontWeight: 900, color: '#0F172A', margin: '0 0 6px', letterSpacing: '-0.02em' }}>
                 ส่งสลิปมัดจำสำเร็จ
               </h4>
-              <p style={{ fontSize: 12.5, color: '#6B7280', margin: 0, lineHeight: 1.55, maxWidth: 280 }}>
+              <p style={{ fontSize: 12.5, color: '#64748B', margin: 0, lineHeight: 1.55, maxWidth: 300 }}>
                 ระบบ EasySlip และทีมงานจะตรวจสอบและยืนยันสถานะการจองให้คุณโดยเร็วที่สุด
               </p>
             </div>
@@ -5134,35 +5265,35 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                 alignItems: 'center',
                 textAlign: 'left',
                 gap: 12,
-                padding: '12px 16px',
-                borderRadius: 12,
-                background: '#FAFAFA',
-                border: '1px solid #E5E7EB',
+                padding: '14px 16px',
+                borderRadius: 14,
+                background: 'linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)',
+                border: '1px solid #E2E8F0',
                 boxSizing: 'border-box',
               }}
             >
               <div
                 style={{
-                  width: 38,
-                  height: 38,
-                  borderRadius: 10,
+                  width: 42,
+                  height: 42,
+                  borderRadius: 12,
                   background: '#FEF2F2',
                   color: '#E50914',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
-                  fontSize: 14,
+                  fontSize: 16,
                 }}
               >
                 <i className="fas fa-calendar-check" />
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 13, fontWeight: 800, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {booking.gameName || 'การจอง'} ({selectedCount} ที่นั่ง)
                 </div>
-                <div style={{ fontSize: 11, color: '#6B7280', marginTop: 2 }}>
-                  {booking.date ? fmtDate(booking.date) : ''} {booking.time ? `- ${booking.time} น.` : ''} · ยอดรวม ฿{totalAmount.toLocaleString()}
+                <div style={{ fontSize: 11.5, color: '#64748B', marginTop: 2 }}>
+                  {booking.date ? fmtDate(booking.date) : ''} {booking.time ? `· ${booking.time} น.` : ''} · ยอดรวม ฿{totalAmount.toLocaleString()}
                 </div>
               </div>
             </div>
@@ -5172,19 +5303,20 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
               onClick={onClose}
               style={{
                 width: '100%',
-                height: 46,
-                borderRadius: 12,
-                background: '#111827',
+                height: 48,
+                borderRadius: 14,
+                background: '#0F172A',
                 color: '#ffffff',
-                fontSize: 13.5,
+                fontSize: 14,
                 fontWeight: 800,
                 border: 'none',
                 cursor: 'pointer',
                 transition: 'all 0.15s',
                 marginTop: 6,
+                boxShadow: '0 4px 14px rgba(15, 23, 42, 0.15)',
               }}
-              onMouseEnter={e => e.currentTarget.style.background = '#000000'}
-              onMouseLeave={e => e.currentTarget.style.background = '#111827'}
+              onMouseEnter={e => e.currentTarget.style.background = '#1E293B'}
+              onMouseLeave={e => e.currentTarget.style.background = '#0F172A'}
             >
               เสร็จสิ้น / ปิดหน้าต่าง
             </button>
