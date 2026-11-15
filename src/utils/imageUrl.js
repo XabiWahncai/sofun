@@ -1,6 +1,8 @@
 // Image optimization utilities for SOFUN platform
-// High-speed local static covers + Google Edge CDN (lh3.googleusercontent.com) delivery
+// High-speed local static covers + local static characters + Google Edge CDN delivery
 // Zero emojis rule strictly applied.
+
+import { STATIC_CHARACTER_IDS } from './staticCharacters'
 
 /**
  * Map of Google Drive file IDs of catalog games to their local static cover filenames.
@@ -221,6 +223,11 @@ export function toOptimizedUrl(url, width = 600, options = {}) {
     return `/covers/${STATIC_COVERS_BY_DRIVE_ID[id]}.jpg`
   }
 
+  // Check if this Drive ID belongs to a pre-cached local static character portrait
+  if (STATIC_CHARACTER_IDS && STATIC_CHARACTER_IDS.has(id)) {
+    return `/characters/${id}.jpg`
+  }
+
   const w = Number(width) || 600
   const webpFlag = options.noWebp ? '' : '-rw'
 
@@ -297,10 +304,11 @@ export function handleImageLoadError(event, originalUrl, width = 600) {
 /**
  * Dedicated error handler for character portraits and member avatars.
  * Never falls back to /logo.png.
- * Step 0: Tries native thumbnail endpoint (works if user has Google session cookies)
- * Step 1: Tries Cloudflare-backed CDN proxy (wsrv.nl) - universally reachable, bypasses ISP/Google blocks
- * Step 2: Tries secondary weserv image proxy
- * Step 3: Hides the broken img element cleanly so the sleek underlying silhouette placeholder displays.
+ * Step 0: Try Google Edge CDN directly
+ * Step 1: Try Cloudflare-backed CDN proxy (wsrv.nl) - universally reachable, bypasses ISP/Google blocks
+ * Step 2: Try secondary weserv image proxy
+ * Step 3: Try native thumbnail endpoint (works if user has Google session cookies)
+ * Step 4: Hides the broken img element cleanly so the sleek underlying silhouette placeholder displays.
  */
 export function handleCharacterImageError(event, originalUrl, width = 340) {
   if (!event || !event.currentTarget) return
@@ -308,28 +316,35 @@ export function handleCharacterImageError(event, originalUrl, width = 340) {
   const step = Number(img.dataset.failStep || 0)
   const driveId = extractDriveId(originalUrl)
 
-  // Step 0: Try native Google Drive thumbnail
+  // Step 0: Try Google Edge CDN
   if (step === 0 && driveId) {
     img.dataset.failStep = '1'
-    img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
+    img.src = `https://lh3.googleusercontent.com/d/${driveId}=w${width}`
     return
   }
 
   // Step 1: Try Cloudflare-backed image CDN (wsrv.nl)
   if (step <= 1 && driveId) {
     img.dataset.failStep = '2'
-    img.src = `https://wsrv.nl/?url=https://drive.google.com/thumbnail?id=${driveId}%26sz=w${width}&output=webp`
+    img.src = `https://wsrv.nl/?url=https://drive.google.com/uc?id=${driveId}&w=${width}&output=jpg`
     return
   }
 
   // Step 2: Try secondary weserv endpoint
   if (step <= 2 && driveId) {
     img.dataset.failStep = '3'
-    img.src = `https://images.weserv.nl/?url=https://drive.google.com/uc?id=${driveId}&w=${width}&output=webp`
+    img.src = `https://images.weserv.nl/?url=https://drive.google.com/uc?id=${driveId}&w=${width}&output=jpg`
+    return
+  }
+
+  // Step 3: Try native Google Drive thumbnail
+  if (step <= 3 && driveId) {
+    img.dataset.failStep = '4'
+    img.src = `https://drive.google.com/thumbnail?id=${driveId}&sz=w${width}`
     return
   }
 
   // Final fallback: hide img cleanly so underlying avatar/placeholder icon shows
-  img.dataset.failStep = '4'
+  img.dataset.failStep = '5'
   img.style.display = 'none'
 }

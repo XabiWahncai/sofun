@@ -286,7 +286,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
   const handleShare = async () => {
     const gameId = game?.id || game?._id
     const url = gameId ? `${window.location.origin}/games/${gameId}` : window.location.href
-    const title = game?.title ? `${game.title} — Script Murder | Sofun Club` : 'Sofun Club Thailand'
+    const title = game?.title ? `${game.title} - Script Murder | Sofun Club` : 'Sofun Club Thailand'
     const synopsis = game?.synopsis || game?.description || ''
 
     if (navigator.share) {
@@ -904,7 +904,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
                             <img
                               src={charImg}
                               alt={char.name}
-                              loading="lazy"
+                              decoding="async"
                               referrerPolicy="no-referrer"
                               onError={e => handleCharacterImageError(e, char.image, 340)}
                               style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'cover', zIndex: 1, transition: 'transform 0.35s ease' }}
@@ -1020,7 +1020,7 @@ export default function DetailPage({ id, showPage, showDetail, allGames = [], li
               {/* Review Feed */}
               {reviews.length === 0 ? (
                 <p style={{ fontSize: 13.5, color: TEXT_SUBTLE, textAlign: 'center', padding: '24px 0' }}>
-                  ยังไม่มีรีวิวสำหรับสคริปต์นี้ — เป็นคนแรกที่ร่วมรีวิว
+                  ยังไม่มีรีวิวสำหรับสคริปต์นี้ เป็นคนแรกที่ร่วมรีวิว
                 </p>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
