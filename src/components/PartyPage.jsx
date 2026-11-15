@@ -80,7 +80,7 @@ function PartyMemberScanModal({ party, onClose }) {
 
       const snap = await getDoc(doc(db, 'members', uid))
       if (!snap.exists()) {
-        setError('ไม่พบสมาชิกในระบบ — ให้สมาชิกลงทะเบียนก่อน')
+        setError('ไม่พบสมาชิกในระบบ - ให้สมาชิกลงทะเบียนก่อน')
         processedRef.current = false; return
       }
 
@@ -313,7 +313,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
       }
     } catch {
       navigator.clipboard.writeText(link).catch(() => {})
-      alert('คัดลอกลิงก์แล้ว — วางใน LINE ได้เลย')
+      alert('คัดลอกลิงก์แล้ว - วางใน LINE ได้เลย')
     }
   }
 
@@ -448,7 +448,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
               </div>
             )}
 
-            {/* Pending requests — owner only */}
+            {/* Pending requests - owner only */}
             {isOwner && pendingRequests.length > 0 && (
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>
@@ -474,7 +474,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
               </div>
             )}
 
-            {/* Invite — owner only */}
+            {/* Invite - owner only */}
             {isOwner && (
               <div>
                 <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '8px' }}>เชิญสมาชิก</div>
@@ -530,7 +530,7 @@ function PartyDetailModal({ party, user, onClose, onApprove, onDeny }) {
               <>
                 <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {messages.length === 0 && (
-                    <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px', padding: '20px 0' }}>ยังไม่มีข้อความ — เริ่มแชทกันเลย!</div>
+                    <div style={{ textAlign: 'center', color: 'var(--text-tertiary)', fontSize: '13px', padding: '20px 0' }}>ยังไม่มีข้อความ - เริ่มแชทกันเลย!</div>
                   )}
                   {messages.map(msg => (
                     <div key={msg.id} style={{ display: 'flex', justifyContent: msg.uid === user?.uid ? 'flex-end' : 'flex-start', alignItems: 'flex-end', gap: '8px' }}>
@@ -610,7 +610,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
       transition: 'box-shadow 0.15s, transform 0.15s',
     }}>
       {/* Image */}
-      <div onClick={() => onDetail(party)} style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
+      <div onClick={() => onDetail(party)} className="party-card-img" style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}>
         {party.gameImage
           ? <img src={convertImageUrl(party.gameImage)} alt={party.gameName} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -629,11 +629,11 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
       </div>
 
       {/* Body */}
-      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+      <div className="party-card-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
 
-        {/* Date/time — primary */}
+        {/* Date/time - primary */}
         <div onClick={() => onDetail(party)} style={{ cursor: 'pointer' }}>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <div className="party-card-date" style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '7px' }}>
             <i className="fas fa-calendar-alt" style={{ color: 'var(--crimson-500)', fontSize: '12px' }} />
             {party.date ? formatDate(party.date) : 'ยังไม่กำหนดวัน'}
           </div>
@@ -645,7 +645,7 @@ function PartyCard({ party, user, onRequestJoin, onLeave, onApprove, onDeny, onC
         </div>
 
         {/* Game name */}
-        <div onClick={() => onDetail(party)} style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer' }}>
+        <div onClick={() => onDetail(party)} className="party-card-gamename" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500, cursor: 'pointer' }}>
           {party.gameName || 'ไม่ระบุเกม'}
         </div>
 
@@ -763,7 +763,7 @@ function BookingPartyCard({ booking, allGames = [], user, onRequestJoin, onOpen 
       onMouseLeave={e => { if (onOpen) { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.07)' } }}
     >
       {/* Image */}
-      <div style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0 }}>
+      <div className="party-card-img" style={{ position: 'relative', height: '160px', overflow: 'hidden', flexShrink: 0 }}>
         {!isLockedRestricted && booking.gameImage
           ? <img src={convertImageUrl(booking.gameImage)} alt={booking.gameName} loading="lazy" decoding="async" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <div style={{ width: '100%', height: '100%', background: 'var(--surface-sunken)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -780,11 +780,11 @@ function BookingPartyCard({ booking, allGames = [], user, onRequestJoin, onOpen 
       </div>
 
       {/* Body */}
-      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
+      <div className="party-card-body" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px', flex: 1 }}>
 
         {/* Date/time */}
         <div>
-          <div style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <div className="party-card-date" style={{ fontWeight: 700, fontSize: '15px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '7px' }}>
             <i className="fas fa-calendar-alt" style={{ color: 'var(--crimson-500)', fontSize: '12px' }} />
             {booking.date ? formatDate(booking.date) : 'ยังไม่กำหนดวัน'}
           </div>
@@ -796,7 +796,7 @@ function BookingPartyCard({ booking, allGames = [], user, onRequestJoin, onOpen 
         </div>
 
         {/* Game name */}
-        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
+        <div className="party-card-gamename" style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: 500 }}>
           {isLockedRestricted ? 'ล็อกห้องแล้ว' : (booking.gameName || 'ไม่ระบุเกม')}
         </div>
 
@@ -1182,6 +1182,49 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
 
   return (
     <div id="party-page" className="page active" style={{ background: '#f5f5f7', minHeight: '100vh', paddingTop: 60, paddingBottom: '80px' }}>
+      <style>{`
+        .party-cards-grid {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 12px !important;
+        }
+        @media (min-width: 900px) {
+          .party-cards-grid {
+            grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            gap: 16px !important;
+          }
+        }
+        @media (min-width: 1280px) {
+          .party-cards-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+            gap: 18px !important;
+          }
+        }
+        @media (max-width: 640px) {
+          .party-cards-grid {
+            gap: 10px !important;
+          }
+          .party-card-img {
+            height: 120px !important;
+          }
+          .party-card-body {
+            padding: 10px 10px !important;
+            gap: 6px !important;
+          }
+          .party-card-date {
+            font-size: 13px !important;
+          }
+          .party-card-gamename {
+            font-size: 12px !important;
+            line-height: 1.3 !important;
+          }
+          .party-card-action-btn {
+            height: 32px !important;
+            font-size: 11.5px !important;
+            padding: 0 8px !important;
+          }
+        }
+      `}</style>
 
       {/* ── HERO HEADER ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid var(--border-default)', position: 'relative', overflow: 'hidden' }}>
@@ -1284,7 +1327,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
               {hasFilters ? 'ไม่พบปาร์ตี้ที่ตรงกับการค้นหา' : filter === 'open' ? 'ยังไม่มีปาร์ตี้เปิดรับสมาชิก' : 'ยังไม่มีปาร์ตี้'}
             </div>
             <div style={{ fontSize: '13px', color: 'var(--text-secondary)', maxWidth: '280px' }}>
-              {hasFilters ? 'ลองปรับตัวกรองหรือล้างการค้นหา' : user ? 'ยังไม่มีปาร์ตี้ในขณะนี้ — ลองกลับมาใหม่' : 'เข้าสู่ระบบเพื่อเข้าร่วมปาร์ตี้'}
+              {hasFilters ? 'ลองปรับตัวกรองหรือล้างการค้นหา' : user ? 'ยังไม่มีปาร์ตี้ในขณะนี้ - ลองกลับมาใหม่' : 'เข้าสู่ระบบเพื่อเข้าร่วมปาร์ตี้'}
             </div>
             {hasFilters ? (
               <button onClick={() => { setGameSearch(''); setDateFilter('') }} style={{ height: '40px', padding: '0 20px', borderRadius: '8px', background: 'var(--crimson-500)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '13px', marginTop: '4px' }}>
@@ -1297,7 +1340,7 @@ export default function PartyPage({ user, allGames, parties = [], highlightParty
             ) : null}
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px' }}>
+          <div className="party-cards-grid">
             {allItems.map(item =>
               item._type === 'booking'
                 ? <BookingPartyCard
