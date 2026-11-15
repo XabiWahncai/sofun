@@ -1782,7 +1782,7 @@ function DayScheduleModal({
                 }}
               >
                 <i className="fas fa-info-circle" style={{ color: 'var(--curtain-crimson, #e50914)', fontSize: '12px', flexShrink: 0 }} />
-                <span>กำหนดให้จองล่วงหน้าอย่างน้อย 2 วัน (หากต้องการจองด่วน กรุณาติดต่อแอดมิน)</span>
+                <span>กำหนดให้จองล่วงหน้าอย่างน้อย 2 วัน (หากต้องการจองด่วน หรือเล่นรอบดึก กรุณาติดต่อแอดมิน)</span>
               </div>
               <a
                 href={LINE_ADMIN_URL}
@@ -1805,7 +1805,7 @@ function DayScheduleModal({
                 }}
               >
                 <i className="fab fa-line" style={{ fontSize: '15px' }} />
-                <span>ติดต่อแอดมินทาง LINE เพื่อจองด่วน</span>
+                <span>ติดต่อแอดมินทาง LINE เพื่อจองด่วน / รอบดึก</span>
               </a>
             </div>
           ) : (

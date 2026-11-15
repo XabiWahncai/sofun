@@ -914,9 +914,14 @@ function CreatePartyModal({ user, allGames, onClose, onCreated }) {
   const [loading, setLoading] = useState(false)
 
   const selectedGame = allGames.find(g => g.id === gameId)
+  const twoDaysLaterStr = new Date(Date.now() + 2 * 86400000).toISOString().split('T')[0]
 
   const submit = async () => {
     if (!gameId || !date || !time) return alert('กรุณาเลือกเกม วันที่ และเวลา')
+    if (date < twoDaysLaterStr) {
+      alert('กำหนดให้จองล่วงหน้าอย่างน้อย 2 วัน หากต้องการจองด่วนหรือเล่นรอบดึก กรุณาติดต่อแอดมิน')
+      return
+    }
     setLoading(true)
     try {
       await addDoc(collection(db, 'parties'), {
@@ -995,12 +1000,53 @@ function CreatePartyModal({ user, allGames, onClose, onCreated }) {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
               <label style={labelStyle}>วันที่ *</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)} min={new Date().toISOString().split('T')[0]} style={{ ...inputStyle, colorScheme: 'light' }} />
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} min={twoDaysLaterStr} style={{ ...inputStyle, colorScheme: 'light' }} />
             </div>
             <div>
               <label style={labelStyle}>เวลา *</label>
               <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{ ...inputStyle, colorScheme: 'light' }} />
             </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '8px',
+              padding: '8px 12px',
+              borderRadius: '10px',
+              background: '#fef2f2',
+              border: '1px solid #fee2e2',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11.5px', color: '#991b1b', fontWeight: 600 }}>
+              <i className="fas fa-info-circle" style={{ color: 'var(--crimson-500)', fontSize: '12px', flexShrink: 0 }} />
+              <span>กำหนดให้จองล่วงหน้าอย่างน้อย 2 วัน (หากต้องการจองด่วน หรือเล่นรอบดึก กรุณาติดต่อแอดมิน)</span>
+            </div>
+            <a
+              href="https://line.me/R/ti/p/@sofunclub"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '8px',
+                background: '#06c755',
+                color: '#ffffff',
+                fontSize: '11.5px',
+                fontWeight: 800,
+                textDecoration: 'none',
+                flexShrink: 0,
+                boxShadow: '0 2px 6px rgba(6, 199, 85, 0.25)',
+              }}
+            >
+              <i className="fab fa-line" style={{ fontSize: '13px' }} />
+              <span>ติดต่อแอดมินทาง LINE</span>
+            </a>
           </div>
 
           <div>
