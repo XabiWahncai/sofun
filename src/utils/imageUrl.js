@@ -2,7 +2,7 @@
 // High-speed local static covers + local static characters + Google Edge CDN delivery
 // Zero emojis rule strictly applied.
 
-import { STATIC_CHARACTER_IDS } from './staticCharacters'
+import { STATIC_CHARACTER_IDS } from './staticCharacters.js'
 
 /**
  * Map of Google Drive file IDs of catalog games to their local static cover filenames.
