@@ -575,31 +575,33 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
 
         {/* Navigation Controls + View Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            onClick={() => setViewModeOverride(m => {
-              if (m === 'auto') return useBarMode ? 'cards' : 'bars'
-              return m === 'bars' ? 'cards' : 'bars'
-            })}
-            title={useBarMode ? 'สลับเป็นมุมมองแสดงการ์ดข้อความ' : 'สลับเป็นมุมมองแท่งสีห้อง'}
-            style={{
-              padding: '7px 12px',
-              borderRadius: '10px',
-              border: `1px solid ${useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
-              background: useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#ffffff',
-              color: useBarMode ? 'var(--curtain-crimson, #e50914)' : '#4b5563',
-              fontSize: '12px',
-              fontWeight: 800,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              transition: 'all 0.15s ease',
-            }}
-          >
-            <i className={useBarMode ? 'fas fa-bars' : 'fas fa-th-large'} style={{ fontSize: '11px' }} />
-            <span>{useBarMode ? 'แท่งสีห้อง' : 'การ์ดข้อความ'}</span>
-          </button>
+          {!isNarrow && (
+            <button
+              type="button"
+              onClick={() => setViewModeOverride(m => {
+                if (m === 'auto') return useBarMode ? 'cards' : 'bars'
+                return m === 'bars' ? 'cards' : 'bars'
+              })}
+              title={useBarMode ? 'สลับเป็นมุมมองแสดงการ์ดข้อความ' : 'สลับเป็นมุมมองแท่งสีห้อง'}
+              style={{
+                padding: '7px 12px',
+                borderRadius: '10px',
+                border: `1px solid ${useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.3)' : 'rgba(0, 0, 0, 0.08)'}`,
+                background: useBarMode ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#ffffff',
+                color: useBarMode ? 'var(--curtain-crimson, #e50914)' : '#4b5563',
+                fontSize: '12px',
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <i className={useBarMode ? 'fas fa-bars' : 'fas fa-th-large'} style={{ fontSize: '11px' }} />
+              <span>{useBarMode ? 'แท่งสีห้อง' : 'การ์ดข้อความ'}</span>
+            </button>
+          )}
 
           <button
             type="button"
@@ -718,30 +720,34 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
               <div
                 key={d}
                 style={{
-                  padding: '10px 2px',
+                  padding: isNarrow ? '8px 2px' : '10px 2px',
                   textAlign: 'center',
-                  fontSize: '11px',
+                  fontSize: isNarrow ? '11.5px' : '11px',
                   fontWeight: 800,
                   color: headerColor,
                   letterSpacing: '0.02em',
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
+                  justifyContent: 'center',
                   gap: '1px',
                 }}
               >
-                <span>{d}</span>
-                <span style={{ fontSize: '9px', opacity: 0.65, fontWeight: 700 }}>
-                  {DAY_NAMES[i]}
-                </span>
+                <span>{isNarrow ? DAY_NAMES[i] : d}</span>
+                {!isNarrow && (
+                  <span style={{ fontSize: '9px', opacity: 0.65, fontWeight: 700 }}>
+                    {DAY_NAMES[i]}
+                  </span>
+                )}
               </div>
             )
           })}
         </div>
 
-        {/* Calendar cells: locked 108px height */}
+        {/* Calendar cells */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)' }}>
           {cells.map((day, idx) => {
+            const cellHeight = isNarrow ? (useBarMode ? '56px' : '88px') : (useBarMode ? '72px' : '108px')
             const col = idx % 7
             const isSun = col === 0
             const isSat = col === 6
@@ -753,7 +759,7 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
 
             if (!day) {
               return (
-                <div key={`e-${idx}`} style={{ height: '108px', background: '#f8fafc', borderRight, borderBottom }} />
+                <div key={`e-${idx}`} style={{ height: cellHeight, background: '#f8fafc', borderRight, borderBottom }} />
               )
             }
 
@@ -765,9 +771,9 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
             const isPast = dateStr < todayStr
 
             const cellBg = isSel
-              ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.03)'
+              ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.05)'
               : isToday
-                ? 'rgba(245, 158, 11, 0.02)'
+                ? 'rgba(245, 158, 11, 0.03)'
                 : isPast
                   ? '#fcfcfd'
                   : '#ffffff'
@@ -777,152 +783,232 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
                 key={day}
                 onClick={() => onDayClick(dateStr)}
                 style={{
-                  height: '108px',
+                  height: cellHeight,
                   overflow: 'hidden',
-                  padding: '8px 6px 6px',
+                  padding: isNarrow ? '5px 2px 3px' : '8px 6px 6px',
                   display: 'flex',
                   flexDirection: 'column',
-                  gap: '3px',
+                  alignItems: isNarrow ? 'center' : 'stretch',
+                  justifyContent: 'flex-start',
+                  gap: isNarrow ? '2px' : '3px',
                   cursor: 'pointer',
                   background: cellBg,
                   borderRight,
                   borderBottom,
                   transition: 'background 0.12s',
                   position: 'relative',
-                  boxShadow: isSel ? 'inset 0 0 0 2px var(--curtain-crimson, #e50914)' : 'none',
+                  boxShadow: isSel
+                    ? (isNarrow
+                      ? 'inset 0 0 0 1.5px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)'
+                      : 'inset 0 0 0 2px var(--curtain-crimson, #e50914)')
+                    : 'none',
                 }}
                 onMouseEnter={e => { if (!isSel && !isToday) e.currentTarget.style.background = 'rgba(0, 0, 0, 0.025)' }}
                 onMouseLeave={e => e.currentTarget.style.background = cellBg}
               >
-                {/* Cell Header: Date Number & Indicator */}
-                <div
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    marginBottom: '2px',
-                    flexShrink: 0,
-                  }}
-                >
-                  {isToday ? (
+                {isNarrow ? (
+                  <>
                     <span
                       style={{
-                        fontSize: '8.5px',
-                        fontWeight: 900,
-                        color: 'var(--curtain-crimson, #e50914)',
-                        letterSpacing: '0.02em',
-                        textTransform: 'uppercase',
+                        width: '24px',
+                        height: '24px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '12px',
+                        fontWeight: 800,
+                        flexShrink: 0,
+                        color: isToday
+                          ? '#ffffff'
+                          : isSel
+                            ? '#ffffff'
+                            : isSun
+                              ? 'var(--curtain-crimson, #e50914)'
+                              : isSat
+                                ? '#2563eb'
+                                : isPast
+                                  ? '#94a3b8'
+                                  : '#1e293b',
+                        background: isToday
+                          ? 'var(--curtain-crimson, #e50914)'
+                          : isSel
+                            ? 'var(--curtain-crimson, #e50914)'
+                            : 'transparent',
+                        boxShadow: (isToday || isSel) ? '0 2px 6px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)' : 'none',
                       }}
                     >
-                      วันนี้
+                      {day}
                     </span>
-                  ) : dayBookingsSorted.length > 0 ? (
-                    <span
-                      style={{
-                        width: '5px',
-                        height: '5px',
-                        borderRadius: '50%',
-                        background: 'var(--curtain-crimson, #e50914)',
-                        opacity: 0.85,
-                      }}
-                    />
-                  ) : <span />}
 
-                  {/* Day Number badge */}
-                  <span
-                    style={{
-                      width: '21px',
-                      height: '21px',
-                      borderRadius: '50%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '11.5px',
-                      fontWeight: 800,
-                      flexShrink: 0,
-                      color: isToday
-                        ? '#ffffff'
-                        : isSel
-                          ? 'var(--curtain-crimson, #e50914)'
-                          : isSun
-                            ? 'var(--curtain-crimson, #e50914)'
-                            : isSat
-                              ? '#2563eb'
-                              : isPast
-                                ? '#94a3b8'
-                                : '#1e293b',
-                      background: isToday
-                        ? 'var(--curtain-crimson, #e50914)'
-                        : isSel
-                          ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.12)'
-                          : 'transparent',
-                      boxShadow: isToday ? '0 2px 6px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)' : 'none',
-                    }}
-                  >
-                    {day}
-                  </span>
-                </div>
-
-                {/* Event items */}
-                {useBarMode ? (
-                  dayBookingsSorted.map(b => {
-                    const rc = ROOM_COLORS[b.room] || '#64748b'
-                    return (
+                    {/* Booking indicator dots on mobile */}
+                    {dayBookingsSorted.length > 0 && (
                       <div
-                        key={b.id}
-                        onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
-                        title={getEventTitle(b, lineUser)}
                         style={{
-                          height: '7px',
-                          borderRadius: '99px',
-                          background: rc,
-                          cursor: 'pointer',
-                          flexShrink: 0,
-                          opacity: 0.88,
-                          transition: 'opacity 0.12s, transform 0.12s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '2.5px',
+                          marginTop: '2px',
                         }}
-                        onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scaleY(1.3)' }}
-                        onMouseLeave={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'scaleY(1)' }}
-                      />
-                    )
-                  })
-                ) : (
-                  dayBookingsSorted.map(b => {
-                    const rc = ROOM_COLORS[b.room] || '#64748b'
-                    const locked = isRoomLocked(b)
-                    return (
-                      <button
-                        key={b.id}
-                        type="button"
-                        onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
-                        title={getEventTitle(b, lineUser)}
-                        style={{
-                          width: '100%',
-                          textAlign: 'left',
-                          padding: '3px 6px',
-                          borderRadius: '6px',
-                          border: 'none',
-                          background: `${rc}18`,
-                          borderLeft: `3px solid ${rc}`,
-                          cursor: 'pointer',
-                          transition: 'opacity 0.12s',
-                          minWidth: 0,
-                        }}
-                        onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
-                        onMouseLeave={e => e.currentTarget.style.opacity = '1'}
                       >
-                        <div style={{ fontSize: '11px', fontWeight: 700, color: '#111827', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.room || 'ห้อง'}</span>
-                          {locked && (
-                            <i className="fas fa-lock" style={{ fontSize: '8px', opacity: 0.7, flexShrink: 0 }} />
-                          )}
-                        </div>
-                        {b.time && (
-                          <div style={{ fontSize: '9.5px', color: '#64748b', lineHeight: 1.2 }}>{b.time} น.</div>
+                        {dayBookingsSorted.slice(0, 3).map(b => {
+                          const rc = ROOM_COLORS[b.room] || '#64748b'
+                          return (
+                            <span
+                              key={b.id}
+                              style={{
+                                width: '4.5px',
+                                height: '4.5px',
+                                borderRadius: '50%',
+                                background: rc,
+                                flexShrink: 0,
+                                display: 'inline-block',
+                              }}
+                            />
+                          )
+                        })}
+                        {dayBookingsSorted.length > 3 && (
+                          <span style={{ fontSize: '8px', fontWeight: 800, color: '#64748b', lineHeight: 1 }}>
+                            +
+                          </span>
                         )}
-                      </button>
-                    )
-                  })
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {/* Cell Header: Date Number & Indicator */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        marginBottom: '2px',
+                        flexShrink: 0,
+                      }}
+                    >
+                      {isToday ? (
+                        <span
+                          style={{
+                            fontSize: '8.5px',
+                            fontWeight: 900,
+                            color: 'var(--curtain-crimson, #e50914)',
+                            letterSpacing: '0.02em',
+                            textTransform: 'uppercase',
+                          }}
+                        >
+                          วันนี้
+                        </span>
+                      ) : dayBookingsSorted.length > 0 ? (
+                        <span
+                          style={{
+                            width: '5px',
+                            height: '5px',
+                            borderRadius: '50%',
+                            background: 'var(--curtain-crimson, #e50914)',
+                            opacity: 0.85,
+                          }}
+                        />
+                      ) : <span />}
+
+                      {/* Day Number badge */}
+                      <span
+                        style={{
+                          width: '21px',
+                          height: '21px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '11.5px',
+                          fontWeight: 800,
+                          flexShrink: 0,
+                          color: isToday
+                            ? '#ffffff'
+                            : isSel
+                              ? 'var(--curtain-crimson, #e50914)'
+                              : isSun
+                                ? 'var(--curtain-crimson, #e50914)'
+                                : isSat
+                                  ? '#2563eb'
+                                  : isPast
+                                    ? '#94a3b8'
+                                    : '#1e293b',
+                          background: isToday
+                            ? 'var(--curtain-crimson, #e50914)'
+                            : isSel
+                              ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.12)'
+                              : 'transparent',
+                          boxShadow: isToday ? '0 2px 6px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.35)' : 'none',
+                        }}
+                      >
+                        {day}
+                      </span>
+                    </div>
+
+                    {/* Event items */}
+                    {useBarMode ? (
+                      dayBookingsSorted.map(b => {
+                        const rc = ROOM_COLORS[b.room] || '#64748b'
+                        return (
+                          <div
+                            key={b.id}
+                            onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
+                            title={getEventTitle(b, lineUser)}
+                            style={{
+                              height: '7px',
+                              borderRadius: '99px',
+                              background: rc,
+                              cursor: 'pointer',
+                              flexShrink: 0,
+                              opacity: 0.88,
+                              transition: 'opacity 0.12s, transform 0.12s',
+                            }}
+                            onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scaleY(1.3)' }}
+                            onMouseLeave={e => { e.currentTarget.style.opacity = '0.88'; e.currentTarget.style.transform = 'scaleY(1)' }}
+                          />
+                        )
+                      })
+                    ) : (
+                      dayBookingsSorted.map(b => {
+                        const rc = ROOM_COLORS[b.room] || '#64748b'
+                        const locked = isRoomLocked(b)
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            onClick={e => { e.stopPropagation(); onEventClick?.(b) }}
+                            title={getEventTitle(b, lineUser)}
+                            style={{
+                              width: '100%',
+                              textAlign: 'left',
+                              padding: '3px 6px',
+                              borderRadius: '6px',
+                              border: 'none',
+                              background: `${rc}18`,
+                              borderLeft: `3px solid ${rc}`,
+                              cursor: 'pointer',
+                              transition: 'opacity 0.12s',
+                              minWidth: 0,
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = '0.75'}
+                            onMouseLeave={e => e.currentTarget.style.opacity = '1'}
+                          >
+                            <div style={{ fontSize: '11px', fontWeight: 700, color: '#111827', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', lineHeight: 1.3, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.room || 'ห้อง'}</span>
+                              {locked && (
+                                <i className="fas fa-lock" style={{ fontSize: '8px', opacity: 0.7, flexShrink: 0 }} />
+                              )}
+                            </div>
+                            {b.time && (
+                              <div style={{ fontSize: '9.5px', color: '#64748b', lineHeight: 1.2 }}>{b.time} น.</div>
+                            )}
+                          </button>
+                        )
+                      })
+                    )}
+                  </>
                 )}
               </div>
             )
@@ -934,146 +1020,181 @@ function BookingCalendar({ bookings, lineUser, onDayClick, selectedDate, onEvent
       <div
         style={{
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: '14px',
-          padding: '16px 20px',
+          flexDirection: 'column',
+          gap: '12px',
+          padding: isNarrow ? '14px 16px' : '16px 20px',
           borderRadius: '16px',
           background: '#ffffff',
           border: '1px solid rgba(0, 0, 0, 0.08)',
           boxShadow: '0 2px 8px rgba(0, 0, 0, 0.02)',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0, flex: 1 }}>
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '12px',
-              background: activeDateStr === todayStr ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#f1f5f9',
-              color: activeDateStr === todayStr ? 'var(--curtain-crimson, #e50914)' : '#4b5563',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '16px',
-              flexShrink: 0,
-              marginTop: '1px',
-            }}
-          >
-            <i className={activeDateStr === todayStr ? 'fas fa-star' : 'far fa-calendar-check'} />
-          </div>
-          <div style={{ minWidth: 0, flex: 1 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
             <div
               style={{
-                fontSize: '14.5px',
-                fontWeight: 900,
-                color: '#111827',
+                width: '38px',
+                height: '38px',
+                borderRadius: '11px',
+                background: activeDateStr === todayStr ? 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)' : '#f1f5f9',
+                color: activeDateStr === todayStr ? 'var(--curtain-crimson, #e50914)' : '#4b5563',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '15px',
+                flexShrink: 0,
+              }}
+            >
+              <i className={activeDateStr === todayStr ? 'fas fa-star' : 'far fa-calendar-check'} />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div
+                style={{
+                  fontSize: '14.5px',
+                  fontWeight: 900,
+                  color: '#111827',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span>{activeDateStr === todayStr ? `วันนี้ · ${fmtDate(activeDateStr)}` : fmtDate(activeDateStr)}</span>
+                {selectedDayBookings.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 800,
+                      padding: '2px 8px',
+                      borderRadius: '20px',
+                      background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
+                      color: 'var(--curtain-crimson, #e50914)',
+                      border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
+                    }}
+                  >
+                    {selectedDayBookings.length} รอบเล่น
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>
+                {selectedDayBookings.length > 0 ? 'แตะรอบเล่นเพื่อดูรายละเอียด' : 'ยังไม่มีรอบเล่นในวันนี้ - สามารถเปิดตี้แรกได้เลย'}
+              </div>
+            </div>
+          </div>
+
+          {!isNarrow && (
+            <button
+              type="button"
+              onClick={() => onBookToday?.(activeDateStr)}
+              className="nfx-btn-primary"
+              style={{
+                flexShrink: 0,
+                padding: '10px 22px',
+                borderRadius: '12px',
+                background: 'var(--curtain-crimson, #e50914)',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '13px',
+                fontWeight: 800,
+                cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '8px',
-                flexWrap: 'wrap',
+                boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28)',
+                whiteSpace: 'nowrap',
               }}
             >
-              <span>{activeDateStr === todayStr ? `วันนี้ · ${fmtDate(activeDateStr)}` : fmtDate(activeDateStr)}</span>
-              {selectedDayBookings.length > 0 && (
-                <span
-                  style={{
-                    fontSize: '11px',
-                    fontWeight: 800,
-                    padding: '2px 8px',
-                    borderRadius: '20px',
-                    background: 'rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.08)',
-                    color: 'var(--curtain-crimson, #e50914)',
-                    border: '1px solid rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.2)',
-                  }}
-                >
-                  {selectedDayBookings.length} รอบเล่น
-                </span>
-              )}
-            </div>
-
-            {selectedDayBookings.length > 0 ? (
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '8px' }}>
-                {selectedDayBookings.map(b => {
-                  const rc = ROOM_COLORS[b.room] || '#64748b'
-                  const locked = isRoomLocked(b)
-                  const canView = canViewBookingDetail(b, lineUser)
-                  const publicName = getPublicGameName(b, lineUser)
-                  return (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onClick={() => onEventClick?.(b)}
-                      title={getEventTitle(b, lineUser)}
-                      style={{
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        padding: '4px 10px',
-                        borderRadius: '8px',
-                        background: `${rc}14`,
-                        border: `1px solid ${rc}40`,
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                        fontFamily: 'Sarabun, sans-serif',
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = `${rc}26`
-                        e.currentTarget.style.borderColor = rc
-                        e.currentTarget.style.transform = 'translateY(-1px)'
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = `${rc}14`
-                        e.currentTarget.style.borderColor = `${rc}40`
-                        e.currentTarget.style.transform = 'translateY(0)'
-                      }}
-                    >
-                      <span style={{ width: 7, height: 7, borderRadius: '50%', background: rc, flexShrink: 0 }} />
-                      <span style={{ fontSize: '11.5px', fontWeight: 800, color: '#111827' }}>{b.room || 'ห้องเล่น'}</span>
-                      {locked && (
-                        <span style={{ fontSize: '9px', fontWeight: 700, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
-                          <i className="fas fa-lock" style={{ fontSize: '8px' }} />ล็อก
-                        </span>
-                      )}
-                      {b.time && <span style={{ fontSize: '11px', color: rc, fontWeight: 800 }}>{b.time} น.</span>}
-                      {canView && publicName && <span style={{ fontSize: '10.5px', color: '#64748b' }}>({publicName})</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            ) : (
-              <div style={{ fontSize: '12.5px', color: '#64748b', marginTop: '3px' }}>
-                ยังไม่มีรอบเล่นในวันนี้ - สามารถเปิดตี้แรกได้เลย
-              </div>
-            )}
-          </div>
+              <i className="fas fa-plus" style={{ fontSize: '11px' }} />
+              จองรอบวันนี้
+            </button>
+          )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => onBookToday?.(activeDateStr)}
-          className="nfx-btn-primary"
-          style={{
-            flexShrink: 0,
-            padding: '10px 22px',
-            borderRadius: '12px',
-            background: 'var(--curtain-crimson, #e50914)',
-            border: 'none',
-            color: '#ffffff',
-            fontSize: '13px',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28)',
-            whiteSpace: 'nowrap',
-          }}
-        >
-          <i className="fas fa-plus" style={{ fontSize: '11px' }} />
-          จองรอบวันนี้
-        </button>
+        {selectedDayBookings.length > 0 && (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '4px' }}>
+            {selectedDayBookings.map(b => {
+              const rc = ROOM_COLORS[b.room] || '#64748b'
+              const locked = isRoomLocked(b)
+              const canView = canViewBookingDetail(b, lineUser)
+              const publicName = getPublicGameName(b, lineUser)
+              return (
+                <button
+                  key={b.id}
+                  type="button"
+                  onClick={() => onEventClick?.(b)}
+                  title={getEventTitle(b, lineUser)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    background: `${rc}14`,
+                    border: `1px solid ${rc}40`,
+                    cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                    fontFamily: 'Sarabun, sans-serif',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = `${rc}26`
+                    e.currentTarget.style.borderColor = rc
+                    e.currentTarget.style.transform = 'translateY(-1px)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = `${rc}14`
+                    e.currentTarget.style.borderColor = `${rc}40`
+                    e.currentTarget.style.transform = 'translateY(0)'
+                  }}
+                >
+                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: rc, flexShrink: 0 }} />
+                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#111827' }}>{b.room || 'ห้องเล่น'}</span>
+                  {locked && (
+                    <span style={{ fontSize: '9.5px', fontWeight: 700, color: '#64748b', display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+                      <i className="fas fa-lock" style={{ fontSize: '8px' }} />ล็อก
+                    </span>
+                  )}
+                  {b.time && <span style={{ fontSize: '11.5px', color: rc, fontWeight: 800 }}>{b.time} น.</span>}
+                  {canView && publicName && <span style={{ fontSize: '11px', color: '#64748b' }}>({publicName})</span>}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {isNarrow && (
+          <button
+            type="button"
+            onClick={() => onBookToday?.(activeDateStr)}
+            className="nfx-btn-primary"
+            style={{
+              width: '100%',
+              height: '44px',
+              borderRadius: '12px',
+              background: 'var(--curtain-crimson, #e50914)',
+              border: 'none',
+              color: '#ffffff',
+              fontSize: '13.5px',
+              fontWeight: 800,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(var(--curtain-crimson-rgb, 229, 9, 20), 0.28)',
+              marginTop: '4px',
+            }}
+          >
+            <i className="fas fa-plus" style={{ fontSize: '12px' }} />
+            <span>จองรอบวันที่ {fmtDate(activeDateStr)}</span>
+          </button>
+        )}
       </div>
     </div>
   )
