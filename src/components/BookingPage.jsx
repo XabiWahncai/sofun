@@ -5815,9 +5815,9 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
             {!isLocked && booking.status === 'confirmed' && (
               <div
                 style={{
-                  background: '#ffffff',
-                  border: isUrgent ? '1px solid #FCA5A5' : '1px solid #E5E7EB',
-                  borderRadius: 14,
+                  background: 'linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%)',
+                  border: isUrgent ? '1.5px solid #FCA5A5' : '1px solid #E2E8F0',
+                  borderRadius: 16,
                   padding: '14px 16px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -5827,50 +5827,65 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                   width: '100%',
                 }}
               >
+                {/* Header row: Countdown chip on left, Remaining on right */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span
+                    <div
                       style={{
-                        width: 7,
-                        height: 7,
-                        borderRadius: '50%',
-                        background: isUrgent ? '#E50914' : '#F59E0B',
-                        display: 'inline-block',
+                        width: 24,
+                        height: 24,
+                        borderRadius: 6,
+                        background: isUrgent ? '#FEF2F2' : '#FFFBEB',
+                        color: isUrgent ? '#E50914' : '#D97706',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 11,
+                        flexShrink: 0,
                       }}
-                    />
-                    <span style={{ fontSize: 13, fontWeight: 800, color: isUrgent ? '#E50914' : '#111827' }}>
-                      {countdown ? `เหลือเวลาชำระอีก ${countdown}` : 'เปิดรับการชำระมัดจำ'}
-                    </span>
+                    >
+                      <i className="fas fa-hourglass-half" />
+                    </div>
+                    <div>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', display: 'block' }}>
+                        {countdown ? `เหลือเวลาชำระอีก ${countdown}` : 'เปิดรับชำระมัดจำ'}
+                      </span>
+                    </div>
                   </div>
+
                   <span
                     style={{
                       fontSize: 11,
                       fontWeight: 700,
-                      padding: '2px 8px',
+                      padding: '3px 10px',
                       borderRadius: 20,
-                      background: isUrgent ? '#FEF2F2' : '#F3F4F6',
-                      color: isUrgent ? '#E50914' : '#4B5563',
-                      border: isUrgent ? '1px solid #FECACA' : '1px solid #E5E7EB',
+                      background: isUrgent ? '#FEF2F2' : '#FFFFFF',
+                      color: isUrgent ? '#DC2626' : '#475569',
+                      border: isUrgent ? '1px solid #FECACA' : '1px solid #E2E8F0',
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                     }}
                   >
                     {isUrgent ? 'ใกล้หมดเวลา' : `ยังขาดอีก ${remainingToLock} คน`}
                   </span>
                 </div>
 
-                {/* Netflix Red Scrubber Progress Bar */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {/* Progress bar container */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, background: '#FFFFFF', padding: '10px 12px', borderRadius: 12, border: '1px solid #F1F5F9' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
-                    <span style={{ color: '#4B5563', fontWeight: 600 }}>
-                      ความคืบหน้าการล็อกห้อง: <strong style={{ color: '#E50914', fontWeight: 800 }}>{paidCount}</strong> / {maxMembers} คน
+                    <span style={{ color: '#475569', fontWeight: 600 }}>
+                      ความคืบหน้าการล็อกห้อง: <strong style={{ color: '#0F172A', fontWeight: 800 }}>{paidCount}</strong> / {maxMembers} คน
                     </span>
-                    <span style={{ color: '#E50914', fontWeight: 800 }}>{paidPct}%</span>
+                    <span style={{ color: paidPct >= 100 ? '#10B981' : '#E50914', fontWeight: 900 }}>
+                      {paidPct}%
+                    </span>
                   </div>
+
                   <div
                     style={{
                       width: '100%',
-                      height: 6,
+                      height: 7,
                       borderRadius: 999,
-                      background: '#F1F3F5',
+                      background: '#F1F5F9',
                       overflow: 'hidden',
                     }}
                   >
@@ -5879,11 +5894,17 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                         width: `${paidPct}%`,
                         height: '100%',
                         borderRadius: 999,
-                        background: '#E50914',
+                        background: paidPct >= 100 ? '#10B981' : 'linear-gradient(90deg, #E50914 0%, #FF4D4F 100%)',
                         transition: 'width 0.4s ease',
                       }}
                     />
                   </div>
+                </div>
+
+                {/* Micro benefit reassurance */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, color: '#64748B' }}>
+                  <i className="fas fa-shield-alt" style={{ color: '#10B981', fontSize: 10 }} />
+                  <span>เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องอัตโนมัติทันที</span>
                 </div>
               </div>
             )}
@@ -6287,50 +6308,52 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      padding: '9px 14px',
-                      borderRadius: 12,
-                      background: '#FAFAFA',
-                      border: '1px dashed #D1D5DB',
+                      padding: '10px 14px',
+                      borderRadius: 14,
+                      background: '#F8FAFC',
+                      border: '1px solid #E2E8F0',
                       boxSizing: 'border-box',
                       width: '100%',
-                      color: '#9CA3AF',
+                      transition: 'all 0.15s ease',
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                       <div
                         style={{
-                          width: 32,
-                          height: 32,
-                          borderRadius: '50%',
-                          background: '#ffffff',
-                          border: '1px solid #E5E7EB',
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          background: '#FFFFFF',
+                          border: '1px solid #E2E8F0',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          fontSize: 11,
-                          color: '#9CA3AF',
+                          fontSize: 13,
+                          color: '#94A3B8',
+                          flexShrink: 0,
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
                         }}
                       >
-                        <i className="fas fa-plus" />
+                        <i className="fas fa-chair" />
                       </div>
                       <div>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#6B7280' }}>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>
                           ที่นั่งว่าง #{seatNum}
-                        </span>
-                        <span style={{ fontSize: 10.5, color: '#9CA3AF', marginLeft: 6 }}>
-                          เปิดรับผู้เล่น
-                        </span>
+                        </div>
+                        <div style={{ fontSize: 11, color: '#94A3B8', marginTop: 1 }}>
+                          เปิดรับผู้เล่น หรือเหมาจ่ายเพื่อล็อกห้อง
+                        </div>
                       </div>
                     </div>
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 10.5,
                         fontWeight: 700,
-                        padding: '2px 8px',
-                        borderRadius: 12,
-                        background: '#ffffff',
-                        color: '#9CA3AF',
-                        border: '1px solid #E5E7EB',
+                        padding: '3px 10px',
+                        borderRadius: 20,
+                        background: '#FFFFFF',
+                        color: '#94A3B8',
+                        border: '1px solid #E2E8F0',
                       }}
                     >
                       ว่าง
@@ -6340,74 +6363,112 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               })}
             </div>
 
-            {/* ── Minimalist Booking Terms & Rules ── */}
-            <div
+            {/* ── Collapsible Booking Terms & Rules ── */}
+            <details
               style={{
-                background: '#ffffff',
-                border: '1px solid #E5E7EB',
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
                 borderRadius: 14,
-                padding: '14px 16px',
+                overflow: 'hidden',
                 boxSizing: 'border-box',
                 width: '100%',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
-                <i className="fas fa-shield-alt" style={{ color: '#E50914', fontSize: 12 }} />
-                <span style={{ fontSize: 12, fontWeight: 800, color: '#111827', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                  เงื่อนไขการจองและล็อกห้อง
+              <summary
+                style={{
+                  padding: '12px 14px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  userSelect: 'none',
+                  listStyle: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <div
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 6,
+                      background: '#FEF2F2',
+                      color: '#E50914',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 11,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <i className="fas fa-shield-alt" />
+                  </div>
+                  <div>
+                    <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A', display: 'block' }}>
+                      เงื่อนไขการจองและล็อกห้อง
+                    </span>
+                    <span style={{ fontSize: 11, color: '#64748B', display: 'block' }}>
+                      ขยายเวลา +3 วัน/คน · ชำระครบ {maxMembers} คนล็อกห้องทันที
+                    </span>
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, color: '#64748B', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <span>กติกา</span>
+                  <i className="fas fa-chevron-down" style={{ fontSize: 10 }} />
                 </span>
-              </div>
+              </summary>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
-                  <i className="fas fa-ban" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+              <div
+                style={{
+                  padding: '0 14px 14px',
+                  borderTop: '1px solid #F1F5F9',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 8,
+                  paddingTop: 10,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
+                  <i className="fas fa-ban" style={{ color: '#E50914', fontSize: 11, marginTop: 2, flexShrink: 0 }} />
                   <div>
                     <strong style={{ color: '#991B1B' }}>ไม่คืนเงินมัดจำ:</strong> เงินมัดจำไม่สามารถขอรับเงินคืนหรือโอนสิทธิ์ได้ทุกกรณี หากยกเลิกการเล่นหรือไม่มาตามนัดหมาย
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
-                  <i className="fas fa-calendar-plus" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
+                  <i className="fas fa-calendar-plus" style={{ color: '#E50914', fontSize: 11, marginTop: 2, flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#111827' }}>ขยายเวลา +3 วัน/คน:</strong> ทุกครั้งที่สมาชิกชำระมัดจำ ระบบจะขยายเวลาให้ตี้อัตโนมัติ
+                    <strong style={{ color: '#0F172A' }}>ขยายเวลา +3 วัน/คน:</strong> ทุกครั้งที่สมาชิกชำระมัดจำ ระบบจะขยายเวลาให้ตี้อัตโนมัติ
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
-                  <i className="fas fa-lock" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
+                  <i className="fas fa-lock" style={{ color: '#E50914', fontSize: 11, marginTop: 2, flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#111827' }}>ล็อกห้องอัตโนมัติ:</strong> เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องถาวรทันที
+                    <strong style={{ color: '#0F172A' }}>ล็อกห้องอัตโนมัติ:</strong> เมื่อชำระมัดจำครบ {maxMembers} คน ระบบจะล็อกห้องถาวรทันที
                   </div>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12, color: '#4B5563', lineHeight: 1.5 }}>
-                  <i className="fas fa-clock" style={{ color: '#E50914', fontSize: 11, marginTop: 3, flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 11.5, color: '#475569', lineHeight: 1.5 }}>
+                  <i className="fas fa-clock" style={{ color: '#E50914', fontSize: 11, marginTop: 2, flexShrink: 0 }} />
                   <div>
-                    <strong style={{ color: '#111827' }}>กำหนดปิดรับ:</strong> ปิดรับชำระมัดจำไม่เกิน 24 ชั่วโมงก่อนวันเริ่มเล่นจริง
+                    <strong style={{ color: '#0F172A' }}>กำหนดปิดรับ:</strong> ปิดรับชำระมัดจำไม่เกิน 24 ชั่วโมงก่อนวันเริ่มเล่นจริง
                   </div>
                 </div>
-              </div>
 
-              {booking.adminNote && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    paddingTop: 10,
-                    borderTop: '1px solid #F3F4F6',
-                    display: 'flex',
-                    alignItems: 'flex-start',
-                    gap: 8,
-                    fontSize: 11.5,
-                    color: '#4B5563',
-                  }}
-                >
-                  <i className="fas fa-comment-alt" style={{ color: '#E50914', fontSize: 11, marginTop: 2, flexShrink: 0 }} />
-                  <div>
-                    <strong style={{ color: '#E50914', fontSize: 11, textTransform: 'uppercase', display: 'block', marginBottom: 2 }}>
-                      โน้ตจากแอดมิน
-                    </strong>
-                    <span>{booking.adminNote}</span>
+                {booking.adminNote && (
+                  <div
+                    style={{
+                      marginTop: 6,
+                      padding: '8px 10px',
+                      background: '#FEF2F2',
+                      borderRadius: 8,
+                      border: '1px solid #FECACA',
+                      fontSize: 11,
+                      color: '#991B1B',
+                    }}
+                  >
+                    <strong>โน้ตจากแอดมิน:</strong> {booking.adminNote}
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </details>
           </div>
 
           {/* ── 3. PINNED NETFLIX ACTION FOOTER ── */}
@@ -6513,9 +6574,10 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                   <i className="fas fa-qrcode" style={{ fontSize: 16 }} />
                   <span>จ่ายมัดจำ / แนบสลิป</span>
                 </button>
-                <span style={{ fontSize: 10.5, textAlign: 'center', color: '#DC2626', fontWeight: 600 }}>
-                  * ไม่คืนเงินมัดจำทุกกรณี - โปรดแนบสลิปในเว็บนี้หลังโอน
-                </span>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  <i className="fas fa-shield-alt" style={{ color: '#10B981', fontSize: 10 }} />
+                  <span>โอนผ่าน QR และแนบสลิปในเว็บนี้เพื่อยืนยันยอดอัตโนมัติ</span>
+                </div>
               </div>
             )}
 
