@@ -11,6 +11,7 @@ import { collection, onSnapshot, doc, getDoc, deleteDoc, updateDoc, setDoc, serv
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  AreaChart, Area, ComposedChart,
 } from 'recharts'
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
 import { calculateDepositDeadline } from './BookingPage'
@@ -36,19 +37,45 @@ function fmtMoney(n) { return n >= 1000 ? `${(n/1000).toFixed(1)}K` : String(Mat
 function fmtDate(d) { return `${d.getDate()}/${d.getMonth()+1}` }
 
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
-function DashboardTab({ allGames, members, onGoTab }) {
+// ─── Dashboard Tab (Power BI Executive Business Intelligence) ─────────────────
+function DashboardTab({ allGames = [], members = [], onGoTab }) {
   const [payments, setPayments] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [range, setRange] = useState(14) // days
+  const [bookings, setBookings] = useState([])
   const [evalList, setEvalList] = useState([])
+  const [loading, setLoading] = useState(true)
 
+  // Power BI Slicers State
+  const [timeRange, setTimeRange] = useState('14d') // today, 7d, 14d, 30d, mtd, 90d, all
+  const [selectedRoom, setSelectedRoom] = useState('ALL')
+  const [activeView, setActiveView] = useState('overview') // overview, scripts, fb, ops, bookings
+  const [ledgerSearch, setLedgerSearch] = useState('')
+  const [ledgerFilter, setLedgerFilter] = useState('ALL') // ALL, with_food, game_only
+
+  // ── Subscriptions ─────────────────────────────────────────────────────────
   useEffect(() => {
-    return onSnapshot(collection(db, 'evaluations'), snap => {
-      setEvalList(snap.docs.map(d => d.data()))
+    const qPay = query(collection(db, 'payments'), orderBy('paidAt', 'desc'), limit(500))
+    const unsubPay = onSnapshot(qPay, snap => {
+      setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+      setLoading(false)
+    }, () => setLoading(false))
+
+    const qBook = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'), limit(300))
+    const unsubBook = onSnapshot(qBook, snap => {
+      setBookings(snap.docs.map(d => ({ id: d.id, ...d.data() })))
     }, () => {})
+
+    const unsubEval = onSnapshot(collection(db, 'evaluations'), snap => {
+      setEvalList(snap.docs.map(d => ({ id: d.id, ...d.data() })))
+    }, () => {})
+
+    return () => {
+      unsubPay()
+      unsubBook()
+      unsubEval()
+    }
   }, [])
 
-  // ── Report ────────────────────────────────────────────────────────────────
+  // ── Report CSV Generator ──────────────────────────────────────────────────
   const [reportOpen, setReportOpen] = useState(false)
   const nowR = new Date()
   const [reportMonth, setReportMonth] = useState(nowR.getMonth())
@@ -69,7 +96,6 @@ function DashboardTab({ allGames, members, onGoTab }) {
       const snap = await getDocs(q)
       const records = snap.docs.map(d => ({ id: d.id, ...d.data() }))
 
-      // Fetch linked order docs for personalDiscount per member
       const orderResults = await Promise.all(records.map(async r => {
         if (!r.orderId) return null
         try {
@@ -80,7 +106,6 @@ function DashboardTab({ allGames, members, onGoTab }) {
       const orderMap = {}
       orderResults.forEach(o => { if (o) orderMap[o.id] = o.members })
 
-      // CSV rows
       const h1 = [
         'DATE','TIME','DM','NPC','ROOM','GAMES','จำนวนผู้เล่น',
         'มัดจำรอบแรก','เก็บหน้าแคชเชียร์','ส่วนลดหน้าแคชเชียร์',
@@ -108,27 +133,27 @@ function DashboardTab({ allGames, members, onGoTab }) {
           date, time,
           p.dm || '', p.npc || '', p.room || '', p.scriptTitle || '',
           p.members?.length || 0,
-          '',                                          // มัดจำรอบแรก
-          p.grandTotal || 0,                           // เก็บหน้าแคชเชียร์
-          totalDiscount || '',                         // ส่วนลดหน้าแคชเชียร์
-          freeMembers.length > 0 ? 'มี' : '',          // ส่วนลดเล่นฟรี
-          freeNames,                                   // ชื่อ
-          freeTotal || '',                             // ส่วนลด (เล่นฟรี)
-          hasPromo ? 'มี' : '',                        // โปรโมชัน
-          p.promoName || '',                           // ชื่อโปรโมชัน
-          promoDisc || '',                             // ส่วนลด (โปรโมชัน)
-          '', '', '',                                  // Voucher (ยังไม่มีข้อมูล)
+          '',
+          p.grandTotal || 0,
+          totalDiscount || '',
+          freeMembers.length > 0 ? 'มี' : '',
+          freeNames,
+          freeTotal || '',
+          hasPromo ? 'มี' : '',
+          p.promoName || '',
+          promoDisc || '',
+          '', '', '',
         ]
       })
 
       const esc = v => `"${String(v).replace(/"/g, '""')}"`
       const csvRow = arr => arr.map(esc).join(',')
-      const csv = '﻿' + [h1, h2, ...rows].map(csvRow).join('\r\n')
+      const csv = '\ufeff' + [h1, h2, ...rows].map(csvRow).join('\r\n')
       const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
       const url  = URL.createObjectURL(blob)
       const a    = document.createElement('a')
       a.href = url
-      a.download = `SoFun_Report_${reportYear}_${String(reportMonth + 1).padStart(2, '0')}.csv`
+      a.download = `SoFun_PowerBI_Report_${reportYear}_${String(reportMonth + 1).padStart(2, '0')}.csv`
       a.click()
       URL.revokeObjectURL(url)
       setReportOpen(false)
@@ -141,370 +166,1893 @@ function DashboardTab({ allGames, members, onGoTab }) {
 
   const MONTHS_TH = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม']
 
-  useEffect(() => {
-    const q = query(collection(db, 'payments'), orderBy('paidAt', 'desc'), limit(500))
-    const unsub = onSnapshot(q,
-      snap => { setPayments(snap.docs.map(d => ({ ...d.data(), id: d.id }))); setLoading(false) },
-      () => setLoading(false)
-    )
-    return unsub
-  }, [])
-
-  // ── derived stats ─────────────────────────────────────────────────────────
+  // ── Power BI Time Filter Calculation ──────────────────────────────────────
   const now = new Date()
-  const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-  const weekStart   = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6)
-  const monthStart  = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  const paidDate = p => p.paidAt?.toDate?.() || null
+  const getFilterStartDate = (r) => {
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    if (r === 'today') return today
+    if (r === '7d') return new Date(today.getTime() - 6 * 86400000)
+    if (r === '14d') return new Date(today.getTime() - 13 * 86400000)
+    if (r === '30d') return new Date(today.getTime() - 29 * 86400000)
+    if (r === 'mtd') return new Date(now.getFullYear(), now.getMonth(), 1)
+    if (r === '90d') return new Date(today.getTime() - 89 * 86400000)
+    return new Date(0)
+  }
 
-  const todayPay   = payments.filter(p => { const d = paidDate(p); return d && d >= todayStart })
-  const weekPay    = payments.filter(p => { const d = paidDate(p); return d && d >= weekStart })
-  const monthPay   = payments.filter(p => { const d = paidDate(p); return d && d >= monthStart })
+  const startDate = useMemo(() => getFilterStartDate(timeRange), [timeRange])
 
-  const sum = arr => arr.reduce((s, p) => s + (p.grandTotal || 0), 0)
-  const players = arr => arr.reduce((s, p) => s + (p.members?.length || 0), 0)
+  // Available Rooms from payments + bookings
+  const availableRooms = useMemo(() => {
+    const s = new Set()
+    payments.forEach(p => { if (p.room) s.add(p.room) })
+    bookings.forEach(b => { if (b.room) s.add(b.room) })
+    return Array.from(s).sort()
+  }, [payments, bookings])
 
-  // ── daily chart data ──────────────────────────────────────────────────────
-  const days = Array.from({ length: range }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (range - 1 - i))
-    return d
-  })
-  const dailyData = days.map(d => {
-    const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate())
-    const de = new Date(ds.getTime() + 86400000)
-    const dp = payments.filter(p => { const pd = paidDate(p); return pd && pd >= ds && pd < de })
-    return {
-      date: fmtDate(d),
-      'ค่าเกม': dp.reduce((s, p) => s + (p.gameTotal || 0), 0),
-      'ค่าอาหาร': dp.reduce((s, p) => s + (p.foodTotal || 0), 0),
-      ปาร์ตี้: dp.length,
-      ผู้เล่น: dp.reduce((s, p) => s + (p.members?.length || 0), 0),
-    }
-  })
-
-  // ── top food items ────────────────────────────────────────────────────────
-  const foodMap = {}
-  payments.forEach(p => {
-    p.foodItems?.forEach(f => {
-      if (!foodMap[f.name]) foodMap[f.name] = { name: f.name, qty: 0, revenue: 0 }
-      foodMap[f.name].qty += f.qty || 1
-      foodMap[f.name].revenue += (f.price || 0) * (f.qty || 1)
+  // Filtered Payments Dataset
+  const filteredPayments = useMemo(() => {
+    return payments.filter(p => {
+      const d = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+      if (!d) return false
+      if (d < startDate) return false
+      if (selectedRoom !== 'ALL' && p.room !== selectedRoom) return false
+      return true
     })
-  })
-  const topFoods = Object.values(foodMap).sort((a, b) => b.revenue - a.revenue).slice(0, 8)
+  }, [payments, startDate, selectedRoom])
 
-  // ── top games ─────────────────────────────────────────────────────────────
-  const gameMap = {}
-  payments.forEach(p => {
-    const k = p.scriptTitle || 'ไม่ระบุ'
-    if (!gameMap[k]) gameMap[k] = { name: k, รอบ: 0, ผู้เล่น: 0, revenue: 0 }
-    gameMap[k].รอบ++
-    gameMap[k].ผู้เล่น += p.members?.length || 0
-    gameMap[k].revenue += p.gameTotal || 0
-  })
-  const topGames = Object.values(gameMap).sort((a, b) => b.รอบ - a.รอบ).slice(0, 6)
+  // Filtered Bookings Dataset
+  const filteredBookings = useMemo(() => {
+    return bookings.filter(b => {
+      const d = b.createdAt?.toDate?.() || (b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000) : null) || (b.date ? new Date(b.date) : null)
+      if (!d) return false
+      if (d < startDate) return false
+      if (selectedRoom !== 'ALL' && b.room !== selectedRoom) return false
+      return true
+    })
+  }, [bookings, startDate, selectedRoom])
 
-  // ── pie data ──────────────────────────────────────────────────────────────
-  const totalGame = payments.reduce((s, p) => s + (p.gameTotal || 0), 0)
-  const totalFood = payments.reduce((s, p) => s + (p.foodTotal || 0), 0)
-  const pieData = [
-    { name: 'ค่าเกม', value: totalGame },
-    { name: 'ค่าอาหาร', value: totalFood },
-  ]
+  // Filtered Evaluations Dataset
+  const filteredEvals = useMemo(() => {
+    return evalList.filter(e => {
+      const d = e.createdAt?.toDate?.() || (e.createdAt?.seconds ? new Date(e.createdAt.seconds * 1000) : null)
+      if (d && d < startDate) return false
+      if (selectedRoom !== 'ALL' && e.room !== selectedRoom) return false
+      return true
+    })
+  }, [evalList, startDate, selectedRoom])
 
-  // ── new members this month ────────────────────────────────────────────────
-  const newMembers = members.filter(m => m.createdAt?.seconds && new Date(m.createdAt.seconds*1000) >= monthStart)
+  // ── Executive Business KPI Metrics ────────────────────────────────────────
+  const totalRevenue = useMemo(() => filteredPayments.reduce((s, p) => s + (p.grandTotal || 0), 0), [filteredPayments])
+  const gameRevenue  = useMemo(() => filteredPayments.reduce((s, p) => s + (p.gameTotal || 0), 0), [filteredPayments])
+  const foodRevenue  = useMemo(() => filteredPayments.reduce((s, p) => s + (p.foodTotal || 0), 0), [filteredPayments])
+  const totalSessions = filteredPayments.length
+  const totalPlayers  = useMemo(() => filteredPayments.reduce((s, p) => s + (p.members?.length || 0), 0), [filteredPayments])
 
-  const KpiCard = ({ icon, color, label, value, sub }) => (
-    <div className="dash-kpi">
-      <div className="dash-kpi-icon" style={{ background: color + '20', color }}>
-        <i className={`fas ${icon}`} />
+  const arps = totalSessions > 0 ? Math.round(totalRevenue / totalSessions) : 0
+  const arpu = totalPlayers > 0 ? Math.round(totalRevenue / totalPlayers) : 0
+  const avgPartySize = totalSessions > 0 ? (totalPlayers / totalSessions).toFixed(1) : '0'
+
+  const fbSessionsCount = useMemo(() => filteredPayments.filter(p => (p.foodTotal || 0) > 0).length, [filteredPayments])
+  const fbAttachmentRate = totalSessions > 0 ? Math.round((fbSessionsCount / totalSessions) * 100) : 0
+  const avgFbPerSession  = totalSessions > 0 ? Math.round(foodRevenue / totalSessions) : 0
+
+  const gameSharePct = totalRevenue > 0 ? Math.round((gameRevenue / totalRevenue) * 100) : 0
+  const foodSharePct = totalRevenue > 0 ? 100 - gameSharePct : 0
+
+  // Previous Period Revenue Delta Calculation
+  const revenueGrowth = useMemo(() => {
+    if (timeRange === 'all') return null
+    const duration = now.getTime() - startDate.getTime()
+    if (duration <= 0) return null
+    const prevStart = new Date(startDate.getTime() - duration)
+    const prevEnd = startDate
+    const prevPay = payments.filter(p => {
+      const d = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+      if (!d) return false
+      if (selectedRoom !== 'ALL' && p.room !== selectedRoom) return false
+      return d >= prevStart && d < prevEnd
+    })
+    const prevRev = prevPay.reduce((s, p) => s + (p.grandTotal || 0), 0)
+    if (prevRev === 0) return totalRevenue > 0 ? 100 : 0
+    return Number((((totalRevenue - prevRev) / prevRev) * 100).toFixed(1))
+  }, [payments, timeRange, startDate, selectedRoom, totalRevenue])
+
+  // CSAT Ratings
+  const avgGameScore = useMemo(() => {
+    if (filteredEvals.length === 0) return '5.0'
+    const s = filteredEvals.reduce((acc, e) => acc + (Number(e.gameRating) || 0), 0)
+    return (s / filteredEvals.length).toFixed(1)
+  }, [filteredEvals])
+
+  const avgDmScore = useMemo(() => {
+    if (filteredEvals.length === 0) return '5.0'
+    const s = filteredEvals.reduce((acc, e) => acc + (Number(e.dmRating) || 0), 0)
+    return (s / filteredEvals.length).toFixed(1)
+  }, [filteredEvals])
+
+  // Booking Funnel Metrics
+  const totalBookingsCount = filteredBookings.length
+  const lockedBookings = filteredBookings.filter(b => b.status === 'locked' || b.status === 'completed').length
+  const confirmedBookings = filteredBookings.filter(b => b.status === 'confirmed').length
+  const waitingBookings = filteredBookings.filter(b => b.status === 'waiting_deposit' || !b.status).length
+  const collapsedBookings = filteredBookings.filter(b => b.status === 'collapsed' || b.status === 'cancelled').length
+  const bookingLockRate = totalBookingsCount > 0 ? Math.round(((lockedBookings + confirmedBookings) / totalBookingsCount) * 100) : 0
+  const totalDepositCollected = filteredBookings.reduce((sum, b) => {
+    const paidM = b.members?.filter(m => m.paidDeposit)?.length || 0
+    const emptyPaid = b.paidEmptySeats?.length || 0
+    const depositEach = Number(b.depositAmount || 0)
+    return sum + ((paidM + emptyPaid) * depositEach)
+  }, 0)
+
+  // ── Daily Trend Chart Data ────────────────────────────────────────────────
+  const trendDaysCount = timeRange === 'today' ? 1 : timeRange === '7d' ? 7 : timeRange === '14d' ? 14 : timeRange === '30d' ? 30 : timeRange === 'mtd' ? Math.max(7, now.getDate()) : 30
+
+  const dailyTrendData = useMemo(() => {
+    const daysArr = Array.from({ length: trendDaysCount }, (_, i) => {
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate() - (trendDaysCount - 1 - i))
+    })
+    return daysArr.map(d => {
+      const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+      const de = new Date(ds.getTime() + 86400000)
+      const dp = filteredPayments.filter(p => {
+        const pd = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+        return pd && pd >= ds && pd < de
+      })
+      const gTot = dp.reduce((s, p) => s + (p.gameTotal || 0), 0)
+      const fTot = dp.reduce((s, p) => s + (p.foodTotal || 0), 0)
+      return {
+        date: `${d.getDate()}/${d.getMonth() + 1}`,
+        fullDate: d.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' }),
+        'ค่าเกม': gTot,
+        'ค่าอาหาร': fTot,
+        'รายได้รวม': gTot + fTot,
+        'รอบเล่น': dp.length,
+        'ผู้เล่น': dp.reduce((s, p) => s + (p.members?.length || 0), 0),
+      }
+    })
+  }, [filteredPayments, trendDaysCount])
+
+  // ── Revenue Mix Pie Data ──────────────────────────────────────────────────
+  const pieData = useMemo(() => [
+    { name: 'ค่าเกม', value: gameRevenue, color: '#0078D4' },
+    { name: 'ค่าอาหาร & เครื่องดื่ม', value: foodRevenue, color: '#10B981' },
+  ], [gameRevenue, foodRevenue])
+
+  // ── Script / Game Intelligence Matrix ─────────────────────────────────────
+  const scriptMatrix = useMemo(() => {
+    const map = {}
+    filteredPayments.forEach(p => {
+      const title = p.scriptTitle || 'ไม่ระบุชื่อสคริปต์'
+      if (!map[title]) {
+        const mg = allGames.find(g => (g.title && g.title.trim().toLowerCase() === title.trim().toLowerCase()) || g.id === p.scriptId)
+        map[title] = {
+          name: title,
+          gameId: p.scriptId || mg?.id || '',
+          image: mg?.image || mg?.coverUrl || '',
+          difficulty: mg?.difficulty || 'ปานกลาง',
+          playersStr: mg?.players || '5-7 คน',
+          sessions: 0,
+          players: 0,
+          gameRevenue: 0,
+          foodRevenue: 0,
+          totalRevenue: 0,
+        }
+      }
+      map[title].sessions += 1
+      map[title].players += p.members?.length || 0
+      map[title].gameRevenue += p.gameTotal || 0
+      map[title].foodRevenue += p.foodTotal || 0
+      map[title].totalRevenue += p.grandTotal || 0
+    })
+
+    Object.values(map).forEach(item => {
+      const evals = evalList.filter(e => e.scriptTitle === item.name || e.scriptId === item.gameId)
+      item.rating = evals.length > 0
+        ? (evals.reduce((s, e) => s + (Number(e.gameRating) || 0), 0) / evals.length).toFixed(1)
+        : '5.0'
+      item.evalCount = evals.length
+      item.arpu = item.players > 0 ? Math.round(item.totalRevenue / item.players) : 0
+      item.revShare = totalRevenue > 0 ? Math.round((item.totalRevenue / totalRevenue) * 100) : 0
+    })
+
+    return Object.values(map).sort((a, b) => b.totalRevenue - a.totalRevenue)
+  }, [filteredPayments, allGames, evalList, totalRevenue])
+
+  // ── F&B Product Performance Matrix ────────────────────────────────────────
+  const foodMatrix = useMemo(() => {
+    const map = {}
+    filteredPayments.forEach(p => {
+      p.foodItems?.forEach(f => {
+        const name = f.name || 'ไม่ระบุเมนู'
+        if (!map[name]) {
+          map[name] = { name, qty: 0, revenue: 0, avgPrice: f.price || 0 }
+        }
+        const q = f.qty || 1
+        map[name].qty += q
+        map[name].revenue += (f.price || 0) * q
+      })
+    })
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue)
+  }, [filteredPayments])
+
+  // ── Peak Hours Distribution ───────────────────────────────────────────────
+  const peakHoursData = useMemo(() => {
+    const slots = [
+      { hour: '11:00', label: '11:00-12:00', sessions: 0, revenue: 0 },
+      { hour: '13:00', label: '13:00-14:00', sessions: 0, revenue: 0 },
+      { hour: '14:00', label: '14:00-15:00', sessions: 0, revenue: 0 },
+      { hour: '15:00', label: '15:00-16:00', sessions: 0, revenue: 0 },
+      { hour: '16:00', label: '16:00-17:00', sessions: 0, revenue: 0 },
+      { hour: '17:00', label: '17:00-18:00', sessions: 0, revenue: 0 },
+      { hour: '18:00', label: '18:00-19:00', sessions: 0, revenue: 0 },
+      { hour: '19:00', label: '19:00-20:00', sessions: 0, revenue: 0 },
+      { hour: '20:00+', label: '20:00 เป็นต้นไป', sessions: 0, revenue: 0 },
+    ]
+
+    filteredPayments.forEach(p => {
+      const dt = p.openAt?.toDate?.() || p.paidAt?.toDate?.() || null
+      if (!dt) return
+      const h = dt.getHours()
+      let s = slots[slots.length - 1]
+      if (h <= 12) s = slots[0]
+      else if (h === 13) s = slots[1]
+      else if (h === 14) s = slots[2]
+      else if (h === 15) s = slots[3]
+      else if (h === 16) s = slots[4]
+      else if (h === 17) s = slots[5]
+      else if (h === 18) s = slots[6]
+      else if (h === 19) s = slots[7]
+      s.sessions += 1
+      s.revenue += p.grandTotal || 0
+    })
+
+    return slots
+  }, [filteredPayments])
+
+  // ── Room Utilization ──────────────────────────────────────────────────────
+  const roomMatrix = useMemo(() => {
+    const map = {}
+    filteredPayments.forEach(p => {
+      const r = p.room || 'ไม่ระบุห้อง'
+      if (!map[r]) map[r] = { name: r, sessions: 0, players: 0, revenue: 0 }
+      map[r].sessions += 1
+      map[r].players += p.members?.length || 0
+      map[r].revenue += p.grandTotal || 0
+    })
+    return Object.values(map).sort((a, b) => b.revenue - a.revenue)
+  }, [filteredPayments])
+
+  // ── DM Performance Ledger ─────────────────────────────────────────────────
+  const dmMatrix = useMemo(() => {
+    const map = {}
+    filteredPayments.forEach(p => {
+      const dm = p.dm || 'ไม่ระบุ DM'
+      if (!map[dm]) map[dm] = { name: dm, sessions: 0, players: 0, revenue: 0 }
+      map[dm].sessions += 1
+      map[dm].players += p.members?.length || 0
+      map[dm].revenue += p.grandTotal || 0
+    })
+
+    Object.values(map).forEach(item => {
+      const evals = evalList.filter(e => e.dm && (e.dm.toLowerCase().includes(item.name.toLowerCase()) || item.name.toLowerCase().includes(e.dm.toLowerCase())))
+      item.rating = evals.length > 0
+        ? (evals.reduce((s, e) => s + (Number(e.dmRating) || 0), 0) / evals.length).toFixed(1)
+        : '5.0'
+      item.evalCount = evals.length
+    })
+
+    return Object.values(map).sort((a, b) => b.sessions - a.sessions)
+  }, [filteredPayments, evalList])
+
+  // ── Ledger Search & Filter ────────────────────────────────────────────────
+  const filteredLedgerPayments = useMemo(() => {
+    return filteredPayments.filter(p => {
+      if (ledgerFilter === 'with_food' && (!p.foodTotal || p.foodTotal <= 0)) return false
+      if (ledgerFilter === 'game_only' && (p.foodTotal && p.foodTotal > 0)) return false
+      if (!ledgerSearch.trim()) return true
+      const q = ledgerSearch.toLowerCase()
+      const title = (p.scriptTitle || '').toLowerCase()
+      const dm = (p.dm || '').toLowerCase()
+      const room = (p.room || '').toLowerCase()
+      const id = (p.id || '').toLowerCase()
+      return title.includes(q) || dm.includes(q) || room.includes(q) || id.includes(q)
+    })
+  }, [filteredPayments, ledgerFilter, ledgerSearch])
+
+  if (loading) {
+    return (
+      <div className="adm-loading" style={{ minHeight: 360, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+        <div className="spinner" />
+        <span style={{ fontSize: 13, color: '#64748B', fontWeight: 700 }}>กำลังโหลดข้อมูล Power BI Analytics...</span>
       </div>
-      <div className="dash-kpi-body">
-        <div className="dash-kpi-label">{label}</div>
-        <div className="dash-kpi-value" style={{ color }}>{value}</div>
-        {sub && <div className="dash-kpi-sub">{sub}</div>}
-      </div>
-    </div>
-  )
-
-  if (loading) return <div className="adm-loading"><div className="spinner" /></div>
+    )
+  }
 
   return (
-    <div className="dash-root">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, fontFamily: "'Sarabun', sans-serif" }}>
 
-      {/* ── Report modal ── */}
-      {reportOpen && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:9000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
-          onClick={e => e.target === e.currentTarget && setReportOpen(false)}>
-          <div style={{ background:'var(--surface-card)', borderRadius:16, padding:'32px 28px', width:'100%', maxWidth:420, boxShadow:'0 24px 64px rgba(0,0,0,0.22)', border:'1px solid var(--border-default)' }}>
-            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:24 }}>
-              <div>
-                <h3 style={{ margin:0, fontSize:18, fontWeight:800, color:'var(--text-primary)' }}>
-                  <i className="fas fa-file-excel" style={{ color:'var(--crimson-500)', marginRight:10 }} />
-                  Export Report
-                </h3>
-                <p style={{ margin:'4px 0 0', fontSize:12, color:'var(--text-tertiary)' }}>ดาวน์โหลด CSV สำหรับนำเข้า Google Sheets</p>
+      {/* ── POWER BI EXECUTIVE RIBBON / HEADER ── */}
+      <div
+        style={{
+          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+          borderRadius: 16,
+          padding: '16px 22px',
+          color: '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 14,
+          boxShadow: '0 4px 20px rgba(15, 23, 42, 0.15)',
+          border: '1px solid #334155',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div
+            style={{
+              width: 46,
+              height: 46,
+              borderRadius: 12,
+              background: 'linear-gradient(135deg, #0078D4 0%, #0284C7 100%)',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 22,
+              boxShadow: '0 4px 12px rgba(0, 120, 212, 0.35)',
+              flexShrink: 0,
+            }}
+          >
+            <i className="fas fa-chart-column" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 900, letterSpacing: '-0.02em', color: '#FFFFFF' }}>
+                SOFUN EXECUTIVE BUSINESS ANALYTICS
+              </h2>
+              <span
+                style={{
+                  fontSize: 10,
+                  fontWeight: 800,
+                  letterSpacing: '0.08em',
+                  padding: '2px 8px',
+                  borderRadius: 20,
+                  background: 'rgba(56, 189, 248, 0.18)',
+                  color: '#38BDF8',
+                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                POWER BI ENGINE
+              </span>
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  color: '#4ADE80',
+                  background: 'rgba(74, 222, 128, 0.15)',
+                  padding: '2px 8px',
+                  borderRadius: 20,
+                  border: '1px solid rgba(74, 222, 128, 0.3)',
+                }}
+              >
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#4ADE80' }} />
+                LIVE SYNC
+              </span>
+            </div>
+            <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 3 }}>
+              ระบบเก็บตัวเลข วิเคราะห์รายได้ กำลังการผลิต และพฤติกรรมลูกค้าเชิงธุรกิจ
+            </div>
+          </div>
+        </div>
+
+        {/* Header Action Buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <button
+            type="button"
+            onClick={() => setReportOpen(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '9px 16px',
+              borderRadius: 10,
+              background: 'linear-gradient(135deg, #0078D4 0%, #0284C7 100%)',
+              color: '#FFFFFF',
+              border: 'none',
+              fontSize: 12.5,
+              fontWeight: 800,
+              cursor: 'pointer',
+              boxShadow: '0 2px 10px rgba(0, 120, 212, 0.3)',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-1px)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'none'}
+          >
+            <i className="fas fa-file-excel" />
+            <span>Export Report CSV</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── POWER BI SLICERS BAR ── */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 14,
+          padding: '12px 16px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
+        }}
+      >
+        {/* Row 1: Time Range Slicer */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 4 }}>
+              <i className="fas fa-filter" style={{ marginRight: 4, color: '#0078D4' }} />
+              ช่วงเวลา (Time Slicer):
+            </span>
+            {[
+              { id: 'today', label: 'วันนี้' },
+              { id: '7d', label: '7 วัน' },
+              { id: '14d', label: '14 วัน' },
+              { id: '30d', label: '30 วัน' },
+              { id: 'mtd', label: 'เดือนนี้ (MTD)' },
+              { id: '90d', label: 'ไตรมาส (90D)' },
+              { id: 'all', label: 'ทั้งหมด (All Time)' },
+            ].map(r => {
+              const active = timeRange === r.id
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => setTimeRange(r.id)}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 12,
+                    fontWeight: active ? 800 : 600,
+                    border: active ? '1.5px solid #0078D4' : '1px solid #E2E8F0',
+                    background: active ? '#0078D4' : '#F8FAFC',
+                    color: active ? '#FFFFFF' : '#475569',
+                    cursor: 'pointer',
+                    boxShadow: active ? '0 2px 6px rgba(0, 120, 212, 0.25)' : 'none',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {r.label}
+                </button>
+              )
+            })}
+          </div>
+
+          {/* Room Filter Slicer */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 11.5, fontWeight: 800, color: '#64748B' }}>
+              ห้องเล่น:
+            </span>
+            <select
+              value={selectedRoom}
+              onChange={e => setSelectedRoom(e.target.value)}
+              style={{
+                padding: '5px 10px',
+                borderRadius: 8,
+                border: '1px solid #CBD5E1',
+                background: '#FFFFFF',
+                fontSize: 12,
+                fontWeight: 700,
+                color: '#0F172A',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="ALL">ทุกห้องจัดแสดง (All Rooms)</option>
+              {availableRooms.map(r => (
+                <option key={r} value={r}>{r}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* Row 2: Page Navigation / View Mode Slicer */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            borderTop: '1px solid #F1F5F9',
+            paddingTop: 10,
+            overflowX: 'auto',
+          }}
+        >
+          <span style={{ fontSize: 11.5, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: 4, flexShrink: 0 }}>
+            มุมมองการวิเคราะห์:
+          </span>
+          {[
+            { id: 'overview', label: 'ภาพรวมบริหาร', icon: 'fa-chart-pie' },
+            { id: 'scripts', label: 'ประสิทธิภาพสคริปต์', icon: 'fa-book-skull' },
+            { id: 'fb', label: 'อาหาร & เครื่องดื่ม (F&B)', icon: 'fa-utensils' },
+            { id: 'ops', label: 'DM & การใช้ห้อง', icon: 'fa-user-tie' },
+            { id: 'bookings', label: 'การจอง & กรวยแปลงสภาพ', icon: 'fa-users-rectangle' },
+          ].map(tab => {
+            const active = activeView === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveView(tab.id)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: active ? 800 : 700,
+                  background: active ? '#0F172A' : '#F1F5F9',
+                  color: active ? '#FFFFFF' : '#475569',
+                  border: active ? '1px solid #0F172A' : '1px solid #E2E8F0',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  boxShadow: active ? '0 2px 6px rgba(15, 23, 42, 0.2)' : 'none',
+                  transition: 'all 0.15s ease',
+                  flexShrink: 0,
+                }}
+              >
+                <i className={`fas ${tab.icon}`} style={{ fontSize: 11, color: active ? '#38BDF8' : '#64748B' }} />
+                <span>{tab.label}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* ── POWER BI EXECUTIVE KPI CARDS GRID (6 TILES) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 12,
+        }}
+      >
+        {/* KPI 1: Gross Business Revenue */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderTop: '3.5px solid #0078D4',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              รายได้รวมสุทธิ (Gross Rev)
+            </span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EFF6FF', color: '#0078D4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+              <i className="fas fa-coins" />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              ฿{totalRevenue.toLocaleString()}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+              {revenueGrowth !== null ? (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 3,
+                    fontSize: 10.5,
+                    fontWeight: 800,
+                    padding: '1px 6px',
+                    borderRadius: 4,
+                    background: revenueGrowth >= 0 ? '#DCFCE7' : '#FEE2E2',
+                    color: revenueGrowth >= 0 ? '#166534' : '#991B1B',
+                  }}
+                >
+                  <i className={`fas ${revenueGrowth >= 0 ? 'fa-arrow-trend-up' : 'fa-arrow-trend-down'}`} />
+                  {revenueGrowth >= 0 ? `+${revenueGrowth}%` : `${revenueGrowth}%`}
+                </span>
+              ) : (
+                <span style={{ fontSize: 10.5, color: '#64748B' }}>ฐานข้อมูลสะสม</span>
+              )}
+              <span style={{ fontSize: 10.5, color: '#94A3B8' }}>vs ช่วงก่อนหน้า</span>
+            </div>
+          </div>
+          {/* Mini Split Progress Bar */}
+          <div>
+            <div style={{ width: '100%', height: 5, borderRadius: 3, background: '#E2E8F0', overflow: 'hidden', display: 'flex' }}>
+              <div style={{ width: `${gameSharePct}%`, background: '#0078D4', height: '100%' }} title={`เกม: ${gameSharePct}%`} />
+              <div style={{ width: `${foodSharePct}%`, background: '#10B981', height: '100%' }} title={`อาหาร: ${foodSharePct}%`} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748B', marginTop: 3 }}>
+              <span>เกม ฿{gameRevenue.toLocaleString()} ({gameSharePct}%)</span>
+              <span>อาหาร ฿{foodRevenue.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 2: AOV / ARPS (Ticket Size) */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderTop: '3.5px solid #0D9488',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              รายได้เฉลี่ย/รอบ (ARPS)
+            </span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#CCFBF1', color: '#0D9488', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+              <i className="fas fa-ticket" />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              ฿{arps.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>/ รอบ</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#059669', fontWeight: 700, marginTop: 4 }}>
+              ARPU: ฿{arpu.toLocaleString()} / ผู้เล่น
+            </div>
+          </div>
+          <div style={{ fontSize: 10.5, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 4 }}>
+            เฉลี่ยบัตรค่าเกม ฿{totalPlayers > 0 ? Math.round(gameRevenue / totalPlayers) : 0} / คน
+          </div>
+        </div>
+
+        {/* KPI 3: Total Sessions & Players */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderTop: '3.5px solid #F59E0B',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              รอบจัดแสดง & ผู้เล่น
+            </span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+              <i className="fas fa-users" />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {totalSessions} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>รอบ</span> · {totalPlayers} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>คน</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#D97706', fontWeight: 700, marginTop: 4 }}>
+              ขนาดตี้เฉลี่ย {avgPartySize} คน / รอบ
+            </div>
+          </div>
+          <div style={{ fontSize: 10.5, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 4 }}>
+            จากสคริปต์ในคลัง {allGames.length} เรื่อง
+          </div>
+        </div>
+
+        {/* KPI 4: F&B Cross-Sell Attachment Rate */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderTop: '3.5px solid #10B981',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              F&B Attachment Rate
+            </span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#DCFCE7', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+              <i className="fas fa-utensils" />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {fbAttachmentRate}% <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>ของปาร์ตี้</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#16A34A', fontWeight: 700, marginTop: 4 }}>
+              สั่งอาหาร/น้ำ {fbSessionsCount} จาก {totalSessions} รอบ
+            </div>
+          </div>
+          <div style={{ fontSize: 10.5, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 4 }}>
+            เฉลี่ย ฿{avgFbPerSession} / รอบเล่น
+          </div>
+        </div>
+
+        {/* KPI 5: Customer Satisfaction CSAT */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderTop: '3.5px solid #EC4899',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 8,
+            cursor: onGoTab ? 'pointer' : 'default',
+          }}
+          onClick={() => onGoTab && onGoTab('evaluations')}
+          title="คลิกเพื่อดูแบบประเมินทั้งหมด"
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              CSAT คะแนนความพึงพอใจ
+            </span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#FCE7F3', color: '#EC4899', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+              <i className="fas fa-star" />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 21, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              เกม {avgGameScore} · DM {avgDmScore}
+            </div>
+            <div style={{ fontSize: 11, color: '#BE185D', fontWeight: 700, marginTop: 4 }}>
+              คะแนนเต็ม 5.0 ดาว
+            </div>
+          </div>
+          <div style={{ fontSize: 10.5, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 4 }}>
+            จาก {filteredEvals.length} รีวิวประเมินจริง
+          </div>
+        </div>
+
+        {/* KPI 6: Booking Lock & Conversion Rate */}
+        <div
+          style={{
+            background: '#FFFFFF',
+            border: '1px solid #E2E8F0',
+            borderTop: '3.5px solid #8B5CF6',
+            borderRadius: 12,
+            padding: '14px 16px',
+            boxShadow: '0 2px 6px rgba(0,0,0,0.02)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            gap: 8,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              อัตราล็อกห้อง (Lock Rate)
+            </span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EDE9FE', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+              <i className="fas fa-lock" />
+            </div>
+          </div>
+          <div>
+            <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", letterSpacing: '-0.02em', lineHeight: 1.1 }}>
+              {bookingLockRate}% <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>สำเร็จ</span>
+            </div>
+            <div style={{ fontSize: 11, color: '#6D28D9', fontWeight: 700, marginTop: 4 }}>
+              {lockedBookings + confirmedBookings} จาก {totalBookingsCount} การจอง
+            </div>
+          </div>
+          <div style={{ fontSize: 10.5, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 4 }}>
+            มัดจำสะสม ฿{totalDepositCollected.toLocaleString()}
+          </div>
+        </div>
+      </div>
+
+      {/* ── VIEW 1: EXECUTIVE SUMMARY (ภาพรวมบริหาร) ── */}
+      {activeView === 'overview' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Main Visuals Row: Revenue Trend (Composed) + Donut Mix */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 14 }}>
+            {/* Revenue Trend Visual */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                    <i className="fas fa-chart-line" style={{ color: '#0078D4', marginRight: 6 }} />
+                    แนวโน้มรายได้ & จำนวนผู้เล่น (Revenue & Player Trend)
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                    แท่ง: ค่าเกม (น้ำเงิน) + ค่าอาหาร (เขียว) | เส้น: ผู้เล่น (ส้ม)
+                  </div>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: '#0F172A', background: '#F8FAFC', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0' }}>
+                  ฿{totalRevenue.toLocaleString()}
+                </div>
               </div>
-              <button onClick={() => setReportOpen(false)} style={{ background:'none', border:'none', cursor:'pointer', fontSize:18, color:'var(--text-tertiary)', padding:4 }}>
-                <i className="fas fa-times" />
+
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart data={dailyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                  <YAxis yAxisId="left" tickFormatter={fmtMoney} tick={{ fontSize: 10.5, fill: '#64748B' }} width={42} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10.5, fill: '#D97706' }} width={25} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.08)', fontSize: 12 }}
+                    formatter={(val, name) => {
+                      if (name === 'ผู้เล่น' || name === 'รอบเล่น') return [`${val} คน`, name]
+                      return [`฿${Number(val).toLocaleString()}`, name]
+                    }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                  <Bar yAxisId="left" dataKey="ค่าเกม" stackId="a" fill="#0078D4" radius={[0, 0, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="ค่าอาหาร" stackId="a" fill="#10B981" radius={[3, 3, 0, 0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="ผู้เล่น" stroke="#D97706" strokeWidth={2.5} dot={{ r: 3, fill: '#D97706' }} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Revenue Category Share Donut */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                  <i className="fas fa-chart-pie" style={{ color: '#10B981', marginRight: 6 }} />
+                  สัดส่วนรายได้ (Sales Mix)
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  การกระจายตัวของค่าเกมเทียบกับ F&B
+                </div>
+              </div>
+
+              {totalRevenue > 0 ? (
+                <div style={{ position: 'relative', width: '100%', height: 190 }}>
+                  <ResponsiveContainer width="100%" height={190}>
+                    <PieChart>
+                      <Pie
+                        data={pieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={52}
+                        outerRadius={78}
+                        dataKey="value"
+                        paddingAngle={3}
+                      >
+                        {pieData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={v => `฿${Number(v).toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  {/* Center Metric */}
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      textAlign: 'center',
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>รวม</div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      ฿{fmtMoney(totalRevenue)}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 12 }}>
+                  ไม่มีข้อมูลธุรกรรม
+                </div>
+              )}
+
+              {/* Legend Summary */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#0078D4' }} />
+                    <span style={{ color: '#475569', fontWeight: 600 }}>ค่าเกม</span>
+                  </div>
+                  <strong style={{ color: '#0F172A' }}>฿{gameRevenue.toLocaleString()} ({gameSharePct}%)</strong>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10B981' }} />
+                    <span style={{ color: '#475569', fontWeight: 600 }}>อาหาร & เครื่องดื่ม</span>
+                  </div>
+                  <strong style={{ color: '#0F172A' }}>฿{foodRevenue.toLocaleString()} ({foodSharePct}%)</strong>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Top 5 Scripts Performance Table */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                  <i className="fas fa-trophy" style={{ color: '#D97706', marginRight: 6 }} />
+                  5 อันดับสคริปต์ทำเงินสูงสุด (Top Revenue Generating Scripts)
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  จัดอันดับตามรายได้รวมและจำนวนรอบการจัดแสดง
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveView('scripts')}
+                style={{
+                  padding: '5px 12px',
+                  borderRadius: 8,
+                  background: '#F1F5F9',
+                  color: '#0078D4',
+                  border: '1px solid #CBD5E1',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                <span>ดูสคริปต์ทั้งหมด</span>
+                <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
               </button>
             </div>
 
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
-              <div>
-                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.08em' }}>เดือน</label>
-                <select value={reportMonth} onChange={e => setReportMonth(Number(e.target.value))}
-                  style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif" }}>
-                  {MONTHS_TH.map((m, i) => <option key={i} value={i}>{m}</option>)}
-                </select>
-              </div>
-              <div>
-                <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.08em' }}>ปี</label>
-                <select value={reportYear} onChange={e => setReportYear(Number(e.target.value))}
-                  style={{ width:'100%', padding:'10px 12px', borderRadius:8, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif" }}>
-                  {[nowR.getFullYear()-1, nowR.getFullYear(), nowR.getFullYear()+1].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5, textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '8px 12px' }}>อันดับ</th>
+                    <th style={{ padding: '8px 12px' }}>สคริปต์เกม</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>จำนวนรอบ</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>ผู้เล่น</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>รายได้รวม</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>ARPU (เฉลี่ย/คน)</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>สัดส่วนรายได้</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scriptMatrix.slice(0, 5).map((g, idx) => (
+                    <tr key={g.name} style={{ borderBottom: '1px solid #F1F5F9', transition: 'background 0.15s' }}>
+                      <td style={{ padding: '10px 12px' }}>
+                        <span
+                          style={{
+                            width: 22,
+                            height: 22,
+                            borderRadius: '50%',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 11,
+                            fontWeight: 900,
+                            background: idx === 0 ? '#FEF3C7' : idx === 1 ? '#F1F5F9' : idx === 2 ? '#FFEDD5' : '#F8FAFC',
+                            color: idx === 0 ? '#B45309' : idx === 1 ? '#475569' : idx === 2 ? '#C2410C' : '#64748B',
+                            border: '1px solid #E2E8F0',
+                          }}
+                        >
+                          {idx + 1}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0F172A' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {g.image ? (
+                            <img src={convertImg(g.image, 60)} alt="" style={{ width: 28, height: 38, borderRadius: 5, objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: 28, height: 38, borderRadius: 5, background: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 12 }}>
+                              <i className="fas fa-masks-theater" />
+                            </div>
+                          )}
+                          <div>
+                            <div>{g.name}</div>
+                            <div style={{ fontSize: 10.5, color: '#64748B', fontWeight: 500 }}>
+                              {g.difficulty} · {g.playersStr}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 700, color: '#0F172A' }}>
+                        {g.sessions} รอบ
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>
+                        {g.players} คน
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0078D4' }}>
+                        ฿{g.totalRevenue.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#059669' }}>
+                        ฿{g.arpu.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                          <div style={{ width: 60, height: 6, borderRadius: 3, background: '#E2E8F0', overflow: 'hidden' }}>
+                            <div style={{ width: `${g.revShare}%`, height: '100%', background: '#0078D4' }} />
+                          </div>
+                          <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B' }}>{g.revShare}%</span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {scriptMatrix.length === 0 && (
+                    <tr>
+                      <td colSpan={7} style={{ textAlign: 'center', padding: '24px', color: '#94A3B8' }}>
+                        ไม่มีข้อมูลสคริปต์ในช่วงเวลานี้
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-
-            <div style={{ background:'var(--surface-page)', borderRadius:10, padding:'12px 14px', marginBottom:20, border:'1px solid var(--border-default)' }}>
-              <p style={{ margin:0, fontSize:11, color:'var(--text-tertiary)', lineHeight:1.7 }}>
-                <i className="fas fa-info-circle" style={{ marginRight:6, color:'var(--crimson-500)' }} />
-                ไฟล์ CSV จะมี 19 คอลัมน์ตามรูปแบบที่กำหนด<br />
-                เปิดใน Google Sheets: <strong>File → Import → Upload</strong>
-              </p>
-            </div>
-
-            <button onClick={generateReport} disabled={reportLoading}
-              style={{ width:'100%', padding:'14px', borderRadius:10, background:'var(--crimson-500)', color:'#fff', border:'none', cursor: reportLoading ? 'not-allowed' : 'pointer', fontSize:14, fontWeight:800, fontFamily:"'Sarabun',sans-serif", opacity: reportLoading ? 0.7 : 1, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-              {reportLoading
-                ? <><div style={{ width:16, height:16, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} /> กำลังสร้าง Report...</>
-                : <><i className="fas fa-download" /> ดาวน์โหลด {MONTHS_TH[reportMonth]} {reportYear}</>
-              }
-            </button>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
           </div>
         </div>
       )}
 
-      {/* ── KPI row ── */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:10 }}>
-        <span style={{ fontSize:13, fontWeight:700, color:'var(--text-tertiary)' }}>ภาพรวมธุรกิจ</span>
-        <button onClick={() => setReportOpen(true)}
-          style={{ display:'flex', alignItems:'center', gap:8, padding:'9px 18px', borderRadius:8, background:'var(--surface-card)', border:'1px solid var(--border-default)', color:'var(--text-primary)', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:"'Sarabun',sans-serif", transition:'border-color 0.18s, color 0.18s' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.color='var(--crimson-500)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border-default)'; e.currentTarget.style.color='var(--text-primary)' }}>
-          <i className="fas fa-file-export" />
-          Report รายเดือน
-        </button>
-      </div>
-      <div className="dash-kpi-grid">
-        <KpiCard icon="fa-calendar-day" color="var(--crimson-500)" label="วันนี้"
-          value={`฿${sum(todayPay).toLocaleString()}`}
-          sub={`${todayPay.length} ปาร์ตี้ · ${players(todayPay)} ผู้เล่น`} />
-        <KpiCard icon="fa-calendar-week" color="#60a5fa" /* ds-allow-hardcode */ label="สัปดาห์นี้"
-          value={`฿${sum(weekPay).toLocaleString()}`}
-          sub={`${weekPay.length} ปาร์ตี้`} />
-        <KpiCard icon="fa-calendar-alt" color="#4ade80" /* ds-allow-hardcode */ label="เดือนนี้"
-          value={`฿${sum(monthPay).toLocaleString()}`}
-          sub={`${monthPay.length} ปาร์ตี้ · ${players(monthPay)} ผู้เล่น`} />
-        <KpiCard icon="fa-users" color="#a78bfa" /* ds-allow-hardcode */ label="สมาชิก"
-          value={members.length}
-          sub={`+${newMembers.length} เดือนนี้`} />
-        <KpiCard icon="fa-scroll" color="#fbbf24" /* ds-allow-hardcode */ label="สคริปต์"
-          value={allGames.length}
-          sub={`${topGames.length} เกมที่เคยเล่น`} />
-        <KpiCard icon="fa-coins" color="#fb923c" /* ds-allow-hardcode */ label="รายได้รวม"
-          value={`฿${(totalGame+totalFood).toLocaleString()}`}
-          sub={`เกม ฿${totalGame.toLocaleString()} · อาหาร ฿${totalFood.toLocaleString()}`} />
-      </div>
-
-      {/* ── Evaluations KPI Row ── */}
-      <div style={{ marginTop: 14, background: 'var(--surface-card)', borderRadius: 14, border: '1px solid var(--border-default)', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-          <div style={{ width: 44, height: 44, borderRadius: 12, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20 }}>
-            <i className="fas fa-star" />
-          </div>
-          <div>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              ความพึงพอใจลูกค้า ({evalList.length} รีวิว)
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 3 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
-                เกม: <strong style={{ color: '#f59e0b' }}>⭐ {evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.gameRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
-              </span>
-              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
-                DM: <strong style={{ color: '#ec4899' }}><i className="fas fa-crown" style={{ fontSize: 11, marginRight: 4 }} />{evalList.length > 0 ? (evalList.reduce((s, e) => s + (Number(e.dmRating) || 0), 0) / evalList.length).toFixed(1) : '—'}</strong>/5
-              </span>
-            </div>
-          </div>
-        </div>
-        {onGoTab && (
-          <button
-            onClick={() => onGoTab('evaluations')}
+      {/* ── VIEW 2: SCRIPT & GAME INTELLIGENCE (ประสิทธิภาพสคริปต์) ── */}
+      {activeView === 'scripts' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Top Scripts Horizontal Bar Chart */}
+          <div
             style={{
-              padding: '8px 16px', borderRadius: 8, background: 'var(--surface-page)',
-              border: '1px solid var(--border-default)', color: 'var(--text-primary)',
-              cursor: 'pointer', fontSize: 13, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
-              fontFamily: "'Sarabun',sans-serif"
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
             }}
           >
-            ดูแบบประเมินทั้งหมด <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
-          </button>
-        )}
-      </div>
-
-      {/* ── Range selector ── */}
-      <div className="dash-range-row">
-        <span className="dash-section-title"><i className="fas fa-chart-bar" /> ยอดขายรายวัน</span>
-        <div className="dash-range-btns">
-          {[7,14,30].map(d => (
-            <button key={d} className={`dash-range-btn${range===d?' active':''}`} onClick={()=>setRange(d)}>
-              {d} วัน
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* ── Daily revenue bar chart ── */}
-      <div className="dash-chart-card">
-        <ResponsiveContainer width="100%" height={220}>
-          <BarChart data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-            <XAxis dataKey="date" tick={{ fontSize: 11, fill: CHART_AXIS }} />
-            <YAxis tickFormatter={fmtMoney} tick={{ fontSize: 11, fill: CHART_AXIS }} width={40} />
-            <Tooltip formatter={(v) => `฿${v.toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-            <Legend iconSize={10} wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="ค่าเกม" fill={CHART_COLORS[0]} radius={[3,3,0,0]} />
-            <Bar dataKey="ค่าอาหาร" fill={CHART_BAR_FOOD} radius={[3,3,0,0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* ── Second row: Party trend + Pie ── */}
-      <div className="dash-row2">
-        {/* Party & player trend */}
-        <div className="dash-chart-card">
-          <div className="dash-chart-title">ผู้เล่นต่อวัน</div>
-          <ResponsiveContainer width="100%" height={180}>
-            <LineChart data={dailyData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: CHART_AXIS }} />
-              <YAxis tick={{ fontSize: 10, fill: CHART_AXIS }} width={25} />
-              <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              <Line type="monotone" dataKey="ผู้เล่น" stroke={CHART_LINE_PLAYER} strokeWidth={2} dot={{ r: 3 }} />
-              <Line type="monotone" dataKey="ปาร์ตี้" stroke={CHART_LINE_PARTY} strokeWidth={2} dot={{ r: 3 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-        {/* Pie: game vs food */}
-        <div className="dash-chart-card">
-          <div className="dash-chart-title">สัดส่วนรายได้</div>
-          {(totalGame + totalFood) > 0 ? (
-            <ResponsiveContainer width="100%" height={180}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={72}
-                  dataKey="value" label={({ name, percent }) => `${name} ${(percent*100).toFixed(0)}%`}
-                  labelLine={false} fontSize={11}>
-                  {pieData.map((_, i) => <Cell key={i} fill={CHART_COLORS[i]} />)}
-                </Pie>
-                <Tooltip formatter={v => `฿${v.toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="adm-empty" style={{height:180,display:'flex',alignItems:'center',justifyContent:'center'}}>ยังไม่มีข้อมูล</div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Third row: Top food + Top games ── */}
-      <div className="dash-row2">
-        {/* Top food */}
-        <div className="dash-chart-card">
-          <div className="dash-chart-title"><i className="fas fa-utensils" /> เมนูยอดนิยม (รายได้)</div>
-          {topFoods.length > 0 ? (
-            <ResponsiveContainer width="100%" height={Math.max(160, topFoods.length*34)}>
-              <BarChart data={topFoods} layout="vertical" margin={{ top: 0, right: 50, left: 10, bottom: 0 }}>
-                <XAxis type="number" tickFormatter={fmtMoney} tick={{ fontSize: 10, fill: CHART_AXIS }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART_AXIS_LG }} width={80} />
-                <Tooltip formatter={(v, n) => n === 'revenue' ? `฿${v.toLocaleString()}` : `${v} ชิ้น`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="revenue" name="รายได้" fill={CHART_BAR_FOOD} radius={[0,4,4,0]}
-                  label={{ position: 'right', formatter: v => `฿${fmtMoney(v)}`, fontSize: 10, fill: CHART_AXIS }} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="adm-empty">ยังไม่มีข้อมูล</div>
-          )}
-        </div>
-
-        {/* Top games */}
-        <div className="dash-chart-card">
-          <div className="dash-chart-title"><i className="fas fa-scroll" /> เกมยอดนิยม (รอบ)</div>
-          {topGames.length > 0 ? (
-            <ResponsiveContainer width="100%" height={Math.max(160, topGames.length*34)}>
-              <BarChart data={topGames} layout="vertical" margin={{ top: 0, right: 40, left: 10, bottom: 0 }}>
-                <XAxis type="number" tick={{ fontSize: 10, fill: CHART_AXIS }} />
-                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART_AXIS_LG }} width={90} />
-                <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                <Bar dataKey="รอบ" fill={CHART_COLORS[0]} radius={[0,4,4,0]}
-                  label={{ position: 'right', fontSize: 10, fill: CHART_AXIS }} />
-                <Bar dataKey="ผู้เล่น" fill={CHART_BAR_PLAYERS} radius={[0,4,4,0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="adm-empty">ยังไม่มีข้อมูล</div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Recent payments ── */}
-      <div className="dash-chart-card">
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div className="dash-chart-title" style={{ margin: 0 }}><i className="fas fa-receipt" /> ออเดอร์ล่าสุด</div>
-          {onGoTab && (
-            <button
-              onClick={() => onGoTab('history')}
-              style={{
-                padding: '6px 14px', borderRadius: 8, background: 'var(--surface-page)',
-                border: '1px solid var(--border-default)', color: 'var(--text-primary)',
-                cursor: 'pointer', fontSize: 12, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6,
-                fontFamily: "'Sarabun',sans-serif", transition: 'all 0.15s ease'
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor='var(--crimson-500)'; e.currentTarget.style.color='var(--crimson-500)' }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border-default)'; e.currentTarget.style.color='var(--text-primary)' }}
-            >
-              ดูประวัติ & บิลทั้งหมด <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
-            </button>
-          )}
-        </div>
-        {payments.slice(0, 10).map(p => {
-          const d = paidDate(p)
-          return (
-            <div
-              key={p.id}
-              className="dash-pay-row"
-              style={{ cursor: onGoTab ? 'pointer' : 'default', transition: 'background 0.15s ease' }}
-              onClick={() => onGoTab && onGoTab('history')}
-              title="คลิกเพื่อดูรายละเอียดในหน้าประวัติ & บิล"
-            >
-              <div className="dash-pay-left">
-                <div className="dash-pay-game">{p.scriptTitle || 'ไม่ระบุ'}</div>
-                <div className="dash-pay-meta">
-                  {p.members?.length || 0} คน
-                  {p.dm && ` · DM: ${p.dm}`}
-                  {p.room && ` · ${p.room}`}
-                  {d && ` · ${d.toLocaleDateString('th-TH', {day:'numeric',month:'short'})} ${d.toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}`}
-                </div>
-              </div>
-              <div className="dash-pay-total">฿{(p.grandTotal||0).toLocaleString()}</div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+              <i className="fas fa-chart-simple" style={{ color: '#0078D4', marginRight: 6 }} />
+              เปรียบเทียบรายได้รวมและจำนวนรอบจัดแสดงรายสคริปต์
             </div>
-          )
-        })}
-        {payments.length === 0 && <div className="adm-empty">ยังไม่มีออเดอร์</div>}
+            <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+              แสดง 8 สคริปต์ที่มีจำนวนรอบเล่นและรายได้สูงสุด
+            </div>
+
+            {scriptMatrix.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(220, Math.min(scriptMatrix.length, 8) * 38)}>
+                <BarChart
+                  data={scriptMatrix.slice(0, 8)}
+                  layout="vertical"
+                  margin={{ top: 5, right: 60, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                  <XAxis type="number" tickFormatter={fmtMoney} tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 600 }} width={120} />
+                  <Tooltip
+                    formatter={(val, name) => [name === 'sessions' ? `${val} รอบ` : `฿${Number(val).toLocaleString()}`, name === 'sessions' ? 'จำนวนรอบ' : 'รายได้รวม']}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Bar dataKey="totalRevenue" name="รายได้รวม" fill="#0078D4" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ padding: 30, textAlign: 'center', color: '#94A3B8' }}>ไม่มีข้อมูล</div>
+            )}
+          </div>
+
+          {/* Full Script Performance Matrix Table */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+              <i className="fas fa-table-list" style={{ color: '#0D9488', marginRight: 6 }} />
+              ตารางวิเคราะห์สคริปต์แบบละเอียด (Full Script Murder Intelligence Ledger)
+            </div>
+            <div style={{ fontSize: 11, color: '#64748B', marginBottom: 14 }}>
+              ข้อมูลเจาะลึก: รอบเล่น, ผู้เล่น, ยอดค่าเกม, ค่าอาหาร, ARPU และคะแนนประเมินจริง
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', textTransform: 'uppercase', fontSize: 11, letterSpacing: '0.04em' }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>สคริปต์</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>ความยาก</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>รอบเล่น</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>ผู้เล่น</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>ค่าเกม</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>ค่า F&B</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>รายได้รวม</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>ARPU/คน</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>CSAT รีวิว</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scriptMatrix.map((g, idx) => (
+                    <tr key={g.name} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: '#64748B' }}>
+                        {idx + 1}
+                      </td>
+                      <td style={{ padding: '10px 12px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          {g.image ? (
+                            <img src={convertImg(g.image, 60)} alt="" style={{ width: 28, height: 38, borderRadius: 5, objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: 28, height: 38, borderRadius: 5, background: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 12 }}>
+                              <i className="fas fa-masks-theater" />
+                            </div>
+                          )}
+                          <div>
+                            <div style={{ fontWeight: 800, color: '#0F172A' }}>{g.name}</div>
+                            <div style={{ fontSize: 10.5, color: '#64748B' }}>{g.playersStr}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 6, ...getDiffBadgeStyle(g.difficulty) }}>
+                          {g.difficulty}
+                        </span>
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: '#0F172A' }}>
+                        {g.sessions}
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center', color: '#475569' }}>
+                        {g.players}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0078D4', fontWeight: 700 }}>
+                        ฿{g.gameRevenue.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10B981', fontWeight: 700 }}>
+                        ฿{g.foodRevenue.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0F172A' }}>
+                        ฿{g.totalRevenue.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#059669' }}>
+                        ฿{g.arpu.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '10px', textAlign: 'center' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, fontWeight: 800, color: '#D97706', fontSize: 11.5 }}>
+                          <i className="fas fa-star" style={{ fontSize: 10 }} />
+                          {g.rating}
+                          <span style={{ fontSize: 9.5, color: '#94A3B8', fontWeight: 500 }}>({g.evalCount})</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {scriptMatrix.length === 0 && (
+                    <tr>
+                      <td colSpan={10} style={{ padding: 24, textAlign: 'center', color: '#94A3B8' }}>
+                        ไม่มีข้อมูลสคริปต์
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW 3: FOOD & BEVERAGE ANALYTICS (อาหาร & เครื่องดื่ม) ── */}
+      {activeView === 'fb' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* F&B Top Cards */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: '14px 16px', borderTop: '3.5px solid #10B981' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>ยอดขาย F&B รวม</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#10B981', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 2 }}>
+                ฿{foodRevenue.toLocaleString()}
+              </div>
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 3 }}>
+                คิดเป็น {foodSharePct}% ของยอดขายทั้งหมด
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: '14px 16px', borderTop: '3.5px solid #0078D4' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>จำนวนชิ้นที่จำหน่าย</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#0078D4', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 2 }}>
+                {foodMatrix.reduce((s, f) => s + f.qty, 0).toLocaleString()} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>ชิ้น</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 3 }}>
+                จากทั้งหมด {foodMatrix.length} รายการเมนู
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: 12, border: '1px solid #E2E8F0', padding: '14px 16px', borderTop: '3.5px solid #F59E0B' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>F&B ต่อรอบเล่น (AOV)</div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#F59E0B', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 2 }}>
+                ฿{avgFbPerSession.toLocaleString()} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>/ รอบ</span>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748B', marginTop: 3 }}>
+                อัตราการสั่ง (Attachment) {fbAttachmentRate}%
+              </div>
+            </div>
+          </div>
+
+          {/* F&B Ranking Horizontal Chart */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+              <i className="fas fa-burger" style={{ color: '#10B981', marginRight: 6 }} />
+              จัดอันดับเมนูอาหาร & เครื่องดื่มตามยอดขาย (Top F&B Revenue SKUs)
+            </div>
+            <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+              เปรียบเทียบยอดขายรวมของแต่ละเมนู
+            </div>
+
+            {foodMatrix.length > 0 ? (
+              <ResponsiveContainer width="100%" height={Math.max(200, Math.min(foodMatrix.length, 10) * 36)}>
+                <BarChart data={foodMatrix.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 60, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                  <XAxis type="number" tickFormatter={fmtMoney} tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 600 }} width={110} />
+                  <Tooltip formatter={val => `฿${Number(val).toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                  <Bar dataKey="revenue" name="ยอดขายรวม" fill="#10B981" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8' }}>ไม่มีรายการอาหารในช่วงเวลานี้</div>
+            )}
+          </div>
+
+          {/* F&B Ledger Table */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', marginBottom: 12 }}>
+              <i className="fas fa-list-check" style={{ color: '#0078D4', marginRight: 6 }} />
+              ตารางยอดจำหน่ายสินค้าทั้งหมด
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', textTransform: 'uppercase', fontSize: 11 }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>ชื่อเมนูอาหาร / เครื่องดื่ม</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>จำนวนที่ขายได้</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>ราคาต่อหน่วย</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>ยอดขายรวม</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>สัดส่วนยอด F&B</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {foodMatrix.map((f, idx) => {
+                    const share = foodRevenue > 0 ? Math.round((f.revenue / foodRevenue) * 100) : 0
+                    return (
+                      <tr key={f.name} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: '#64748B' }}>{idx + 1}</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0F172A' }}>{f.name}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#0078D4' }}>{f.qty} ชิ้น</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#475569' }}>฿{f.avgPrice.toLocaleString()}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#10B981' }}>฿{f.revenue.toLocaleString()}</td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}>
+                            <div style={{ width: 50, height: 6, borderRadius: 3, background: '#E2E8F0', overflow: 'hidden' }}>
+                              <div style={{ width: `${share}%`, height: '100%', background: '#10B981' }} />
+                            </div>
+                            <span style={{ fontSize: 11, fontWeight: 700, color: '#64748B' }}>{share}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW 4: OPERATIONS & DM MATRIX (DM & การใช้ห้อง) ── */}
+      {activeView === 'ops' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Peak Operational Hours Bar Chart */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+              <i className="fas fa-clock" style={{ color: '#0078D4', marginRight: 6 }} />
+              ช่วงเวลาเปิดห้องยอดนิยม (Peak Operating Hours Distribution)
+            </div>
+            <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+              ช่วยวางแผนจัดตารางเวร DM และบริหารความจุห้องเล่น
+            </div>
+
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={peakHoursData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                <XAxis dataKey="hour" tick={{ fontSize: 11, fill: '#64748B' }} />
+                <YAxis tick={{ fontSize: 11, fill: '#64748B' }} width={30} />
+                <Tooltip
+                  formatter={(val, name) => [name === 'sessions' ? `${val} รอบ` : `฿${Number(val).toLocaleString()}`, name === 'sessions' ? 'จำนวนรอบ' : 'รายได้']}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Bar dataKey="sessions" name="จำนวนรอบ" fill="#0078D4" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Room Utilization Cards Row */}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', marginBottom: 8 }}>
+              <i className="fas fa-door-open" style={{ color: '#0D9488', marginRight: 6 }} />
+              ประสิทธิภาพการใช้งานห้องจัดแสดง (Room Utilization & Revenue)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+              {roomMatrix.map(r => {
+                const share = totalRevenue > 0 ? Math.round((r.revenue / totalRevenue) * 100) : 0
+                return (
+                  <div
+                    key={r.name}
+                    style={{
+                      background: '#FFFFFF',
+                      borderRadius: 12,
+                      border: '1px solid #E2E8F0',
+                      padding: '14px 16px',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 13, fontWeight: 800, color: '#0F172A' }}>{r.name}</span>
+                      <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 10, background: '#EFF6FF', color: '#0078D4' }}>
+                        {r.sessions} รอบ
+                      </span>
+                    </div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: '#0078D4', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                      ฿{r.revenue.toLocaleString()}
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#64748B', marginTop: 4 }}>
+                      <span>ผู้เล่นรวม {r.players} คน</span>
+                      <span>สัดส่วน {share}%</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* DM Performance Ledger */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', marginBottom: 4 }}>
+              <i className="fas fa-crown" style={{ color: '#EC4899', marginRight: 6 }} />
+              ตารางสมรรถนะการจัดแสดงของ DM (Dungeon Master Operational Ledger)
+            </div>
+            <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+              แสดงจำนวนรอบจัดแสดง, ผู้เล่นที่ดูแล, ยอดขายที่บริหาร และคะแนน CSAT จากลูกค้า
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', textTransform: 'uppercase', fontSize: 11 }}>
+                    <th style={{ padding: '8px 10px', textAlign: 'center' }}>#</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>ชื่อ DM</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>จำนวนรอบจัดแสดง</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>ผู้เล่นที่ดูแล</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>รายได้รวมที่บริหาร</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>คะแนน CSAT</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dmMatrix.map((dm, idx) => (
+                    <tr key={dm.name} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                      <td style={{ padding: '10px', textAlign: 'center', fontWeight: 800, color: '#64748B' }}>{idx + 1}</td>
+                      <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0F172A' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <i className="fas fa-user-tie" style={{ color: '#64748B', fontSize: 12 }} />
+                          <span>{dm.name}</span>
+                        </div>
+                      </td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#0078D4' }}>{dm.sessions} รอบ</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#475569' }}>{dm.players} คน</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0F172A' }}>฿{dm.revenue.toLocaleString()}</td>
+                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 800, color: '#EC4899', fontSize: 12 }}>
+                          <i className="fas fa-star" style={{ fontSize: 10 }} />
+                          {dm.rating} / 5
+                          <span style={{ fontSize: 10, color: '#94A3B8' }}>({dm.evalCount})</span>
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW 5: BOOKING FUNNEL (การจอง & กรวยแปลงสภาพ) ── */}
+      {activeView === 'bookings' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Funnel Pipeline Visual Cards */}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#0F172A', marginBottom: 8 }}>
+              <i className="fas fa-filter-circle-dollar" style={{ color: '#8B5CF6', marginRight: 6 }} />
+              ขั้นตอนการจองและการแปลงสภาพ (Booking Funnel Pipeline)
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
+              {[
+                { stage: '1. สร้างการจอง', count: totalBookingsCount, color: '#0284C7', icon: 'fa-calendar-plus', sub: 'ทั้งหมดในระบบ' },
+                { stage: '2. รอชำระมัดจำ', count: waitingBookings, color: '#F59E0B', icon: 'fa-clock', sub: 'กำลังรวมตี้' },
+                { stage: '3. แอดมินยืนยัน', count: confirmedBookings, color: '#3B82F6', icon: 'fa-check-to-slot', sub: 'เปิดรับผู้เล่นต่อ' },
+                { stage: '4. ล็อกห้องสำเร็จ', count: lockedBookings, color: '#10B981', icon: 'fa-lock', sub: 'ชำระมัดจำครบ' },
+                { stage: '5. ปาร์ตี้ล่ม/ยกเลิก', count: collapsedBookings, color: '#EF4444', icon: 'fa-ban', sub: 'ชำระไม่ทันกำหนด' },
+              ].map(f => (
+                <div
+                  key={f.stage}
+                  style={{
+                    background: '#FFFFFF',
+                    borderRadius: 12,
+                    border: '1px solid #E2E8F0',
+                    borderTop: `3.5px solid ${f.color}`,
+                    padding: '12px 14px',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B' }}>{f.stage}</span>
+                    <i className={`fas ${f.icon}`} style={{ color: f.color, fontSize: 12 }} />
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                    {f.count} <span style={{ fontSize: 12, fontWeight: 600, color: '#64748B' }}>ปาร์ตี้</span>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 2 }}>{f.sub}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Bookings Summary Row */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                <i className="fas fa-calendar-check" style={{ color: '#0078D4', marginRight: 6 }} />
+                รายการการจองล่าสุดในระบบ (Recent Bookings Ledger)
+              </div>
+              {onGoTab && (
+                <button
+                  type="button"
+                  onClick={() => onGoTab('bookings')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    background: '#F1F5F9',
+                    color: '#0078D4',
+                    border: '1px solid #CBD5E1',
+                    fontSize: 11.5,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  จัดการการจองทั้งหมด <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
+                </button>
+              )}
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+                <thead>
+                  <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', textTransform: 'uppercase', fontSize: 11 }}>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>สคริปต์</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>วันที่ & เวลา</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left' }}>หัวหน้าตี้</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>สมาชิก</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'center' }}>สถานะ</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'right' }}>มัดจำรวม</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBookings.slice(0, 10).map(b => {
+                    const paidMembers = b.members?.filter(m => m.paidDeposit)?.length || 0
+                    const maxM = b.maxMembers || 6
+                    return (
+                      <tr key={b.id} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0F172A' }}>
+                          {b.gameName || 'ไม่ระบุสคริปต์'}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#475569' }}>
+                          {b.date} · {b.time} น.
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#0F172A', fontWeight: 600 }}>
+                          {b.leaderName || 'ไม่ระบุ'}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span style={{ fontWeight: 700, color: paidMembers >= maxM ? '#10B981' : '#0F172A' }}>
+                            {b.members?.length || 0} / {maxM} คน
+                          </span>
+                          <span style={{ fontSize: 10, color: '#64748B', display: 'block' }}>
+                            มัดจำ {paidMembers} คน
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 6,
+                              background: b.status === 'locked' ? '#DCFCE7' : b.status === 'confirmed' ? '#EFF6FF' : b.status === 'collapsed' ? '#FEE2E2' : '#FEF3C7',
+                              color: b.status === 'locked' ? '#166534' : b.status === 'confirmed' ? '#1D4ED8' : b.status === 'collapsed' ? '#991B1B' : '#B45309',
+                            }}
+                          >
+                            {b.status === 'locked' ? 'ล็อกห้องแล้ว' : b.status === 'confirmed' ? 'ยืนยันแล้ว' : b.status === 'collapsed' ? 'ปาร์ตี้ล่ม' : 'รอชำระมัดจำ'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0078D4' }}>
+                          ฿{((paidMembers + (b.paidEmptySeats?.length || 0)) * (Number(b.depositAmount) || 0)).toLocaleString()}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {filteredBookings.length === 0 && (
+                    <tr>
+                      <td colSpan={6} style={{ padding: 24, textAlign: 'center', color: '#94A3B8' }}>
+                        ไม่มีข้อมูลการจองในช่วงเวลานี้
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── POWER BI TRANSACTION LEDGER (ตารางประวัติธุรกรรม & บิลการเงิน) ── */}
+      <div
+        style={{
+          background: '#FFFFFF',
+          borderRadius: 14,
+          padding: '16px 20px',
+          border: '1px solid #E2E8F0',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 12 }}>
+          <div>
+            <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+              <i className="fas fa-receipt" style={{ color: '#0078D4', marginRight: 6 }} />
+              ตารางธุรกรรมการเงินและบิลแคชเชียร์ (Power BI Transaction Ledger)
+            </div>
+            <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+              ค้นหาและกรองรายละเอียดรายการชำระเงินจริงจากแคชเชียร์ POS
+            </div>
+          </div>
+
+          {/* Search Box & Quick Filters */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <div style={{ position: 'relative' }}>
+              <i className="fas fa-search" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: 11 }} />
+              <input
+                type="text"
+                placeholder="ค้นหาสคริปต์, DM, ห้อง..."
+                value={ledgerSearch}
+                onChange={e => setLedgerSearch(e.target.value)}
+                style={{
+                  height: 32,
+                  padding: '0 10px 0 28px',
+                  borderRadius: 8,
+                  border: '1px solid #CBD5E1',
+                  fontSize: 12,
+                  color: '#0F172A',
+                  outline: 'none',
+                  width: 170,
+                }}
+              />
+            </div>
+
+            <select
+              value={ledgerFilter}
+              onChange={e => setLedgerFilter(e.target.value)}
+              style={{
+                height: 32,
+                padding: '0 8px',
+                borderRadius: 8,
+                border: '1px solid #CBD5E1',
+                fontSize: 12,
+                color: '#0F172A',
+                background: '#FFFFFF',
+                cursor: 'pointer',
+                outline: 'none',
+              }}
+            >
+              <option value="ALL">ทั้งหมด ({filteredPayments.length})</option>
+              <option value="with_food">เฉพาะมีสั่งอาหาร</option>
+              <option value="game_only">เฉพาะค่าเกม</option>
+            </select>
+
+            {onGoTab && (
+              <button
+                type="button"
+                onClick={() => onGoTab('history')}
+                style={{
+                  height: 32,
+                  padding: '0 12px',
+                  borderRadius: 8,
+                  background: '#F1F5F9',
+                  color: '#0078D4',
+                  border: '1px solid #CBD5E1',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 5,
+                }}
+              >
+                <span>ดูบิลทั้งหมด</span>
+                <i className="fas fa-arrow-right" style={{ fontSize: 10 }} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Ledger Table */}
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12.5 }}>
+            <thead>
+              <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', textTransform: 'uppercase', fontSize: 11 }}>
+                <th style={{ padding: '8px 12px', textAlign: 'left' }}>วันเวลา</th>
+                <th style={{ padding: '8px 12px', textAlign: 'left' }}>สคริปต์เกม</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left' }}>ห้อง</th>
+                <th style={{ padding: '8px 10px', textAlign: 'left' }}>DM</th>
+                <th style={{ padding: '8px 10px', textAlign: 'center' }}>ผู้เล่น</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right' }}>ค่าอาหาร</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right' }}>ค่าเกม</th>
+                <th style={{ padding: '8px 12px', textAlign: 'right' }}>รวมสุทธิ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredLedgerPayments.slice(0, 15).map(p => {
+                const dt = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => onGoTab && onGoTab('history')}
+                    style={{ borderBottom: '1px solid #F1F5F9', cursor: onGoTab ? 'pointer' : 'default', transition: 'background 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#F8FAFC'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    title="คลิกเพื่อดูรายละเอียดในหน้าประวัติ & บิล"
+                  >
+                    <td style={{ padding: '10px 12px', color: '#64748B', whiteSpace: 'nowrap' }}>
+                      {dt ? `${dt.toLocaleDateString('th-TH', { day: 'numeric', month: 'short' })} ${dt.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}` : '-'}
+                    </td>
+                    <td style={{ padding: '10px 12px', fontWeight: 800, color: '#0F172A' }}>
+                      {p.scriptTitle || 'ไม่ระบุสคริปต์'}
+                    </td>
+                    <td style={{ padding: '10px', color: '#475569' }}>
+                      {p.room || '-'}
+                    </td>
+                    <td style={{ padding: '10px', color: '#475569' }}>
+                      {p.dm || '-'}
+                    </td>
+                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 700, color: '#0F172A' }}>
+                      {p.members?.length || 0} คน
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: p.foodTotal > 0 ? '#10B981' : '#94A3B8', fontWeight: p.foodTotal > 0 ? 700 : 400 }}>
+                      ฿{(p.foodTotal || 0).toLocaleString()}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0078D4', fontWeight: 700 }}>
+                      ฿{(p.gameTotal || 0).toLocaleString()}
+                    </td>
+                    <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0F172A' }}>
+                      ฿{(p.grandTotal || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                )
+              })}
+              {filteredLedgerPayments.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ padding: 24, textAlign: 'center', color: '#94A3B8' }}>
+                    ไม่พบรายการธุรกรรมที่ค้นหา
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
+      {/* ── REPORT CSV EXPORT MODAL ── */}
+      {reportOpen && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            zIndex: 9000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 20,
+          }}
+          onClick={e => e.target === e.currentTarget && setReportOpen(false)}
+        >
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 16,
+              padding: '32px 28px',
+              width: '100%',
+              maxWidth: 420,
+              boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
+              border: '1px solid #E2E8F0',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+              <div>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 900, color: '#0F172A' }}>
+                  <i className="fas fa-file-excel" style={{ color: '#10B981', marginRight: 10 }} />
+                  Export Power BI Report
+                </h3>
+                <p style={{ margin: '4px 0 0', fontSize: 12, color: '#64748B' }}>
+                  ดาวน์โหลดไฟล์ CSV 19 คอลัมน์สำหรับ Excel และ Google Sheets
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportOpen(false)}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, color: '#94A3B8', padding: 4 }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 6, textTransform: 'uppercase' }}>
+                  เดือน
+                </label>
+                <select
+                  value={reportMonth}
+                  onChange={e => setReportMonth(Number(e.target.value))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, outline: 'none' }}
+                >
+                  {MONTHS_TH.map((m, i) => <option key={i} value={i}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#64748B', marginBottom: 6, textTransform: 'uppercase' }}>
+                  ปี
+                </label>
+                <select
+                  value={reportYear}
+                  onChange={e => setReportYear(Number(e.target.value))}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #CBD5E1', fontSize: 13, outline: 'none' }}
+                >
+                  {[nowR.getFullYear() - 1, nowR.getFullYear(), nowR.getFullYear() + 1].map(y => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '12px 14px', marginBottom: 20, border: '1px solid #E2E8F0', fontSize: 11.5, color: '#64748B', lineHeight: 1.6 }}>
+              <i className="fas fa-info-circle" style={{ marginRight: 6, color: '#0078D4' }} />
+              ข้อมูลครอบคลุมรายได้ค่าเกม, ค่าอาหาร, ส่วนลด, DM, NPC, และจำนวนผู้เล่น พร้อมใช้งานใน Power BI Desktop
+            </div>
+
+            <button
+              type="button"
+              onClick={generateReport}
+              disabled={reportLoading}
+              style={{
+                width: '100%',
+                padding: '13px',
+                borderRadius: 10,
+                background: 'linear-gradient(135deg, #0078D4 0%, #0284C7 100%)',
+                color: '#FFFFFF',
+                border: 'none',
+                cursor: reportLoading ? 'not-allowed' : 'pointer',
+                fontSize: 14,
+                fontWeight: 800,
+                opacity: reportLoading ? 0.7 : 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+              }}
+            >
+              {reportLoading ? (
+                <>
+                  <i className="fas fa-spinner fa-spin" />
+                  <span>กำลังสร้างรายงาน...</span>
+                </>
+              ) : (
+                <>
+                  <i className="fas fa-download" />
+                  <span>ดาวน์โหลด {MONTHS_TH[reportMonth]} {reportYear}</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   )
