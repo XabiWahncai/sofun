@@ -319,6 +319,49 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
     { name: 'ค่าอาหาร & เครื่องดื่ม', value: foodRevenue, color: '#10B981' },
   ], [gameRevenue, foodRevenue])
 
+  // ── Executive Stats for Separated Visuals ─────────────────────────────────
+  const gameStats = useMemo(() => {
+    let peakVal = 0
+    let peakDate = ''
+    dailyTrendData.forEach(d => {
+      const v = d['ค่าเกม'] || 0
+      if (v > peakVal) {
+        peakVal = v
+        peakDate = d.date
+      }
+    })
+    const avg = dailyTrendData.length > 0 ? Math.round(gameRevenue / dailyTrendData.length) : 0
+    return { peakVal, peakDate, avg }
+  }, [dailyTrendData, gameRevenue])
+
+  const foodStats = useMemo(() => {
+    let peakVal = 0
+    let peakDate = ''
+    dailyTrendData.forEach(d => {
+      const v = d['ค่าอาหาร'] || 0
+      if (v > peakVal) {
+        peakVal = v
+        peakDate = d.date
+      }
+    })
+    const avg = dailyTrendData.length > 0 ? Math.round(foodRevenue / dailyTrendData.length) : 0
+    return { peakVal, peakDate, avg }
+  }, [dailyTrendData, foodRevenue])
+
+  const playerStats = useMemo(() => {
+    let peakVal = 0
+    let peakDate = ''
+    dailyTrendData.forEach(d => {
+      const v = d['ผู้เล่น'] || 0
+      if (v > peakVal) {
+        peakVal = v
+        peakDate = d.date
+      }
+    })
+    const avg = dailyTrendData.length > 0 ? (totalPlayers / dailyTrendData.length).toFixed(1) : '0'
+    return { peakVal, peakDate, avg }
+  }, [dailyTrendData, totalPlayers])
+
   // ── Script / Game Intelligence Matrix ─────────────────────────────────────
   const scriptMatrix = useMemo(() => {
     const map = {}
@@ -973,61 +1016,17 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
       {/* ── VIEW 1: EXECUTIVE SUMMARY (ภาพรวมบริหาร) ── */}
       {activeView === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {/* Main Visuals Row: Revenue Trend (Composed) + Donut Mix */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 14 }}>
-            {/* Revenue Trend Visual */}
+          {/* Main Visuals 2x2 Matrix: 1. Game Fees | 2. Food Fees | 3. Players & Sessions | 4. Sales Mix */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+
+            {/* Visual 1: Game Revenue Trend (แยกกราฟ ค่าเกม) */}
             <div
               style={{
                 background: '#FFFFFF',
                 borderRadius: 14,
                 padding: '16px 20px',
                 border: '1px solid #E2E8F0',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div>
-                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
-                    <i className="fas fa-chart-line" style={{ color: '#0078D4', marginRight: 6 }} />
-                    แนวโน้มรายได้ & จำนวนผู้เล่น (Revenue & Player Trend)
-                  </div>
-                  <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                    แท่ง: ค่าเกม (น้ำเงิน) + ค่าอาหาร (เขียว) | เส้น: ผู้เล่น (ส้ม)
-                  </div>
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#0F172A', background: '#F8FAFC', padding: '4px 10px', borderRadius: 8, border: '1px solid #E2E8F0' }}>
-                  ฿{totalRevenue.toLocaleString()}
-                </div>
-              </div>
-
-              <ResponsiveContainer width="100%" height={260}>
-                <ComposedChart data={dailyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
-                  <XAxis dataKey="date" tick={{ fontSize: 10.5, fill: '#64748B' }} />
-                  <YAxis yAxisId="left" tickFormatter={fmtMoney} tick={{ fontSize: 10.5, fill: '#64748B' }} width={42} />
-                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10.5, fill: '#D97706' }} width={25} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.08)', fontSize: 12 }}
-                    formatter={(val, name) => {
-                      if (name === 'ผู้เล่น' || name === 'รอบเล่น') return [`${val} คน`, name]
-                      return [`฿${Number(val).toLocaleString()}`, name]
-                    }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
-                  <Bar yAxisId="left" dataKey="ค่าเกม" stackId="a" fill="#0078D4" radius={[0, 0, 0, 0]} />
-                  <Bar yAxisId="left" dataKey="ค่าอาหาร" stackId="a" fill="#10B981" radius={[3, 3, 0, 0]} />
-                  <Line yAxisId="right" type="monotone" dataKey="ผู้เล่น" stroke="#D97706" strokeWidth={2.5} dot={{ r: 3, fill: '#D97706' }} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-
-            {/* Revenue Category Share Donut */}
-            <div
-              style={{
-                background: '#FFFFFF',
-                borderRadius: 14,
-                padding: '16px 20px',
-                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #0078D4',
                 boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
                 display: 'flex',
                 flexDirection: 'column',
@@ -1035,57 +1034,253 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
               }}
             >
               <div>
-                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
-                  <i className="fas fa-chart-pie" style={{ color: '#10B981', marginRight: 6 }} />
-                  สัดส่วนรายได้ (Sales Mix)
-                </div>
-                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
-                  การกระจายตัวของค่าเกมเทียบกับ F&B
-                </div>
-              </div>
-
-              {totalRevenue > 0 ? (
-                <div style={{ position: 'relative', width: '100%', height: 190 }}>
-                  <ResponsiveContainer width="100%" height={190}>
-                    <PieChart>
-                      <Pie
-                        data={pieData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={52}
-                        outerRadius={78}
-                        dataKey="value"
-                        paddingAngle={3}
-                      >
-                        {pieData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={v => `฿${Number(v).toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                  {/* Center Metric */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      textAlign: 'center',
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>รวม</div>
-                    <div style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif" }}>
-                      ฿{fmtMoney(totalRevenue)}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EFF6FF', color: '#0078D4', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                      <i className="fas fa-gamepad" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                        ยอดค่าเกมรายวัน (Game Fees)
+                      </div>
+                      <div style={{ fontSize: 10.5, color: '#64748B' }}>
+                        เฉลี่ย ฿{gameStats.avg.toLocaleString()} / วัน {gameStats.peakVal > 0 ? `· พีค ฿${gameStats.peakVal.toLocaleString()} (${gameStats.peakDate})` : ''}
+                      </div>
                     </div>
                   </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#0078D4', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      ฿{gameRevenue.toLocaleString()}
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#0078D4', background: '#EFF6FF', padding: '1px 6px', borderRadius: 4 }}>
+                      {gameSharePct}% ของรายได้
+                    </span>
+                  </div>
                 </div>
-              ) : (
-                <div style={{ height: 190, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 12 }}>
-                  ไม่มีข้อมูลธุรกรรม
+
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={dailyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                    <YAxis tickFormatter={fmtMoney} tick={{ fontSize: 10.5, fill: '#64748B' }} width={42} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.08)', fontSize: 12 }}
+                      formatter={val => [`฿${Number(val).toLocaleString()}`, 'ยอดค่าเกม']}
+                    />
+                    <Bar dataKey="ค่าเกม" name="ยอดค่าเกม" fill="#0078D4" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#64748B' }}>
+                <span>รอบเล่นรวม {totalSessions} รอบ</span>
+                <span>เฉลี่ย ฿{totalPlayers > 0 ? Math.round(gameRevenue / totalPlayers) : 0} / ผู้เล่น</span>
+              </div>
+            </div>
+
+            {/* Visual 2: Food & Beverage Revenue Trend (แยกกราฟ ค่าอาหาร) */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #10B981',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: '#ECFDF5', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                      <i className="fas fa-utensils" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                        ยอดค่าอาหาร & เครื่องดื่มรายวัน (F&B Fees)
+                      </div>
+                      <div style={{ fontSize: 10.5, color: '#64748B' }}>
+                        เฉลี่ย ฿{foodStats.avg.toLocaleString()} / วัน {foodStats.peakVal > 0 ? `· พีค ฿${foodStats.peakVal.toLocaleString()} (${foodStats.peakDate})` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#10B981', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      ฿{foodRevenue.toLocaleString()}
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#047857', background: '#ECFDF5', padding: '1px 6px', borderRadius: 4 }}>
+                      {foodSharePct}% ของรายได้
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={dailyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                    <YAxis tickFormatter={fmtMoney} tick={{ fontSize: 10.5, fill: '#64748B' }} width={42} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.08)', fontSize: 12 }}
+                      formatter={val => [`฿${Number(val).toLocaleString()}`, 'ยอดค่าอาหาร & เครื่องดื่ม']}
+                    />
+                    <Bar dataKey="ค่าอาหาร" name="ยอดค่าอาหาร" fill="#10B981" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#64748B' }}>
+                <span>อัตราการสั่ง F&B: {fbAttachmentRate}% ของปาร์ตี้</span>
+                <span>เฉลี่ย ฿{avgFbPerSession} / รอบเล่น</span>
+              </div>
+            </div>
+
+            {/* Visual 3: Player Volume & Sessions Trend (แยกกราฟ จำนวนผู้เล่น) */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #D97706',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: '#FEF3C7', color: '#D97706', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                      <i className="fas fa-users" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                        จำนวนผู้เล่น & รอบจัดแสดง (Player Volume)
+                      </div>
+                      <div style={{ fontSize: 10.5, color: '#64748B' }}>
+                        เฉลี่ย {playerStats.avg} คน / วัน {playerStats.peakVal > 0 ? `· พีค ${playerStats.peakVal} คน (${playerStats.peakDate})` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#D97706', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      {totalPlayers} <span style={{ fontSize: 12, fontWeight: 600 }}>คน</span>
+                    </div>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: '#6D28D9', background: '#EDE9FE', padding: '1px 6px', borderRadius: 4 }}>
+                      {totalSessions} รอบจัดแสดง
+                    </span>
+                  </div>
+                </div>
+
+                <ResponsiveContainer width="100%" height={210}>
+                  <ComposedChart data={dailyTrendData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                    <XAxis dataKey="date" tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                    <YAxis yAxisId="left" tick={{ fontSize: 10.5, fill: '#64748B' }} width={28} />
+                    <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10.5, fill: '#8B5CF6' }} width={24} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: 10, border: '1px solid #E2E8F0', boxShadow: '0 4px 14px rgba(0,0,0,0.08)', fontSize: 12 }}
+                      formatter={(val, name) => [name === 'ผู้เล่น' ? `${val} คน` : `${val} รอบ`, name]}
+                    />
+                    <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
+                    <Bar yAxisId="left" dataKey="ผู้เล่น" name="ผู้เล่น" fill="#D97706" radius={[4, 4, 0, 0]} />
+                    <Line yAxisId="right" type="monotone" dataKey="รอบเล่น" name="รอบเล่น" stroke="#8B5CF6" strokeWidth={2.5} dot={{ r: 3, fill: '#8B5CF6' }} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div style={{ borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 11, color: '#64748B' }}>
+                <span>แท่งสีส้ม: ผู้เล่น (คน)</span>
+                <span>เส้นสีม่วง: จำนวนรอบจัดแสดง (รอบ)</span>
+              </div>
+            </div>
+
+            {/* Visual 4: Revenue Category Share Donut (สัดส่วนรายได้ภาพรวม) */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #6366F1',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 28, height: 28, borderRadius: 8, background: '#EEF2FF', color: '#6366F1', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13 }}>
+                      <i className="fas fa-chart-pie" />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A' }}>
+                        สัดส่วนรายได้ภาพรวม (Sales Mix)
+                      </div>
+                      <div style={{ fontSize: 10.5, color: '#64748B' }}>
+                        การกระจายตัวของค่าเกมเทียบกับ F&B
+                      </div>
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 16, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      ฿{totalRevenue.toLocaleString()}
+                    </div>
+                    <span style={{ fontSize: 10.5, color: '#64748B' }}>
+                      รายได้รวมสุทธิ
+                    </span>
+                  </div>
+                </div>
+
+                {totalRevenue > 0 ? (
+                  <div style={{ position: 'relative', width: '100%', height: 180 }}>
+                    <ResponsiveContainer width="100%" height={180}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={50}
+                          outerRadius={75}
+                          dataKey="value"
+                          paddingAngle={3}
+                        >
+                          {pieData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip formatter={v => `฿${Number(v).toLocaleString()}`} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Center Metric */}
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        textAlign: 'center',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700, textTransform: 'uppercase' }}>รวม</div>
+                      <div style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                        ฿{fmtMoney(totalRevenue)}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ height: 180, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#94A3B8', fontSize: 12 }}>
+                    ไม่มีข้อมูลธุรกรรม
+                  </div>
+                )}
+              </div>
 
               {/* Legend Summary */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, borderTop: '1px solid #F1F5F9', paddingTop: 8 }}>
@@ -1105,6 +1300,7 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
                 </div>
               </div>
             </div>
+
           </div>
 
           {/* Quick Top 5 Scripts Performance Table */}
