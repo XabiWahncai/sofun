@@ -265,6 +265,20 @@ const fmtCurrency = (val) => {
   return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+export const parseDiscountValue = (val) => {
+  if (val === null || val === undefined) return 0
+  if (typeof val === 'number') return isNaN(val) ? 0 : val
+  if (typeof val === 'string') {
+    const n = parseFloat(val)
+    return isNaN(n) ? 0 : n
+  }
+  if (typeof val === 'object') {
+    const n = val.value ?? val.applied ?? val.amount ?? 0
+    return Number(n) || 0
+  }
+  return 0
+}
+
 export const newPOSSession = () => ({
   id: Date.now() + Math.random(),
   label: `ปาร์ตี้ ${sessionCounter++}`,
@@ -664,8 +678,9 @@ export default function POSPage({
               room: mo.room || '',
               order: orderItems,
               confirmedOrderId: mo.id,
+              status: mo.status || 'active',
               promoName: mo.promoName || '',
-              discount: mo.discount || 0,
+              discount: parseDiscountValue(mo.discount),
               discountMode: mo.discountMode || 'perPerson',
               discountMemberIds: Array.isArray(mo.discountMemberIds) ? mo.discountMemberIds : [],
               customPrice: mo.customPrice ?? '',
@@ -702,8 +717,9 @@ export default function POSPage({
             scriptId: orderData.scriptId || session.scriptId,
             dm: orderData.dm || session.dm,
             room: orderData.room || session.room,
+            status: orderData.status || session.status || 'active',
             promoName: orderData.promoName || session.promoName || '',
-            discount: orderData.discount !== undefined ? orderData.discount : (session.discount || 0),
+            discount: orderData.discount !== undefined ? parseDiscountValue(orderData.discount) : parseDiscountValue(session.discount),
             discountMode: orderData.discountMode || session.discountMode || 'perPerson',
             discountMemberIds: Array.isArray(orderData.discountMemberIds) ? orderData.discountMemberIds : (session.discountMemberIds || []),
             customPrice: orderData.customPrice ?? session.customPrice ?? '',
@@ -751,15 +767,17 @@ export default function POSPage({
       }, 0)
       const fTotal = (session.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
       const dMode = session.discountMode || 'perPerson'
-      const dRaw = Number(session.discount) || 0
+      const dRaw = parseDiscountValue(session.discount)
       const dSelIds = Array.isArray(session.discountMemberIds) ? session.discountMemberIds : []
       const dEffIds = dSelIds.length > 0
         ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
         : newMembers.map(mm => mm.uid)
       const nD = dEffIds.length
+      const totMemberPromo = newMembers.reduce((s, m) => s + (Number(m.discount) || 0), 0)
       const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
+      const effectiveTotD = totD > 0 ? totD : totMemberPromo
       const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
-      const newGrandTotal = Math.max(0, fTotal + newGamePrice - totD - totPersonal)
+      const newGrandTotal = Math.max(0, fTotal + newGamePrice - effectiveTotD - totPersonal)
 
       const membersPayload = newMembers.map(m => ({
         uid: m.uid, name: m.name, character: m.character || '',
@@ -1012,10 +1030,37 @@ export default function POSPage({
       if (Array.isArray(data.members) && data.members.length > 0) {
         const curMembers = activeSession?.members || []
         const isMembersDiff = data.members.length !== curMembers.length ||
-          data.members.some((m, idx) => !curMembers[idx] || curMembers[idx].uid !== m.uid || curMembers[idx].name !== m.name || curMembers[idx].customGamePrice !== m.customGamePrice || curMembers[idx].unpaidDeposit !== m.unpaidDeposit || curMembers[idx].personalDiscount !== m.personalDiscount)
+          data.members.some((m, idx) => !curMembers[idx] || curMembers[idx].uid !== m.uid || curMembers[idx].name !== m.name || curMembers[idx].customGamePrice !== m.customGamePrice || curMembers[idx].unpaidDeposit !== m.unpaidDeposit || curMembers[idx].personalDiscount !== m.personalDiscount || curMembers[idx].discount !== m.discount)
         if (isMembersDiff) {
           updateActive({ members: data.members })
         }
+      }
+
+      // Keep activeSession discount, promo, and status in sync with Firestore orders
+      const firestoreDisc = parseDiscountValue(data.discount)
+      const firestorePromo = data.promoName || ''
+      const firestoreDiscMode = data.discountMode || 'perPerson'
+      const firestoreDiscMemberIds = Array.isArray(data.discountMemberIds) ? data.discountMemberIds : []
+      const firestoreStatus = data.status || 'active'
+
+      const discUpdates = {}
+      if (firestoreDisc > 0 && parseDiscountValue(activeSession?.discount) !== firestoreDisc) {
+        discUpdates.discount = firestoreDisc
+      }
+      if (firestorePromo && activeSession?.promoName !== firestorePromo) {
+        discUpdates.promoName = firestorePromo
+      }
+      if (data.discountMode && activeSession?.discountMode !== firestoreDiscMode) {
+        discUpdates.discountMode = firestoreDiscMode
+      }
+      if (data.discountMemberIds && JSON.stringify(activeSession?.discountMemberIds || []) !== JSON.stringify(firestoreDiscMemberIds)) {
+        discUpdates.discountMemberIds = firestoreDiscMemberIds
+      }
+      if (data.status && activeSession?.status !== firestoreStatus) {
+        discUpdates.status = firestoreStatus
+      }
+      if (Object.keys(discUpdates).length > 0) {
+        updateActive(discUpdates)
       }
     }, () => {})
   }, [activeId, activeSession?.confirmedOrderId])
@@ -1039,23 +1084,43 @@ export default function POSPage({
   const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
   const gamePrice = sessionMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
   const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
-  const discountRaw = Number(activeSession?.discount) || 0
+  const discountRaw = parseDiscountValue(activeSession?.discount)
   // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
   const discountMemberIdsRaw = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
   const discountEffectiveIds = discountMemberIdsRaw.length > 0
     ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid))
     : sessionMembers.map(m => m.uid)
   const nDiscounted = discountEffectiveIds.length
-  const totalDiscount = nDiscounted > 0
+
+  // Member-level promo discounts (e.g. from event promotions, coupons or member orders)
+  const totalMemberPromoDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.discount) || 0), 0)
+
+  const sessionDiscount = nDiscounted > 0
     ? (discountMode === 'split' ? discountRaw : discountRaw * nDiscounted)
     : 0
+
+  // Total promo discount: session-level discount, or sum of individual member promo discounts
+  let totalDiscount = sessionDiscount > 0 ? sessionDiscount : totalMemberPromoDiscounts
+  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+
+  // Verified total from members
+  const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  const allVerified = sessionMembers.length > 0 && sessionMembers.every(m => memberPayments[m.uid]?.verified)
+
+  // If all members are verified paid and their total paid is less than pre-discount total,
+  // the difference is the verified discount applied at payment time!
+  const preDiscountSubtotal = Math.max(0, foodTotal + gamePrice - totalPersonalDiscounts)
+  if (totalDiscount === 0 && allVerified && verifiedTotal > 0 && preDiscountSubtotal > verifiedTotal) {
+    totalDiscount = Math.round((preDiscountSubtotal - verifiedTotal) * 100) / 100
+  }
+
+  const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
+
   const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person (across all)
   const discountPerDiscounted = nDiscounted > 0
     ? (discountMode === 'split' ? discountRaw / nDiscounted : discountRaw)
-    : 0  // per selected member
+    : (sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0)  // per selected member
   const isPartialDiscount = discountMemberIdsRaw.length > 0 && nDiscounted < sessionMembers.length
-  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
-  const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
 
   // Unassigned food items (orderedBy: null) shared across members in split mode
   const unassignedFoodTotal = orderArr
@@ -1073,7 +1138,7 @@ export default function POSPage({
     const myBaseGame = getMemberGamePrice(m)
     const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
     let myDisc = 0
-    if (isMemberDiscounted) {
+    if (isMemberDiscounted && discountRaw > 0) {
       if (discountMode === 'split' && nDiscounted > 0) {
         const baseDisc = Math.floor((discountRaw / nDiscounted) * 100) / 100
         const remainder = Math.round((discountRaw - baseDisc * nDiscounted) * 100) / 100
@@ -1081,6 +1146,10 @@ export default function POSPage({
       } else {
         myDisc = discountRaw
       }
+    } else if (Number(m.discount) > 0) {
+      myDisc = Number(m.discount)
+    } else if (totalDiscount > 0 && sessionMembers.length > 0) {
+      myDisc = Math.round((totalDiscount / sessionMembers.length) * 100) / 100
     }
     return Math.round(Math.max(0, myBaseGame + myFood + sharedFoodPerMember - (Number(m.personalDiscount) || 0) - myDisc) * 100) / 100
   }
@@ -1095,11 +1164,16 @@ export default function POSPage({
   }
 
   // ── payment status helpers ───────────────────────────────────────
-  const allMembersPaid = activeSession?.confirmedOrderId &&
+  const allMembersPaid = Boolean(
+    activeSession?.confirmedOrderId &&
     sessionMembers.length > 0 &&
-    sessionMembers.every(m => isMemberFullyPaid(m))
-  const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
-  const remainingAmount = Math.max(0, grandTotal - verifiedTotal)
+    (
+      sessionMembers.every(m => isMemberFullyPaid(m)) ||
+      allVerified ||
+      activeSession?.status === 'paid'
+    )
+  )
+  const remainingAmount = allMembersPaid ? 0 : Math.max(0, grandTotal - verifiedTotal)
 
   // ── Auto-sync active confirmed order to Firestore so customer device is ALWAYS in real-time sync ──
   const lastSyncedOrderRef = useRef('')
@@ -1108,6 +1182,7 @@ export default function POSPage({
   useEffect(() => {
     const orderId = activeSession?.confirmedOrderId
     if (!orderId) return
+    if (activeSession?.status === 'paid') return
 
     clearTimeout(syncOrderTimerRef.current)
     syncOrderTimerRef.current = setTimeout(async () => {
@@ -1135,7 +1210,7 @@ export default function POSPage({
           gameUnitPrice: gameUnitPay,
           gameTotal: gamePrice,
           foodTotal,
-          discount: discountRaw,
+          discount: discountRaw || totalDiscount,
           discountMode,
           discountMemberIds: discountMemberIdsRaw,
           promoName: activeSession.promoName || '',
@@ -1147,7 +1222,7 @@ export default function POSPage({
         lastSyncedOrderRef.current = payloadKey
 
         await updateDoc(doc(db, 'orders', orderId), {
-          discount: discountRaw,
+          discount: discountRaw || totalDiscount,
           discountMode,
           discountMemberIds: discountMemberIdsRaw,
           promoName: activeSession.promoName || '',
@@ -4170,7 +4245,7 @@ export default function POSPage({
                 <div style={{ margin: '0 16px 14px', padding: '12px 14px', background: '#faf7f5', borderRadius: 10, border: '1px solid rgba(26,26,26,0.06)', display: 'flex', flexDirection: 'column', gap: 6 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
                     <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {activeSession.promoName || 'ส่วนลด'}
+                      {activeSession.promoName || sessionMembers.find(m => m.promoName)?.promoName || 'ส่วนลด'}
                     </span>
                     <span style={{ fontSize: 15, fontWeight: 900, color: '#c62419', flexShrink: 0 }}>
                       −฿{totalDiscount.toLocaleString()}
@@ -4557,21 +4632,21 @@ export default function POSPage({
               )}
 
               {/* Discounts */}
-              {(totalDiscount > 0 || activeSession.members.some(m => Number(m.personalDiscount) > 0)) && (
+              {(totalDiscount > 0 || sessionMembers.some(m => Number(m.personalDiscount) > 0)) && (
                 <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(198,36,25,0.04)', border: '1px solid rgba(198,36,25,0.15)', display: 'flex', flexDirection: 'column', gap: 5 }}>
                   {totalDiscount > 0 && (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
                       <span style={{ color: 'rgba(26,26,26,0.75)' }}>
                         <i className="fas fa-tag" style={{ color: '#c62419', fontSize: 10, marginRight: 5 }} />
-                        {activeSession.promoName || 'ส่วนลด'}
+                        {activeSession.promoName || sessionMembers.find(m => m.promoName)?.promoName || 'ส่วนลดโปรโมชัน'}
                         <span style={{ color: 'rgba(26,26,26,0.4)', fontSize: 10, marginLeft: 4 }}>
-                          ({discountMode === 'split' ? 'เฉลี่ย' : `฿${fmtCurrency(discountRaw)}×${nDiscounted}`})
+                          ({discountMode === 'split' ? 'เฉลี่ย' : `฿${fmtCurrency(discountRaw || (totalDiscount / (nDiscounted || sessionMembers.length || 1)))}×${nDiscounted || sessionMembers.length}`})
                         </span>
                       </span>
                       <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{fmtCurrency(totalDiscount)}</span>
                     </div>
                   )}
-                  {activeSession.members.filter(m => Number(m.personalDiscount) > 0).map(m => (
+                  {sessionMembers.filter(m => Number(m.personalDiscount) > 0).map(m => (
                     <div key={m.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
                       <span style={{ color: 'rgba(26,26,26,0.65)' }}>
                         <i className="fas fa-user-tag" style={{ color: '#c62419', fontSize: 9, marginRight: 5 }} />
