@@ -23,7 +23,7 @@ import { checkBruteForceLockout, recordFailedLogin, recordSuccessfulLogin, logSe
 import { syncMemberTierAchievements } from '../utils/achievementTierSync'
 import { parseGamePlayerCount } from '../utils/bookingHelper'
 
-/* ds-allow-hardcode: chart SVG attributes — CSS custom properties do not resolve in SVG fill/stroke attributes */
+/* ds-allow-hardcode: chart SVG attributes  -  CSS custom properties do not resolve in SVG fill/stroke attributes */
 const CHART_COLORS  = ['#c62419', '#4ade80', '#60a5fa', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#34d399'] /* ds-allow-hardcode */
 const CHART_AXIS    = '#888888' /* ds-allow-hardcode */
 const CHART_AXIS_LG = '#444444' /* ds-allow-hardcode */
@@ -3568,7 +3568,7 @@ const matchPlayersCount = (playersStr, filterVal) => {
   }
   const target = parseInt(filterVal, 10)
   if (isNaN(target)) return true
-  const parts = s.split(/[-–—]/).map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n))
+  const parts = s.split(/[\-\s]+/).map(x => parseInt(x.trim(), 10)).filter(n => !isNaN(n))
   if (parts.length === 1) return parts[0] === target
   if (parts.length >= 2) return target >= parts[0] && target <= parts[1]
   return s.includes(String(target))
@@ -6418,7 +6418,7 @@ function MenuTab({ showToast }) {
     const unsub = onSnapshot(q,
       snap => setMenuItems(snap.docs.map(d => ({ ...d.data(), id: d.id }))),
       () => {
-        // composite index not ready yet — fall back to unordered query
+        // composite index not ready yet  -  fall back to unordered query
         const q2 = collection(db, 'menuItems')
         onSnapshot(q2, snap => setMenuItems(snap.docs.map(d => ({ ...d.data(), id: d.id }))))
       }
@@ -7135,7 +7135,7 @@ function PaymentTab({ showToast }) {
             onChange={e => setEasySlipApiKey(e.target.value)}
           />
           <div className="adm-hint" style={{ marginTop: 6 }}>
-            ถ้าใส่ API Key ระบบจะตรวจสลิปอัตโนมัติสำหรับทั้งสองบัญชี (ทั้งมัดจำและชำระเงิน) — ถ้าไม่ใส่ ลูกค้าส่งสลิปแล้วรอแอดมินยืนยันเอง
+            ถ้าใส่ API Key ระบบจะตรวจสลิปอัตโนมัติสำหรับทั้งสองบัญชี (ทั้งมัดจำและชำระเงิน)  -  ถ้าไม่ใส่ ลูกค้าส่งสลิปแล้วรอแอดมินยืนยันเอง
           </div>
         </div>
       </div>
@@ -10093,19 +10093,19 @@ function DataTab({ showToast }) {
         <DangerRow
           icon="fa-receipt"
           label="ลบประวัติการชำระเงินทั้งหมด"
-          sub="ลบทุก document ใน collection payments — ประวัติการเล่นของสมาชิกทั้งหมดจะหายไป"
+          sub="ลบทุก document ใน collection payments  -  ประวัติการเล่นของสมาชิกทั้งหมดจะหายไป"
           target="payments"
         />
         <DangerRow
           icon="fa-shopping-cart"
           label="ลบออเดอร์ทั้งหมด"
-          sub="ลบทุก document ใน collection orders — รายการสั่งอาหาร/เครื่องดื่มจะหายไป"
+          sub="ลบทุก document ใน collection orders  -  รายการสั่งอาหาร/เครื่องดื่มจะหายไป"
           target="orders"
         />
         <DangerRow
           icon="fa-history"
           label="ลบรายงานการเล่นทั้งหมด"
-          sub="ลบทุก document ใน collection playHistory — log การสแกน QR และปิดออเดอร์ทั้งหมดจะหายไป"
+          sub="ลบทุก document ใน collection playHistory  -  log การสแกน QR และปิดออเดอร์ทั้งหมดจะหายไป"
           target="playHistory"
         />
         <DangerRow
@@ -10287,14 +10287,14 @@ function ConfirmBookingModal({ booking, adminUser, onClose, showToast }) {
   )
 }
 
-function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
+function MockBookingModal({ adminUser, onClose, showToast, allGames = [], initialRoom = '', initialDate = '', initialTime = '13:00' }) {
   const today = new Date().toISOString().slice(0, 10)
   const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
   const dayAfter = new Date(Date.now() + 172800000).toISOString().slice(0, 10)
 
-  const [date, setDate] = useState(today)
-  const [time, setTime] = useState('13:00')
-  const [room, setRoom] = useState('')
+  const [date, setDate] = useState(initialDate || today)
+  const [time, setTime] = useState(initialTime || '13:00')
+  const [room, setRoom] = useState(initialRoom || '')
   const [note, setNote] = useState('')
   const [gameMode, setGameMode] = useState('select') // 'select' | 'custom'
   const [selectedGameId, setSelectedGameId] = useState('')
@@ -10769,317 +10769,823 @@ function MockBookingModal({ adminUser, onClose, showToast, allGames = [] }) {
   )
 }
 
-function EditBookingModal({ booking, onClose, showToast }) {
-  const [status, setStatus]       = useState(booking.status || 'pending')
-  const [room, setRoom]           = useState(booking.room || '')
-  const [date, setDate]           = useState(booking.date || '')
-  const [time, setTime]           = useState(booking.time || '')
-  const [adminNote, setAdminNote] = useState(booking.adminNote || '')
-  const [deposit, setDeposit]     = useState(String(booking.depositAmount ?? ''))
-  const [maxMembers, setMaxMembers] = useState(String(booking.maxMembers ?? ''))
-  const [deadline, setDeadline]   = useState(
-    booking.depositDeadline ? booking.depositDeadline.slice(0, 16) : ''
-  )
-  const [saving, setSaving] = useState(false)
-
-  const handleSave = async () => {
-    setSaving(true)
-    try {
-      const payload = {
-        status,
-        room,
-        date,
-        time,
-        adminNote,
-        depositAmount: parseFloat(deposit) || 0,
-        maxMembers: parseInt(maxMembers) || 0,
-        depositDeadline: deadline ? new Date(deadline).toISOString() : booking.depositDeadline || '',
-        updatedAt: serverTimestamp(),
-      }
-      await updateDoc(doc(db, 'bookings', booking.id), payload)
-      showToast('บันทึกการแก้ไขสำเร็จ')
-      onClose()
-    } catch (e) {
-      showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
-    } finally { setSaving(false) }
-  }
-
-  const STATUSES = ['pending','confirmed','locked','collapsed','cancelled']
-
-  return (
-    <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.72)', zIndex:9900, display:'flex', alignItems:'flex-end', justifyContent:'center' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background:'var(--surface-elevated, #ffffff)', borderRadius:'20px 20px 0 0', width:'100%', maxWidth:520, maxHeight:'92vh', overflowY:'auto', border:'1px solid var(--border-default)', borderBottom:'none', boxShadow:'0 -8px 48px rgba(0,0,0,0.45)', fontFamily:"'Sarabun',sans-serif", animation:'slideUp 0.28s cubic-bezier(0.22,1,0.36,1)' }}>
-        <div style={{ display:'flex', justifyContent:'center', paddingTop:14, paddingBottom:4 }}>
-          <div style={{ width:40, height:4, borderRadius:2, background:'var(--border-strong)' }} />
-        </div>
-        <div style={{ padding:'12px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16 }}>
-          <div>
-            <div style={{ fontSize:17, fontWeight:800, color:'var(--text-primary)' }}>แก้ไขการจอง</div>
-            <div style={{ fontSize:11, color:'var(--text-tertiary)', marginTop:2 }}>{booking.gameName || booking.mockNote || '-'}</div>
-          </div>
-          <button onClick={onClose} style={{ background:'none', border:'none', cursor:'pointer', fontSize:17, color:'var(--text-tertiary)', padding:6 }}>
-            <i className="fas fa-times" />
-          </button>
-        </div>
-
-        <div style={{ padding:'0 20px 32px', display:'flex', flexDirection:'column', gap:16 }}>
-
-          {/* Status */}
-          <div>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.07em' }}>สถานะ</label>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {STATUSES.map(s => {
-                const col = STATUS_COLORS_B[s] || '#888' /* ds-allow-hardcode: status data-viz */
-                const sel = status === s
-                return (
-                  <button key={s} onClick={() => setStatus(s)}
-                    style={{ padding:'6px 12px', borderRadius:20, fontSize:12, fontWeight:700, border: sel ? `1.5px solid ${col}` : '1px solid var(--border-default)', background: sel ? col + '22' : 'var(--surface-page)', color: sel ? col : 'var(--text-secondary)', cursor:'pointer', fontFamily:"'Sarabun',sans-serif" }}>
-                    {STATUS_LABELS_B[s] || s}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Room */}
-          <div>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:8, textTransform:'uppercase', letterSpacing:'0.07em' }}>ห้อง</label>
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              {ALL_ROOMS_ADMIN.map(r => {
-                const rc = ROOM_COLORS_ADM[r] || '#888' /* ds-allow-hardcode: room data-viz */
-                const sel = room === r
-                return (
-                  <button key={r} onClick={() => setRoom(r)}
-                    style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'5px 11px', borderRadius:20, fontSize:11, fontWeight:700, border: sel ? `1.5px solid ${rc}` : '1px solid var(--border-default)', background: sel ? rc + '22' : 'var(--surface-page)', color: sel ? rc : 'var(--text-secondary)', cursor:'pointer', fontFamily:"'Sarabun',sans-serif" }}>
-                    <span style={{ width:6, height:6, borderRadius:'50%', background:rc, flexShrink:0 }} />
-                    {r}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* Date + Time */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>วันที่เล่น</label>
-              <input type="date" value={date} onChange={e => setDate(e.target.value)}
-                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif", outline:'none', boxSizing:'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>เวลาเริ่ม</label>
-              <input type="time" value={time} onChange={e => setTime(e.target.value)}
-                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif", outline:'none', boxSizing:'border-box' }} />
-            </div>
-          </div>
-
-          {/* Deposit amount + Max members */}
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-            <div>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>มัดจำ/คน (฿)</label>
-              <input type="number" value={deposit} onChange={e => setDeposit(e.target.value)} min="0"
-                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif", outline:'none', boxSizing:'border-box' }} />
-            </div>
-            <div>
-              <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>จำนวนสมาชิก</label>
-              <input type="number" value={maxMembers} onChange={e => setMaxMembers(e.target.value)} min="1"
-                style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif", outline:'none', boxSizing:'border-box' }} />
-            </div>
-          </div>
-
-          {/* Deposit deadline */}
-          <div>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>กำหนดจ่ายมัดจำ</label>
-            <input type="datetime-local" value={deadline} onChange={e => setDeadline(e.target.value)}
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:14, fontFamily:"'Sarabun',sans-serif", outline:'none', boxSizing:'border-box' }} />
-          </div>
-
-          {/* Admin note */}
-          <div>
-            <label style={{ display:'block', fontSize:11, fontWeight:700, color:'var(--text-tertiary)', marginBottom:6, textTransform:'uppercase', letterSpacing:'0.07em' }}>หมายเหตุถึงสมาชิก</label>
-            <textarea value={adminNote} onChange={e => setAdminNote(e.target.value)} rows={3}
-              placeholder="เช่น นัดเวลา 18:00 น."
-              style={{ width:'100%', padding:'10px 12px', borderRadius:10, border:'1px solid var(--border-default)', background:'var(--surface-page)', color:'var(--text-primary)', fontSize:13, fontFamily:"'Sarabun',sans-serif", outline:'none', resize:'vertical', boxSizing:'border-box' }} />
-          </div>
-
-          {/* Actions */}
-          <div style={{ display:'flex', gap:10 }}>
-            <button onClick={onClose}
-              style={{ flex:1, padding:'13px', borderRadius:10, border:'1px solid var(--border-default)', background:'none', color:'var(--text-secondary)', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:"'Sarabun',sans-serif" }}>
-              ยกเลิก
-            </button>
-            <button onClick={handleSave} disabled={saving}
-              style={{ flex:2, padding:'13px', borderRadius:10, border:'none', background:'var(--crimson-500)', color:'#fff', cursor:saving ? 'default' : 'pointer', fontSize:14, fontWeight:800, fontFamily:"'Sarabun',sans-serif", display:'flex', alignItems:'center', justifyContent:'center', gap:8, opacity:saving ? 0.7 : 1 }}>
-              {saving
-                ? <><div style={{ width:14, height:14, border:'2px solid rgba(255,255,255,0.3)', borderTopColor:'#fff', borderRadius:'50%', animation:'spin 0.8s linear infinite' }} />กำลังบันทึก...</>
-                : <><i className="fas fa-save" />บันทึกการแก้ไข</>}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 const BOOKING_ROOMS = [
-  'Waiting Area 1','Waiting Area 2','404 Bar','Japanese Room',
-  'Chinese Room','Europe Room','Ghost Room','Projector Room',
-  '5 Floor','Yang','Chinese DM','Thai DM',
+  'Waiting Area 1', 'Waiting Area 2', '404 Bar', 'Japanese Room',
+  'Chinese Room', 'Europe Room', 'Ghost Room', 'Projector Room',
+  '5 Floor', 'Yang', 'Chinese DM', 'Thai DM',
 ]
+
 const ROOM_COLORS_ADM = {
-  'Waiting Area 1':'#94a3b8','Waiting Area 2':'#64748b','404 Bar':'#f59e0b',
-  'Japanese Room':'#ef4444','Chinese Room':'#f97316','Europe Room':'#3b82f6',
-  'Ghost Room':'#8b5cf6','Projector Room':'#06b6d4','5 Floor':'#22c55e',
-  'Yang':'#ec4899','Chinese DM':'#c62419','Thai DM':'#d97706',
+  'Waiting Area 1': '#94a3b8',
+  'Waiting Area 2': '#64748b',
+  '404 Bar': '#f59e0b',
+  'Japanese Room': '#ef4444',
+  'Chinese Room': '#f97316',
+  'Europe Room': '#3b82f6',
+  'Ghost Room': '#8b5cf6',
+  'Projector Room': '#06b6d4',
+  '5 Floor': '#22c55e',
+  'Yang': '#ec4899',
+  'Chinese DM': '#c62419',
+  'Thai DM': '#d97706',
 }
 
-function RoomGrid({ bookings, onSelectBooking }) {
-  const today = new Date()
-  const todayStr = today.toISOString().slice(0, 10)
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = new Date(today)
-    d.setDate(today.getDate() + i)
-    return d.toISOString().slice(0, 10)
-  })
-  const DAY_TH = ['อา','จ','อ','พ','พฤ','ศ','ส']
+const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+const THAI_DAYS_SHORT = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส']
 
-  const occupied = {}
-  bookings.forEach(b => {
-    if (b.status === 'cancelled') return
-    if (b.room && b.date) {
-      if (!occupied[b.date]) occupied[b.date] = {}
-      occupied[b.date][b.room] = b
-    }
+function formatThaiDateDisplay(dateStr) {
+  if (!dateStr) return '-'
+  try {
+    const parts = dateStr.split('-')
+    if (parts.length < 3) return dateStr
+    const y = parseInt(parts[0], 10)
+    const m = parseInt(parts[1], 10)
+    const d = parseInt(parts[2], 10)
+    const dt = new Date(y, m - 1, d)
+    const dayName = THAI_DAYS_SHORT[dt.getDay()] || ''
+    const monthName = THAI_MONTHS_SHORT[m - 1] || ''
+    return `${dayName} ${d} ${monthName}`
+  } catch {
+    return dateStr
+  }
+}
+
+// ── Room Schedule Matrix & Timeline Controller ──────────────────────────────
+function RoomScheduleMatrix({ bookings = [], allGames = [], onSelectBooking, onQuickBook }) {
+  const [dayOffset, setDayOffset] = useState(0)
+  const [viewMode, setViewMode] = useState('matrix') // 'matrix' | 'timeline'
+  const [selectedDayForTimeline, setSelectedDayForTimeline] = useState(() => {
+    return new Date().toISOString().slice(0, 10)
   })
 
-  // Grid dimensions: room-name column 120px + 14 day columns 36px each
-  const GRID_COLS = '120px repeat(14, 36px)'
-  const CELL_H = 28
+  const today = useMemo(() => new Date(), [])
+  const todayStr = useMemo(() => today.toISOString().slice(0, 10), [today])
+
+  // Compute 14 consecutive days based on dayOffset
+  const days = useMemo(() => {
+    return Array.from({ length: 14 }, (_, i) => {
+      const d = new Date(today)
+      d.setDate(today.getDate() + dayOffset + i)
+      return d.toISOString().slice(0, 10)
+    })
+  }, [today, dayOffset])
+
+  // Multi-booking occupant map: date -> room -> array of bookings
+  const occupiedMap = useMemo(() => {
+    const map = {}
+    bookings.forEach(b => {
+      if (b.status === 'cancelled') return
+      if (b.room && b.date) {
+        if (!map[b.date]) map[b.date] = {}
+        if (!map[b.date][b.room]) map[b.date][b.room] = []
+        map[b.date][b.room].push(b)
+      }
+    })
+    // Sort slots by time
+    Object.keys(map).forEach(d => {
+      Object.keys(map[d]).forEach(r => {
+        map[d][r].sort((a, b) => (a.time || '').localeCompare(b.time || ''))
+      })
+    })
+    return map
+  }, [bookings])
 
   return (
-    <div style={{ marginBottom: 32, background: 'var(--surface-card)', borderRadius: 14, border: '1px solid var(--border-default)', overflow: 'hidden' }}>
-      {/* Section header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 18px 10px', borderBottom: '1px solid var(--border-default)', marginBottom: 0 }}>
-        <div style={{ width: 3, height: 20, borderRadius: 2, background: 'var(--crimson-500)', flexShrink: 0 }} />
-        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '0.10em', textTransform: 'uppercase', fontVariant: 'small-caps' }}>
-          ห้องว่าง &middot; 14 วันข้างหน้า
-        </span>
+    <div style={{
+      marginBottom: 32,
+      background: 'var(--surface-card)',
+      borderRadius: 16,
+      border: '1px solid var(--border-default)',
+      boxShadow: '0 4px 24px rgba(0, 0, 0, 0.05)',
+      overflow: 'hidden',
+    }}>
+      {/* ── Control & Filter Header ── */}
+      <div style={{
+        padding: '16px 20px',
+        borderBottom: '1px solid var(--border-default)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 14,
+        background: 'var(--surface-elevated)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            background: 'rgba(229, 9, 20, 0.1)',
+            color: 'var(--crimson-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 16,
+          }}>
+            <i className="fas fa-th-large" />
+          </div>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              ผังห้องและตารางรอบเกม (ROOM MATRIX & TIMELINE)
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>
+              คลิกที่รอบเวลาเพื่อจัดการปาร์ตี้ หรือคลิกช่องว่างเพื่อบล็อกห้องทันที
+            </div>
+          </div>
+        </div>
+
+        {/* View Toggle & Day Navigation */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          {/* View Mode Buttons */}
+          <div style={{
+            display: 'flex',
+            background: 'var(--surface-page)',
+            padding: 3,
+            borderRadius: 10,
+            border: '1px solid var(--border-default)',
+          }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('matrix')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: 'none',
+                background: viewMode === 'matrix' ? 'var(--surface-card)' : 'transparent',
+                color: viewMode === 'matrix' ? 'var(--crimson-500)' : 'var(--text-secondary)',
+                fontWeight: viewMode === 'matrix' ? 800 : 600,
+                fontSize: 12,
+                cursor: 'pointer',
+                boxShadow: viewMode === 'matrix' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
+              <i className="fas fa-calendar-alt" />
+              <span>ผัง 14 วัน</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('timeline')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: 'none',
+                background: viewMode === 'timeline' ? 'var(--surface-card)' : 'transparent',
+                color: viewMode === 'timeline' ? 'var(--crimson-500)' : 'var(--text-secondary)',
+                fontWeight: viewMode === 'timeline' ? 800 : 600,
+                fontSize: 12,
+                cursor: 'pointer',
+                boxShadow: viewMode === 'timeline' ? '0 2px 6px rgba(0,0,0,0.08)' : 'none',
+                transition: 'all 0.15s',
+              }}
+            >
+              <i className="fas fa-stream" />
+              <span>คิวห้องรายวัน</span>
+            </button>
+          </div>
+
+          {/* Date Pagination (Only in Matrix View) */}
+          {viewMode === 'matrix' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+              <button
+                type="button"
+                onClick={() => setDayOffset(prev => prev - 7)}
+                title="7 วันก่อนหน้า"
+                style={{
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-default)',
+                  background: 'var(--surface-page)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                <i className="fas fa-chevron-left" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setDayOffset(0)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-default)',
+                  background: dayOffset === 0 ? 'rgba(229, 9, 20, 0.08)' : 'var(--surface-page)',
+                  color: dayOffset === 0 ? 'var(--crimson-500)' : 'var(--text-secondary)',
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  fontSize: 11.5,
+                }}
+              >
+                วันนี้
+              </button>
+              <button
+                type="button"
+                onClick={() => setDayOffset(prev => prev + 7)}
+                title="7 วันถัดไป"
+                style={{
+                  padding: '7px 10px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-default)',
+                  background: 'var(--surface-page)',
+                  color: 'var(--text-secondary)',
+                  cursor: 'pointer',
+                  fontSize: 12,
+                }}
+              >
+                <i className="fas fa-chevron-right" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Scrollable grid wrapper with right-edge fade */}
-      <div style={{ position: 'relative' }}>
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 4 }}>
-          <div style={{ minWidth: 120 + 36 * 14 + 36, padding: '0 18px 14px' }}>
+      {/* ── MODE 1: MATRIX VIEW (FULL WIDTH RESPONSIVE) ── */}
+      {viewMode === 'matrix' && (
+        <div style={{ position: 'relative' }}>
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '16px 20px' }}>
+            <div style={{ minWidth: 1050 }}>
+              {/* Day Header Row */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '130px repeat(14, minmax(64px, 1fr))',
+                gap: 4,
+                marginBottom: 8,
+              }}>
+                <div style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: 'var(--text-tertiary)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.08em',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}>
+                  ห้อง / วันที่
+                </div>
+                {days.map(d => {
+                  const dt = new Date(d + 'T00:00:00')
+                  const isToday = d === todayStr
+                  const dayName = THAI_DAYS_SHORT[dt.getDay()]
+                  const monthName = THAI_MONTHS_SHORT[dt.getMonth()]
+                  return (
+                    <div
+                      key={d}
+                      style={{
+                        textAlign: 'center',
+                        padding: '6px 2px',
+                        borderRadius: 10,
+                        background: isToday ? 'rgba(229, 9, 20, 0.1)' : 'var(--surface-page)',
+                        border: isToday ? '1.5px solid var(--crimson-500)' : '1px solid var(--border-default)',
+                        boxShadow: isToday ? '0 2px 8px rgba(229, 9, 20, 0.15)' : 'none',
+                      }}
+                    >
+                      <div style={{
+                        fontSize: 10,
+                        fontWeight: 800,
+                        color: isToday ? 'var(--crimson-500)' : 'var(--text-tertiary)',
+                        lineHeight: 1.2,
+                      }}>
+                        {dayName}
+                      </div>
+                      <div style={{
+                        fontSize: 13,
+                        fontWeight: 900,
+                        color: isToday ? 'var(--crimson-500)' : 'var(--text-primary)',
+                        lineHeight: 1.2,
+                        marginTop: 2,
+                      }}>
+                        {dt.getDate()}
+                      </div>
+                      <div style={{
+                        fontSize: 9,
+                        color: isToday ? 'var(--crimson-500)' : 'var(--text-tertiary)',
+                        lineHeight: 1,
+                        marginTop: 1,
+                        opacity: 0.8,
+                      }}>
+                        {monthName}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
 
-            {/* Day headers row — CSS grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: GRID_COLS, gap: '0 2px', paddingTop: 12, marginBottom: 5 }}>
-              {/* Empty room-name column spacer */}
-              <div />
-              {days.map(d => {
-                const dt = new Date(d + 'T00:00:00')
-                const isToday = d === todayStr
-                return (
-                  <div key={d} style={{
-                    textAlign: 'center',
-                    borderLeft: isToday ? '2px solid var(--crimson-500)' : '2px solid transparent',
-                    paddingTop: 2,
-                  }}>
-                    <div style={{ fontSize: 9, fontWeight: 700, color: isToday ? 'var(--crimson-500)' : 'var(--text-tertiary)', letterSpacing: '0.02em', lineHeight: 1.2 }}>
-                      {DAY_TH[dt.getDay()]}
+              {/* Room Rows */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+                {BOOKING_ROOMS.map(room => {
+                  const roomColor = ROOM_COLORS_ADM[room] || '#888'
+                  return (
+                    <div
+                      key={room}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '130px repeat(14, minmax(64px, 1fr))',
+                        gap: 4,
+                        alignItems: 'stretch',
+                      }}
+                    >
+                      {/* Room Label */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 8,
+                        padding: '6px 10px',
+                        background: 'var(--surface-page)',
+                        borderRadius: 8,
+                        border: '1px solid var(--border-default)',
+                        minWidth: 0,
+                      }}>
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          background: roomColor,
+                          flexShrink: 0,
+                          boxShadow: `0 0 6px ${roomColor}66`,
+                        }} />
+                        <span style={{
+                          fontSize: 11.5,
+                          fontWeight: 700,
+                          color: 'var(--text-primary)',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}>
+                          {room}
+                        </span>
+                      </div>
+
+                      {/* Day Cells */}
+                      {days.map(d => {
+                        const slots = occupiedMap[d]?.[room] || []
+                        const isToday = d === todayStr
+                        const hasSlots = slots.length > 0
+
+                        return (
+                          <div
+                            key={d}
+                            style={{
+                              minHeight: 38,
+                              borderRadius: 8,
+                              padding: 3,
+                              display: 'flex',
+                              flexDirection: 'column',
+                              gap: 3,
+                              justifyContent: 'center',
+                              background: hasSlots
+                                ? 'rgba(0,0,0,0.02)'
+                                : isToday
+                                  ? 'rgba(229, 9, 20, 0.03)'
+                                  : 'var(--surface-page)',
+                              border: isToday
+                                ? '1px dashed rgba(229, 9, 20, 0.4)'
+                                : '1px solid var(--border-default)',
+                              transition: 'all 0.15s ease',
+                              position: 'relative',
+                            }}
+                          >
+                            {hasSlots ? (
+                              slots.map(b => {
+                                const isMock = !!b.isMock
+                                const col = isMock
+                                  ? '#f59e0b'
+                                  : STATUS_COLORS_B[b.status] || '#3b82f6'
+                                const memberCount = b.members?.length || 0
+                                const paidCount = b.members?.filter(m => m.paidDeposit).length || 0
+
+                                return (
+                                  <div
+                                    key={b.id}
+                                    onClick={() => onSelectBooking && onSelectBooking(b)}
+                                    title={`${isMock ? `[Mock Block] ${b.gameName || 'บล็อกห้อง'}` : (b.gameName || '-')} (${b.time || '13:00'}) · ${STATUS_LABELS_B[b.status] || b.status} · ${b.leaderName || ''} (${paidCount}/${memberCount} จ่าย)`}
+                                    style={{
+                                      padding: '3px 5px',
+                                      borderRadius: 6,
+                                      background: col + '1f',
+                                      border: `1px solid ${col}88`,
+                                      cursor: 'pointer',
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: 3,
+                                      boxShadow: '0 1px 4px rgba(0,0,0,0.05)',
+                                      transition: 'transform 0.1s, box-shadow 0.1s',
+                                    }}
+                                    onMouseEnter={e => {
+                                      e.currentTarget.style.transform = 'translateY(-1px)'
+                                      e.currentTarget.style.boxShadow = `0 3px 8px ${col}44`
+                                    }}
+                                    onMouseLeave={e => {
+                                      e.currentTarget.style.transform = 'translateY(0)'
+                                      e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,0.05)'
+                                    }}
+                                  >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                                      {isMock ? (
+                                        <i className="fas fa-lock" style={{ fontSize: 9, color: col, flexShrink: 0 }} />
+                                      ) : (
+                                        <span style={{ width: 5, height: 5, borderRadius: '50%', background: col, flexShrink: 0 }} />
+                                      )}
+                                      <span style={{
+                                        fontSize: 10,
+                                        fontWeight: 800,
+                                        color: col,
+                                        fontFamily: "'Sarabun', sans-serif",
+                                        letterSpacing: '-0.02em',
+                                      }}>
+                                        {b.time || '13:00'}
+                                      </span>
+                                    </div>
+                                    {!isMock && memberCount > 0 && (
+                                      <span style={{
+                                        fontSize: 8.5,
+                                        fontWeight: 800,
+                                        padding: '1px 3px',
+                                        borderRadius: 4,
+                                        background: paidCount >= memberCount ? '#10b981' : 'rgba(0,0,0,0.08)',
+                                        color: paidCount >= memberCount ? '#fff' : 'var(--text-tertiary)',
+                                      }}>
+                                        {paidCount}/{memberCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                )
+                              })
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => onQuickBook && onQuickBook(room, d)}
+                                title={`คลิกเพื่อบล็อกห้อง ${room} ในวันที่ ${d}`}
+                                style={{
+                                  width: '100%',
+                                  height: '100%',
+                                  minHeight: 32,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  color: 'var(--text-tertiary)',
+                                  opacity: 0.25,
+                                  fontSize: 11,
+                                  transition: 'all 0.15s',
+                                  borderRadius: 6,
+                                }}
+                                onMouseEnter={e => {
+                                  e.currentTarget.style.opacity = '1'
+                                  e.currentTarget.style.color = 'var(--crimson-500)'
+                                  e.currentTarget.style.background = 'rgba(229, 9, 20, 0.08)'
+                                }}
+                                onMouseLeave={e => {
+                                  e.currentTarget.style.opacity = '0.25'
+                                  e.currentTarget.style.color = 'var(--text-tertiary)'
+                                  e.currentTarget.style.background = 'transparent'
+                                }}
+                              >
+                                <i className="fas fa-plus" />
+                              </button>
+                            )}
+                          </div>
+                        )
+                      })}
                     </div>
-                    <div style={{
-                      fontSize: 12, fontWeight: 800, lineHeight: 1,
-                      color: isToday ? 'var(--crimson-500)' : 'var(--text-secondary)',
-                      background: isToday ? 'rgba(198,36,25,0.12)' : 'transparent',
-                      borderRadius: 5, padding: '3px 2px',
-                    }}>
-                      {dt.getDate()}
-                    </div>
-                  </div>
-                )
-              })}
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODE 2: TIMELINE PLANNER VIEW (DAY-FOCUSED) ── */}
+      {viewMode === 'timeline' && (
+        <div style={{ padding: '20px' }}>
+          {/* Day Selector Strip */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: 12,
+            marginBottom: 20,
+            padding: '12px 16px',
+            background: 'var(--surface-elevated)',
+            borderRadius: 12,
+            border: '1px solid var(--border-default)',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-secondary)' }}>
+                เลือกวันที่ต้องการดูผังห้อง:
+              </span>
+              <input
+                type="date"
+                value={selectedDayForTimeline}
+                onChange={e => e.target.value && setSelectedDayForTimeline(e.target.value)}
+                style={{
+                  padding: '7px 12px',
+                  borderRadius: 8,
+                  border: '1px solid var(--border-default)',
+                  background: 'var(--surface-page)',
+                  color: 'var(--text-primary)',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+              />
             </div>
 
-            {/* Room rows — CSS grid */}
+            {/* Quick Date Pills */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {[
+                { label: 'วันนี้', val: todayStr },
+                { label: 'พรุ่งนี้', val: new Date(Date.now() + 86400000).toISOString().slice(0, 10) },
+                { label: 'มะรืนนี้', val: new Date(Date.now() + 172800000).toISOString().slice(0, 10) },
+              ].map(p => (
+                <button
+                  key={p.val}
+                  type="button"
+                  onClick={() => setSelectedDayForTimeline(p.val)}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 20,
+                    border: selectedDayForTimeline === p.val ? '1px solid var(--crimson-500)' : '1px solid var(--border-default)',
+                    background: selectedDayForTimeline === p.val ? 'rgba(229, 9, 20, 0.1)' : 'var(--surface-page)',
+                    color: selectedDayForTimeline === p.val ? 'var(--crimson-500)' : 'var(--text-secondary)',
+                    fontWeight: selectedDayForTimeline === p.val ? 800 : 600,
+                    fontSize: 12,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Rooms Grid for Selected Day */}
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(290px, 1fr))',
+            gap: 16,
+          }}>
             {BOOKING_ROOMS.map(room => {
-              const roomColor = ROOM_COLORS_ADM[room] || '#888' /* ds-allow-hardcode: room data-viz */
+              const roomColor = ROOM_COLORS_ADM[room] || '#888'
+              const dayBookings = occupiedMap[selectedDayForTimeline]?.[room] || []
+
               return (
-                <div key={room} style={{ display: 'grid', gridTemplateColumns: GRID_COLS, gap: '0 2px', marginBottom: 3, alignItems: 'center' }}>
-                  {/* Room label */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, paddingRight: 8, minWidth: 0 }}>
-                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: roomColor, flexShrink: 0 }} />
-                    <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {room}
+                <div
+                  key={room}
+                  style={{
+                    borderRadius: 14,
+                    background: 'var(--surface-page)',
+                    border: '1px solid var(--border-default)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+                  }}
+                >
+                  {/* Room Card Header */}
+                  <div style={{
+                    padding: '12px 16px',
+                    background: 'var(--surface-elevated)',
+                    borderBottom: '1px solid var(--border-default)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: roomColor, boxShadow: `0 0 6px ${roomColor}88` }} />
+                      <span style={{ fontSize: 13.5, fontWeight: 800, color: 'var(--text-primary)' }}>
+                        {room}
+                      </span>
+                    </div>
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      background: dayBookings.length > 0 ? 'rgba(59, 130, 246, 0.12)' : 'rgba(0,0,0,0.05)',
+                      color: dayBookings.length > 0 ? '#3b82f6' : 'var(--text-tertiary)',
+                    }}>
+                      {dayBookings.length > 0 ? `${dayBookings.length} รอบจอง` : 'ว่าง'}
                     </span>
                   </div>
-                  {/* Day cells */}
-                  {days.map(d => {
-                    const b = occupied[d]?.[room]
-                    const isToday = d === todayStr
-                    const isMockOccupied = b?.isMock
-                    const statusColor = b
-                      ? (isMockOccupied ? (STATUS_COLORS_B[b.status] || '#f59e0b') : (STATUS_COLORS_B[b.status] || '#888'))
-                      : null
-                    return (
-                      <div
-                        key={d}
-                        onClick={() => b && onSelectBooking && onSelectBooking(b)}
-                        title={b ? `${b.isMock ? `[Mock Block] ${b.gameName || 'บล็อกห้อง'}` : (b.gameName || '-')} ${b.time ? `(${b.time})` : ''} · ${STATUS_LABELS_B[b.status] || b.status}` : 'ว่าง'}
-                        style={{
-                          height: CELL_H, borderRadius: 6,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          background: statusColor
-                            ? (isMockOccupied ? 'rgba(245,158,11,0.22)' : roomColor + '40')
-                            : isToday ? 'rgba(198,36,25,0.05)' : 'var(--surface-card)',
-                          border: `1px solid ${statusColor
-                            ? (isMockOccupied ? '#f59e0b' : roomColor + '66')
-                            : isToday ? 'rgba(198,36,25,0.22)' : 'var(--border-default)'}`,
-                          borderLeft: isToday ? '2px solid var(--crimson-500)' : undefined,
-                          cursor: b ? 'pointer' : 'default',
-                          transition: 'opacity 0.12s, transform 0.1s',
-                        }}>
-                        {isMockOccupied && (
-                          <i className="fas fa-lock" style={{ fontSize: 7, color: '#f59e0b' }} />
-                        )}
-                        {b && !isMockOccupied && (
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: roomColor, flexShrink: 0 }} />
-                        )}
+
+                  {/* Room Bookings Body */}
+                  <div style={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {dayBookings.length > 0 ? (
+                      dayBookings.map(b => {
+                        const isMock = !!b.isMock
+                        const matchedGame = allGames.find(g => g.id === b.gameId || (g.title || g.name) === b.gameName)
+                        const coverImg = matchedGame?.image || b.gameImage || ''
+                        const col = isMock ? '#f59e0b' : (STATUS_COLORS_B[b.status] || '#3b82f6')
+                        const memberCount = b.members?.length || 0
+                        const paidCount = b.members?.filter(m => m.paidDeposit).length || 0
+
+                        return (
+                          <div
+                            key={b.id}
+                            style={{
+                              padding: '10px',
+                              borderRadius: 10,
+                              background: 'var(--surface-card)',
+                              border: `1px solid ${col}44`,
+                              display: 'flex',
+                              gap: 10,
+                              alignItems: 'center',
+                            }}
+                          >
+                            {/* Mini Poster Thumbnail */}
+                            <div style={{
+                              width: 44,
+                              height: 58,
+                              borderRadius: 6,
+                              overflow: 'hidden',
+                              background: '#1a1a1a',
+                              flexShrink: 0,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}>
+                              {coverImg ? (
+                                <img
+                                  src={convertImg(coverImg, 100)}
+                                  alt="cover"
+                                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                              ) : (
+                                <i className={isMock ? 'fas fa-lock' : 'fas fa-dice'} style={{ color: col, fontSize: 16 }} />
+                              )}
+                            </div>
+
+                            {/* Info */}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                <span style={{
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  padding: '1px 6px',
+                                  borderRadius: 4,
+                                  background: col + '22',
+                                  color: col,
+                                }}>
+                                  {b.time || '13:00'}
+                                </span>
+                                <BookingStatusBadge status={b.status} />
+                              </div>
+                              <div style={{
+                                fontSize: 13,
+                                fontWeight: 800,
+                                color: 'var(--text-primary)',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}>
+                                {b.gameName || (isMock ? 'Mock Block' : '-')}
+                              </div>
+                              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 2 }}>
+                                <i className="fas fa-user" style={{ fontSize: 9, marginRight: 4, opacity: 0.6 }} />
+                                {b.leaderName || '-'} · จ่าย {paidCount}/{memberCount} คน
+                              </div>
+                            </div>
+
+                            {/* Quick Manage Button */}
+                            <button
+                              type="button"
+                              onClick={() => onSelectBooking && onSelectBooking(b)}
+                              style={{
+                                padding: '6px 10px',
+                                borderRadius: 8,
+                                border: 'none',
+                                background: 'var(--crimson-500)',
+                                color: '#fff',
+                                fontWeight: 700,
+                                fontSize: 11,
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                              }}
+                            >
+                              จัดการ
+                            </button>
+                          </div>
+                        )
+                      })
+                    ) : (
+                      <div style={{
+                        padding: '24px 12px',
+                        textAlign: 'center',
+                        color: 'var(--text-tertiary)',
+                        fontSize: 12,
+                      }}>
+                        <div style={{ marginBottom: 8, opacity: 0.4 }}>
+                          <i className="fas fa-door-open" style={{ fontSize: 24 }} />
+                        </div>
+                        <div>ห้องว่างตลอดวัน</div>
+                        <button
+                          type="button"
+                          onClick={() => onQuickBook && onQuickBook(room, selectedDayForTimeline)}
+                          style={{
+                            marginTop: 10,
+                            padding: '6px 12px',
+                            borderRadius: 8,
+                            border: '1px solid var(--border-default)',
+                            background: 'var(--surface-elevated)',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 700,
+                            fontSize: 11,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <i className="fas fa-lock" style={{ marginRight: 4 }} /> บล็อกห้องนี้
+                        </button>
                       </div>
-                    )
-                  })}
+                    )}
+                  </div>
                 </div>
               )
             })}
           </div>
         </div>
-        {/* Right-edge fade overlay */}
-        <div style={{ position: 'absolute', top: 0, right: 0, bottom: 0, width: 32, background: 'linear-gradient(to right, transparent, var(--surface-card))', pointerEvents: 'none' }} />
-      </div>
+      )}
 
-      {/* Legend row */}
-      <div style={{ display: 'flex', gap: 8, padding: '8px 18px 14px', flexWrap: 'wrap', borderTop: '1px solid var(--border-default)' }}>
-        {Object.entries(STATUS_LABELS_B).map(([k, v]) => (
-          <span key={k} style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--text-tertiary)', background: 'var(--surface-page)', border: '1px solid var(--border-default)', borderRadius: 20, padding: '2px 9px' }}>
-            <span style={{ width: 10, height: 10, borderRadius: 3, background: STATUS_COLORS_B[k] || '#888', flexShrink: 0 }} /> {/* ds-allow-hardcode */}
-            {v}
+      {/* ── Status Legend Footer ── */}
+      <div style={{
+        padding: '10px 20px',
+        borderTop: '1px solid var(--border-default)',
+        background: 'var(--surface-elevated)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: 10,
+      }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+            สถานะรอบ:
           </span>
-        ))}
-        <span style={{ fontSize: 11, display: 'inline-flex', alignItems: 'center', gap: 5, color: 'var(--text-tertiary)', background: 'var(--surface-page)', border: '1px solid var(--border-default)', borderRadius: 20, padding: '2px 9px' }}>
-          <i className="fas fa-lock" style={{ fontSize: 9 }} /> Mock Block
-        </span>
+          {Object.entries(STATUS_LABELS_B).map(([k, v]) => (
+            <span
+              key={k}
+              style={{
+                fontSize: 11,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                color: 'var(--text-secondary)',
+                background: 'var(--surface-page)',
+                border: '1px solid var(--border-default)',
+                borderRadius: 20,
+                padding: '2px 9px',
+              }}
+            >
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: STATUS_COLORS_B[k] || '#888' }} />
+              {v}
+            </span>
+          ))}
+          <span style={{
+            fontSize: 11,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 5,
+            color: 'var(--text-secondary)',
+            background: 'var(--surface-page)',
+            border: '1px solid var(--border-default)',
+            borderRadius: 20,
+            padding: '2px 9px',
+          }}>
+            <i className="fas fa-lock" style={{ fontSize: 9, color: '#f59e0b' }} />
+            Mock Block
+          </span>
+        </div>
       </div>
     </div>
   )
 }
 
+// ── Main Bookings Admin Controller Tab ───────────────────────────────────────
 function BookingsTab({ showToast, adminUser, allGames = [] }) {
   const [bookings, setBookings] = useState([])
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [dateFilter, setDateFilter] = useState('all') // 'all' | 'today' | 'upcoming' | 'past'
+  const [searchQuery, setSearchQuery] = useState('')
+  const [viewLayout, setViewLayout] = useState('cards') // 'cards' | 'table'
+
   const [confirmModal, setConfirmModal] = useState(null)
   const [editModal, setEditModal]       = useState(null)
   const [mockModal, setMockModal]       = useState(false)
+  const [mockInitial, setMockInitial]   = useState({ room: '', date: '', time: '13:00' })
+
   const [bookingEnabled, setBookingEnabled] = useState(() => {
     try {
       const cached = localStorage.getItem('sofun_booking_enabled')
@@ -11089,6 +11595,7 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
   })
   const [settingUpdating, setSettingUpdating] = useState(false)
 
+  // Listen to system setting
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'settings', 'booking'), snap => {
       if (snap.exists()) {
@@ -11128,6 +11635,7 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
     }
   }
 
+  // Live snapshot of all bookings
   useEffect(() => {
     const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'))
     const unsub = onSnapshot(q, snap => {
@@ -11138,12 +11646,12 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
   }, [])
 
   const handleDelete = async (id) => {
-    if (!window.confirm('ลบการจองนี้ถาวรหรือไม่?')) return
+    if (!window.confirm('ยืนยันลบการจองนี้อย่างถาวรหรือไม่? ข้อมูลปาร์ตี้และสลิปจะถูกลบออกจากระบบ')) return
     try {
       await deleteDoc(doc(db, 'bookings', id))
-      showToast('ลบการจองสำเร็จ')
+      showToast('ลบการจองเรียบร้อยแล้ว')
     } catch (e) {
-      showToast('เกิดข้อผิดพลาด: ' + e.message, 'error')
+      showToast('เกิดข้อผิดพลาดในการลบ: ' + e.message, 'error')
     }
   }
 
@@ -11153,7 +11661,7 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
       const snap = await getDoc(ref)
       if (!snap.exists()) { showToast('ไม่พบการจอง', 'error'); return }
       const data = snap.data()
-      const updatedMembers = data.members.map(m =>
+      const updatedMembers = (data.members || []).map(m =>
         m.uid === memberUid
           ? { ...m, paidDeposit: true, paidAt: new Date().toISOString(), slipStatus: 'verified' }
           : m
@@ -11172,17 +11680,17 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
       }
       if (isFullAndPaid && data.status === 'confirmed') payload.status = 'locked'
       await updateDoc(ref, payload)
-      showToast(isFullAndPaid ? 'ครบแล้ว — ล็อกห้องอัตโนมัติ' : 'ยืนยันสลิปสำเร็จ · ปรับเดดไลน์ตามเงื่อนไข')
+      showToast(isFullAndPaid ? 'ครบแล้ว  -  ระบบล็อกห้องอัตโนมัติ' : 'ยืนยันสลิปสำเร็จ')
     } catch (e) { showToast('เกิดข้อผิดพลาด: ' + e.message, 'error') }
   }
 
   const handleRejectSlip = async (bookingId, memberUid) => {
-    if (!window.confirm('ปฏิเสธสลิปนี้ใช่ไหม? สมาชิกจะต้องส่งสลิปใหม่')) return
+    if (!window.confirm('ปฏิเสธสลิปนี้ใช่ไหม? สมาชิกจะต้องอัปโหลดสลิปใหม่')) return
     try {
       const ref = doc(db, 'bookings', bookingId)
       const snap = await getDoc(ref)
       if (!snap.exists()) { showToast('ไม่พบการจอง', 'error'); return }
-      const updatedMembers = snap.data().members.map(m =>
+      const updatedMembers = (snap.data().members || []).map(m =>
         m.uid === memberUid ? { ...m, slipStatus: 'rejected', slipUrl: '' } : m
       )
       await updateDoc(ref, { members: updatedMembers, updatedAt: serverTimestamp() })
@@ -11190,31 +11698,114 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
     } catch (e) { showToast('เกิดข้อผิดพลาด: ' + e.message, 'error') }
   }
 
-  const pendingCount = bookings.filter(b => b.status === 'pending').length
-  const STATUS_FILTERS = ['all', 'pending', 'confirmed', 'locked', 'collapsed', 'cancelled']
-  const STATUS_FILTER_LABELS = { all: 'ทั้งหมด', ...STATUS_LABELS_B }
+  // Today reference
+  const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
-  const filtered = statusFilter === 'all'
-    ? bookings
-    : bookings.filter(b => b.status === statusFilter)
+  // KPI Calculations
+  const kpis = useMemo(() => {
+    const todayParties = bookings.filter(b => b.date === todayStr && b.status !== 'cancelled')
+    const pendingReview = bookings.filter(b => {
+      const hasPendingSlip = (b.members || []).some(m => m.slipStatus === 'pending_verification' && !m.paidDeposit)
+      return b.status === 'pending' || hasPendingSlip
+    })
+    const lockedOrConfirmed = bookings.filter(b => b.status === 'locked' || b.status === 'confirmed')
 
-  if (loading) return <div className="adm-loading"><div className="spinner" /></div>
+    let totalDepositCollected = 0
+    let paidMembersCount = 0
+    bookings.forEach(b => {
+      if (b.status === 'cancelled') return
+      ;(b.members || []).forEach(m => {
+        if (m.paidDeposit) {
+          paidMembersCount += 1
+          const amt = Number(m.depositPaidAmount) > 0 ? Number(m.depositPaidAmount) : (Number(b.depositAmount) || 0)
+          totalDepositCollected += amt
+        }
+      })
+    })
 
-  const pendingBookings = bookings.filter(b => b.status === 'pending')
+    return {
+      todayCount: todayParties.length,
+      nextTodayTime: todayParties[0]?.time || null,
+      pendingCount: pendingReview.length,
+      activeCount: lockedOrConfirmed.length,
+      totalDeposit: totalDepositCollected,
+      paidMembers: paidMembersCount,
+    }
+  }, [bookings, todayStr])
+
+  // Status Counts for Tabs
+  const statusCounts = useMemo(() => {
+    const counts = { all: bookings.length, pending: 0, confirmed: 0, locked: 0, collapsed: 0, cancelled: 0 }
+    bookings.forEach(b => {
+      if (counts[b.status] !== undefined) counts[b.status] += 1
+    })
+    return counts
+  }, [bookings])
+
+  // Filtered & Searched Bookings
+  const filteredBookings = useMemo(() => {
+    let result = [...bookings]
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      result = result.filter(b => b.status === statusFilter)
+    }
+
+    // Date filter
+    if (dateFilter === 'today') {
+      result = result.filter(b => b.date === todayStr)
+    } else if (dateFilter === 'upcoming') {
+      result = result.filter(b => b.date >= todayStr && b.status !== 'cancelled')
+    } else if (dateFilter === 'past') {
+      result = result.filter(b => b.date < todayStr)
+    }
+
+    // Search query
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase()
+      result = result.filter(b => {
+        const game = (b.gameName || '').toLowerCase()
+        const leader = (b.leaderName || '').toLowerCase()
+        const room = (b.room || '').toLowerCase()
+        const id = (b.id || '').toLowerCase()
+        const date = (b.date || '').toLowerCase()
+        return game.includes(q) || leader.includes(q) || room.includes(q) || id.includes(q) || date.includes(q)
+      })
+    }
+
+    return result
+  }, [bookings, statusFilter, dateFilter, searchQuery, todayStr])
+
+  // Urgent pending slips across all bookings
+  const pendingSlipsList = useMemo(() => {
+    const list = []
+    bookings.forEach(b => {
+      ;(b.members || []).forEach(m => {
+        if (m.slipStatus === 'pending_verification' && !m.paidDeposit && m.slipUrl) {
+          list.push({ booking: b, member: m })
+        }
+      })
+    })
+    return list
+  }, [bookings])
+
+  if (loading) {
+    return <div className="adm-loading"><div className="spinner" /></div>
+  }
 
   return (
     <div style={{ fontFamily: "'Sarabun', sans-serif" }}>
       <style>{`
-        @keyframes spin{to{transform:rotate(360deg)}}
-        @keyframes pendingPulse{0%,100%{opacity:1}50%{opacity:0.4}}
-        @keyframes slideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pendingGlow { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4); } 50% { box-shadow: 0 0 0 8px rgba(245, 158, 11, 0); } }
+        @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
       `}</style>
 
-      {/* ── Master Switch: Booking & Party System ── */}
+      {/* ── 1. MASTER SYSTEM SWITCH & STATUS HEADER ── */}
       <div style={{
-        background: bookingEnabled ? 'var(--surface-elevated)' : 'rgba(239, 68, 68, 0.04)',
-        border: `1.5px solid ${bookingEnabled ? 'var(--border-default)' : 'rgba(239, 68, 68, 0.35)'}`,
-        borderRadius: 14,
+        background: bookingEnabled ? 'var(--surface-card)' : 'rgba(239, 68, 68, 0.05)',
+        border: `1.5px solid ${bookingEnabled ? 'var(--border-default)' : 'rgba(239, 68, 68, 0.3)'}`,
+        borderRadius: 16,
         padding: '16px 20px',
         marginBottom: 20,
         display: 'flex',
@@ -11222,34 +11813,32 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
         justifyContent: 'space-between',
         flexWrap: 'wrap',
         gap: 16,
-        boxShadow: bookingEnabled ? 'none' : '0 2px 14px rgba(239, 68, 68, 0.08)',
-        transition: 'all 0.2s ease',
+        boxShadow: '0 2px 14px rgba(0, 0, 0, 0.04)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 260, flex: '1 1 auto' }}>
           <div style={{
-            width: 44,
-            height: 44,
+            width: 46,
+            height: 46,
             borderRadius: 12,
             background: bookingEnabled ? 'rgba(34, 197, 94, 0.12)' : 'rgba(239, 68, 68, 0.12)',
             color: bookingEnabled ? '#16a34a' : '#dc2626',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: 20,
+            fontSize: 22,
             flexShrink: 0,
-            transition: 'all 0.2s',
           }}>
             <i className={bookingEnabled ? 'fas fa-calendar-check' : 'fas fa-calendar-times'} />
           </div>
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 3 }}>
-              <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary)' }}>
-                สถานะระบบจองและปาร์ตี้ (Booking & Party System)
+              <span style={{ fontSize: 16, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                ระบบจองและปาร์ตี้ (Booking & Party Command Center)
               </span>
               <span style={{
                 fontSize: 11,
                 fontWeight: 800,
-                padding: '2px 9px',
+                padding: '2px 10px',
                 borderRadius: 20,
                 background: bookingEnabled ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                 color: bookingEnabled ? '#16a34a' : '#dc2626',
@@ -11258,25 +11847,20 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
                 alignItems: 'center',
                 gap: 5,
               }}>
-                <span style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: '50%',
-                  background: bookingEnabled ? '#16a34a' : '#dc2626',
-                }} />
-                {bookingEnabled ? 'เปิดใช้งาน (Online)' : 'ปิดระบบจอง (Redirect to LINE)'}
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: bookingEnabled ? '#16a34a' : '#dc2626' }} />
+                {bookingEnabled ? 'เปิดใช้งาน (Online)' : 'ปิดปรับปรุง (Offline)'}
               </span>
             </div>
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.45 }}>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', lineHeight: 1.4 }}>
               {bookingEnabled
-                ? 'ระบบจองบนเว็บและระบบค้นหาปาร์ตี้เปิดให้บริการปกติ ปุ่มจองและปาร์ตี้แสดงใน Navbar'
-                : 'ซ่อนเมนู "ปาร์ตี้" และ "จอง" ใน Navbar — ทุกปุ่มจองบนเว็บจะคัดลอกรูปภาพและข้อมูลเกม แล้วนำทางไปที่ LINE @sofunclub อัตโนมัติ'}
+                ? 'ระบบจองและค้นหาปาร์ตี้เปิดให้บริการปกติ เมนูจองและปาร์ตี้แสดงใน Navbar สำหรับผู้เล่นทุกคน'
+                : 'ระบบจองปิดอยู่ เมนูถูกซ่อน และปุ่มจองจะแนะนำให้ผู้เล่นติดต่อ LINE @sofunclub แทน'}
             </div>
           </div>
         </div>
 
         {/* Action Toggle Button */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <button
             type="button"
             onClick={handleToggleBookingSystem}
@@ -11285,7 +11869,7 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 8,
-              padding: '9px 18px',
+              padding: '10px 18px',
               borderRadius: 10,
               fontSize: 13,
               fontWeight: 800,
@@ -11294,7 +11878,6 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
               background: bookingEnabled ? 'rgba(239, 68, 68, 0.08)' : '#16a34a',
               color: bookingEnabled ? '#dc2626' : '#ffffff',
               transition: 'all 0.18s ease',
-              boxShadow: bookingEnabled ? 'none' : '0 2px 8px rgba(22, 163, 74, 0.25)',
             }}
           >
             {settingUpdating ? (
@@ -11307,334 +11890,1133 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
         </div>
       </div>
 
-      {/* Room availability grid */}
-      <RoomGrid bookings={bookings} onSelectBooking={setEditModal} />
+      {/* ── 2. EXECUTIVE KPI CARDS GRID ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: 14,
+        marginBottom: 24,
+      }}>
+        {/* KPI 1: Today's Parties */}
+        <div style={{
+          padding: '16px 18px',
+          borderRadius: 14,
+          background: 'var(--surface-card)',
+          border: '1px solid var(--border-default)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+        }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(229, 9, 20, 0.1)',
+            color: 'var(--crimson-500)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+          }}>
+            <i className="fas fa-calendar-day" />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              รอบเกมวันนี้
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.2, marginTop: 2 }}>
+              {kpis.todayCount} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)' }}>ตี้</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {kpis.nextTodayTime ? `คิวถัดไปเวลา ${kpis.nextTodayTime} น.` : 'ไม่มีรอบเกมในวันนี้'}
+            </div>
+          </div>
+        </div>
 
-      {/* ── Pending urgency section ── */}
-      {pendingBookings.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          {/* Section label */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-            <div style={{ width: 3, height: 18, borderRadius: 2, background: '#f59e0b', flexShrink: 0 }} /> {/* ds-allow-hardcode: status data-viz */}
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.09em', textTransform: 'uppercase' }}> {/* ds-allow-hardcode */}
-              รอยืนยัน
-            </span>
-            {/* Pulsing amber dot */}
-            <span style={{
-              display: 'inline-block', width: 7, height: 7, borderRadius: '50%',
-              background: '#f59e0b', /* ds-allow-hardcode: status data-viz */
-              animation: 'pendingPulse 1.2s ease-in-out infinite',
-            }} />
-            <span style={{ fontSize: 11, fontWeight: 800, background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: 20, padding: '1px 8px' }}> {/* ds-allow-hardcode */}
-              {pendingBookings.length}
+        {/* KPI 2: Action Required / Pending Review */}
+        <div style={{
+          padding: '16px 18px',
+          borderRadius: 14,
+          background: kpis.pendingCount > 0 ? 'rgba(245, 158, 11, 0.05)' : 'var(--surface-card)',
+          border: kpis.pendingCount > 0 ? '1.5px solid rgba(245, 158, 11, 0.4)' : '1px solid var(--border-default)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          animation: kpis.pendingCount > 0 ? 'pendingGlow 2.5s infinite' : 'none',
+        }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(245, 158, 11, 0.15)',
+            color: '#f59e0b',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+          }}>
+            <i className="fas fa-bell" />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              ต้องดำเนินการด่วน
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#f59e0b', lineHeight: 1.2, marginTop: 2 }}>
+              {kpis.pendingCount} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)' }}>รายการ</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+              {pendingSlipsList.length > 0
+                ? `มีสลิปรอตรวจ ${pendingSlipsList.length} ใบ`
+                : 'รอตรวจสอบและยืนยันรอบ'}
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 3: Locked & Confirmed */}
+        <div style={{
+          padding: '16px 18px',
+          borderRadius: 14,
+          background: 'var(--surface-card)',
+          border: '1px solid var(--border-default)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+        }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(16, 185, 129, 0.12)',
+            color: '#10b981',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+          }}>
+            <i className="fas fa-shield-alt" />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              พร้อมเล่น / ล็อกห้อง
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: '#10b981', lineHeight: 1.2, marginTop: 2 }}>
+              {kpis.activeCount} <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-tertiary)' }}>ตี้</span>
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+              ห้องพร้อมเล่นและมีผู้เล่นยืนยัน
+            </div>
+          </div>
+        </div>
+
+        {/* KPI 4: Total Deposit Collected */}
+        <div style={{
+          padding: '16px 18px',
+          borderRadius: 14,
+          background: 'var(--surface-card)',
+          border: '1px solid var(--border-default)',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.03)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+        }}>
+          <div style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: 'rgba(59, 130, 246, 0.12)',
+            color: '#3b82f6',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: 18,
+            flexShrink: 0,
+          }}>
+            <i className="fas fa-coins" />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              มัดจำที่จัดเก็บได้
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-primary)', lineHeight: 1.2, marginTop: 2 }}>
+              ฿{kpis.totalDeposit.toLocaleString()}
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text-secondary)', marginTop: 2 }}>
+              จากสมาชิกที่ชำระแล้ว {kpis.paidMembers} คน
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 3. URGENT SLIPS VERIFICATION BANNER ── */}
+      {pendingSlipsList.length > 0 && (
+        <div style={{
+          marginBottom: 24,
+          padding: '16px 20px',
+          borderRadius: 14,
+          background: 'rgba(245, 158, 11, 0.08)',
+          border: '1.5px solid rgba(245, 158, 11, 0.4)',
+          boxShadow: '0 4px 16px rgba(245, 158, 11, 0.1)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                width: 8,
+                height: 8,
+                borderRadius: '50%',
+                background: '#f59e0b',
+                animation: 'pulseDot 1.2s infinite',
+              }} />
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#f59e0b' }}>
+                มีสลิปรอการตรวจสอบด่วน ({pendingSlipsList.length} ใบ)
+              </span>
+            </div>
+            <span style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
+              ตรวจสอบยอดเงินและสลิปเพื่อล็อกห้องให้ผู้เล่นทันที
             </span>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {pendingBookings.map(b => {
-              const totalMembers = b.members?.length || 0
-              const paidCount = b.members?.filter(m => m.paidDeposit).length || 0
-              const pendingSlips = (b.members || []).filter(m => m.slipStatus === 'pending_verification' && !m.paidDeposit)
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {pendingSlipsList.map(({ booking: b, member: m }) => (
+              <div
+                key={`${b.id}_${m.uid}`}
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: 'var(--surface-card)',
+                  border: '1px solid var(--border-default)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                }}
+              >
+                {/* Clickable Slip Thumbnail */}
+                <div
+                  onClick={() => viewSlipImage(m.slipUrl)}
+                  style={{
+                    width: 52,
+                    height: 52,
+                    borderRadius: 8,
+                    overflow: 'hidden',
+                    background: '#000',
+                    cursor: 'pointer',
+                    flexShrink: 0,
+                    border: '1px solid var(--border-default)',
+                  }}
+                  title="คลิกเพื่อขยายดูสลิปเต็มจอ"
+                >
+                  <img src={m.slipUrl} alt="slip" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {m.name || m.uid}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {b.gameName} · {b.time || '13:00'}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleVerifySlip(b.id, m.uid)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: 'none',
+                        background: '#10b981',
+                        color: '#fff',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 4,
+                      }}
+                    >
+                      <i className="fas fa-check" /> อนุมัติ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRejectSlip(b.id, m.uid)}
+                      style={{
+                        padding: '4px 8px',
+                        borderRadius: 6,
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        background: 'transparent',
+                        color: '#ef4444',
+                        fontSize: 11,
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      ปฏิเสธ
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── 4. ROOM SCHEDULE MATRIX & TIMELINE CONTROLLER ── */}
+      <RoomScheduleMatrix
+        bookings={bookings}
+        allGames={allGames}
+        onSelectBooking={setEditModal}
+        onQuickBook={(room, date) => {
+          setMockInitial({ room, date, time: '13:00' })
+          setMockModal(true)
+        }}
+      />
+
+      {/* ── 5. PARTY LIST COMMAND CENTER & CONTROLS ── */}
+      <div style={{
+        background: 'var(--surface-card)',
+        borderRadius: 16,
+        border: '1px solid var(--border-default)',
+        padding: '20px',
+        boxShadow: '0 4px 24px rgba(0, 0, 0, 0.05)',
+      }}>
+        {/* Header & Quick Action Buttons */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 14,
+          marginBottom: 18,
+        }}>
+          <div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+              รายการปาร์ตี้ทั้งหมด ({filteredBookings.length} รายการ)
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }}>
+              จัดการย้ายหัวหน้าปาร์ตี้, เปลี่ยนเกม, คำนวณราคามัดจำใหม่, และตรวจสอบสมาชิก
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+            {/* View Layout Toggle */}
+            <div style={{
+              display: 'flex',
+              background: 'var(--surface-page)',
+              padding: 3,
+              borderRadius: 8,
+              border: '1px solid var(--border-default)',
+            }}>
+              <button
+                type="button"
+                onClick={() => setViewLayout('cards')}
+                title="มุมมองการ์ดสไตล์ Netflix"
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: viewLayout === 'cards' ? 'var(--surface-card)' : 'transparent',
+                  color: viewLayout === 'cards' ? 'var(--crimson-500)' : 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                <i className="fas fa-th-large" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewLayout('table')}
+                title="มุมมองตารางกระชับ"
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 6,
+                  border: 'none',
+                  background: viewLayout === 'table' ? 'var(--surface-card)' : 'transparent',
+                  color: viewLayout === 'table' ? 'var(--crimson-500)' : 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                <i className="fas fa-list" />
+              </button>
+            </div>
+
+            {/* Mock Block Action */}
+            <button
+              type="button"
+              onClick={() => {
+                setMockInitial({ room: '', date: '', time: '13:00' })
+                setMockModal(true)
+              }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 7,
+                padding: '9px 16px',
+                borderRadius: 10,
+                border: 'none',
+                background: '#f59e0b',
+                color: '#fff',
+                fontWeight: 800,
+                fontSize: 12.5,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.25)',
+              }}
+            >
+              <i className="fas fa-lock" />
+              <span>+ Mock Block (ล็อกห้อง)</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Search & Filters Toolbar */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          marginBottom: 20,
+          padding: '14px',
+          borderRadius: 12,
+          background: 'var(--surface-elevated)',
+          border: '1px solid var(--border-default)',
+        }}>
+          {/* Search Input Bar */}
+          <div style={{ position: 'relative', width: '100%' }}>
+            <i
+              className="fas fa-search"
+              style={{
+                position: 'absolute',
+                left: 14,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                color: 'var(--text-tertiary)',
+                fontSize: 14,
+              }}
+            />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="ค้นหาชื่อเกม, หัวหน้าปาร์ตี้, ชื่อห้อง, วันที่, หรือรหัสการจอง..."
+              style={{
+                width: '100%',
+                padding: '11px 40px 11px 38px',
+                borderRadius: 10,
+                border: '1px solid var(--border-default)',
+                background: 'var(--surface-page)',
+                color: 'var(--text-primary)',
+                fontSize: 13,
+                fontFamily: "'Sarabun', sans-serif",
+                outline: 'none',
+                boxSizing: 'border-box',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                style={{
+                  position: 'absolute',
+                  right: 12,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'none',
+                  border: 'none',
+                  color: 'var(--text-tertiary)',
+                  cursor: 'pointer',
+                  fontSize: 13,
+                }}
+              >
+                <i className="fas fa-times-circle" />
+              </button>
+            )}
+          </div>
+
+          {/* Status Tabs with Exact Count Badges */}
+          <div style={{
+            display: 'flex',
+            gap: 6,
+            flexWrap: 'wrap',
+            alignItems: 'center',
+          }}>
+            {[
+              { key: 'all', label: 'ทั้งหมด', count: statusCounts.all, color: 'var(--crimson-500)' },
+              { key: 'pending', label: 'รอยืนยัน', count: statusCounts.pending, color: '#f59e0b' },
+              { key: 'confirmed', label: 'ยืนยันแล้ว', count: statusCounts.confirmed, color: '#3b82f6' },
+              { key: 'locked', label: 'ล็อกห้อง', count: statusCounts.locked, color: '#10b981' },
+              { key: 'collapsed', label: 'ปาร์ตี้ล่ม', count: statusCounts.collapsed, color: '#ef4444' },
+              { key: 'cancelled', label: 'ยกเลิก', count: statusCounts.cancelled, color: '#64748b' },
+            ].map(tabItem => {
+              const active = statusFilter === tabItem.key
               return (
-                <div key={b.id} style={{
-                  display: 'flex', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden',
-                  background: 'var(--surface-elevated)', border: pendingSlips.length > 0 ? '1px solid rgba(6,199,85,0.35)' : '1px solid rgba(245,158,11,0.28)',
-                  boxShadow: pendingSlips.length > 0 ? '0 2px 14px rgba(6,199,85,0.1)' : '0 2px 14px rgba(245,158,11,0.09)',
-                }}>
-                  {/* Amber left border strip */}
-                  <div style={{ width: 4, background: '#f59e0b', flexShrink: 0 }} /> {/* ds-allow-hardcode */}
-                  <div style={{ flex: 1, padding: '14px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <button
+                  key={tabItem.key}
+                  type="button"
+                  onClick={() => setStatusFilter(tabItem.key)}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '6px 14px',
+                    borderRadius: 20,
+                    fontSize: 12,
+                    fontWeight: active ? 800 : 600,
+                    cursor: 'pointer',
+                    border: active ? `1.5px solid ${tabItem.color}` : '1px solid var(--border-default)',
+                    background: active ? tabItem.color + '1a' : 'var(--surface-page)',
+                    color: active ? tabItem.color : 'var(--text-secondary)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  <span>{tabItem.label}</span>
+                  <span style={{
+                    fontSize: 10,
+                    fontWeight: 800,
+                    padding: '1px 6px',
+                    borderRadius: 10,
+                    background: active ? tabItem.color : 'rgba(0,0,0,0.08)',
+                    color: active ? '#fff' : 'var(--text-tertiary)',
+                  }}>
+                    {tabItem.count}
+                  </span>
+                </button>
+              )
+            })}
+
+            {/* Date Quick Filter Strip */}
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+              {[
+                { key: 'all', label: 'ทุกวัน' },
+                { key: 'today', label: 'วันนี้' },
+                { key: 'upcoming', label: 'เร็วๆ นี้' },
+                { key: 'past', label: 'อดีต' },
+              ].map(df => (
+                <button
+                  key={df.key}
+                  type="button"
+                  onClick={() => setDateFilter(df.key)}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: 6,
+                    border: 'none',
+                    background: dateFilter === df.key ? 'var(--text-primary)' : 'transparent',
+                    color: dateFilter === df.key ? 'var(--surface-card)' : 'var(--text-tertiary)',
+                    fontSize: 11,
+                    fontWeight: dateFilter === df.key ? 800 : 600,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {df.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* ── 6. CARDS OR TABLE LIST CONTENT ── */}
+        {filteredBookings.length === 0 ? (
+          <div style={{
+            padding: '48px 20px',
+            textAlign: 'center',
+            color: 'var(--text-tertiary)',
+            background: 'var(--surface-elevated)',
+            borderRadius: 12,
+          }}>
+            <i className="fas fa-search" style={{ fontSize: 32, marginBottom: 12, opacity: 0.4 }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-secondary)' }}>
+              ไม่พบการจองที่ตรงกับเงื่อนไขการค้นหา
+            </div>
+            <div style={{ fontSize: 12, marginTop: 4 }}>
+              ลองเปลี่ยนสถานะหรือเคลียร์คำค้นหาเพื่อดูรายการทั้งหมด
+            </div>
+          </div>
+        ) : viewLayout === 'cards' ? (
+          /* Netflix Rich Cards Grid */
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
+            gap: 16,
+          }}>
+            {filteredBookings.map(b => {
+              const isMock = !!b.isMock
+              const matchedGame = allGames.find(g => g.id === b.gameId || (g.title || g.name) === b.gameName)
+              const coverImg = matchedGame?.image || b.gameImage || ''
+              const roomColor = ROOM_COLORS_ADM[b.room] || '#888'
+              const members = b.members || []
+              const totalMembers = members.length
+              const paidMembers = members.filter(m => m.paidDeposit)
+              const paidCount = paidMembers.length
+              const targetMax = b.maxMembers || 6
+
+              // Check financial deltas
+              const hasOwed = members.some(m => Number(m.depositOwed) > 0)
+              const hasOverpaid = members.some(m => Number(m.cashierDiscount) > 0 || Number(m.depositOverpaid) > 0)
+              const pendingSlips = members.filter(m => m.slipStatus === 'pending_verification' && !m.paidDeposit)
+
+              return (
+                <div
+                  key={b.id}
+                  style={{
+                    borderRadius: 14,
+                    background: 'var(--surface-page)',
+                    border: '1px solid var(--border-default)',
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    boxShadow: '0 4px 16px rgba(0, 0, 0, 0.04)',
+                    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.transform = 'translateY(-2px)'
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(0, 0, 0, 0.08)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.transform = 'translateY(0)'
+                    e.currentTarget.style.boxShadow = '0 4px 16px rgba(0, 0, 0, 0.04)'
+                  }}
+                >
+                  {/* Top Info Banner */}
+                  <div style={{
+                    padding: '14px',
+                    display: 'flex',
+                    gap: 12,
+                    alignItems: 'flex-start',
+                    background: 'var(--surface-elevated)',
+                    borderBottom: '1px solid var(--border-default)',
+                  }}>
+                    {/* Game Poster Cover */}
+                    <div style={{
+                      width: 58,
+                      height: 78,
+                      borderRadius: 8,
+                      overflow: 'hidden',
+                      background: '#141414',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                    }}>
+                      {coverImg ? (
+                        <img
+                          src={convertImg(coverImg, 140)}
+                          alt="poster"
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : (
+                        <i className={isMock ? 'fas fa-lock' : 'fas fa-theater-masks'} style={{ color: 'var(--crimson-500)', fontSize: 22 }} />
+                      )}
+                    </div>
+
+                    {/* Header Info */}
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
-                        <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
-                          {b.gameName || '-'}
-                        </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 4 }}>
                         <BookingStatusBadge status={b.status} />
+                        {isMock && (
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '1px 7px',
+                            borderRadius: 10,
+                            background: 'rgba(245,158,11,0.15)',
+                            color: '#f59e0b',
+                            border: '1px solid rgba(245,158,11,0.35)',
+                          }}>
+                            MOCK
+                          </span>
+                        )}
+                        <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>
+                          #{b.id.slice(0, 8)}
+                        </span>
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: 10, rowGap: 4, marginBottom: 6 }}>
-                        <span><i className="fas fa-calendar" style={{ marginRight: 4, opacity: 0.55 }} />{b.date}</span>
-                        {b.time && <span><i className="fas fa-clock" style={{ marginRight: 4, opacity: 0.55 }} />{b.time}</span>}
+
+                      <div style={{
+                        fontSize: 15,
+                        fontWeight: 900,
+                        color: 'var(--text-primary)',
+                        lineHeight: 1.25,
+                        marginBottom: 6,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {b.gameName || (isMock ? 'Mock Block' : '-')}
+                      </div>
+
+                      {/* Date, Time & Room Chips */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 11 }}>
+                        <span style={{
+                          padding: '2px 8px',
+                          borderRadius: 6,
+                          background: 'var(--surface-page)',
+                          border: '1px solid var(--border-default)',
+                          color: 'var(--text-secondary)',
+                          fontWeight: 700,
+                        }}>
+                          <i className="fas fa-calendar-alt" style={{ marginRight: 4, opacity: 0.6 }} />
+                          {formatThaiDateDisplay(b.date)}
+                        </span>
+                        {b.time && (
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'var(--surface-page)',
+                            border: '1px solid var(--border-default)',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 700,
+                          }}>
+                            <i className="fas fa-clock" style={{ marginRight: 4, opacity: 0.6 }} />
+                            {b.time} น.
+                          </span>
+                        )}
                         {b.room && (
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--surface-page)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '0 8px', fontWeight: 700, fontSize: 11 }}>
-                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: ROOM_COLORS_ADM[b.room] || 'var(--text-tertiary)' }} /> {/* ds-allow-hardcode: room data-viz */}
+                          <span style={{
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'var(--surface-page)',
+                            border: '1px solid var(--border-default)',
+                            color: 'var(--text-secondary)',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}>
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: roomColor }} />
                             {b.room}
                           </span>
                         )}
-                        <span><i className="fas fa-user" style={{ marginRight: 4, opacity: 0.55 }} />{b.leaderName || '-'}</span>
                       </div>
-                      {/* Member progress bar */}
-                      {totalMembers > 0 && (
-                        <div style={{ marginBottom: 4 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-                            <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{paidCount}/{totalMembers} จ่ายแล้ว</span>
-                          </div>
-                          <div style={{ height: 5, borderRadius: 4, background: 'var(--surface-page)', overflow: 'hidden' }}>
-                            <div style={{ height: '100%', borderRadius: 4, background: '#3b82f6', width: `${(paidCount / totalMembers) * 100}%`, transition: 'width 0.3s' }} /> {/* ds-allow-hardcode: status data-viz */}
-                          </div>
-                        </div>
-                      )}
-                      {b.adminNote && (
-                        <div style={{ marginTop: 6, fontSize: 11, color: 'var(--text-tertiary)', fontStyle: 'italic', display: 'flex', alignItems: 'flex-start', gap: 5, lineHeight: 1.5 }}>
-                          <i className="fas fa-comment-alt" style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }} />
-                          {b.adminNote}
-                        </div>
-                      )}
-                      {/* Slip review section */}
-                      {pendingSlips.length > 0 && (
-                        <div style={{ marginTop: 10, borderTop: '1px solid var(--border-default)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          <div style={{ fontSize: 10, fontWeight: 700, color: '#06c755', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}> {/* ds-allow-hardcode: paid-green */}
-                            <i className="fas fa-receipt" style={{ marginRight: 5 }} />สลิปรอยืนยัน
-                          </div>
-                          {pendingSlips.map(m => (
-                            <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                              <div onClick={() => viewSlipImage(m.slipUrl)} style={{ flexShrink: 0, cursor: 'pointer' }} title="คลิกดูสลิปเต็มจอ">
-                                <img src={m.slipUrl} alt="slip" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-default)', display: 'block' }} />
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {m.name || m.uid}
-                                </div>
-                                <div style={{ display: 'flex', gap: 6 }}>
-                                  <button
-                                    onClick={() => handleVerifySlip(b.id, m.uid)}
-                                    style={{ padding: '5px 12px', borderRadius: 7, border: 'none', background: '#06c755', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: "'Sarabun',sans-serif" }}> {/* ds-allow-hardcode: paid-green */}
-                                    <i className="fas fa-check" style={{ marginRight: 4 }} />ยืนยัน
-                                  </button>
-                                  <button
-                                    onClick={() => handleRejectSlip(b.id, m.uid)}
-                                    style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(198,36,25,0.35)', background: 'transparent', color: 'var(--crimson-500)', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: "'Sarabun',sans-serif" }}>
-                                    <i className="fas fa-times" style={{ marginRight: 4 }} />ปฏิเสธ
-                                  </button>
-                                </div>
-                              </div>
+                    </div>
+                  </div>
+
+                  {/* Body Content */}
+                  <div style={{ padding: '14px', flex: 1, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {/* Leader Row */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 12 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <i className="fas fa-crown" style={{ color: '#f59e0b', fontSize: 12 }} />
+                        <span style={{ fontWeight: 700, color: 'var(--text-tertiary)' }}>หัวหน้าตี้:</span>
+                        <span style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                          {b.leaderName || '-'}
+                        </span>
+                      </div>
+                      <span style={{
+                        fontSize: 11,
+                        fontWeight: 700,
+                        color: 'var(--text-secondary)',
+                      }}>
+                        {totalMembers}/{targetMax} คน
+                      </span>
+                    </div>
+
+                    {/* Member Avatars Overlap Row */}
+                    {totalMembers > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                        <div style={{ display: 'flex', alignItems: 'center' }}>
+                          {members.slice(0, 6).map((m, idx) => (
+                            <div
+                              key={m.uid || idx}
+                              style={{
+                                width: 26,
+                                height: 26,
+                                borderRadius: '50%',
+                                background: m.paidDeposit ? '#10b981' : '#64748b',
+                                color: '#fff',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: 10,
+                                fontWeight: 800,
+                                border: '2px solid var(--surface-page)',
+                                marginLeft: idx > 0 ? -6 : 0,
+                                overflow: 'hidden',
+                              }}
+                              title={`${m.name || m.uid} · ${m.paidDeposit ? 'จ่ายมัดจำแล้ว' : 'ยังไม่จ่าย'}`}
+                            >
+                              {m.avatar ? (
+                                <img src={m.avatar} alt="av" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                              ) : (
+                                (m.name || 'M')[0].toUpperCase()
+                              )}
                             </div>
                           ))}
                         </div>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-start' }}>
+                        {totalMembers > 6 && (
+                          <span style={{ fontSize: 10, color: 'var(--text-tertiary)', fontWeight: 700 }}>
+                            +{totalMembers - 6}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Deposit Progress Bar */}
+                    {!isMock && (
+                      <div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600 }}>
+                            มัดจำ ฿{b.depositAmount || 0}/คน
+                          </span>
+                          <span style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: paidCount >= targetMax ? '#10b981' : '#3b82f6',
+                          }}>
+                            ชำระแล้ว {paidCount}/{totalMembers} คน
+                          </span>
+                        </div>
+                        <div style={{ height: 6, borderRadius: 3, background: 'var(--surface-elevated)', overflow: 'hidden' }}>
+                          <div style={{
+                            height: '100%',
+                            borderRadius: 3,
+                            background: paidCount >= targetMax ? '#10b981' : '#3b82f6',
+                            width: `${totalMembers > 0 ? (paidCount / totalMembers) * 100 : 0}%`,
+                            transition: 'width 0.3s ease',
+                          }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Financial Delta Badges */}
+                    {(hasOwed || hasOverpaid) && (
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {hasOwed && (
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(245, 158, 11, 0.15)',
+                            color: '#f59e0b',
+                            border: '1px solid rgba(245, 158, 11, 0.3)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}>
+                            <i className="fas fa-exclamation-triangle" /> มียอดค้างชำระเพิ่ม
+                          </span>
+                        )}
+                        {hasOverpaid && (
+                          <span style={{
+                            fontSize: 10,
+                            fontWeight: 800,
+                            padding: '2px 8px',
+                            borderRadius: 6,
+                            background: 'rgba(16, 185, 129, 0.15)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.3)',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                          }}>
+                            <i className="fas fa-tag" /> ได้รับส่วนลดแคชเชียร์
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Admin Note if any */}
+                    {b.adminNote && (
+                      <div style={{
+                        fontSize: 11,
+                        color: 'var(--text-tertiary)',
+                        fontStyle: 'italic',
+                        padding: '6px 10px',
+                        borderRadius: 8,
+                        background: 'var(--surface-elevated)',
+                        display: 'flex',
+                        alignItems: 'flex-start',
+                        gap: 6,
+                        lineHeight: 1.4,
+                      }}>
+                        <i className="fas fa-comment-alt" style={{ fontSize: 9, marginTop: 3, opacity: 0.6 }} />
+                        <span>{b.adminNote}</span>
+                      </div>
+                    )}
+
+                    {/* Pending Slips in Card */}
+                    {pendingSlips.length > 0 && (
+                      <div style={{
+                        marginTop: 4,
+                        padding: '8px 10px',
+                        borderRadius: 8,
+                        background: 'rgba(245, 158, 11, 0.08)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                      }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: '#f59e0b' }}>
+                          <i className="fas fa-receipt" style={{ marginRight: 5 }} />มีสลิปรอตรวจ {pendingSlips.length} ใบ
+                        </span>
+                        <div style={{ display: 'flex', gap: 4 }}>
+                          {pendingSlips.map(m => (
+                            <button
+                              key={m.uid}
+                              type="button"
+                              onClick={() => viewSlipImage(m.slipUrl)}
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                border: '1px solid var(--border-default)',
+                                background: 'var(--surface-card)',
+                                color: 'var(--text-primary)',
+                                fontSize: 10,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              ดูสลิป
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Card Action Footer */}
+                  <div style={{
+                    padding: '10px 14px',
+                    borderTop: '1px solid var(--border-default)',
+                    background: 'var(--surface-elevated)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 8,
+                  }}>
+                    {/* Primary Button: Open Netflix Style Modal */}
+                    <button
+                      type="button"
+                      onClick={() => setEditModal(b)}
+                      style={{
+                        flex: 1,
+                        padding: '9px 14px',
+                        borderRadius: 8,
+                        border: 'none',
+                        background: 'var(--crimson-500)',
+                        color: '#ffffff',
+                        fontWeight: 800,
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 7,
+                        boxShadow: '0 2px 8px rgba(229, 9, 20, 0.25)',
+                      }}
+                    >
+                      <i className="fas fa-sliders-h" />
+                      <span>จัดการปาร์ตี้</span>
+                    </button>
+
+                    {/* Quick Confirm Button if pending */}
+                    {b.status === 'pending' && (
                       <button
+                        type="button"
                         onClick={() => setConfirmModal(b)}
-                        style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800, fontFamily: "'Sarabun',sans-serif", display: 'flex', alignItems: 'center', gap: 6 }}> {/* ds-allow-hardcode: action blue */}
-                        <i className="fas fa-check" /> ยืนยัน
+                        style={{
+                          padding: '9px 12px',
+                          borderRadius: 8,
+                          border: 'none',
+                          background: '#3b82f6',
+                          color: '#fff',
+                          fontWeight: 800,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 5,
+                        }}
+                      >
+                        <i className="fas fa-check" />
+                        <span>ยืนยัน</span>
                       </button>
-                      <button
-                        onClick={() => setEditModal(b)}
-                        style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, transition: 'border-color 0.14s, color 0.14s' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}>
-                        <i className="fas fa-pencil-alt" />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(b.id)}
-                        style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, transition: 'border-color 0.14s, color 0.14s' }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--crimson-500)'; e.currentTarget.style.color = 'var(--crimson-500)' }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-default)'; e.currentTarget.style.color = 'var(--text-tertiary)' }}>
-                        <i className="fas fa-trash" />
-                      </button>
-                    </div>
+                    )}
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(b.id)}
+                      title="ลบการจอง"
+                      style={{
+                        width: 34,
+                        height: 34,
+                        borderRadius: 8,
+                        border: '1px solid transparent',
+                        background: 'transparent',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: 13,
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.color = '#ef4444'
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.color = 'var(--text-tertiary)'
+                        e.currentTarget.style.background = 'transparent'
+                      }}
+                    >
+                      <i className="fas fa-trash-alt" />
+                    </button>
                   </div>
                 </div>
               )
             })}
           </div>
-        </div>
-      )}
+        ) : (
+          /* Table List View */
+          <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: 800 }}>
+              <thead>
+                <tr style={{ borderBottom: '1.5px solid var(--border-default)', fontSize: 11, fontWeight: 800, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '12px 10px' }}>เกม</th>
+                  <th style={{ padding: '12px 10px' }}>ห้อง & วันเวลา</th>
+                  <th style={{ padding: '12px 10px' }}>หัวหน้าตี้</th>
+                  <th style={{ padding: '12px 10px' }}>สมาชิก & มัดจำ</th>
+                  <th style={{ padding: '12px 10px' }}>สถานะ</th>
+                  <th style={{ padding: '12px 10px', textAlign: 'right' }}>การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredBookings.map(b => {
+                  const isMock = !!b.isMock
+                  const matchedGame = allGames.find(g => g.id === b.gameId || (g.title || g.name) === b.gameName)
+                  const coverImg = matchedGame?.image || b.gameImage || ''
+                  const members = b.members || []
+                  const paidCount = members.filter(m => m.paidDeposit).length
 
-      {/* ── Divider: History section ── */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-        <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
-        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-tertiary)', letterSpacing: '0.10em', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>
-          ประวัติทั้งหมด
-        </span>
-        <div style={{ flex: 1, height: 1, background: 'var(--border-default)' }} />
-      </div>
-
-      {/* ── Full list header row ── */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-        <span style={{ fontSize: 11, color: 'var(--text-tertiary)', fontWeight: 600 }}>
-          {filtered.length} รายการ
-        </span>
-        {/* Mock Block — prominent amber utility button */}
-        <button
-          onClick={() => setMockModal(true)}
-          style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: 'rgba(245,158,11,0.08)', color: '#f59e0b', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: "'Sarabun',sans-serif", display: 'flex', alignItems: 'center', gap: 6, transition: 'all 0.15s' }}
-          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.18)' }}
-          onMouseLeave={e => { e.currentTarget.style.background = 'rgba(245,158,11,0.08)' }}>
-          <i className="fas fa-lock" /> + Mock Block (ล็อกห้อง)
-        </button>
-      </div>
-
-      {/* Status filter chips */}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
-        {STATUS_FILTERS.map(s => {
-          const active = statusFilter === s
-          const col = s === 'all' ? 'var(--crimson-500)' : STATUS_COLORS_B[s] || 'var(--crimson-500)' /* ds-allow-hardcode */
-          return (
-            <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              style={{
-                padding: '5px 13px', borderRadius: 20, fontSize: 11, fontWeight: 700,
-                border: active ? `1.5px solid ${col}` : '1px solid var(--border-default)',
-                background: active ? (s === 'all' ? 'rgba(198,36,25,0.10)' : col + '1a') : 'var(--surface-page)',
-                color: active ? col : 'var(--text-secondary)',
-                cursor: 'pointer', transition: 'all 0.14s', fontFamily: "'Sarabun',sans-serif",
-              }}>
-              {STATUS_FILTER_LABELS[s]}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* All booking cards */}
-      {filtered.length === 0 ? (
-        <div className="adm-empty">ไม่มีการจองในสถานะนี้</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {filtered.map(b => {
-            const paidCount = b.members?.filter(m => m.paidDeposit).length || 0
-            const totalMembers = b.members?.length || 0
-            const statusColor = STATUS_COLORS_B[b.status] || (b.isMock ? '#f59e0b' : '#888') /* ds-allow-hardcode: status data-viz */
-            const pendingSlips = (b.members || []).filter(m => m.slipStatus === 'pending_verification' && !m.paidDeposit)
-            return (
-              <div key={b.id} style={{
-                display: 'flex', alignItems: 'stretch', borderRadius: 12, overflow: 'hidden',
-                background: 'var(--surface-card)', border: '1px solid var(--border-default)',
-              }}>
-                {/* 4px colored left strip — flex child, full height */}
-                <div style={{ width: 4, background: statusColor, flexShrink: 0 }} />
-                <div style={{ flex: 1, padding: '13px 16px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  {/* Main info */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* Game name + status badge on same row */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 5, flexWrap: 'wrap' }}>
-                      <span style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.01em', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                        {b.isMock && <i className="fas fa-lock" style={{ fontSize: 11, color: '#f59e0b' }} title="Mock Block" />}
-                        {b.gameName || (b.isMock ? 'Mock Block' : '-')}
-                      </span>
-                      <BookingStatusBadge status={b.status} />
-                      {b.isMock && (
-                        <span style={{ fontSize: 10, padding: '1px 7px', borderRadius: 10, background: 'rgba(245,158,11,0.14)', color: '#f59e0b', fontWeight: 800, border: '1px solid rgba(245,158,11,0.3)' }}>
-                          MOCK BLOCK
-                        </span>
-                      )}
-                    </div>
-                    {/* Date, room chip, leader name in a wrapping flex row */}
-                    <div style={{ fontSize: 12, color: 'var(--text-secondary)', display: 'flex', flexWrap: 'wrap', gap: 10, rowGap: 4, marginBottom: 5, alignItems: 'center' }}>
-                      <span><i className="fas fa-calendar" style={{ marginRight: 4, opacity: 0.55 }} />{b.date}</span>
-                      {b.time && <span><i className="fas fa-clock" style={{ marginRight: 4, opacity: 0.55 }} />{b.time}</span>}
-                      {b.room && (
-                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--surface-page)', border: '1px solid var(--border-default)', borderRadius: 10, padding: '1px 8px', fontWeight: 700, fontSize: 11 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: ROOM_COLORS_ADM[b.room] || 'var(--text-tertiary)' }} /> {/* ds-allow-hardcode: room data-viz */}
-                          {b.room}
-                        </span>
-                      )}
-                      <span><i className="fas fa-user" style={{ marginRight: 4, opacity: 0.55 }} />{b.leaderName || '-'}</span>
-                    </div>
-                    {/* Member progress bar — 5px tall, full-width, counts above */}
-                    {!b.isMock && totalMembers > 0 && (
-                      <div style={{ marginBottom: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-                          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{paidCount}/{totalMembers} จ่าย</span>
-                          {/* Deadline countdown pill — amber, confirmed only */}
-                          {b.depositDeadline && b.status === 'confirmed' && (() => {
-                            const diff = new Date(b.depositDeadline) - new Date()
-                            if (diff <= 0) return (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#ef4444', background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 20, padding: '1px 8px' }}>หมดเวลา</span> /* ds-allow-hardcode */
-                            )
-                            const dv = Math.floor(diff / 86400000)
-                            const hv = Math.floor((diff % 86400000) / 3600000)
-                            return (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: '#f59e0b', background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)', borderRadius: 20, padding: '1px 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}> {/* ds-allow-hardcode */}
-                                <i className="fas fa-clock" style={{ fontSize: 8 }} />
-                                {dv > 0 ? `${dv}ว ${hv}ชม.` : `${hv}ชม.`}
-                              </span>
-                            )
-                          })()}
-                        </div>
-                        <div style={{ height: 5, borderRadius: 4, background: 'var(--surface-page)', overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 4, background: '#3b82f6', width: `${(paidCount / totalMembers) * 100}%`, transition: 'width 0.3s' }} /> {/* ds-allow-hardcode: status data-viz */}
-                        </div>
-                      </div>
-                    )}
-                    {/* Admin note — italic, 11px, muted, comment icon */}
-                    {b.adminNote && (
-                      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', fontStyle: 'italic', display: 'flex', alignItems: 'flex-start', gap: 5, lineHeight: 1.5 }}>
-                        <i className="fas fa-comment-alt" style={{ fontSize: 9, marginTop: 2, opacity: 0.6 }} />
-                        {b.adminNote}
-                      </div>
-                    )}
-                    {/* Slip review section */}
-                    {pendingSlips.length > 0 && (
-                      <div style={{ marginTop: 10, borderTop: '1px solid var(--border-default)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        <div style={{ fontSize: 10, fontWeight: 700, color: '#06c755', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}> {/* ds-allow-hardcode: paid-green */}
-                          <i className="fas fa-receipt" style={{ marginRight: 5 }} />สลิปรอยืนยัน
-                        </div>
-                        {pendingSlips.map(m => (
-                          <div key={m.uid} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                            <a href={m.slipUrl} target="_blank" rel="noreferrer" style={{ flexShrink: 0 }}>
-                              <img src={m.slipUrl} alt="slip" style={{ width: 52, height: 52, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--border-default)', display: 'block' }} />
-                            </a>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {m.name || m.uid}
-                              </div>
-                              <div style={{ display: 'flex', gap: 6 }}>
-                                <button
-                                  onClick={() => handleVerifySlip(b.id, m.uid)}
-                                  style={{ padding: '5px 12px', borderRadius: 7, border: 'none', background: '#06c755', color: '#fff', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: "'Sarabun',sans-serif" }}> {/* ds-allow-hardcode: paid-green */}
-                                  <i className="fas fa-check" style={{ marginRight: 4 }} />ยืนยัน
-                                </button>
-                                <button
-                                  onClick={() => handleRejectSlip(b.id, m.uid)}
-                                  style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid rgba(198,36,25,0.35)', background: 'transparent', color: 'var(--crimson-500)', cursor: 'pointer', fontSize: 11, fontWeight: 700, fontFamily: "'Sarabun',sans-serif" }}>
-                                  <i className="fas fa-times" style={{ marginRight: 4 }} />ปฏิเสธ
-                                </button>
-                              </div>
+                  return (
+                    <tr
+                      key={b.id}
+                      style={{
+                        borderBottom: '1px solid var(--border-default)',
+                        fontSize: 12.5,
+                        transition: 'background 0.1s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.background = 'var(--surface-elevated)' }}
+                      onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                    >
+                      {/* Game & Poster */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{
+                            width: 32,
+                            height: 42,
+                            borderRadius: 6,
+                            overflow: 'hidden',
+                            background: '#141414',
+                            flexShrink: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            {coverImg ? (
+                              <img src={convertImg(coverImg, 80)} alt="poster" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            ) : (
+                              <i className="fas fa-dice" style={{ color: 'var(--crimson-500)', fontSize: 13 }} />
+                            )}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                              {b.gameName || (isMock ? 'Mock Block' : '-')}
+                            </div>
+                            <div style={{ fontSize: 10, color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>
+                              #{b.id.slice(0, 8)}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                        </div>
+                      </td>
 
-                  {/* Action buttons flush right */}
-                  <div style={{ display: 'flex', gap: 6, flexShrink: 0, alignItems: 'flex-start' }}>
-                    {/* Confirm button — blue, compact, only for pending */}
-                    {b.status === 'pending' && (
-                      <button
-                        onClick={() => setConfirmModal(b)}
-                        style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: '#3b82f6', color: '#fff', cursor: 'pointer', fontSize: 12, fontWeight: 800, fontFamily: "'Sarabun',sans-serif", display: 'flex', alignItems: 'center', gap: 5 }}> {/* ds-allow-hardcode: action blue */}
-                        <i className="fas fa-check" /> ยืนยัน
-                      </button>
-                    )}
-                    {/* Edit — pencil icon */}
-                    <button
-                      onClick={() => setEditModal(b)}
-                      title="แก้ไข"
-                      style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid transparent', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, transition: 'border-color 0.14s, color 0.14s, background 0.14s' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-strong)'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--surface-page)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent' }}>
-                      <i className="fas fa-pencil-alt" />
-                    </button>
-                    {/* Delete — ghost red icon button, always visible */}
-                    <button
-                      onClick={() => handleDelete(b.id)}
-                      title="ลบ"
-                      style={{ width: 34, height: 34, borderRadius: 8, border: '1px solid transparent', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, transition: 'border-color 0.14s, color 0.14s, background 0.14s' }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(198,36,25,0.35)'; e.currentTarget.style.color = 'var(--crimson-500)'; e.currentTarget.style.background = 'rgba(198,36,25,0.08)' }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.color = 'var(--text-tertiary)'; e.currentTarget.style.background = 'transparent' }}>
-                      <i className="fas fa-trash" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+                      {/* Room & DateTime */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ fontWeight: 700, color: 'var(--text-primary)' }}>
+                          {formatThaiDateDisplay(b.date)} {b.time ? `(${b.time} น.)` : ''}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
+                          <span style={{ width: 6, height: 6, borderRadius: '50%', background: ROOM_COLORS_ADM[b.room] || '#888' }} />
+                          {b.room || '-'}
+                        </div>
+                      </td>
 
+                      {/* Leader */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          <i className="fas fa-crown" style={{ color: '#f59e0b', fontSize: 10 }} />
+                          {b.leaderName || '-'}
+                        </div>
+                      </td>
+
+                      {/* Members & Deposit */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <div style={{ fontWeight: 700, color: paidCount >= (b.maxMembers || 6) ? '#10b981' : 'var(--text-primary)' }}>
+                          จ่ายแล้ว {paidCount}/{members.length || (b.maxMembers || 6)} คน
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>
+                          มัดจำ ฿{b.depositAmount || 0}/คน
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td style={{ padding: '12px 10px' }}>
+                        <BookingStatusBadge status={b.status} />
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '12px 10px', textAlign: 'right' }}>
+                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setEditModal(b)}
+                            style={{
+                              padding: '6px 12px',
+                              borderRadius: 6,
+                              border: 'none',
+                              background: 'var(--crimson-500)',
+                              color: '#fff',
+                              fontSize: 11,
+                              fontWeight: 800,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            จัดการ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(b.id)}
+                            style={{
+                              width: 28,
+                              height: 28,
+                              borderRadius: 6,
+                              border: 'none',
+                              background: 'transparent',
+                              color: 'var(--text-tertiary)',
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            <i className="fas fa-trash-alt" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* ── 7. MODALS ── */}
       {confirmModal && (
         <ConfirmBookingModal
           booking={confirmModal}
@@ -11660,11 +13042,15 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
           onClose={() => setMockModal(false)}
           showToast={showToast}
           allGames={allGames}
+          initialRoom={mockInitial.room}
+          initialDate={mockInitial.date}
+          initialTime={mockInitial.time}
         />
       )}
     </div>
   )
 }
+
 
 function EvaluationsTab({ showToast, allGames = [] }) {
   const [evaluations, setEvaluations] = useState([])
@@ -11777,9 +13163,9 @@ function EvaluationsTab({ showToast, allGames = [] }) {
   }
 
   const formatEvalDate = (createdAt) => {
-    if (!createdAt) return '—'
+    if (!createdAt) return ' - '
     const dt = createdAt.toDate ? createdAt.toDate() : (createdAt.seconds ? new Date(createdAt.seconds * 1000) : new Date(createdAt))
-    if (isNaN(dt.getTime())) return '—'
+    if (isNaN(dt.getTime())) return ' - '
     return dt.toLocaleDateString('th-TH', {
       day: 'numeric', month: 'short', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
@@ -11845,7 +13231,7 @@ function EvaluationsTab({ showToast, allGames = [] }) {
                 onClick={() => setSelectedDm(prev => prev === stat.dm ? 'ALL' : stat.dm)}
               >
                 <span className="adm-eval-dm-name"><i className="fas fa-user-circle" /> {stat.dm}</span>
-                <span className="adm-eval-dm-score">⭐ {stat.avgDm}</span>
+                <span className="adm-eval-dm-score">{stat.avgDm} / 5</span>
                 <span className="adm-eval-dm-count">({stat.count} รีวิว)</span>
               </button>
             ))}
@@ -11922,10 +13308,10 @@ function EvaluationsTab({ showToast, allGames = [] }) {
               value={ratingFilter}
               onChange={e => setRatingFilter(e.target.value)}
             >
-              <option value="ALL">⭐ ทุกคะแนนดาว</option>
-              <option value="5">⭐⭐⭐⭐⭐ 5 ดาว</option>
-              <option value="4+">⭐ 4 ดาวขึ้นไป</option>
-              <option value="3+">⭐ 3 ดาวขึ้นไป</option>
+              <option value="ALL">ทุกคะแนนดาว</option>
+              <option value="5">5 ดาว</option>
+              <option value="4+">4 ดาวขึ้นไป</option>
+              <option value="3+">3 ดาวขึ้นไป</option>
               <option value="low">น้อยกว่า 3 ดาว</option>
             </select>
           </div>
