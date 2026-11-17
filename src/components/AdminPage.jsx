@@ -47,7 +47,7 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
   // Power BI Slicers State
   const [timeRange, setTimeRange] = useState('14d') // today, 7d, 14d, 30d, mtd, 90d, all
   const [selectedRoom, setSelectedRoom] = useState('ALL')
-  const [activeView, setActiveView] = useState('overview') // overview, scripts, fb, ops, bookings
+  const [activeView, setActiveView] = useState('overview') // overview, customers, scripts, fb, ops, bookings
   const [ledgerSearch, setLedgerSearch] = useState('')
   const [ledgerFilter, setLedgerFilter] = useState('ALL') // ALL, with_food, game_only
 
@@ -488,6 +488,429 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
     return Object.values(map).sort((a, b) => b.sessions - a.sessions)
   }, [filteredPayments, evalList])
 
+  // ── Customer Behavior & Multi-Dimensional Intelligence Matrix ─────────────
+  const customerAnalytics = useMemo(() => {
+    // 1. Build member lookup map from registered members
+    const memberProfileMap = new Map()
+    members.forEach(m => {
+      if (m.id) memberProfileMap.set(m.id, m)
+      if (m.uid) memberProfileMap.set(m.uid, m)
+    })
+
+    // 2. Build lifetime player stats from ALL payments
+    const lifetimeMap = new Map()
+    payments.forEach(p => {
+      const pDate = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null) || (p.openAt?.toDate?.() || null)
+      const pMembers = Array.isArray(p.members) ? p.members : []
+      const bills = p.memberBills || {}
+      const paymentsMap = p.memberPayments || {}
+
+      pMembers.forEach(m => {
+        const uid = m.uid || m.name || 'unknown'
+        if (!lifetimeMap.has(uid)) {
+          const prof = memberProfileMap.get(uid) || {}
+          lifetimeMap.set(uid, {
+            uid,
+            name: m.name || prof.nickname || prof.firstname || prof.name || 'ลูกค้า',
+            avatar: m.avatar || prof.pictureUrl || prof.avatar || '',
+            tier: prof.tier || 'ทั่วไป',
+            points: prof.points || 0,
+            tel: prof.tel_no || '',
+            sessionsCount: 0,
+            totalSpend: 0,
+            gameSpend: 0,
+            foodSpend: 0,
+            firstVisitDate: pDate,
+            lastVisitDate: pDate,
+            playedScripts: new Set(),
+            playedGenres: new Set(),
+            visits: [],
+          })
+        }
+
+        const player = lifetimeMap.get(uid)
+        player.sessionsCount += 1
+
+        let pSpend = 0
+        let pGameSpend = 0
+        let pFoodSpend = 0
+
+        if (bills[uid]) {
+          pSpend = Number(bills[uid].total || 0)
+          pGameSpend = Number(bills[uid].gamePrice || 0)
+          pFoodSpend = Number(bills[uid].foodPrice || 0)
+        } else if (paymentsMap[uid]) {
+          pSpend = Number(paymentsMap[uid].amount || 0)
+          pGameSpend = Math.round(Number(p.gameUnitPrice || (p.gameTotal && pMembers.length ? p.gameTotal / pMembers.length : 0)))
+          pFoodSpend = Math.max(0, pSpend - pGameSpend)
+        } else {
+          pSpend = pMembers.length > 0 ? Math.round((p.grandTotal || 0) / pMembers.length) : 0
+          pGameSpend = pMembers.length > 0 ? Math.round((p.gameTotal || 0) / pMembers.length) : 0
+          pFoodSpend = pMembers.length > 0 ? Math.round((p.foodTotal || 0) / pMembers.length) : 0
+        }
+
+        player.totalSpend += pSpend
+        player.gameSpend += pGameSpend
+        player.foodSpend += pFoodSpend
+
+        if (p.scriptTitle) player.playedScripts.add(p.scriptTitle)
+
+        const mg = allGames.find(g => (g.title && g.title.trim().toLowerCase() === (p.scriptTitle || '').trim().toLowerCase()) || g.id === p.scriptId)
+        if (mg && Array.isArray(mg.tags)) {
+          mg.tags.forEach(t => player.playedGenres.add(t))
+        }
+
+        if (pDate) {
+          if (!player.firstVisitDate || pDate < player.firstVisitDate) player.firstVisitDate = pDate
+          if (!player.lastVisitDate || pDate > player.lastVisitDate) player.lastVisitDate = pDate
+          player.visits.push(pDate)
+        }
+      })
+    })
+
+    // 3. In-period player stats (from filteredPayments)
+    const periodMap = new Map()
+    filteredPayments.forEach(p => {
+      const pDate = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null) || (p.openAt?.toDate?.() || null)
+      const pMembers = Array.isArray(p.members) ? p.members : []
+      const bills = p.memberBills || {}
+      const paymentsMap = p.memberPayments || {}
+
+      const foodByPlayer = new Set()
+      if (Array.isArray(p.foodItems)) {
+        p.foodItems.forEach(item => {
+          if (item.orderedBy?.uid) foodByPlayer.add(item.orderedBy.uid)
+          else if (item.orderedBy?.name) foodByPlayer.add(item.orderedBy.name)
+        })
+      }
+
+      pMembers.forEach(m => {
+        const uid = m.uid || m.name || 'unknown'
+        if (!periodMap.has(uid)) {
+          const lInfo = lifetimeMap.get(uid) || {}
+          const prof = memberProfileMap.get(uid) || {}
+          periodMap.set(uid, {
+            uid,
+            name: m.name || prof.nickname || prof.firstname || prof.name || 'ลูกค้า',
+            avatar: m.avatar || prof.pictureUrl || prof.avatar || '',
+            tier: prof.tier || 'ทั่วไป',
+            points: prof.points || 0,
+            lifetimeSessions: lInfo.sessionsCount || 1,
+            lifetimeSpend: lInfo.totalSpend || 0,
+            firstVisitDate: lInfo.firstVisitDate,
+            lastVisitDate: lInfo.lastVisitDate,
+            isNew: lInfo.firstVisitDate && lInfo.firstVisitDate >= startDate,
+            sessionsCount: 0,
+            totalSpend: 0,
+            gameSpend: 0,
+            foodSpend: 0,
+            hasOrderedFood: false,
+            scripts: [],
+          })
+        }
+
+        const pData = periodMap.get(uid)
+        pData.sessionsCount += 1
+
+        let pSpend = 0
+        let pGameSpend = 0
+        let pFoodSpend = 0
+
+        if (bills[uid]) {
+          pSpend = Number(bills[uid].total || 0)
+          pGameSpend = Number(bills[uid].gamePrice || 0)
+          pFoodSpend = Number(bills[uid].foodPrice || 0)
+        } else if (paymentsMap[uid]) {
+          pSpend = Number(paymentsMap[uid].amount || 0)
+          pGameSpend = Math.round(Number(p.gameUnitPrice || (p.gameTotal && pMembers.length ? p.gameTotal / pMembers.length : 0)))
+          pFoodSpend = Math.max(0, pSpend - pGameSpend)
+        } else {
+          pSpend = pMembers.length > 0 ? Math.round((p.grandTotal || 0) / pMembers.length) : 0
+          pGameSpend = pMembers.length > 0 ? Math.round((p.gameTotal || 0) / pMembers.length) : 0
+          pFoodSpend = pMembers.length > 0 ? Math.round((p.foodTotal || 0) / pMembers.length) : 0
+        }
+
+        pData.totalSpend += pSpend
+        pData.gameSpend += pGameSpend
+        pData.foodSpend += pFoodSpend
+
+        if (foodByPlayer.has(uid) || (bills[uid] && bills[uid].foodPrice > 0)) {
+          pData.hasOrderedFood = true
+        }
+
+        if (p.scriptTitle) pData.scripts.push(p.scriptTitle)
+      })
+    })
+
+    const periodPlayersList = Array.from(periodMap.values())
+    const uniquePlayersCount = periodPlayersList.length
+
+    // Dimension 1: New vs Returning Customers
+    const newCustomers = periodPlayersList.filter(p => p.isNew)
+    const returningCustomers = periodPlayersList.filter(p => !p.isNew)
+    const newCount = newCustomers.length
+    const returningCount = returningCustomers.length
+    const repeatRate = uniquePlayersCount > 0 ? Math.round((returningCount / uniquePlayersCount) * 100) : 0
+
+    const newVsReturningData = [
+      { name: 'ลูกค้าประจำ / เล่นซ้ำ', value: returningCount, color: '#0078D4', pct: repeatRate },
+      { name: 'ลูกค้าใหม่ (ครั้งแรก)', value: newCount, color: '#10B981', pct: 100 - repeatRate },
+    ]
+
+    // Dimension 2: RFM Customer Segmentation (All active/historical players)
+    const rfmSegments = {
+      vip: { name: 'VIP แฟนพันธุ์แท้', desc: 'เล่น >= 4 รอบ หรือยอดสะสม >= ฿2,500 & มาต่อเนื่อง', color: '#7C3AED', icon: 'fa-crown', players: [], revenue: 0, strategy: 'มอบสิทธิพิเศษ VIP, ให้สิทธิ์จองรอบพิเศษก่อนใคร' },
+      loyal: { name: 'ลูกค้าประจำ (Loyal)', desc: 'เล่น >= 3 รอบ & มาสม่ำเสมอใน 60 วัน', color: '#0078D4', icon: 'fa-shield-heart', players: [], revenue: 0, strategy: 'ส่งเสริมการสะสมแต้ม แนะนำบทสืบสวนระดับยาก' },
+      potential: { name: 'ดาวรุ่ง (Potential)', desc: 'เล่น 2 รอบ & มีแนวโน้มชอบเล่น', color: '#10B981', icon: 'fa-chart-line-up', players: [], revenue: 0, strategy: 'มอบส่วนลดเล่นรอบที่ 3 ชวนเข้าคอมมูนิตี้หาตี้' },
+      new_cust: { name: 'ลูกค้าใหม่ (New)', desc: 'เพิ่งมาเล่นครั้งแรกในช่วงที่ผ่านมา', color: '#F59E0B', icon: 'fa-user-plus', players: [], revenue: 0, strategy: 'ส่งแบบประเมิน แนะนำสคริปต์สืบคดียอดนิยม' },
+      at_risk: { name: 'เริ่มห่างหาย (At Risk)', desc: 'เคยเล่นหลายรอบ แต่ไม่มาเกิน 45 วัน', color: '#EF4444', icon: 'fa-triangle-exclamation', players: [], revenue: 0, strategy: 'Broadcast LINE แนะนำสคริปต์ใหม่ มอบส่วนลดต้อนรับกลับ' },
+      dormant: { name: 'หลับใหล (Dormant)', desc: 'ไม่ได้มาเล่นนานเกิน 90 วัน', color: '#64748B', icon: 'fa-bed', players: [], revenue: 0, strategy: 'แคมเปญ Win-back โปรฯ คืนตี้ ลดพิเศษเพื่อดึงดูดกลับมา' },
+    }
+
+    lifetimeMap.forEach(player => {
+      const daysSinceLast = player.lastVisitDate ? Math.floor((now.getTime() - player.lastVisitDate.getTime()) / 86400000) : 999
+      const freq = player.sessionsCount
+      const spend = player.totalSpend
+
+      let segKey = 'dormant'
+      if (daysSinceLast > 90) {
+        segKey = 'dormant'
+      } else if (freq >= 2 && daysSinceLast > 45) {
+        segKey = 'at_risk'
+      } else if (freq >= 4 || spend >= 2500) {
+        segKey = 'vip'
+      } else if (freq >= 3) {
+        segKey = 'loyal'
+      } else if (freq === 2) {
+        segKey = 'potential'
+      } else {
+        segKey = 'new_cust'
+      }
+
+      rfmSegments[segKey].players.push(player)
+      rfmSegments[segKey].revenue += spend
+    })
+
+    const totalLifetimePlayers = lifetimeMap.size || 1
+    const totalLifetimeRev = Array.from(lifetimeMap.values()).reduce((s, p) => s + p.totalSpend, 0) || 1
+
+    const rfmTable = Object.entries(rfmSegments).map(([key, seg]) => ({
+      key,
+      name: seg.name,
+      desc: seg.desc,
+      color: seg.color,
+      icon: seg.icon,
+      count: seg.players.length,
+      share: Math.round((seg.players.length / totalLifetimePlayers) * 100),
+      revenue: seg.revenue,
+      revShare: Math.round((seg.revenue / totalLifetimeRev) * 100),
+      avgSpend: seg.players.length > 0 ? Math.round(seg.revenue / seg.players.length) : 0,
+      strategy: seg.strategy,
+    }))
+
+    // Dimension 3: Play Frequency Cohort Distribution
+    const frequencyCohorts = [
+      { cohort: '1 รอบ (ครั้งเดียว)', min: 1, max: 1, count: 0, revenue: 0, color: '#94A3B8' },
+      { cohort: '2 รอบ (เริ่มกลับมา)', min: 2, max: 2, count: 0, revenue: 0, color: '#38BDF8' },
+      { cohort: '3-4 รอบ (ประจำ)', min: 3, max: 4, count: 0, revenue: 0, color: '#0078D4' },
+      { cohort: '5-7 รอบ (ระดับสูง)', min: 5, max: 7, count: 0, revenue: 0, color: '#7C3AED' },
+      { cohort: '8+ รอบ (เซียนคดี)', min: 8, max: 9999, count: 0, revenue: 0, color: '#F59E0B' },
+    ]
+
+    lifetimeMap.forEach(player => {
+      const f = player.sessionsCount
+      const c = frequencyCohorts.find(co => f >= co.min && f <= co.max)
+      if (c) {
+        c.count += 1
+        c.revenue += player.totalSpend
+      }
+    })
+
+    // Dimension 4: Day-of-Week Behavior (จันทร์ - อาทิตย์)
+    const dayBehavior = [
+      { dayIndex: 1, day: 'จันทร์', sessions: 0, players: 0, revenue: 0, isWeekend: false },
+      { dayIndex: 2, day: 'อังคาร', sessions: 0, players: 0, revenue: 0, isWeekend: false },
+      { dayIndex: 3, day: 'พุธ', sessions: 0, players: 0, revenue: 0, isWeekend: false },
+      { dayIndex: 4, day: 'พฤหัสฯ', sessions: 0, players: 0, revenue: 0, isWeekend: false },
+      { dayIndex: 5, day: 'ศุกร์', sessions: 0, players: 0, revenue: 0, isWeekend: true },
+      { dayIndex: 6, day: 'เสาร์', sessions: 0, players: 0, revenue: 0, isWeekend: true },
+      { dayIndex: 0, day: 'อาทิตย์', sessions: 0, players: 0, revenue: 0, isWeekend: true },
+    ]
+
+    filteredPayments.forEach(p => {
+      const dt = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null) || (p.openAt?.toDate?.() || null)
+      if (!dt) return
+      const dIdx = dt.getDay()
+      const dObj = dayBehavior.find(d => d.dayIndex === dIdx)
+      if (dObj) {
+        dObj.sessions += 1
+        dObj.players += p.members?.length || 0
+        dObj.revenue += p.grandTotal || 0
+      }
+    })
+
+    const weekdayRev = dayBehavior.filter(d => !d.isWeekend).reduce((s, d) => s + d.revenue, 0)
+    const weekendRev = dayBehavior.filter(d => d.isWeekend).reduce((s, d) => s + d.revenue, 0)
+    const totalDayRev = weekdayRev + weekendRev || 1
+    const weekdayPct = Math.round((weekdayRev / totalDayRev) * 100)
+    const weekendPct = 100 - weekdayPct
+
+    // Dimension 5: Time-of-Day Slots (ช่วงเวลาที่ชอบมาเล่น)
+    const timeSlots = [
+      { slot: 'บ่าย (12:00 - 16:59)', icon: 'fa-sun', sessions: 0, players: 0, revenue: 0, color: '#F59E0B' },
+      { slot: 'เย็น (17:00 - 19:59)', icon: 'fa-cloud-sun', sessions: 0, players: 0, revenue: 0, color: '#0078D4' },
+      { slot: 'ดึก (20:00 เป็นต้นไป)', icon: 'fa-moon', sessions: 0, players: 0, revenue: 0, color: '#7C3AED' },
+    ]
+
+    filteredPayments.forEach(p => {
+      const dt = p.openAt?.toDate?.() || p.paidAt?.toDate?.() || null
+      if (!dt) return
+      const h = dt.getHours()
+      let idx = 0
+      if (h >= 20 || h < 4) idx = 2
+      else if (h >= 17) idx = 1
+      else idx = 0
+
+      timeSlots[idx].sessions += 1
+      timeSlots[idx].players += p.members?.length || 0
+      timeSlots[idx].revenue += p.grandTotal || 0
+    })
+
+    // Dimension 6: Party Size Dynamics (ขนาดกลุ่มที่ชอบมาเล่น)
+    const partySizeGroups = [
+      { label: 'ตี้เล็ก (4 - 5 คน)', desc: 'บทกระชับ หรือเฉพาะกลุ่มเพื่อนสนิท', min: 1, max: 5, sessions: 0, players: 0, revenue: 0, color: '#38BDF8' },
+      { label: 'ตี้มาตรฐาน (6 - 7 คน)', desc: 'ขนาดตี้ยอดนิยมสำหรับสืบคดีส่วนใหญ่', min: 6, max: 7, sessions: 0, players: 0, revenue: 0, color: '#0078D4' },
+      { label: 'ตี้ใหญ่ (8+ คน)', desc: 'ปาร์ตี้อลังการ หรือเกมขยายบทพิเศษ', min: 8, max: 99, sessions: 0, players: 0, revenue: 0, color: '#7C3AED' },
+    ]
+
+    filteredPayments.forEach(p => {
+      const count = p.members?.length || 0
+      const group = partySizeGroups.find(g => count >= g.min && count <= g.max) || partySizeGroups[0]
+      group.sessions += 1
+      group.players += count
+      group.revenue += p.grandTotal || 0
+    })
+
+    // Dimension 7: Payment Behavior (แยกจ่าย vs หัวหน้าตี้เลี้ยง)
+    let soloOrSplitSessions = 0
+    let hostOrSinglePayerSessions = 0
+
+    filteredPayments.forEach(p => {
+      const pMems = p.members?.length || 0
+      if (pMems <= 1) {
+        soloOrSplitSessions += 1
+        return
+      }
+
+      let payerCount = 0
+      let hasProxy = false
+      if (p.memberPayments && typeof p.memberPayments === 'object') {
+        const payers = Object.values(p.memberPayments)
+        payerCount = payers.filter(x => x && (x.amount > 0 || x.verified || x.transRef)).length
+        hasProxy = payers.some(x => x && (x.forAll || x.paidByProxy))
+      }
+
+      if (hasProxy || (payerCount === 1 && pMems > 1)) {
+        hostOrSinglePayerSessions += 1
+      } else {
+        soloOrSplitSessions += 1
+      }
+    })
+
+    const totalPaySessions = soloOrSplitSessions + hostOrSinglePayerSessions || 1
+    const splitPayPct = Math.round((soloOrSplitSessions / totalPaySessions) * 100)
+    const hostPayPct = 100 - splitPayPct
+
+    // Dimension 8: F&B Dining & Spend Attachment per Player
+    const diningPlayersCount = periodPlayersList.filter(p => p.hasOrderedFood || p.foodSpend > 0).length
+    const playerFbAttachmentRate = uniquePlayersCount > 0 ? Math.round((diningPlayersCount / uniquePlayersCount) * 100) : 0
+    const totalFoodRevInPeriod = periodPlayersList.reduce((s, p) => s + p.foodSpend, 0)
+    const avgFbPerDiner = diningPlayersCount > 0 ? Math.round(totalFoodRevInPeriod / diningPlayersCount) : 0
+
+    // Dimension 9: Favorite Story Genres (สไตล์แนวเกมที่ลูกค้าชอบ)
+    const genreMap = {}
+    filteredPayments.forEach(p => {
+      const mg = allGames.find(g => (g.title && g.title.trim().toLowerCase() === (p.scriptTitle || '').trim().toLowerCase()) || g.id === p.scriptId)
+      const tags = (mg && Array.isArray(mg.tags) && mg.tags.length > 0) ? mg.tags : ['สืบสวนทั่วไป']
+      const pCount = p.members?.length || 1
+
+      tags.forEach(tag => {
+        const t = tag.trim()
+        if (!genreMap[t]) genreMap[t] = { name: t, players: 0, sessions: 0, revenue: 0 }
+        genreMap[t].players += pCount
+        genreMap[t].sessions += 1
+        genreMap[t].revenue += p.grandTotal || 0
+      })
+    })
+
+    const topGenres = Object.values(genreMap).sort((a, b) => b.players - a.players).slice(0, 6)
+
+    // Dimension 10: Top 10 High-Value Customers Leaderboard
+    const topCustomers = periodPlayersList
+      .sort((a, b) => b.totalSpend - a.totalSpend)
+      .slice(0, 10)
+      .map((c, idx) => {
+        const lInfo = lifetimeMap.get(c.uid)
+        return {
+          rank: idx + 1,
+          uid: c.uid,
+          name: c.name,
+          avatar: c.avatar,
+          tier: c.tier,
+          periodSessions: c.sessionsCount,
+          lifetimeSessions: c.lifetimeSessions,
+          periodSpend: c.totalSpend,
+          lifetimeSpend: c.lifetimeSpend,
+          gameSpend: c.gameSpend,
+          foodSpend: c.foodSpend,
+          fbAttachment: c.totalSpend > 0 ? Math.round((c.foodSpend / c.totalSpend) * 100) : 0,
+          isNew: c.isNew,
+          lastSeen: c.lastVisitDate ? c.lastVisitDate.toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit' }) : '-',
+          favoriteScript: c.scripts[0] || (lInfo && Array.from(lInfo.playedScripts)[0]) || 'สืบสวน',
+        }
+      })
+
+    // Average days between visits for repeat players
+    let totalGapDays = 0
+    let gapCount = 0
+    lifetimeMap.forEach(p => {
+      if (p.visits.length >= 2) {
+        const sortedV = [...p.visits].sort((a, b) => a.getTime() - b.getTime())
+        for (let i = 1; i < sortedV.length; i++) {
+          const diffDays = Math.round((sortedV[i].getTime() - sortedV[i - 1].getTime()) / 86400000)
+          if (diffDays > 0 && diffDays < 180) {
+            totalGapDays += diffDays
+            gapCount += 1
+          }
+        }
+      }
+    })
+    const avgDaysBetweenVisits = gapCount > 0 ? (totalGapDays / gapCount).toFixed(1) : '14.0'
+
+    return {
+      uniquePlayersCount,
+      newCount,
+      returningCount,
+      repeatRate,
+      newVsReturningData,
+      rfmTable,
+      frequencyCohorts,
+      dayBehavior,
+      weekdayPct,
+      weekendPct,
+      timeSlots,
+      partySizeGroups,
+      splitPayPct,
+      hostPayPct,
+      playerFbAttachmentRate,
+      diningPlayersCount,
+      avgFbPerDiner,
+      topGenres,
+      topCustomers,
+      avgDaysBetweenVisits,
+    }
+  }, [payments, filteredPayments, members, allGames, startDate, now])
+
   // ── Ledger Search & Filter ────────────────────────────────────────────────
   const filteredLedgerPayments = useMemo(() => {
     return filteredPayments.filter(p => {
@@ -720,6 +1143,7 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
           </span>
           {[
             { id: 'overview', label: 'ภาพรวมบริหาร', icon: 'fa-chart-pie' },
+            { id: 'customers', label: 'วิเคราะห์พฤติกรรมลูกค้า', icon: 'fa-users-gear' },
             { id: 'scripts', label: 'ประสิทธิภาพสคริปต์', icon: 'fa-book-skull' },
             { id: 'fb', label: 'อาหาร & เครื่องดื่ม (F&B)', icon: 'fa-utensils' },
             { id: 'ops', label: 'DM & การใช้ห้อง', icon: 'fa-user-tie' },
@@ -1430,6 +1854,61 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
               </table>
             </div>
           </div>
+
+          {/* Quick Customer Behavior Insights Bar in Overview */}
+          <div
+            style={{
+              background: '#FFFFFF',
+              borderRadius: 14,
+              padding: '16px 20px',
+              border: '1px solid #E2E8F0',
+              borderLeft: '4.5px solid #8B5CF6',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 14,
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 10, background: '#EDE9FE', color: '#8B5CF6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>
+                <i className="fas fa-users-gear" />
+              </div>
+              <div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>ไฮไลท์พฤติกรรมลูกค้า (Customer Behavior Highlights)</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: '#F5F3FF', color: '#7C3AED' }}>
+                    Repeat Rate: {customerAnalytics.repeatRate}%
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  ผู้เล่นแอคทีฟ {customerAnalytics.uniquePlayersCount} คน · อัตราเล่นซ้ำ {customerAnalytics.repeatRate}% · ลูกค้าประจำกลับมาเล่นทุกๆ {customerAnalytics.avgDaysBetweenVisits} วัน · สั่งอาหาร {customerAnalytics.playerFbAttachmentRate}%
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveView('customers')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '7px 14px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 800,
+                background: '#F5F3FF',
+                color: '#7C3AED',
+                border: '1px solid #DDD6FE',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+            >
+              <span>ดูการวิเคราะห์พฤติกรรมลูกค้าเชิงลึก (10 มิติ)</span>
+              <i className="fas fa-arrow-right" style={{ fontSize: 11 }} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -1974,6 +2453,830 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── VIEW 6: CUSTOMER BEHAVIOR ANALYTICS (วิเคราะห์พฤติกรรมลูกค้า) ── */}
+      {activeView === 'customers' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+          {/* Banner: Power BI Customer Intelligence Suite */}
+          <div
+            style={{
+              background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+              borderRadius: 14,
+              padding: '18px 22px',
+              color: '#FFFFFF',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: 16,
+              boxShadow: '0 4px 14px rgba(15, 23, 42, 0.15)',
+              border: '1px solid #334155',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 12,
+                  background: 'linear-gradient(135deg, #38BDF8 0%, #0284C7 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: 20,
+                  color: '#FFFFFF',
+                  boxShadow: '0 4px 12px rgba(56, 189, 248, 0.3)',
+                }}
+              >
+                <i className="fas fa-users-gear" />
+              </div>
+              <div>
+                <div style={{ fontSize: 17, fontWeight: 900, letterSpacing: '-0.02em', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span>การวิเคราะห์พฤติกรรมลูกค้าเชิงลึก (Customer Behavior Analytics)</span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: 'rgba(56, 189, 248, 0.2)', color: '#38BDF8', border: '1px solid rgba(56, 189, 248, 0.4)' }}>
+                    Power BI Engine
+                  </span>
+                </div>
+                <div style={{ fontSize: 11.5, color: '#94A3B8', marginTop: 2 }}>
+                  เจาะลึก 10 มิติ: RFM Segmentation, การเล่นซ้ำ, วัน-เวลาที่ชอบมาเล่น, ขนาดปาร์ตี้, สไตล์การจ่ายเงิน, F&B Attachment และแนวเกมโปรด
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#94A3B8' }}>ผู้เล่นในช่วงเวลาที่เลือก</div>
+                <div style={{ fontSize: 19, fontWeight: 900, color: '#38BDF8', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                  {customerAnalytics.uniquePlayersCount} คน
+                </div>
+              </div>
+              <div style={{ height: 26, width: 1, background: '#334155' }} />
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: '#94A3B8' }}>อัตราเล่นซ้ำ (Repeat Rate)</div>
+                <div style={{ fontSize: 19, fontWeight: 900, color: '#10B981', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                  {customerAnalytics.repeatRate}%
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 1: 5 Micro KPI Tiles */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+            <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', border: '1px solid #E2E8F0', borderTop: '3.5px solid #0078D4', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>ผู้เล่นที่มีการเคลื่อนไหว</span>
+                <i className="fas fa-users" style={{ color: '#0078D4', fontSize: 13 }} />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                {customerAnalytics.uniquePlayersCount} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>คน</span>
+              </div>
+              <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 4 }}>
+                จากสมาชิกลงทะเบียนทั้งหมด {members.length} คน
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', border: '1px solid #E2E8F0', borderTop: '3.5px solid #10B981', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>อัตราการเล่นซ้ำ (Repeat Rate)</span>
+                <i className="fas fa-rotate-right" style={{ color: '#10B981', fontSize: 13 }} />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                {customerAnalytics.repeatRate}%
+              </div>
+              <div style={{ fontSize: 10.5, color: '#059669', fontWeight: 700, marginTop: 4 }}>
+                ลูกค้าประจำ {customerAnalytics.returningCount} คน · ลูกค้าใหม่ {customerAnalytics.newCount} คน
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', border: '1px solid #E2E8F0', borderTop: '3.5px solid #8B5CF6', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>ความถี่รอบเฉลี่ย (Cycle)</span>
+                <i className="fas fa-calendar-days" style={{ color: '#8B5CF6', fontSize: 13 }} />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                {customerAnalytics.avgDaysBetweenVisits} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>วัน</span>
+              </div>
+              <div style={{ fontSize: 10.5, color: '#6D28D9', fontWeight: 700, marginTop: 4 }}>
+                ระยะห่างเฉลี่ยระหว่างการกลับมาเล่นซ้ำ
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', border: '1px solid #E2E8F0', borderTop: '3.5px solid #F59E0B', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>สั่ง F&B ระหว่างเล่น</span>
+                <i className="fas fa-burger" style={{ color: '#F59E0B', fontSize: 13 }} />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                {customerAnalytics.playerFbAttachmentRate}%
+              </div>
+              <div style={{ fontSize: 10.5, color: '#D97706', fontWeight: 700, marginTop: 4 }}>
+                เฉลี่ย ฿{customerAnalytics.avgFbPerDiner} / คนที่สั่งอาหาร
+              </div>
+            </div>
+
+            <div style={{ background: '#FFFFFF', borderRadius: 12, padding: '14px 16px', border: '1px solid #E2E8F0', borderTop: '3.5px solid #EC4899', boxShadow: '0 2px 6px rgba(0,0,0,0.02)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 11, fontWeight: 800, color: '#64748B', textTransform: 'uppercase' }}>กลุ่ม VIP แฟนพันธุ์แท้</span>
+                <i className="fas fa-crown" style={{ color: '#EC4899', fontSize: 13 }} />
+              </div>
+              <div style={{ fontSize: 24, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 4 }}>
+                {customerAnalytics.rfmTable[0]?.count || 0} <span style={{ fontSize: 13, fontWeight: 600, color: '#64748B' }}>คน</span>
+              </div>
+              <div style={{ fontSize: 10.5, color: '#BE185D', fontWeight: 700, marginTop: 4 }}>
+                สร้างรายได้สะสม ฿{(customerAnalytics.rfmTable[0]?.revenue || 0).toLocaleString()}
+              </div>
+            </div>
+          </div>
+
+          {/* Row 2: RFM Segmentation Matrix Table */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: 14 }}>
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #7C3AED',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-layer-group" style={{ color: '#7C3AED' }} />
+                    <span>ตารางแบ่งส่วนพฤติกรรมลูกค้า RFM (Recency, Frequency, Monetary)</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748B' }}>
+                    จัดกลุ่มลูกค้าตามความถี่ ยอดใช้จ่าย และความสดใหม่ของการมาเยือน เพื่อกำหนดกลยุทธ์การตลาดและบริหารความสัมพันธ์
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 6, background: '#F5F3FF', color: '#7C3AED', border: '1px solid #DDD6FE' }}>
+                  6 Segment Cohorts
+                </span>
+              </div>
+
+              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', fontSize: 11, textTransform: 'uppercase' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>กลุ่มลูกค้า (Segment)</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>เงื่อนไขพฤติกรรม</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>จำนวน (คน)</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>สัดส่วนลูกค้า</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>รายได้รวมสะสม</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>สัดส่วนรายได้</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>ARPU (เฉลี่ย/คน)</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>กลยุทธ์และข้อเสนอแนะ</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerAnalytics.rfmTable.map(seg => (
+                      <tr key={seg.key} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '10px 12px', fontWeight: 800 }}>
+                          <span
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '3px 8px',
+                              borderRadius: 6,
+                              background: `${seg.color}15`,
+                              color: seg.color,
+                              fontSize: 11.5,
+                              fontWeight: 800,
+                              border: `1px solid ${seg.color}35`,
+                            }}
+                          >
+                            <i className={`fas ${seg.icon}`} style={{ fontSize: 11 }} />
+                            <span>{seg.name}</span>
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#475569', fontSize: 11.5 }}>
+                          {seg.desc}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#0F172A' }}>
+                          {seg.count} คน
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: '#F1F5F9', color: '#475569' }}>
+                            {seg.share}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0078D4', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13 }}>
+                          ฿{seg.revenue.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: 11,
+                              fontWeight: 800,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: seg.revShare >= 25 ? '#DCFCE7' : '#EFF6FF',
+                              color: seg.revShare >= 25 ? '#166534' : '#1D4ED8',
+                            }}
+                          >
+                            {seg.revShare}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 800, color: '#0F172A' }}>
+                          ฿{seg.avgSpend.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#334155', fontSize: 11 }}>
+                          <span style={{ background: '#F8FAFC', padding: '3px 8px', borderRadius: 6, border: '1px solid #E2E8F0', display: 'inline-block' }}>
+                            {seg.strategy}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 3: Retention Donut & Play Frequency Distribution */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+            {/* Visual: New vs Returning Customers */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #10B981',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-chart-pie" style={{ color: '#10B981' }} />
+                    <span>สัดส่วนลูกค้าใหม่ vs. ลูกค้าประจำ (Retention Ratio)</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#DCFCE7', color: '#166534' }}>
+                    Repeat: {customerAnalytics.repeatRate}%
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                  เปรียบเทียบผู้เล่นที่มาเล่นครั้งแรก กับผู้เล่นที่แวะเวียนกลับมาเล่นซ้ำในช่วงเวลาที่เลือก
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                  <ResponsiveContainer width="100%" height={210}>
+                    <PieChart>
+                      <Pie
+                        data={customerAnalytics.newVsReturningData}
+                        dataKey="value"
+                        nameKey="name"
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={55}
+                        outerRadius={85}
+                        paddingAngle={3}
+                      >
+                        {customerAnalytics.newVsReturningData.map(entry => (
+                          <Cell key={entry.name} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(val, name) => [`${val} คน`, name]} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  <div style={{ position: 'absolute', textAlign: 'center', pointerEvents: 'none' }}>
+                    <div style={{ fontSize: 22, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                      {customerAnalytics.repeatRate}%
+                    </div>
+                    <div style={{ fontSize: 10, color: '#64748B', fontWeight: 700 }}>อัตราเล่นซ้ำ</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-around', borderTop: '1px solid #F1F5F9', paddingTop: 10, marginTop: 4 }}>
+                {customerAnalytics.newVsReturningData.map(d => (
+                  <div key={d.name} style={{ textAlign: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, color: '#64748B', justifyContent: 'center' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: d.color }} />
+                      <span>{d.name}</span>
+                    </div>
+                    <div style={{ fontSize: 15, fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", marginTop: 2 }}>
+                      {d.value} คน ({d.pct}%)
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Visual: Play Frequency Cohorts */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #0078D4',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-chart-column" style={{ color: '#0078D4' }} />
+                    <span>การกระจายตัวตามความถี่การเล่น (Play Frequency Cohorts)</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#EFF6FF', color: '#1D4ED8' }}>
+                    Lifetime Depth
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                  จำนวนผู้เล่นแบ่งตามจำนวนรอบสืบคดีที่เคยลงเล่นในประวัติร้าน
+                </div>
+
+                <ResponsiveContainer width="100%" height={210}>
+                  <BarChart data={customerAnalytics.frequencyCohorts} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                    <XAxis dataKey="cohort" tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                    <YAxis tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                    <Tooltip
+                      formatter={(val, name) => [name === 'count' ? `${val} คน` : `฿${Number(val).toLocaleString()}`, name === 'count' ? 'จำนวนผู้เล่น' : 'รายได้รวม']}
+                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                    />
+                    <Bar dataKey="count" name="จำนวนผู้เล่น" fill="#0078D4" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div style={{ fontSize: 11, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+                <span>ผู้เล่นประจำ (3 รอบขึ้นไป): {customerAnalytics.frequencyCohorts.slice(2).reduce((s, c) => s + c.count, 0)} คน</span>
+                <span style={{ fontWeight: 700, color: '#0078D4' }}>สร้างรายได้สะสม ฿{customerAnalytics.frequencyCohorts.slice(2).reduce((s, c) => s + c.revenue, 0).toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Row 4: Day-of-Week & Time Slot Behavior */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+            {/* Visual: Day of Week Behavior */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #0284C7',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4, flexWrap: 'wrap', gap: 6 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-calendar-week" style={{ color: '#0284C7' }} />
+                  <span>พฤติกรรมตามวันในสัปดาห์ (Day of Week Distribution)</span>
+                </div>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 4, background: '#EFF6FF', color: '#0369A1' }}>
+                    ศุกร์-อาทิตย์ {customerAnalytics.weekendPct}%
+                  </span>
+                  <span style={{ fontSize: 10.5, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#F1F5F9', color: '#475569' }}>
+                    จันทร์-พฤหัสฯ {customerAnalytics.weekdayPct}%
+                  </span>
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                จำนวนรอบจัดแสดงและผู้เล่นที่เข้าใช้บริการแยกตามวัน จันทร์ ถึง อาทิตย์
+              </div>
+
+              <ResponsiveContainer width="100%" height={210}>
+                <BarChart data={customerAnalytics.dayBehavior} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" vertical={false} />
+                  <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 600 }} />
+                  <YAxis tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                  <Tooltip
+                    formatter={(val, name) => [name === 'sessions' ? `${val} รอบ` : name === 'players' ? `${val} คน` : `฿${Number(val).toLocaleString()}`, name === 'sessions' ? 'จำนวนรอบ' : name === 'players' ? 'จำนวนผู้เล่น' : 'รายได้รวม']}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Bar dataKey="sessions" name="จำนวนรอบ" fill="#0284C7" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="players" name="จำนวนผู้เล่น" fill="#38BDF8" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Visual: Preferred Time Slots */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #F59E0B',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-clock" style={{ color: '#F59E0B' }} />
+                    <span>ช่วงเวลายอดนิยมในการเข้าเล่น (Time Slot Bands)</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#FEF3C7', color: '#B45309' }}>
+                    3 Time Bands
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginBottom: 14 }}>
+                  ช่วงเวลาที่ลูกค้าเลือกเล่นมากที่สุด (บ่าย, เย็น, ดึก)
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {customerAnalytics.timeSlots.map(slot => {
+                    const totalSess = totalSessions || 1
+                    const sharePct = Math.round((slot.sessions / totalSess) * 100)
+                    return (
+                      <div
+                        key={slot.slot}
+                        style={{
+                          background: '#F8FAFC',
+                          borderRadius: 10,
+                          padding: '12px 14px',
+                          border: '1px solid #E2E8F0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <div style={{ width: 34, height: 34, borderRadius: 8, background: `${slot.color}15`, color: slot.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14 }}>
+                            <i className={`fas ${slot.icon}`} />
+                          </div>
+                          <div>
+                            <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>{slot.slot}</div>
+                            <div style={{ fontSize: 10.5, color: '#64748B' }}>
+                              ผู้เล่น {slot.players} คน · รายได้ ฿{slot.revenue.toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 16, fontWeight: 900, color: slot.color, fontFamily: "'Barlow Condensed', sans-serif" }}>
+                            {slot.sessions} รอบ
+                          </div>
+                          <span style={{ fontSize: 10, fontWeight: 700, color: '#64748B', background: '#FFFFFF', padding: '1px 6px', borderRadius: 4, border: '1px solid #E2E8F0' }}>
+                            {sharePct}% ของรอบทั้งหมด
+                          </span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 10 }}>
+                กลยุทธ์: หากต้องการเพิ่มยอดในวันธรรมดา แนะนำจัดโปรโมชัน Early Bird ช่วงบ่าย (13:00 - 16:00)
+              </div>
+            </div>
+          </div>
+
+          {/* Row 5: Group Dynamics & Payment Styles */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+            {/* Visual: Party Size Dynamics */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #8B5CF6',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-people-group" style={{ color: '#8B5CF6' }} />
+                    <span>ขนาดกลุ่มและสไตล์การรวมตี้ (Party Size Preference)</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#EDE9FE', color: '#6D28D9' }}>
+                    เฉลี่ย {avgPartySize} คน/ตี้
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                  พฤติกรรมการรวมกลุ่มของผู้เล่น: กลุ่มเล็ก (4-5 คน), กลุ่มมาตรฐาน (6-7 คน), กลุ่มใหญ่ (8+ คน)
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {customerAnalytics.partySizeGroups.map(group => {
+                    const totalS = totalSessions || 1
+                    const pPct = Math.round((group.sessions / totalS) * 100)
+                    return (
+                      <div
+                        key={group.label}
+                        style={{
+                          background: '#F8FAFC',
+                          borderRadius: 10,
+                          padding: '12px 14px',
+                          border: '1px solid #E2E8F0',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>{group.label}</div>
+                          <div style={{ fontSize: 10.5, color: '#64748B' }}>{group.desc}</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: 16, fontWeight: 900, color: group.color, fontFamily: "'Barlow Condensed', sans-serif" }}>
+                            {group.sessions} รอบ ({pPct}%)
+                          </div>
+                          <div style={{ fontSize: 10.5, color: '#64748B' }}>
+                            ผู้เล่น {group.players} คน · ฿{group.revenue.toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 10 }}>
+                insight: ตี้ขนาด 6-7 คนเป็นกลุ่มหลักของร้าน แนะนำสคริปต์สืบคดีที่รองรับ 6-7 ผู้เล่นเป็นอันดับแรก
+              </div>
+            </div>
+
+            {/* Visual: Group Payment Dynamics */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #059669',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-wallet" style={{ color: '#059669' }} />
+                    <span>พฤติกรรมการชำระเงินของกลุ่ม (Group Payment Dynamics)</span>
+                  </div>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#D1FAE5', color: '#047857' }}>
+                    Financing Style
+                  </span>
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginBottom: 14 }}>
+                  สัดส่วนการแยกจ่ายเงินรายคน vs. หัวหน้าตี้/ตัวแทนโอนเหมาทั้งกลุ่ม
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '14px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <i className="fas fa-users-viewfinder" style={{ color: '#0078D4' }} />
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>แยกโอนของตัวเองแต่ละคน (Split Bill)</span>
+                      </div>
+                      <span style={{ fontSize: 16, fontWeight: 900, color: '#0078D4', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                        {customerAnalytics.splitPayPct}%
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, borderRadius: 3, background: '#E2E8F0', overflow: 'hidden' }}>
+                      <div style={{ width: `${customerAnalytics.splitPayPct}%`, background: '#0078D4', height: '100%' }} />
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 4 }}>
+                      ผู้เล่นสแกน QR Code เพื่อจ่ายเฉพาะส่วนของตนเองผ่านระบบ POS PromptPay สุ่มเศษสตางค์
+                    </div>
+                  </div>
+
+                  <div style={{ background: '#F8FAFC', borderRadius: 10, padding: '14px', border: '1px solid #E2E8F0' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <i className="fas fa-hand-holding-dollar" style={{ color: '#059669' }} />
+                        <span style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A' }}>หัวหน้าตี้เลี้ยง / โอนเหมา (Host Pay)</span>
+                      </div>
+                      <span style={{ fontSize: 16, fontWeight: 900, color: '#059669', fontFamily: "'Barlow Condensed', sans-serif" }}>
+                        {customerAnalytics.hostPayPct}%
+                      </span>
+                    </div>
+                    <div style={{ width: '100%', height: 6, borderRadius: 3, background: '#E2E8F0', overflow: 'hidden' }}>
+                      <div style={{ width: `${customerAnalytics.hostPayPct}%`, background: '#059669', height: '100%' }} />
+                    </div>
+                    <div style={{ fontSize: 10.5, color: '#64748B', marginTop: 4 }}>
+                      มีตัวแทนตี้ 1 คนโอนเหมาครอบคลุมเพื่อนในโต๊ะ (รวมค่าเกมและค่าอาหาร)
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ fontSize: 11, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 8, marginTop: 10 }}>
+                ระบบ POS ของ SOFUN CLUB รองรับทั้งการแยกโอนและโอนเหมาพร้อมกันอย่างแม่นยำ
+              </div>
+            </div>
+          </div>
+
+          {/* Row 6: Favorite Story Genres & Top Spenders Leaderboard */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 14 }}>
+            {/* Visual: Favorite Story Genres */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #EC4899',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <i className="fas fa-masks-theater" style={{ color: '#EC4899' }} />
+                  <span>แนวเรื่องและสไตล์ที่ลูกค้าชอบ (Preferred Story Genres)</span>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4, background: '#FCE7F3', color: '#BE185D' }}>
+                  Top Genres
+                </span>
+              </div>
+              <div style={{ fontSize: 11, color: '#64748B', marginBottom: 12 }}>
+                แนวสืบคดียอดนิยมที่ผู้เล่นเลือกเล่นมากที่สุด (นับตามจำนวนผู้เล่นที่ร่วมเล่น)
+              </div>
+
+              {customerAnalytics.topGenres.length > 0 ? (
+                <ResponsiveContainer width="100%" height={Math.max(200, customerAnalytics.topGenres.length * 36)}>
+                  <BarChart data={customerAnalytics.topGenres} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 10.5, fill: '#64748B' }} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#0F172A', fontWeight: 600 }} width={95} />
+                    <Tooltip
+                      formatter={(val, name) => [name === 'players' ? `${val} คน` : `฿${Number(val).toLocaleString()}`, name === 'players' ? 'ผู้เล่น' : 'รายได้']}
+                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                    />
+                    <Bar dataKey="players" name="ผู้เล่น" fill="#EC4899" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div style={{ padding: 24, textAlign: 'center', color: '#94A3B8' }}>ไม่มีข้อมูลแนวเกม</div>
+              )}
+            </div>
+
+            {/* Visual: Top 10 High-Value Customers */}
+            <div
+              style={{
+                background: '#FFFFFF',
+                borderRadius: 14,
+                padding: '16px 20px',
+                border: '1px solid #E2E8F0',
+                borderTop: '3.5px solid #F59E0B',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                gridColumn: 'span 2',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, flexWrap: 'wrap', gap: 8 }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: '#0F172A', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-trophy" style={{ color: '#F59E0B' }} />
+                    <span>ทำเนียบสุดยอดลูกค้ามูลค่าสูงสุด (Top 10 High-Value Customers)</span>
+                  </div>
+                  <div style={{ fontSize: 11, color: '#64748B' }}>
+                    รายชื่อลูกค้าที่มียอดใช้จ่ายและจำนวนรอบเล่นสูงสุดในช่วงเวลาที่เลือก พร้อมข้อมูล F&B Attachment และสคริปต์โปรด
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 6, background: '#FEF3C7', color: '#B45309', border: '1px solid #FDE68A' }}>
+                  Leaderboard
+                </span>
+              </div>
+
+              <div style={{ overflowX: 'auto', marginTop: 10 }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr style={{ background: '#F8FAFC', color: '#64748B', borderBottom: '1.5px solid #E2E8F0', fontSize: 11, textTransform: 'uppercase' }}>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>อันดับ</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>ลูกค้า / ผู้เล่น</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>ระดับสมาชิก</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>รอบเล่นช่วงนี้</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>รอบเล่นสะสม</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>ยอดค่าเกม</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>ยอดค่าอาหาร (F&B)</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'right' }}>ยอดรวมสุทธิ</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>สัดส่วน F&B</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'left' }}>สคริปต์ที่เล่น</th>
+                      <th style={{ padding: '8px 12px', textAlign: 'center' }}>มาเยือนล่าสุด</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {customerAnalytics.topCustomers.map(player => (
+                      <tr key={player.uid} style={{ borderBottom: '1px solid #F1F5F9' }}>
+                        <td style={{ padding: '10px 12px' }}>
+                          <span
+                            style={{
+                              width: 22,
+                              height: 22,
+                              borderRadius: '50%',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontSize: 11,
+                              fontWeight: 900,
+                              background: player.rank === 1 ? '#FEF3C7' : player.rank === 2 ? '#F1F5F9' : player.rank === 3 ? '#FFEDD5' : '#F8FAFC',
+                              color: player.rank === 1 ? '#B45309' : player.rank === 2 ? '#475569' : player.rank === 3 ? '#C2410C' : '#64748B',
+                              border: '1px solid #E2E8F0',
+                            }}
+                          >
+                            {player.rank}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {player.avatar ? (
+                              <img src={convertImg(player.avatar, 50)} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+                            ) : (
+                              <div style={{ width: 28, height: 28, borderRadius: '50%', background: '#E2E8F0', color: '#64748B', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700 }}>
+                                {player.name.charAt(0)}
+                              </div>
+                            )}
+                            <div>
+                              <div style={{ fontWeight: 800, color: '#0F172A' }}>{player.name}</div>
+                              <div style={{ fontSize: 10, color: '#64748B' }}>
+                                {player.isNew ? 'ลูกค้าใหม่' : 'ลูกค้าประจำ'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: '2px 8px',
+                              borderRadius: 4,
+                              background: player.tier === 'Gold' ? '#FEF3C7' : player.tier === 'Silver' ? '#F1F5F9' : '#EFF6FF',
+                              color: player.tier === 'Gold' ? '#B45309' : player.tier === 'Silver' ? '#475569' : '#1D4ED8',
+                            }}
+                          >
+                            {player.tier || 'ทั่วไป'}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', fontWeight: 800, color: '#0F172A' }}>
+                          {player.periodSessions} รอบ
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#64748B', fontWeight: 600 }}>
+                          {player.lifetimeSessions} รอบ
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#0078D4', fontWeight: 700 }}>
+                          ฿{player.gameSpend.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', color: '#10B981', fontWeight: 700 }}>
+                          ฿{player.foodSpend.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 900, color: '#0F172A', fontFamily: "'Barlow Condensed', sans-serif", fontSize: 13 }}>
+                          ฿{player.periodSpend.toLocaleString()}
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: 10.5,
+                              fontWeight: 700,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: player.fbAttachment > 20 ? '#DCFCE7' : '#F1F5F9',
+                              color: player.fbAttachment > 20 ? '#166534' : '#64748B',
+                            }}
+                          >
+                            {player.fbAttachment}%
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', color: '#475569', fontSize: 11.5 }}>
+                          <span style={{ background: '#F8FAFC', padding: '2px 6px', borderRadius: 4, border: '1px solid #E2E8F0' }}>
+                            {player.favoriteScript}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 12px', textAlign: 'center', color: '#64748B', fontSize: 11 }}>
+                          {player.lastSeen}
+                        </td>
+                      </tr>
+                    ))}
+                    {customerAnalytics.topCustomers.length === 0 && (
+                      <tr>
+                        <td colSpan={11} style={{ padding: 24, textAlign: 'center', color: '#94A3B8' }}>
+                          ไม่มีข้อมูลลูกค้าในช่วงเวลานี้
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
