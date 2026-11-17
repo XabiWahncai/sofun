@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, onSnapshot,
-  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, setDoc
+  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, setDoc,
+  getDocs, limit
 } from 'firebase/firestore'
 import { Html5Qrcode } from 'html5-qrcode'
 import { viewSlipImage } from '../utils/slipVerifier'
@@ -740,12 +741,47 @@ export default function POSPage({
       const snap = await getDoc(doc(db, 'members', uid))
       if (!snap.exists()) { showToast('ไม่พบสมาชิก', 'error'); return }
       const d = snap.data()
+
+      // Auto-detect deposit credit (overpaid from game change) or deposit debt from booking
+      let bookingCredit = 0
+      let bookingNote = ''
+      let isUnpaidDep = false
+      try {
+        const bQuery = query(
+          collection(db, 'bookings'),
+          where('status', 'in', ['confirmed', 'locked']),
+          orderBy('createdAt', 'desc'),
+          limit(25)
+        )
+        const bSnap = await getDocs(bQuery)
+        for (const bDoc of bSnap.docs) {
+          const bData = bDoc.data()
+          const matchedMem = (bData.members || []).find(bm => (bm.uid || bm.id) === uid)
+          if (matchedMem) {
+            const over = Number(matchedMem.depositOverpaid) || Number(matchedMem.cashierDiscount) || 0
+            if (over > 0) {
+              bookingCredit = over
+              bookingNote = 'ส่วนลดมัดจำรอบเดิม (เปลี่ยนเกม)'
+            }
+            if (Number(matchedMem.depositOwed) > 0 || !matchedMem.paidDeposit) {
+              isUnpaidDep = true
+            }
+            break
+          }
+        }
+      } catch (err) {
+        console.warn('Booking discount lookup fallback:', err)
+      }
+
       const newMember = {
         uid,
         name: d.nickname || d.firstname || d.name || 'ไม่ระบุ',
         avatar: d.pictureUrl || '',
         character: '',
         scanInAt: new Date().toISOString(),
+        personalDiscount: bookingCredit,
+        personalDiscountNote: bookingNote,
+        unpaidDeposit: isUnpaidDep,
       }
       const newMembers = [...session.members, newMember]
       updateSession(sessionId, {

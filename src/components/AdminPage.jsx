@@ -14,7 +14,7 @@ import {
   AreaChart, Area, ComposedChart,
 } from 'recharts'
 import HistoryTab, { MemberHistoryModal, ThermalSlipModal, EditPaymentModal } from './HistoryTab'
-import { calculateDepositDeadline } from './BookingPage'
+import { calculateDepositDeadline, AdminManageBookingModal } from './BookingPage'
 import SecurityTab from './SecurityTab'
 import KrathongAdminTab from './KrathongAdminTab'
 import DmRecommendationsTab from './DmRecommendationsTab'
@@ -11645,10 +11645,12 @@ function BookingsTab({ showToast, adminUser, allGames = [] }) {
       )}
 
       {editModal && (
-        <EditBookingModal
+        <AdminManageBookingModal
           booking={editModal}
+          allGames={allGames}
           onClose={() => setEditModal(null)}
           showToast={showToast}
+          onUpdated={() => setEditModal(null)}
         />
       )}
 

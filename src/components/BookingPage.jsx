@@ -3261,13 +3261,18 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
   const depositPerPerson = booking.depositAmount || 0
 
   const myMember = booking.members?.find(m => m.uid === lineUser?.uid || m.id === lineUser?.uid)
-  const isMyMemberPaid = myMember?.paidDeposit || false
+  const isMyMemberFullyPaid = myMember?.paidDeposit && (!myMember?.depositOwed || myMember?.depositOwed <= 0)
+  const isMyMemberPaid = isMyMemberFullyPaid
   const myMemberUid = lineUser?.uid || ''
 
   const totalMembers = booking.members?.length || 0
   const emptySeatCount = Math.max(0, maxMembers - totalMembers)
 
-  const unpaidMembers = (booking.members || []).filter(m => !m.paidDeposit && m.slipStatus !== 'pending_verification')
+  // Unpaid or owing deposit delta from game change
+  const unpaidMembers = (booking.members || []).filter(m => {
+    const isFullyPaid = m.paidDeposit && (!m.depositOwed || m.depositOwed <= 0)
+    return !isFullyPaid && m.slipStatus !== 'pending_verification'
+  })
   const availableEmptySeats = []
   for (let i = 0; i < emptySeatCount; i++) {
     const seatNum = totalMembers + i + 1
@@ -3281,7 +3286,7 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
   const generateRandomSatang = () => (Math.floor(Math.random() * 49) + 1) / 100
   const [randomSatang, setRandomSatang] = useState(generateRandomSatang)
 
-  // Pre-select current user by default if unpaid
+  // Pre-select current user by default if unpaid or owes difference
   const [selectedMembers, setSelectedMembers] = useState(() => {
     if (!isMyMemberPaid && myMemberUid) {
       return [myMemberUid]
@@ -3290,8 +3295,21 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
   })
   const [selectedEmptySeats, setSelectedEmptySeats] = useState([])
 
+  const getMemberAmountDue = useCallback((m) => {
+    if (m && m.depositOwed && m.depositOwed > 0) {
+      return Number(m.depositOwed)
+    }
+    return depositPerPerson
+  }, [depositPerPerson])
+
   const selectedCount = selectedMembers.length + selectedEmptySeats.length
-  const baseDepositAmount = selectedCount * depositPerPerson
+  const baseDepositAmount = [
+    ...selectedMembers.map(uid => {
+      const m = (booking.members || []).find(x => (x.uid || x.id) === uid)
+      return getMemberAmountDue(m)
+    }),
+    ...selectedEmptySeats.map(() => depositPerPerson)
+  ].reduce((sum, v) => sum + v, 0)
   const totalAmount = baseDepositAmount
   // ยอดโอนจริงที่สุ่มเศษสตางค์ (.01 - .49) เพื่อป้องกันการใช้สลิปเดิมหลอกระบบ
   const totalPayAmount = baseDepositAmount > 0 ? Number((baseDepositAmount + randomSatang).toFixed(2)) : 0
@@ -3439,6 +3457,9 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
       const updatedMembers = (data.members || []).map(m => {
         const uid = m.uid || m.id
         if (selectedMembers.includes(uid)) {
+          const owed = Number(m.depositOwed) || 0
+          const currentPaid = Number(m.depositPaidAmount) || (m.paidDeposit ? (data.depositAmount || 0) : 0)
+          const newPaidAmount = owed > 0 ? (currentPaid + owed) : (Number(data.depositAmount) || currentPaid || 0)
           return {
             ...m,
             slipUrl,
@@ -3446,7 +3467,16 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
             paidBy: payerName,
             paidByUid: lineUser?.uid || '',
             ...(verified
-              ? { paidDeposit: true, paidAt: nowIso, slipStatus: 'verified', ...verifyData }
+              ? {
+                  paidDeposit: true,
+                  depositPaidAmount: newPaidAmount,
+                  depositOwed: 0,
+                  depositOverpaid: 0,
+                  cashierDiscount: 0,
+                  paidAt: nowIso,
+                  slipStatus: 'verified',
+                  ...verifyData
+                }
               : { slipStatus: 'pending_verification' })
           }
         }
@@ -3889,12 +3919,14 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                     const mUid = m.uid || m.id
                     const isMe = mUid === myMemberUid
                     const isLeader = mUid === booking.leaderId
-                    const isPaid = !!m.paidDeposit
-                    const isPending = m.slipStatus === 'pending_verification' && !isPaid
+                    const isPaid = !!m.paidDeposit && (!m.depositOwed || m.depositOwed <= 0)
+                    const owesDelta = !!m.paidDeposit && Number(m.depositOwed) > 0
+                    const isPending = m.slipStatus === 'pending_verification' && !isPaid && !owesDelta
                     const isChecked = selectedMembers.includes(mUid)
                     const mProf = profilesMap[mUid]
                     const mAvatar = m.avatar || mProf?.pictureUrl || mProf?.avatar || ''
                     const mName = m.name || mProf?.nickname || mProf?.firstname || mProf?.name || 'สมาชิก'
+                    const memDue = owesDelta ? Number(m.depositOwed) : depositPerPerson
 
                     if (isPaid) {
                       return (
@@ -4081,14 +4113,25 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
                                   <i className="fas fa-crown" style={{ fontSize: 8.5, marginRight: 2 }} />หัวหน้า
                                 </span>
                               )}
+                              {owesDelta && (
+                                <span style={{ fontSize: 9.5, fontWeight: 700, color: '#DC2626', background: '#FEF2F2', padding: '1px 6px', borderRadius: 4, border: '1px solid #FECACA' }}>
+                                  <i className="fas fa-exclamation-circle" style={{ fontSize: 8.5, marginRight: 2 }} />
+                                  ค้างส่วนต่างมัดจำ
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
 
                         <div style={{ textAlign: 'right', flexShrink: 0, marginLeft: 10 }}>
                           <span style={{ fontSize: 13.5, fontWeight: 800, color: isChecked ? '#E50914' : '#334155' }}>
-                            ฿{depositPerPerson.toLocaleString()}
+                            ฿{memDue.toLocaleString()}
                           </span>
+                          {owesDelta && (
+                            <div style={{ fontSize: 10, color: '#DC2626', fontWeight: 600 }}>
+                              (ส่วนต่างเกมใหม่)
+                            </div>
+                          )}
                         </div>
                       </div>
                     )
@@ -5353,6 +5396,1034 @@ function DepositPaymentModal({ booking, allGames = [], lineUser, onClose, showTo
 }
 
 
+// ── Admin Manage Booking & Party Controller Modal ──────────────────────────────
+export function AdminManageBookingModal({ booking, allGames = [], onClose, showToast, onUpdated, lineUser }) {
+  const [status, setStatus] = useState(booking.status || 'confirmed')
+  const [leaderId, setLeaderId] = useState(booking.leaderId || (booking.members?.[0]?.uid || booking.members?.[0]?.id || ''))
+  const [selectedGameId, setSelectedGameId] = useState(booking.gameId || '')
+  const [gameSearch, setGameSearch] = useState('')
+  const [room, setRoom] = useState(booking.room || 'Chinese Room')
+  const [date, setDate] = useState(booking.date || '')
+  const [time, setTime] = useState(booking.time || '13:00')
+  const [adminNote, setAdminNote] = useState(booking.adminNote || '')
+  const [saving, setSaving] = useState(false)
+
+  const originalOldDeposit = Number(booking.depositAmount) || 0
+
+  // Matched new game
+  const matchedNewGame = useMemo(() => {
+    if (!selectedGameId || !Array.isArray(allGames)) return null
+    return allGames.find(g => g.id === selectedGameId || g._id === selectedGameId) || null
+  }, [selectedGameId, allGames])
+
+  const newGameDeposit = matchedNewGame ? (Number(matchedNewGame.deposit) || 0) : originalOldDeposit
+  const [customDeposit, setCustomDeposit] = useState(String(newGameDeposit))
+
+  const effectiveDeposit = customDeposit !== '' && !isNaN(Number(customDeposit))
+    ? Number(customDeposit)
+    : newGameDeposit
+
+  const resolvedMaxMembers = matchedNewGame ? parseGamePlayerCount(matchedNewGame) : (booking.maxMembers || 6)
+  const [maxMembers, setMaxMembers] = useState(String(resolvedMaxMembers))
+
+  // Members mutable state
+  const [membersState, setMembersState] = useState(() => {
+    return (booking.members || []).map(m => {
+      const isPaid = !!m.paidDeposit
+      const paidAmt = Number(m.depositPaidAmount) || (isPaid ? originalOldDeposit : 0)
+      return {
+        ...m,
+        paidDeposit: isPaid,
+        depositPaidAmount: paidAmt,
+        depositOwed: Number(m.depositOwed) || 0,
+        depositOverpaid: Number(m.depositOverpaid) || 0,
+        cashierDiscount: Number(m.cashierDiscount) || 0,
+        isLeader: (m.uid || m.id) === booking.leaderId,
+      }
+    })
+  })
+
+  // Prevent background scrolling while modal is open
+  useEffect(() => {
+    const origOverflow = document.body.style.overflow
+    const origTouchAction = document.body.style.touchAction
+    document.body.style.overflow = 'hidden'
+    document.body.style.touchAction = 'none'
+    return () => {
+      document.body.style.overflow = origOverflow
+      document.body.style.touchAction = origTouchAction
+    }
+  }, [])
+
+  // Filtered games list for search
+  const filteredGames = useMemo(() => {
+    if (!Array.isArray(allGames)) return []
+    if (!gameSearch.trim()) return allGames.slice(0, 30)
+    const q = gameSearch.trim().toLowerCase()
+    return allGames.filter(g =>
+      (g.title || g.name || '').toLowerCase().includes(q) ||
+      (g.description || '').toLowerCase().includes(q)
+    ).slice(0, 30)
+  }, [allGames, gameSearch])
+
+  // Recalculate financial impact for all members based on target deposit vs original paid amount
+  const applyRecalculation = useCallback((targetDeposit) => {
+    setMembersState(prev => prev.map(m => {
+      if (m.paidDeposit) {
+        const prevPaid = Number(m.depositPaidAmount) > 0 ? Number(m.depositPaidAmount) : originalOldDeposit
+        if (targetDeposit > prevPaid) {
+          const diff = targetDeposit - prevPaid
+          return {
+            ...m,
+            depositPaidAmount: prevPaid,
+            depositOwed: diff,
+            depositOverpaid: 0,
+            cashierDiscount: 0,
+          }
+        } else if (targetDeposit < prevPaid) {
+          const over = prevPaid - targetDeposit
+          return {
+            ...m,
+            depositPaidAmount: prevPaid,
+            depositOwed: 0,
+            depositOverpaid: over,
+            cashierDiscount: over,
+          }
+        } else {
+          return {
+            ...m,
+            depositPaidAmount: prevPaid,
+            depositOwed: 0,
+            depositOverpaid: 0,
+            cashierDiscount: 0,
+          }
+        }
+      } else {
+        return {
+          ...m,
+          depositPaidAmount: 0,
+          depositOwed: 0,
+          depositOverpaid: 0,
+          cashierDiscount: 0,
+        }
+      }
+    }))
+  }, [originalOldDeposit])
+
+  // When game selection changes, auto-recalculate prices and update maxMembers
+  const handleSelectGame = (game) => {
+    setSelectedGameId(game.id)
+    const gDep = Number(game.deposit) || 0
+    setCustomDeposit(String(gDep))
+    const gMax = parseGamePlayerCount(game)
+    if (gMax) setMaxMembers(String(gMax))
+    applyRecalculation(gDep)
+  }
+
+  // Toggle member paid
+  const toggleMemberPaid = (uid) => {
+    setMembersState(prev => prev.map(m => {
+      if ((m.uid || m.id) === uid) {
+        const nextPaid = !m.paidDeposit
+        return {
+          ...m,
+          paidDeposit: nextPaid,
+          depositPaidAmount: nextPaid ? effectiveDeposit : 0,
+          depositOwed: 0,
+          depositOverpaid: 0,
+          cashierDiscount: 0,
+        }
+      }
+      return m
+    }))
+  }
+
+  // Clear owed difference (admin received cash/outside)
+  const clearMemberOwed = (uid) => {
+    setMembersState(prev => prev.map(m => {
+      if ((m.uid || m.id) === uid) {
+        return {
+          ...m,
+          paidDeposit: true,
+          depositPaidAmount: (Number(m.depositPaidAmount) || 0) + (Number(m.depositOwed) || 0),
+          depositOwed: 0,
+        }
+      }
+      return m
+    }))
+    showToast('เคลียร์ยอดค้างชำระของสมาชิกแล้ว')
+  }
+
+  // Remove member from party
+  const removeMember = (uid, name) => {
+    if (!window.confirm(`ยืนยันการนำคุณ "${name}" ออกจากปาร์ตี้นี้หรือไม่?`)) return
+    setMembersState(prev => prev.filter(m => (m.uid || m.id) !== uid))
+    if (leaderId === uid) {
+      const remaining = membersState.filter(m => (m.uid || m.id) !== uid)
+      if (remaining.length > 0) setLeaderId(remaining[0].uid || remaining[0].id)
+    }
+    showToast(`นำ ${name} ออกจากตี้แล้ว`)
+  }
+
+  const priceDelta = effectiveDeposit - originalOldDeposit
+  const paidCount = membersState.filter(m => m.paidDeposit).length
+  const unpaidCount = membersState.filter(m => !m.paidDeposit).length
+  const totalOwed = membersState.reduce((sum, m) => sum + (Number(m.depositOwed) || 0), 0)
+  const totalDiscount = membersState.reduce((sum, m) => sum + (Number(m.cashierDiscount) || 0), 0)
+
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const finalDeposit = Number(effectiveDeposit) || 0
+      const finalMax = Number(maxMembers) || (matchedNewGame ? parseGamePlayerCount(matchedNewGame) : 6)
+      const finalMembers = membersState.map(m => ({
+        ...m,
+        isLeader: (m.uid || m.id) === leaderId,
+      }))
+
+      const payload = {
+        status,
+        room,
+        date,
+        time,
+        adminNote,
+        leaderId,
+        depositAmount: finalDeposit,
+        maxMembers: finalMax,
+        members: finalMembers,
+        updatedAt: serverTimestamp(),
+      }
+
+      if (matchedNewGame) {
+        payload.gameId = matchedNewGame.id
+        payload.gameName = matchedNewGame.title || matchedNewGame.name || booking.gameName
+        payload.gameImage = matchedNewGame.image || booking.gameImage || ''
+      }
+
+      if (status === 'confirmed') {
+        payload.depositDeadline = calculateDepositDeadline({
+          ...booking,
+          ...payload,
+          members: finalMembers,
+        })
+      }
+
+      const bRef = doc(db, 'bookings', booking.id)
+      await updateDoc(bRef, payload)
+      showToast('บันทึกการจัดการปาร์ตี้เรียบร้อยแล้ว')
+      if (onUpdated) onUpdated()
+      onClose()
+    } catch (err) {
+      showToast('เกิดข้อผิดพลาด: ' + err.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const STATUS_CONFIGS = [
+    { id: 'confirmed', label: 'เปิดรับสมัคร (เปิดตี้)', icon: 'fa-door-open', bg: '#ECFDF5', color: '#059669', border: '#A7F3D0' },
+    { id: 'locked', label: 'ล็อกห้อง (ปิดรับคน)', icon: 'fa-lock', bg: '#EFF6FF', color: '#2563EB', border: '#BFDBFE' },
+    { id: 'collapsed', label: 'ปิดตี้ / ปาร์ตี้ล่ม', icon: 'fa-ban', bg: '#FEF2F2', color: '#DC2626', border: '#FECACA' },
+    { id: 'pending', label: 'รอยืนยัน', icon: 'fa-clock', bg: '#FFFBEB', color: '#D97706', border: '#FDE68A' },
+    { id: 'cancelled', label: 'ยกเลิกการจอง', icon: 'fa-times', bg: '#F3F4F6', color: '#6B7280', border: '#E5E7EB' },
+  ]
+
+  return (
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 'clamp(8px, 2.5vh, 20px) 12px',
+        background: 'rgba(0, 0, 0, 0.78)',
+        backdropFilter: 'blur(8px)',
+        overscrollBehavior: 'contain',
+        touchAction: 'none',
+        boxSizing: 'border-box',
+      }}
+    >
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 540,
+          maxHeight: 'min(94dvh, 840px)',
+          display: 'flex',
+          flexDirection: 'column',
+          borderRadius: 20,
+          overflow: 'hidden',
+          background: '#ffffff',
+          boxShadow: '0 25px 60px -10px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.1)',
+          fontFamily: "'Sarabun', sans-serif",
+          boxSizing: 'border-box',
+        }}
+      >
+        {/* Header */}
+        <div
+          style={{
+            position: 'relative',
+            padding: '16px 20px',
+            background: 'linear-gradient(135deg, #141414 0%, #1F1F1F 100%)',
+            color: '#ffffff',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 10,
+                background: 'rgba(229, 9, 20, 0.2)',
+                border: '1px solid rgba(229, 9, 20, 0.4)',
+                color: '#E50914',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 16,
+                flexShrink: 0,
+              }}
+            >
+              <i className="fas fa-sliders-h" />
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 16, fontWeight: 900, letterSpacing: '-0.01em', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span>จัดการปาร์ตี้ (โหมดแอดมิน)</span>
+                <span style={{ fontSize: 10, fontWeight: 800, padding: '1px 6px', borderRadius: 4, background: '#E50914', color: '#ffffff' }}>
+                  ADMIN
+                </span>
+              </div>
+              <div style={{ fontSize: 11.5, color: '#9CA3AF', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {booking.gameName || 'การจองห้อง'} · รหัส: {booking.id ? booking.id.slice(0, 8) : ''}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: '50%',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.2)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+          >
+            <i className="fas fa-times" style={{ fontSize: 13 }} />
+          </button>
+        </div>
+
+        {/* Scrollable Content */}
+        <div
+          style={{
+            flex: 1,
+            overflowY: 'auto',
+            padding: '16px 20px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 16,
+            boxSizing: 'border-box',
+          }}
+        >
+          {/* Section 1: สถานะปาร์ตี้ (Status & Open/Close) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <i className="fas fa-toggle-on" style={{ marginRight: 6, color: '#E50914' }} />
+              สถานะปาร์ตี้ (เปิดตี้ / ปิดตี้ / ล็อกห้อง)
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 6 }}>
+              {STATUS_CONFIGS.map(sc => {
+                const isSelected = status === sc.id
+                return (
+                  <button
+                    key={sc.id}
+                    type="button"
+                    onClick={() => setStatus(sc.id)}
+                    style={{
+                      padding: '8px 10px',
+                      borderRadius: 10,
+                      background: isSelected ? sc.bg : '#F9FAFB',
+                      color: isSelected ? sc.color : '#4B5563',
+                      border: isSelected ? `2px solid ${sc.color}` : '1px solid #E5E7EB',
+                      fontWeight: isSelected ? 800 : 600,
+                      fontSize: 11.5,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      justifyContent: 'center',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <i className={`fas ${sc.icon}`} style={{ fontSize: 11 }} />
+                    <span>{sc.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Section 2: ย้ายหัวหน้าปาร์ตี้ (Transfer Leader) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <i className="fas fa-crown" style={{ marginRight: 6, color: '#F59E0B' }} />
+                ย้ายหัวหน้าปาร์ตี้ (Transfer Leader)
+              </label>
+              <span style={{ fontSize: 11, color: '#6B7280' }}>
+                คลิกเลือกสมาชิกเพื่อแต่งตั้งเป็นหัวหน้า
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {membersState.map((m, idx) => {
+                const mUid = m.uid || m.id
+                const isLead = mUid === leaderId
+                return (
+                  <div
+                    key={mUid || idx}
+                    onClick={() => setLeaderId(mUid)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      background: isLead ? '#FEF3C7' : '#FFFFFF',
+                      border: isLead ? '1.5px solid #F59E0B' : '1px solid #E5E7EB',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <MemberAvatar src={m.avatar || ''} name={m.name || 'สมาชิก'} size={30} />
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {m.name || 'สมาชิก'}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                      {isLead ? (
+                        <span style={{ fontSize: 11, fontWeight: 800, color: '#B45309', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          <i className="fas fa-crown" style={{ color: '#F59E0B' }} />
+                          หัวหน้าปาร์ตี้
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: 11, color: '#9CA3AF' }}>
+                          แตะเพื่อแต่งตั้ง
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Section 3: แก้ไขเปลี่ยนเกม & คำนวณราคาใหม่ (Change Game & Delta Engine) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+              <i className="fas fa-exchange-alt" style={{ marginRight: 6, color: '#2563EB' }} />
+              เปลี่ยนเกมของปาร์ตี้ & คำนวณราคามัดจำใหม่
+            </label>
+
+            {/* Current vs New Game Banner */}
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 8,
+                padding: '10px 12px',
+                borderRadius: 12,
+                background: '#F8FAFC',
+                border: '1px solid #E2E8F0',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: '#64748B', textTransform: 'uppercase' }}>เกมเดิม (รอบที่จอง)</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#0F172A', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {booking.gameName || 'เกมเดิม'}
+                </div>
+                <div style={{ fontSize: 11, color: '#64748B', marginTop: 1 }}>
+                  มัดจำ <strong>฿{originalOldDeposit}</strong> / คน
+                </div>
+              </div>
+
+              <div>
+                <div style={{ fontSize: 10.5, fontWeight: 700, color: '#2563EB', textTransform: 'uppercase' }}>เกมใหม่ที่เลือก</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1E40AF', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {matchedNewGame?.title || matchedNewGame?.name || booking.gameName}
+                </div>
+                <div style={{ fontSize: 11, color: '#2563EB', marginTop: 1 }}>
+                  มัดจำ <strong>฿{effectiveDeposit}</strong> / คน
+                </div>
+              </div>
+            </div>
+
+            {/* Price Delta Alert Notice */}
+            {priceDelta > 0 && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: '#FEF3C7',
+                  border: '1px solid #FDE68A',
+                  color: '#92400E',
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  display: 'flex',
+                  gap: 8,
+                }}
+              >
+                <i className="fas fa-exclamation-triangle" style={{ color: '#D97706', fontSize: 14, flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <strong>มัดจำเพิ่มขึ้น +฿{priceDelta} / คน:</strong> คนที่จ่ายเกมเดิมแล้ว ({paidCount} คน) จะต้องชำระส่วนต่างเพิ่มคนละ <strong>฿{priceDelta}</strong> (รวม ฿{totalOwed}) ส่วนคนที่ยังไม่จ่าย ({unpaidCount} คน) จะชำระที่ราคาใหม่ ฿{effectiveDeposit} ปกติ
+                </div>
+              </div>
+            )}
+
+            {priceDelta < 0 && (
+              <div
+                style={{
+                  padding: '10px 12px',
+                  borderRadius: 10,
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  color: '#065F46',
+                  fontSize: 11.5,
+                  lineHeight: 1.5,
+                  display: 'flex',
+                  gap: 8,
+                }}
+              >
+                <i className="fas fa-gift" style={{ color: '#059669', fontSize: 14, flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <strong>มัดจำลดลง -฿{Math.abs(priceDelta)} / คน:</strong> คนที่จ่ายเกมเดิมแล้ว ({paidCount} คน) ระบบจะแจ้งเตือนและบันทึกสิทธิ์เป็น <strong>ส่วนลดจากครึ่งหลังหน้าแคชเชียร์ ฿{Math.abs(priceDelta)}</strong> (รวมส่วนลด ฿{totalDiscount}) ส่วนคนที่เหลือจ่าย ฿{effectiveDeposit} ปกติ
+                </div>
+              </div>
+            )}
+
+            {priceDelta === 0 && (
+              <div
+                style={{
+                  padding: '8px 12px',
+                  borderRadius: 8,
+                  background: '#F1F5F9',
+                  border: '1px solid #E2E8F0',
+                  color: '#475569',
+                  fontSize: 11.5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                }}
+              >
+                <i className="fas fa-check-circle" style={{ color: '#2563EB' }} />
+                <span>ราคามัดจำเท่าเดิม (฿{effectiveDeposit} / คน) ไม่มียอดส่วนต่างเพิ่มเติม</span>
+              </div>
+            )}
+
+            {/* Game Search & Selector */}
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                placeholder="ค้นหาชื่อเกมเพื่อเปลี่ยน..."
+                value={gameSearch}
+                onChange={e => setGameSearch(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '9px 32px 9px 12px',
+                  borderRadius: 10,
+                  border: '1px solid #CBD5E1',
+                  fontSize: 12.5,
+                  boxSizing: 'border-box',
+                }}
+              />
+              {gameSearch ? (
+                <button
+                  type="button"
+                  onClick={() => setGameSearch('')}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: '#94A3B8',
+                    cursor: 'pointer',
+                    padding: 4,
+                  }}
+                >
+                  <i className="fas fa-times" />
+                </button>
+              ) : (
+                <i className="fas fa-search" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: '#94A3B8', fontSize: 12 }} />
+              )}
+            </div>
+
+            {/* Games Quick Pick Grid */}
+            <div
+              style={{
+                maxHeight: 180,
+                overflowY: 'auto',
+                border: '1px solid #E2E8F0',
+                borderRadius: 10,
+                padding: 6,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 4,
+                background: '#F8FAFC',
+              }}
+            >
+              {filteredGames.map(g => {
+                const isCurrent = g.id === selectedGameId
+                const gDep = Number(g.deposit) || 0
+                const gPlayers = parseGamePlayerCount(g)
+                return (
+                  <div
+                    key={g.id}
+                    onClick={() => handleSelectGame(g)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '7px 10px',
+                      borderRadius: 8,
+                      background: isCurrent ? '#EFF6FF' : '#FFFFFF',
+                      border: isCurrent ? '1.5px solid #2563EB' : '1px solid #E2E8F0',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 6,
+                          background: isCurrent ? '#2563EB' : '#E2E8F0',
+                          color: isCurrent ? '#FFFFFF' : '#64748B',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 10,
+                          flexShrink: 0,
+                        }}
+                      >
+                        <i className="fas fa-dice" />
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: isCurrent ? 800 : 600, color: isCurrent ? '#1E40AF' : '#1E293B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {g.title || g.name}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, fontSize: 11 }}>
+                      <span style={{ color: '#64748B' }}>{gPlayers} คน</span>
+                      <span style={{ fontWeight: 700, color: '#E50914' }}>฿{gDep}/คน</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Custom Deposit / Max Members Override */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4B5563', marginBottom: 4 }}>
+                  ยอดมัดจำต่อคน (฿)
+                </label>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <input
+                    type="number"
+                    value={customDeposit}
+                    onChange={e => {
+                      setCustomDeposit(e.target.value)
+                      if (!isNaN(Number(e.target.value))) {
+                        applyRecalculation(Number(e.target.value))
+                      }
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: 8,
+                      border: '1px solid #CBD5E1',
+                      fontSize: 12,
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => applyRecalculation(effectiveDeposit)}
+                    style={{
+                      padding: '0 10px',
+                      borderRadius: 8,
+                      background: '#F1F5F9',
+                      border: '1px solid #CBD5E1',
+                      color: '#475569',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      whiteSpace: 'nowrap',
+                    }}
+                    title="คำนวณส่วนต่างใหม่"
+                  >
+                    <i className="fas fa-calculator" />
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4B5563', marginBottom: 4 }}>
+                  จำนวนผู้เล่นสูงสุด (คน)
+                </label>
+                <input
+                  type="number"
+                  value={maxMembers}
+                  onChange={e => setMaxMembers(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 10px',
+                    borderRadius: 8,
+                    border: '1px solid #CBD5E1',
+                    fontSize: 12,
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Section 4: ตารางสมาชิกและยอดเงินรายคน (Member Financial Breakdown) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label style={{ fontSize: 12, fontWeight: 800, color: '#374151', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                <i className="fas fa-users-cog" style={{ marginRight: 6, color: '#10B981' }} />
+                จัดการสมาชิกและยอดชำระ ({membersState.length} คน)
+              </label>
+              <span style={{ fontSize: 11, color: '#6B7280' }}>
+                จ่ายแล้ว {paidCount} · ยังไม่จ่าย {unpaidCount}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {membersState.map((m, idx) => {
+                const mUid = m.uid || m.id
+                const isLead = mUid === leaderId
+                const owes = Number(m.depositOwed) || 0
+                const over = Number(m.cashierDiscount) || Number(m.depositOverpaid) || 0
+
+                return (
+                  <div
+                    key={mUid || idx}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 12,
+                      background: '#FFFFFF',
+                      border: '1px solid #E5E7EB',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 6,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.02)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0, flex: 1 }}>
+                        <MemberAvatar src={m.avatar || ''} name={m.name || 'สมาชิก'} size={32} />
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: '#111827', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {m.name || 'สมาชิก'}
+                            </span>
+                            {isLead && (
+                              <span style={{ fontSize: 9.5, fontWeight: 800, color: '#B45309', background: '#FEF3C7', padding: '1px 5px', borderRadius: 4, border: '1px solid #FDE68A' }}>
+                                หัวหน้า
+                              </span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#6B7280', marginTop: 1 }}>
+                            ชำระแล้ว: ฿{m.depositPaidAmount || 0}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Badges */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                        {owes > 0 && (
+                          <span style={{ fontSize: 10.5, fontWeight: 800, color: '#DC2626', background: '#FEF2F2', padding: '2px 8px', borderRadius: 6, border: '1px solid #FECACA' }}>
+                            ค้างชำระเพิ่ม ฿{owes}
+                          </span>
+                        )}
+                        {over > 0 && (
+                          <span style={{ fontSize: 10.5, fontWeight: 800, color: '#059669', background: '#ECFDF5', padding: '2px 8px', borderRadius: 6, border: '1px solid #A7F3D0' }}>
+                            ลดแคชเชียร์ ฿{over}
+                          </span>
+                        )}
+                        {m.paidDeposit && owes === 0 && (
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: '#15803D', background: '#DCFCE7', padding: '2px 8px', borderRadius: 6, border: '1px solid #86EFAC' }}>
+                            จ่ายครบแล้ว
+                          </span>
+                        )}
+                        {!m.paidDeposit && (
+                          <span style={{ fontSize: 10.5, fontWeight: 700, color: '#6B7280', background: '#F3F4F6', padding: '2px 8px', borderRadius: 6, border: '1px solid #E5E7EB' }}>
+                            ยังไม่จ่าย (ต้องจ่าย ฿{effectiveDeposit})
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Member Quick Action Controls */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, paddingTop: 4, borderTop: '1px dashed #F1F5F9' }}>
+                      <button
+                        type="button"
+                        onClick={() => toggleMemberPaid(mUid)}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: 6,
+                          background: m.paidDeposit ? '#FEF2F2' : '#ECFDF5',
+                          color: m.paidDeposit ? '#DC2626' : '#059669',
+                          border: m.paidDeposit ? '1px solid #FECACA' : '1px solid #A7F3D0',
+                          fontSize: 11,
+                          fontWeight: 700,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {m.paidDeposit ? 'ปรับเป็นยังไม่จ่าย' : 'ปรับเป็นชำระแล้ว'}
+                      </button>
+
+                      {owes > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => clearMemberOwed(mUid)}
+                          style={{
+                            padding: '4px 10px',
+                            borderRadius: 6,
+                            background: '#EFF6FF',
+                            color: '#2563EB',
+                            border: '1px solid #BFDBFE',
+                            fontSize: 11,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                          }}
+                          title="เคลียร์ยอดค้างเมื่อรับเงินสดนอกระบบ"
+                        >
+                          <i className="fas fa-check" style={{ marginRight: 4 }} />
+                          เคลียร์ยอดค้าง (รับเงินแล้ว)
+                        </button>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => removeMember(mUid, m.name || 'สมาชิก')}
+                        style={{
+                          marginLeft: 'auto',
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          background: 'none',
+                          border: 'none',
+                          color: '#9CA3AF',
+                          fontSize: 11,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.color = '#DC2626'}
+                        onMouseLeave={e => e.currentTarget.style.color = '#9CA3AF'}
+                        title="นำออกจากปาร์ตี้"
+                      >
+                        <i className="fas fa-trash-alt" />
+                        <span>ลบ</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Section 5: ห้องและเวลาเล่น (Room & Schedule) */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4B5563', marginBottom: 4 }}>
+                <i className="fas fa-door-open" style={{ marginRight: 4, color: '#E50914' }} />
+                ห้องที่ต้องเล่น
+              </label>
+              <select
+                value={room}
+                onChange={e => setRoom(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #CBD5E1',
+                  fontSize: 12,
+                  boxSizing: 'border-box',
+                  background: '#FFFFFF',
+                }}
+              >
+                {ALL_ROOMS.map(r => (
+                  <option key={r} value={r}>{r}</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4B5563', marginBottom: 4 }}>
+                <i className="fas fa-clock" style={{ marginRight: 4, color: '#F59E0B' }} />
+                เวลาเริ่มเล่น
+              </label>
+              <select
+                value={time}
+                onChange={e => setTime(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #CBD5E1',
+                  fontSize: 12,
+                  boxSizing: 'border-box',
+                  background: '#FFFFFF',
+                }}
+              >
+                {TIME_SLOTS.map(t => (
+                  <option key={t} value={t}>{t} น.</option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ gridColumn: 'span 2' }}>
+              <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4B5563', marginBottom: 4 }}>
+                <i className="fas fa-calendar-alt" style={{ marginRight: 4, color: '#2563EB' }} />
+                วันที่เล่น (YYYY-MM-DD)
+              </label>
+              <input
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '8px 10px',
+                  borderRadius: 8,
+                  border: '1px solid #CBD5E1',
+                  fontSize: 12,
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Section 6: โน้ตจากแอดมิน (Admin Note) */}
+          <div>
+            <label style={{ display: 'block', fontSize: 11, fontWeight: 700, color: '#4B5563', marginBottom: 4 }}>
+              <i className="fas fa-sticky-note" style={{ marginRight: 4, color: '#8B5CF6' }} />
+              โน้ตจากแอดมิน (Admin Note)
+            </label>
+            <textarea
+              rows={2}
+              value={adminNote}
+              onChange={e => setAdminNote(e.target.value)}
+              placeholder="ระบุเหตุผลการแก้ไข เช่น เปลี่ยนเกมตามที่ผู้เล่นร้องขอ..."
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                borderRadius: 8,
+                border: '1px solid #CBD5E1',
+                fontSize: 12,
+                boxSizing: 'border-box',
+                fontFamily: "'Sarabun', sans-serif",
+                resize: 'none',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Footer Actions */}
+        <div
+          style={{
+            padding: '12px 20px',
+            background: '#F9FAFB',
+            borderTop: '1px solid #E5E7EB',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 10,
+            flexShrink: 0,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={saving}
+            style={{
+              padding: '9px 16px',
+              borderRadius: 10,
+              background: '#FFFFFF',
+              color: '#374151',
+              border: '1px solid #D1D5DB',
+              fontSize: 12.5,
+              fontWeight: 700,
+              cursor: saving ? 'not-allowed' : 'pointer',
+            }}
+          >
+            ยกเลิก
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              padding: '9px 20px',
+              borderRadius: 10,
+              background: '#E50914',
+              color: '#FFFFFF',
+              border: 'none',
+              fontSize: 12.5,
+              fontWeight: 800,
+              cursor: saving ? 'wait' : 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              boxShadow: '0 4px 12px rgba(229, 9, 20, 0.3)',
+            }}
+          >
+            {saving ? (
+              <>
+                <i className="fas fa-spinner fa-spin" />
+                <span>กำลังบันทึก...</span>
+              </>
+            ) : (
+              <>
+                <i className="fas fa-save" />
+                <span>บันทึกการเปลี่ยนแปลง</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+
 // ── Booking Detail & Party Lounge Modal ───────────────────────────────────────
 export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, showToast, onUpdated }) {
   const openProfile = useOpenProfile()
@@ -5363,6 +6434,7 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
   const [approvingUid, setApprovingUid] = useState(null)
   const [rejectingUid, setRejectingUid] = useState(null)
   const [showDepositPay, setShowDepositPay] = useState(false)
+  const [showAdminManage, setShowAdminManage] = useState(false)
 
   // Dynamically resolve current game to guarantee maxMembers reflects latest game settings
   const [matchedGame, setMatchedGame] = useState(() => {
@@ -5787,6 +6859,41 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               }}
             />
 
+            {/* Admin Control Trigger (Top Left) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowAdminManage(true)}
+                style={{
+                  position: 'absolute',
+                  top: 10,
+                  left: 12,
+                  zIndex: 10,
+                  height: 30,
+                  padding: '0 12px',
+                  borderRadius: 20,
+                  background: 'rgba(229, 9, 20, 0.9)',
+                  backdropFilter: 'blur(8px)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  color: '#ffffff',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontSize: 11,
+                  fontWeight: 800,
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3)',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
+                onMouseLeave={e => e.currentTarget.style.background = 'rgba(229, 9, 20, 0.9)'}
+                title="จัดการปาร์ตี้อิสระสำหรับแอดมิน"
+              >
+                <i className="fas fa-user-shield" style={{ fontSize: 11 }} />
+                <span>จัดการปาร์ตี้ (แอดมิน)</span>
+              </button>
+            )}
+
             {/* Close Button */}
             <button
               type="button"
@@ -5924,6 +7031,118 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               width: '100%',
             }}
           >
+            {/* Admin Control Banner (Quick Entry) */}
+            {isAdmin && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 14,
+                  background: 'linear-gradient(135deg, #18181B 0%, #0F172A 100%)',
+                  border: '1px solid rgba(229, 9, 20, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 10,
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                  <div
+                    style={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: 8,
+                      background: '#E50914',
+                      color: '#ffffff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: 12,
+                      flexShrink: 0,
+                    }}
+                  >
+                    <i className="fas fa-user-shield" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#ffffff' }}>แผงควบคุมแอดมิน</div>
+                    <div style={{ fontSize: 10.5, color: '#9CA3AF' }}>ย้ายหัวหน้าตี้, เปลี่ยนเกม, เปลี่ยนห้อง, คำนวณมัดจำ</div>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAdminManage(true)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 8,
+                    background: '#E50914',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: 11.5,
+                    fontWeight: 800,
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 5,
+                    flexShrink: 0,
+                    boxShadow: '0 2px 6px rgba(229, 9, 20, 0.4)',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#B80710'}
+                  onMouseLeave={e => e.currentTarget.style.background = '#E50914'}
+                >
+                  <i className="fas fa-sliders-h" style={{ fontSize: 10 }} />
+                  <span>จัดการตี้</span>
+                </button>
+              </div>
+            )}
+
+            {/* Alert: Cashier Discount From Game Change */}
+            {booking.members?.some(m => Number(m.depositOverpaid) > 0 || Number(m.cashierDiscount) > 0) && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  background: '#ECFDF5',
+                  border: '1px solid #A7F3D0',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
+              >
+                <i className="fas fa-gift" style={{ color: '#059669', fontSize: 15, marginTop: 2, flexShrink: 0 }} />
+                <div style={{ fontSize: 11.5, color: '#065F46', lineHeight: 1.5 }}>
+                  <strong>สิทธิ์ส่วนลดหน้าแคชเชียร์:</strong> ปาร์ตี้นี้มีการปรับเปลี่ยนเกม สมาชิกที่ชำระมัดจำรอบเดิมไว้แล้วจะได้รับส่วนลดจากครึ่งหลังหน้าแคชเชียร์อัตโนมัติเมื่อเช็คบิลที่ร้าน
+                </div>
+              </div>
+            )}
+
+            {/* Alert: Current User Owes Extra Deposit From Game Change */}
+            {myMember && Number(myMember.depositOwed) > 0 && (
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 12,
+                  background: '#FEF2F2',
+                  border: '1px solid #FECACA',
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                  boxSizing: 'border-box',
+                  width: '100%',
+                }}
+              >
+                <i className="fas fa-exclamation-triangle" style={{ color: '#DC2626', fontSize: 15, marginTop: 2, flexShrink: 0 }} />
+                <div style={{ fontSize: 11.5, color: '#991B1B', lineHeight: 1.5 }}>
+                  <strong>มีการเปลี่ยนแปลงเกม:</strong> มัดจำเกมใหม่สูงกว่าเดิม กรุณาชำระส่วนต่างมัดจำเพิ่ม <strong>฿{myMember.depositOwed}</strong> เพื่อรักษาสิทธิ์ของปาร์ตี้
+                </div>
+              </div>
+            )}
+
             {/* Status Case: Locked (100% Complete) */}
             {isLocked && (
               <div
@@ -6352,27 +7571,39 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                           borderRadius: 20,
                           whiteSpace: 'nowrap',
                           background: m.paidDeposit
-                            ? '#ECFDF5'
+                            ? (Number(m.depositOwed) > 0 ? '#FEF2F2' : '#ECFDF5')
                             : m.slipStatus === 'pending_verification'
                               ? '#FFFBEB'
                               : '#F3F4F6',
                           color: m.paidDeposit
-                            ? '#059669'
+                            ? (Number(m.depositOwed) > 0 ? '#DC2626' : '#059669')
                             : m.slipStatus === 'pending_verification'
                               ? '#D97706'
                               : '#6B7280',
                           border: m.paidDeposit
-                            ? '1px solid #A7F3D0'
+                            ? (Number(m.depositOwed) > 0 ? '1px solid #FECACA' : '1px solid #A7F3D0')
                             : m.slipStatus === 'pending_verification'
                               ? '1px solid #FDE68A'
                               : '1px solid #E5E7EB',
                         }}
                       >
                         {m.paidDeposit ? (
-                          <>
-                            <i className="fas fa-check" style={{ marginRight: 4, fontSize: 9 }} />
-                            จ่ายแล้ว
-                          </>
+                          Number(m.depositOwed) > 0 ? (
+                            <>
+                              <i className="fas fa-exclamation-circle" style={{ marginRight: 4, fontSize: 9, color: '#DC2626' }} />
+                              ชำระแล้ว (ค้างเพิ่ม ฿{m.depositOwed})
+                            </>
+                          ) : Number(m.depositOverpaid || m.cashierDiscount) > 0 ? (
+                            <>
+                              <i className="fas fa-tag" style={{ marginRight: 4, fontSize: 9, color: '#059669' }} />
+                              ชำระแล้ว (ลดแคชเชียร์ ฿{m.depositOverpaid || m.cashierDiscount})
+                            </>
+                          ) : (
+                            <>
+                              <i className="fas fa-check" style={{ marginRight: 4, fontSize: 9 }} />
+                              จ่ายแล้ว
+                            </>
+                          )
                         ) : m.slipStatus === 'pending_verification' ? (
                           <>
                             <i className="fas fa-clock" style={{ marginRight: 4, fontSize: 9 }} />
@@ -6691,7 +7922,7 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               </div>
             )}
 
-            {/* Pay Deposit CTA */}
+            {/* Pay Deposit CTA for member who has not paid */}
             {isMember && booking.status === 'confirmed' && !myMember?.paidDeposit && myMember?.slipStatus !== 'pending_verification' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <button
@@ -6727,8 +7958,44 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
               </div>
             )}
 
-            {/* Paid Status */}
-            {isMember && myMember?.paidDeposit && (
+            {/* Pay Extra Deposit CTA for member who paid earlier but owes difference from game change */}
+            {isMember && booking.status === 'confirmed' && myMember?.paidDeposit && Number(myMember.depositOwed) > 0 && myMember?.slipStatus !== 'pending_verification' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setShowDepositPay(true)}
+                  style={{
+                    width: '100%',
+                    height: 48,
+                    borderRadius: 12,
+                    background: 'linear-gradient(135deg, #E50914, #B80710)',
+                    color: '#ffffff',
+                    fontWeight: 800,
+                    fontSize: 14,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 14px rgba(229, 9, 20, 0.35)',
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#991B1B'}
+                  onMouseLeave={e => e.currentTarget.style.background = 'linear-gradient(135deg, #E50914, #B80710)'}
+                >
+                  <i className="fas fa-coins" style={{ fontSize: 16 }} />
+                  <span>จ่ายส่วนต่างมัดจำ (฿{myMember.depositOwed})</span>
+                </button>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11, color: '#DC2626', marginTop: 2 }}>
+                  <i className="fas fa-exclamation-circle" style={{ fontSize: 10 }} />
+                  <span>มีการเปลี่ยนเกม: ชำระเพิ่มเฉพาะส่วนต่าง ฿{myMember.depositOwed} เพื่อรักษาสิทธิ์</span>
+                </div>
+              </div>
+            )}
+
+            {/* Paid Status (Fully paid, no owed delta) */}
+            {isMember && myMember?.paidDeposit && (!myMember?.depositOwed || myMember?.depositOwed <= 0) && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 <div
                   style={{
@@ -6752,6 +8019,27 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
                       : `คุณชำระมัดจำแล้ว (รอเพื่อนในตี้อีก ${remainingToLock} คน)`}
                   </span>
                 </div>
+
+                {Number(myMember?.depositOverpaid || myMember?.cashierDiscount) > 0 && (
+                  <div
+                    style={{
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      background: '#F0FDF4',
+                      border: '1px solid #BBF7D0',
+                      color: '#15803D',
+                      fontSize: 11.5,
+                      fontWeight: 700,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                    }}
+                  >
+                    <i className="fas fa-gift" style={{ color: '#16A34A' }} />
+                    <span>คุณได้รับส่วนลดจากครึ่งหลังหน้าแคชเชียร์ ฿{myMember.depositOverpaid || myMember.cashierDiscount}</span>
+                  </div>
+                )}
 
                 {!isLocked && remainingToLock > 0 && booking.status === 'confirmed' && (
                   <button
@@ -6912,6 +8200,20 @@ export function BookingDetailModal({ booking, allGames = [], lineUser, onClose, 
           onClose={() => setShowDepositPay(false)}
           showToast={showToast}
           onUpdated={onUpdated}
+        />
+      )}
+
+      {showAdminManage && (
+        <AdminManageBookingModal
+          booking={booking}
+          allGames={allGames}
+          lineUser={lineUser}
+          onClose={() => setShowAdminManage(false)}
+          showToast={showToast}
+          onUpdated={() => {
+            setShowAdminManage(false)
+            if (onUpdated) onUpdated()
+          }}
         />
       )}
     </>
