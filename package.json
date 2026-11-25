@@ -9,7 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@line/liff": "^2.29.0",
+    "@line/liff": "^2.32.0",
     "@tailwindcss/vite": "^4.3.3",
     "firebase": "^10.7.1",
     "html5-qrcode": "^2.3.8",
