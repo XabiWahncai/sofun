@@ -3906,10 +3906,11 @@ export default function BasicPOSPage({
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="pos-divider" />
-
-          <div className="pos-section-title"><i className="fas fa-utensils" /> เมนูอาหาร</div>
+        {/* MIDDLE - food and drinks menu */}
+        <div className="pos-middle">
+          <div className="pos-section-title"><i className="fas fa-utensils" /> {t('menuTitle', 'อาหารและเครื่องดื่ม')}</div>
 
           {menuItems.length > 0 && (
             <div className="pos-menu-filter">
@@ -3918,7 +3919,7 @@ export default function BasicPOSPage({
                 <input
                   className="pos-menu-search-input"
                   type="text"
-                  placeholder="ค้นหาเมนู..."
+                  placeholder={t('searchMenuPlaceholder', 'ค้นหาเมนู...')}
                   value={menuSearch}
                   onChange={e => setMenuSearch(e.target.value)}
                 />
