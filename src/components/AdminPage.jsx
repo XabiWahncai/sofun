@@ -39,39 +39,73 @@ function fmtDate(d) { return `${d.getDate()}/${d.getMonth()+1}` }
 // ─── Dashboard Tab ────────────────────────────────────────────────────────────
 // ─── Dashboard Tab (Power BI Executive Business Intelligence) ─────────────────
 
-// Helper to compute deposit for a payment session
+// Helper to compute deposit for a payment session with exact per-game rates and zero-deposit support
 function computePaymentDeposit(p, bookings = [], allGames = []) {
+  // If no script or general food order, deposit is strictly 0
+  const title = (p.scriptTitle || '').trim()
+  if (!p.scriptId && (!title || title === 'ออเดอร์ทั่วไป' || title === 'หมวดหมู่อาหาร')) {
+    return 0
+  }
+  if (!title && (!p.gameTotal || p.gameTotal <= 0)) {
+    return 0
+  }
+
+  // 1. Check linked booking
   let matchedBooking = null
   if (p.bookingId) {
     matchedBooking = bookings.find(b => b.id === p.bookingId)
   }
-  if (!matchedBooking && p.room && p.paidAt) {
-    const pDate = p.paidAt?.toDate?.() || (p.paidAt?.seconds ? new Date(p.paidAt.seconds * 1000) : (p.paidAt ? new Date(p.paidAt) : null))
-    if (pDate) {
+  if (!matchedBooking && p.room && (p.openAt || p.paidAt)) {
+    const pDate = p.openAt?.toDate?.() || (p.openAt?.seconds ? new Date(p.openAt.seconds * 1000) : (p.openAt ? new Date(p.openAt) : null)) ||
+                  p.paidAt?.toDate?.() || (p.paidAt?.seconds ? new Date(p.paidAt.seconds * 1000) : (p.paidAt ? new Date(p.paidAt) : null))
+    if (pDate && !isNaN(pDate.getTime())) {
       const pDateStr = pDate.toISOString().slice(0, 10)
       matchedBooking = bookings.find(b => b.date === pDateStr && b.room === p.room && b.status !== 'cancelled')
     }
   }
 
-  const members = p.members || []
-  const memberCount = members.length || 1
-  const depositPaidMembers = members.filter(m => !m.unpaidDeposit)
-  const depositEligibleCount = depositPaidMembers.length > 0 ? depositPaidMembers.length : memberCount
+  // 2. Find matched game with normalized title matching
+  const normTitle = title.toLowerCase().replace(/[\s\-_]+/g, '')
+  const matchedGame = allGames.find(g => {
+    if (p.scriptId && g.id === p.scriptId) return true
+    const gTitleNorm = (g.title || g.name || '').trim().toLowerCase().replace(/[\s\-_]+/g, '')
+    if (gTitleNorm && gTitleNorm === normTitle) return true
+    if (normTitle && gTitleNorm && (normTitle.includes(gTitleNorm) || gTitleNorm.includes(normTitle))) return true
+    return false
+  })
 
+  // 3. Determine per-person deposit amount accurately
   let depositPerPerson = 0
-  if (matchedBooking && Number(matchedBooking.depositAmount) > 0) {
+  if (matchedBooking && matchedBooking.depositAmount !== undefined && matchedBooking.depositAmount !== null && matchedBooking.depositAmount !== '') {
     depositPerPerson = Number(matchedBooking.depositAmount)
+  } else if (matchedGame) {
+    if (matchedGame.deposit !== undefined && matchedGame.deposit !== null && matchedGame.deposit !== '') {
+      depositPerPerson = Number(matchedGame.deposit)
+    } else if (matchedGame.noDeposit || matchedGame.depositRequired === false || Number(matchedGame.price) === 0) {
+      depositPerPerson = 0
+    } else {
+      depositPerPerson = 300
+    }
   } else {
-    const matchedGame = allGames.find(g => g.id === p.scriptId || (g.title || g.name) === p.scriptTitle)
-    depositPerPerson = matchedGame && Number(matchedGame.deposit) > 0 ? Number(matchedGame.deposit) : 300
+    depositPerPerson = (p.gameTotal && p.gameTotal > 0) ? 300 : 0
   }
 
+  // If game has no deposit (0), return 0 immediately
+  if (depositPerPerson <= 0) return 0
+
+  // 4. If booking has individual member records with deposit
   if (matchedBooking && Array.isArray(matchedBooking.members) && matchedBooking.members.length > 0) {
     const bookingDepositSum = matchedBooking.members
       .filter(m => m.paidDeposit)
       .reduce((s, m) => s + (Number(m.depositPaidAmount) || depositPerPerson), 0)
     if (bookingDepositSum > 0) return bookingDepositSum
   }
+
+  // 5. Check payment members who paid deposit (!m.unpaidDeposit)
+  const members = p.members || []
+  const memberCount = members.length || 1
+  const depositPaidMembers = members.filter(m => !m.unpaidDeposit)
+  const depositEligibleCount = depositPaidMembers.length > 0 ? depositPaidMembers.length : memberCount
 
   return depositPerPerson * depositEligibleCount
 }
@@ -1463,7 +1497,7 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
             </div>
           </div>
           <div style={{ fontSize: 10.5, color: '#64748B', borderTop: '1px solid #F1F5F9', paddingTop: 4 }}>
-            มัดจำระบบจอง & ตี้ (เฉลี่ย ฿300/คน)
+            มัดจำตามเรทแต่ละเกม (฿0 - ฿495/คน)
           </div>
         </div>
 
@@ -2265,7 +2299,7 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
                     กรณีตรวจสอบมาตรฐาน (Audit Example: Serial 0000000107)
                   </div>
                   <div style={{ fontSize: 11, color: '#64748B' }}>
-                    เกม "ความลับของวันที่ 7 ธันวาคม" (2 ผู้เล่น) : มัดจำ ฿600 + แคชเชียร์ ฿543 = รายได้จริงทั้งปาร์ตี้ ฿1,143 (ยอดเกมจริง ฿1,198)
+                    เกม "ความลับของวันที่ 7 ธันวาคม" (2 ผู้เล่น) : มัดจำ ฿600 + แคชเชียร์ ฿543 = รายได้จริงทั้งปาร์ตี้ ฿1,143 (ยอดเกมจริง ฿1,198) · รองรับสคริปต์ที่ไม่มีมัดจำ (฿0) และอัตรามัดจำเฉพาะของแต่ละเกมตามจริง
                   </div>
                 </div>
               </div>
