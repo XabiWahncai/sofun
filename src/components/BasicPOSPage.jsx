@@ -1,4 +1,4 @@
-import { basicPosTranslations } from '../constants/basicPosTranslations'
+import { basicPosTranslations, translateCategory, translateMenuItem, translateAddon } from '../constants/basicPosTranslations'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
@@ -2430,7 +2430,17 @@ export default function BasicPOSPage({
   const filteredMenuItems = menuItems.filter(item => {
     if (item.available === false) return false
     if (menuCategory !== 'ทั้งหมด' && item.category !== menuCategory) return false
-    if (menuSearch && !item.name.toLowerCase().includes(menuSearch.toLowerCase())) return false
+    if (menuSearch) {
+      const q = menuSearch.toLowerCase().trim()
+      const thName = (item.name || '').toLowerCase()
+      const enName = translateMenuItem(item.name, 'en').toLowerCase()
+      const zhName = translateMenuItem(item.name, 'zh').toLowerCase()
+      const customEn = (item.name_en || item.nameEn || '').toLowerCase()
+      const customZh = (item.name_zh || item.nameZh || '').toLowerCase()
+      if (!thName.includes(q) && !enName.includes(q) && !zhName.includes(q) && !customEn.includes(q) && !customZh.includes(q)) {
+        return false
+      }
+    }
     return true
   })
 
@@ -3288,26 +3298,26 @@ export default function BasicPOSPage({
       {/* ── MOBILE TOP SHORTCUT TABS (visible <820px) ── */}
       <div className="pos-mobile-shortcut">
         {[
-          { key: 'members', icon: 'fa-users', label: 'สมาชิก', badge: (activeSession.members || []).length },
-          { key: 'menu', icon: 'fa-utensils', label: 'เมนู', badge: 0 },
-          { key: 'order', icon: 'fa-receipt', label: 'สรุปออเดอร์', badge: orderArr.length },
-        ].map(t => {
-          const active = mobilePanel === t.key
+          { key: 'members', icon: 'fa-users', label: t('tabMembers', 'สมาชิก'), badge: (activeSession.members || []).length },
+          { key: 'menu', icon: 'fa-utensils', label: t('tabMenu', 'เมนู'), badge: 0 },
+          { key: 'order', icon: 'fa-receipt', label: t('tabOrder', 'สรุปออเดอร์'), badge: orderArr.length },
+        ].map(item => {
+          const active = mobilePanel === item.key
           return (
             <button
-              key={t.key}
+              key={item.key}
               type="button"
               onClick={() => {
-                setMobilePanel(t.key)
+                setMobilePanel(item.key)
                 // Scroll to top so user sees the panel from start
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               className={`pos-mobile-shortcut-btn${active ? ' active' : ''}`}
             >
-              <i className={`fas ${t.icon}`} style={{ fontSize: 12 }} />
-              <span>{t.label}</span>
-              {t.badge > 0 && (
-                <span className="pos-mobile-shortcut-badge">{t.badge}</span>
+              <i className={`fas ${item.icon}`} style={{ fontSize: 12 }} />
+              <span>{item.label}</span>
+              {item.badge > 0 && (
+                <span className="pos-mobile-shortcut-badge">{item.badge}</span>
               )}
             </button>
           )
@@ -3936,7 +3946,7 @@ export default function BasicPOSPage({
                     className={`pos-menu-cat-chip${menuCategory === cat ? ' active' : ''}`}
                     onClick={() => setMenuCategory(menuCategory === cat ? 'ทั้งหมด' : cat)}
                   >
-                    {cat}
+                    {translateCategory(cat, lang)}
                   </button>
                 ))}
               </div>
@@ -3944,13 +3954,13 @@ export default function BasicPOSPage({
           )}
 
           <div className="pos-menu-scroll">
-            {menuItems.length === 0 && <div className="pos-empty">ยังไม่มีเมนู (เพิ่มได้ในหน้า Admin)</div>}
+            {menuItems.length === 0 && <div className="pos-empty">{t('noMenuConfigured', 'ยังไม่มีเมนู (เพิ่มได้ในหน้า Admin)')}</div>}
             {menuItems.length > 0 && filteredMenuItems.length === 0 && (
-              <div className="pos-empty">ไม่พบเมนู "{menuSearch}"</div>
+              <div className="pos-empty">{t('menuNotFound', 'ไม่พบเมนู')} "{menuSearch}"</div>
             )}
             {Object.entries(groupedMenu).map(([cat, items]) => (
               <div key={cat} className="pos-menu-group">
-                <div className="pos-menu-cat">{menuCategory === 'ทั้งหมด' ? cat : ''}</div>
+                <div className="pos-menu-cat">{menuCategory === 'ทั้งหมด' ? translateCategory(cat, lang) : ''}</div>
                 {items.map(item => {
                   const itemQty = orderArr.filter(x => x.menuId === item.id).reduce((s, x) => s + x.qty, 0)
                   return (
@@ -3963,7 +3973,7 @@ export default function BasicPOSPage({
                       {item.imageUrl && <img src={item.imageUrl} alt="" className="pos-menu-item-img" />}
                       <div className="pos-menu-item-info">
                         <div className="pos-menu-item-name">
-                          {item.name}
+                          {item['name_' + lang] || item['name' + lang.toUpperCase()] || translateMenuItem(item.name, lang)}
                           {item.addons?.length > 0 && <span className="pos-menu-has-addon"><i className="fas fa-plus-circle" /></span>}
                         </div>
                         <div className="pos-menu-item-price">฿{item.price}</div>
@@ -3974,7 +3984,7 @@ export default function BasicPOSPage({
                           type="button"
                           className="pos-qty-btn add"
                           onClick={(e) => { e.stopPropagation(); addItem(item) }}
-                          title="สั่งอาหารรายการนี้"
+                          title={t('orderThisItem', 'สั่งอาหารรายการนี้')}
                         >
                           +
                         </button>
@@ -3990,10 +4000,10 @@ export default function BasicPOSPage({
         {/* RIGHT - order summary */}
         <div className="pos-right">
           <div className="pos-section-title">
-            <i className="fas fa-receipt" /> สรุปออเดอร์
+            <i className="fas fa-receipt" /> {t('orderTitle', 'สรุปออเดอร์')}
             {orderArr.length > 0 && (
               <span style={{ marginLeft: 'auto', fontWeight: 800, color: 'rgba(26,26,26,0.5)', textTransform: 'none', letterSpacing: 0, fontSize: 11, padding: '2px 9px', borderRadius: 999, background: 'rgba(26,26,26,0.05)' }}>
-                {orderArr.length} รายการ
+                {orderArr.length} {t('itemsCount', 'รายการ')}
               </span>
             )}
           </div>
@@ -4015,7 +4025,7 @@ export default function BasicPOSPage({
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedGame.title}</div>
                       <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 1, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {selectedGame.players && <span><i className="fas fa-users" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.players} คน</span>}
+                        {selectedGame.players && <span><i className="fas fa-users" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.players} {t('peopleCount', 'คน')}</span>}
                         {selectedGame.time && <span><i className="fas fa-clock" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.time}</span>}
                       </div>
                     </div>
@@ -4033,8 +4043,8 @@ export default function BasicPOSPage({
                     </div>
                   ) : (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
-                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>ค่าเกม</span>
-                      <span style={{ fontSize: 14, fontWeight: 900, color: '#c8a050' }}>ฟรี</span>
+                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>{t('gamePriceLabel', 'ค่าเกม')}</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#c8a050' }}>{t('free', 'ฟรี')}</span>
                     </div>
                   )}
                 </div>
@@ -4046,7 +4056,7 @@ export default function BasicPOSPage({
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 2px 6px' }}>
                     <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)' }}>
                       <i className="fas fa-utensils" style={{ color: '#c62419', marginRight: 5, fontSize: 10 }} />
-                      อาหาร / เครื่องดื่ม
+                      {t('foodAndDrinks', 'อาหาร / เครื่องดื่ม')}
                     </span>
                     <span style={{ fontSize: 11, fontWeight: 800, color: '#1a1a1a' }}>฿{foodTotal.toLocaleString()}</span>
                   </div>
@@ -4060,11 +4070,11 @@ export default function BasicPOSPage({
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', lineHeight: 1.3 }}>
-                              {x.name} <span style={{ color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>× {x.qty}</span>
+                              {translateMenuItem(x.name, lang)} <span style={{ color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>× {x.qty}</span>
                             </div>
                             {x.addons?.length > 0 && (
                               <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
-                                {x.addons.map(a => a.name).join(', ')}
+                                {x.addons.map(a => translateAddon(a.name || a, lang)).join(', ')}
                               </div>
                             )}
                           </div>
@@ -4102,14 +4112,14 @@ export default function BasicPOSPage({
                                   background: 'transparent', color: 'rgba(26,26,26,0.5)',
                                   border: '1px solid rgba(26,26,26,0.14)', cursor: 'pointer',
                                   fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
-                                }}>ล้าง</button>
+                                }}>{t('btnClear', 'ล้าง')}</button>
                               )}
                               <button onClick={() => setEditingBillKey(null)} style={{
                                 fontSize: 10, padding: '3px 7px', borderRadius: 999,
                                 background: '#1a1a1a', color: '#fff', border: 'none', cursor: 'pointer',
                                 fontWeight: 700,
                               }}>
-                                <i className="fas fa-check" /> เสร็จ
+                                <i className="fas fa-check" /> {t('btnDone', 'เสร็จ')}
                               </button>
                             </>
                           ) : isLocked ? (
@@ -4132,7 +4142,7 @@ export default function BasicPOSPage({
                               cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 700,
                             }}>
                               <i className="fas fa-user-tag" style={{ marginRight: 4, fontSize: 9 }} />
-                              {x.orderedBy ? x.orderedBy.name.split(' ')[0] : 'ระบุเจ้าบิล'}
+                              {x.orderedBy ? x.orderedBy.name.split(' ')[0] : t('assignBill', 'ระบุเจ้าบิล')}
                             </button>
                           )}
                         </div>
@@ -4177,27 +4187,27 @@ export default function BasicPOSPage({
                   color: '#fff', boxShadow: '0 6px 20px rgba(198,36,25,0.3)',
                   display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
                 }}>
-                  <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.9 }}>ยอดรวม</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.9 }}>{t('totalAmount', 'ยอดรวม')}</span>
                   <span style={{ fontSize: 22, fontWeight: 900 }}>฿{fmtCurrency(grandTotal)}</span>
                 </div>
               ) : (
                 <div style={{ padding: '28px 18px', textAlign: 'center', color: 'rgba(26,26,26,0.3)', fontSize: 13 }}>
                   <i className="fas fa-receipt" style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
-                  ยังไม่มีรายการ
+                  {t('noItemsInOrder', 'ยังไม่มีรายการ')}
                 </div>
               )}
             </div>
 
             {allMembersPaid ? (
               <div className="pos-all-paid-banner">
-                <div className="pos-all-paid-label"><i className="fas fa-check-double" /> ทุกคนจ่ายครบแล้ว</div>
+                <div className="pos-all-paid-label"><i className="fas fa-check-double" /> {t('allPaid', 'ทุกคนจ่ายครบแล้ว')}</div>
                 <button className="pos-close-table-btn" onClick={closeTable}>
-                  <i className="fas fa-flag-checkered" /> ตี้นี้เล่นเสร็จแล้ว
+                  <i className="fas fa-flag-checkered" /> {t('tableFinished', 'ตี้นี้เล่นเสร็จแล้ว')}
                 </button>
               </div>
             ) : verifiedTotal > 0 && (
               <div className="pos-partial-paid-banner">
-                <i className="fas fa-check-circle" /> จ่ายแล้ว ฿{fmtCurrency(verifiedTotal)} · ค้าง ฿{fmtCurrency(remainingAmount)}
+                <i className="fas fa-check-circle" /> {t('paidAmount', 'จ่ายแล้ว')} ฿{fmtCurrency(verifiedTotal)} · {t('unpaidAmount', 'ค้าง')} ฿{fmtCurrency(remainingAmount)}
               </div>
             )}
 
@@ -4212,12 +4222,12 @@ export default function BasicPOSPage({
                     cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
                     display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
                   }}>
-                    <i className="fas fa-object-group" /> รวมบิลจ่ายกัน
+                    <i className="fas fa-object-group" /> {t('groupPay', 'รวมบิลจ่ายกัน')}
                   </button>
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)' }}>
-                      เลือกสมาชิกที่จ่ายรวมกัน
+                      {t('selectGroupPayMembers', 'เลือกสมาชิกที่จ่ายรวมกัน')}
                     </div>
                     {activeSession.members
                       .filter(m => !memberPayments[m.uid]?.verified)
@@ -4293,9 +4303,9 @@ export default function BasicPOSPage({
                   <i className="fas fa-eye" style={{ fontSize: 13 }} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a' }}>ดูอย่างเดียว</div>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a' }}>{t('readOnlyNotice', 'ดูอย่างเดียว')}</div>
                   <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', marginTop: 2 }}>
-                    DM เจ้าของตี้: <strong>{activeSession.dm || '-'}</strong> · คุณกดรับออเดอร์ได้
+                    {t('ownerDmPrefix', 'DM เจ้าของตี้:')} <strong>{activeSession.dm || '-'}</strong> · {t('canAcceptOrdersNotice', 'คุณกดรับออเดอร์ได้')}
                   </div>
                 </div>
               </div>
@@ -4318,7 +4328,7 @@ export default function BasicPOSPage({
                     onMouseLeave={e => { e.currentTarget.style.background = '#c62419'; e.currentTarget.style.transform = 'translateY(0)' }}
                   >
                     <i className="fas fa-qrcode" />
-                    ชำระเงิน{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
+                    {t('payBillBtn', 'ชำระเงิน')}{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
                   </button>
                 ) : (
                   <button
@@ -4335,10 +4345,10 @@ export default function BasicPOSPage({
                     }}
                   >
                     {saving
-                      ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                      ? <><i className="fas fa-spinner fa-spin" /> {t('saving', 'กำลังบันทึก...')}</>
                       : activeSession.confirmedOrderId
-                        ? <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
-                        : <><i className="fas fa-check-circle" /> ยืนยันออเดอร์</>
+                        ? <><i className="fas fa-sync" /> {t('btnUpdateOrder', 'อัปเดตออเดอร์')}</>
+                        : <><i className="fas fa-check-circle" /> {t('btnConfirmOrder', 'ยืนยันออเดอร์')}</>
                     }
                   </button>
                 )}
@@ -4358,8 +4368,8 @@ export default function BasicPOSPage({
                     }}
                   >
                     {saving
-                      ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
-                      : <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                      ? <><i className="fas fa-spinner fa-spin" /> {t('saving', 'กำลังบันทึก...')}</>
+                      : <><i className="fas fa-sync" /> {t('btnUpdateOrder', 'อัปเดตออเดอร์')}</>
                     }
                   </button>
                 )}
@@ -4369,7 +4379,7 @@ export default function BasicPOSPage({
                   {activeSession.confirmedOrderId && (
                     <button
                       onClick={async () => {
-                        if (!window.confirm('ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR')) return
+                        if (!window.confirm(t('cancelConfirmPrompt', 'ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR'))) return
                         try {
                           await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
                             status: 'closed', closedAt: serverTimestamp()
@@ -4382,8 +4392,8 @@ export default function BasicPOSPage({
                           } else {
                             setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
                           }
-                          showToast('ยกเลิกตี้แล้ว')
-                        } catch (e) { showToast('ยกเลิกล้มเหลว', 'error') }
+                          showToast(t('cancelSuccess', 'ยกเลิกตี้แล้ว'))
+                        } catch (e) { showToast(t('cancelFailed', 'ยกเลิกล้มเหลว'), 'error') }
                       }}
                       style={{
                         flex: 1, padding: '9px 10px', borderRadius: 10,
@@ -4394,7 +4404,7 @@ export default function BasicPOSPage({
                         fontFamily: "'Sarabun', sans-serif",
                       }}
                     >
-                      <i className="fas fa-ban" style={{ fontSize: 10 }} /> ยกเลิกตี้
+                      <i className="fas fa-ban" style={{ fontSize: 10 }} /> {t('cancelParty', 'ยกเลิกตี้')}
                     </button>
                   )}
                   <button
@@ -4408,7 +4418,7 @@ export default function BasicPOSPage({
                       fontFamily: "'Sarabun', sans-serif",
                     }}
                   >
-                    <i className="fas fa-times" style={{ fontSize: 10 }} /> ปิดหน้า POS
+                    <i className="fas fa-times" style={{ fontSize: 10 }} /> {t('closePos', 'ปิดหน้า POS')}
                   </button>
                 </div>
               </>
@@ -4473,10 +4483,10 @@ export default function BasicPOSPage({
               <div>
                 <div className="pos-order-modal-title">
                   <i className="fas fa-user-tag" style={{ color: '#c62419' }} />
-                  <span>สั่งให้ลูกค้าคนไหน?</span>
+                  <span>{t('orderModalTitle', 'สั่งให้ลูกค้าคนไหน?')}</span>
                 </div>
                 <div className="pos-order-modal-subtitle">
-                  เลือกผู้สั่งเพื่อคิดบิลรายบุคคล หรือสั่งรวมทั้งโต๊ะ
+                  {t('orderModalSubtitle', 'เลือกผู้สั่งเพื่อคิดบิลรายบุคคล หรือสั่งรวมทั้งโต๊ะ')}
                 </div>
               </div>
               <button
@@ -4514,7 +4524,7 @@ export default function BasicPOSPage({
                 )}
                 <div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
-                    {orderModal.item.name}
+                    {orderModal.item['name_' + lang] || orderModal.item['name' + lang.toUpperCase()] || translateMenuItem(orderModal.item.name, lang)}
                   </div>
                   {orderModal.item.category && (
                     <span style={{
@@ -4522,13 +4532,13 @@ export default function BasicPOSPage({
                       background: 'rgba(26,26,26,0.05)', padding: '2px 7px',
                       borderRadius: 6, display: 'inline-block', marginTop: 3
                     }}>
-                      {orderModal.item.category}
+                      {translateCategory(orderModal.item.category, lang)}
                     </span>
                   )}
                 </div>
               </div>
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 700, textTransform: 'uppercase' }}>ราคาเริ่มต้น</div>
+                <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 700, textTransform: 'uppercase' }}>{t('orderModalStartPrice', 'ราคาเริ่มต้น')}</div>
                 <div style={{ fontSize: 17, fontWeight: 900, color: '#c62419' }}>
                   ฿{(orderModal.item.price || 0).toLocaleString()}
                 </div>
@@ -4542,14 +4552,14 @@ export default function BasicPOSPage({
                 <div className="pos-order-section-title">
                   <span>
                     <i className="fas fa-users" style={{ color: '#c62419', marginRight: 6 }} />
-                    เลือกลูกค้าในตี้ ({(activeSession?.members || []).length} คน)
+                    {t('selectCustomerInParty', 'เลือกลูกค้าในตี้')} ({(activeSession?.members || []).length} {t('peopleCount', 'คน')})
                   </span>
                   {orderModal.member === 'all' ? (
-                    <span style={{ color: '#c62419', fontWeight: 800 }}>สั่งรวมทั้งโต๊ะ</span>
+                    <span style={{ color: '#c62419', fontWeight: 800 }}>{t('orderForTable', 'สั่งรวมทั้งโต๊ะ')}</span>
                   ) : orderModal.member ? (
-                    <span style={{ color: '#c62419', fontWeight: 800 }}>สั่งให้: {orderModal.member.name}</span>
+                    <span style={{ color: '#c62419', fontWeight: 800 }}>{t('orderFor', 'สั่งให้:')} {orderModal.member.name}</span>
                   ) : (
-                    <span style={{ color: '#e53e3e', fontWeight: 800 }}>* กรุณาเลือกคนที่สั่ง</span>
+                    <span style={{ color: '#e53e3e', fontWeight: 800 }}>{t('pleaseSelectCustomer', '* กรุณาเลือกคนที่สั่ง')}</span>
                   )}
                 </div>
 
@@ -4565,10 +4575,10 @@ export default function BasicPOSPage({
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
-                        ทั้งโต๊ะ (สั่งรวม)
+                        {t('wholeTable', 'ทั้งโต๊ะ (สั่งรวม)')}
                       </div>
                       <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
-                        หารบิลกลาง
+                        {t('splitBillCommon', 'หารบิลกลาง')}
                       </div>
                     </div>
                     {orderModal.member === 'all' && (
@@ -4603,7 +4613,7 @@ export default function BasicPOSPage({
                             </div>
                           ) : (
                             <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.4)', marginTop: 2 }}>
-                              สมาชิก
+                              {t('memberLabel', 'สมาชิก')}
                             </div>
                           )}
                         </div>
@@ -4618,7 +4628,7 @@ export default function BasicPOSPage({
                 {(activeSession?.members || []).length === 0 && (
                   <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: '#faf7f5', border: '1px dashed rgba(26,26,26,0.12)', fontSize: 12, color: 'rgba(26,26,26,0.6)', display: 'flex', alignItems: 'center', gap: 8 }}>
                     <i className="fas fa-info-circle" style={{ color: '#c62419' }} />
-                    <span>ยังไม่มีสมาชิกในปาร์ตี้นี้ (ระบบจะบันทึกเป็นบิลรวมทั้งโต๊ะ)</span>
+                    <span>{t('noMembersNotice', 'ยังไม่มีสมาชิกในปาร์ตี้นี้ (ระบบจะบันทึกเป็นบิลรวมทั้งโต๊ะ)')}</span>
                   </div>
                 )}
               </div>
@@ -4627,7 +4637,7 @@ export default function BasicPOSPage({
               {(orderModal.item.addons || []).length > 0 && (
                 <div>
                   <div className="pos-order-section-title">
-                    <span><i className="fas fa-layer-group" style={{ color: '#c62419', marginRight: 6 }} /> ตัวเลือกเพิ่มเติม (Add-on)</span>
+                    <span><i className="fas fa-layer-group" style={{ color: '#c62419', marginRight: 6 }} /> {t('addonsTitle', 'ตัวเลือกเพิ่มเติม (Add-on)')}</span>
                   </div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {orderModal.item.addons.map((a, i) => {
@@ -4654,7 +4664,7 @@ export default function BasicPOSPage({
                             gap: 6,
                           }}
                         >
-                          <span>{a.name}</span>
+                          <span>{translateAddon(a.name, lang)}</span>
                           {(a.price || 0) > 0 && <span style={{ opacity: 0.8 }}>+฿{a.price}</span>}
                           {isSelected && <i className="fas fa-check" style={{ fontSize: 10 }} />}
                         </button>
@@ -4667,14 +4677,14 @@ export default function BasicPOSPage({
               {/* Note */}
               <div>
                 <div className="pos-order-section-title">
-                  <span><i className="fas fa-pen" style={{ color: '#c62419', marginRight: 6 }} /> หมายเหตุ</span>
-                  <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.4)', textTransform: 'none' }}>(ถ้ามี)</span>
+                  <span><i className="fas fa-pen" style={{ color: '#c62419', marginRight: 6 }} /> {t('noteTitle', 'หมายเหตุ')}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.4)', textTransform: 'none' }}>{t('optional', '(ถ้ามี)')}</span>
                 </div>
                 <input
                   type="text"
                   value={orderModal.note || ''}
                   onChange={e => setOrderModal(p => ({ ...p, note: e.target.value }))}
-                  placeholder="เช่น ไม่ใส่ผัก, เผ็ดน้อย, แยกน้ำแข็ง..."
+                  placeholder={t('orderNotePlaceholder', 'เช่น ไม่ใส่ผัก, เผ็ดน้อย, แยกน้ำแข็ง...')}
                   maxLength={120}
                   style={{
                     width: '100%', boxSizing: 'border-box',
@@ -4696,7 +4706,7 @@ export default function BasicPOSPage({
               }}>
                 <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>
                   <i className="fas fa-sort-numeric-up" style={{ color: '#c62419', marginRight: 6 }} />
-                  จำนวน
+                  {t('qtyTitle', 'จำนวน')}
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <button
@@ -4739,13 +4749,13 @@ export default function BasicPOSPage({
                 const isSelected = orderModal.member !== undefined
                 const isAll = orderModal.member === 'all'
                 const memberObj = !isAll ? orderModal.member : null
-                const recipientLabel = isAll ? 'ทั้งโต๊ะ' : (memberObj?.name ? memberObj.name.split(' ')[0] : '')
+                const recipientLabel = isAll ? t('wholeTable', 'ทั้งโต๊ะ') : (memberObj?.name ? memberObj.name.split(' ')[0] : '')
 
                 return (
                   <>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(26,26,26,0.55)' }}>
-                        ยอดรวม ({orderModal.qty || 1} รายการ)
+                        {t('totalItemsCount', 'ยอดรวม')} ({orderModal.qty || 1} {t('itemsCount', 'รายการ')})
                       </div>
                       <div style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a' }}>
                         ฿{itemTotal.toLocaleString()}
@@ -4788,12 +4798,12 @@ export default function BasicPOSPage({
                       {!isSelected ? (
                         <>
                           <i className="fas fa-hand-pointer" />
-                          <span>กรุณาเลือกลูกค้าที่สั่งอาหาร</span>
+                          <span>{t('pleaseSelectCustomerBtn', 'กรุณาเลือกลูกค้าที่สั่งอาหาร')}</span>
                         </>
                       ) : (
                         <>
                           <i className="fas fa-plus-circle" />
-                          <span>สั่งให้ {recipientLabel} · ฿{itemTotal.toLocaleString()}</span>
+                          <span>{t('orderForBtn', 'สั่งให้')} {recipientLabel} · ฿{itemTotal.toLocaleString()}</span>
                         </>
                       )}
                     </button>

@@ -3,7 +3,7 @@
 
 export const basicPosTranslations = {
   th: {
-    // Top Bar & Header
+    // Top Bar and Header
     basicPosBadge: 'BASIC POS (ไม่ต้องล็อกอิน)',
     todayParties: 'ปาร์ตี้วันนี้:',
     rounds: 'รอบ',
@@ -80,11 +80,17 @@ export const basicPosTranslations = {
     unitPrice: 'ราคา',
     outOfStock: 'หมด',
     addToOrder: 'สั่ง',
+    orderThisItem: 'สั่งรายการนี้',
+    noMenuConfigured: 'ยังไม่มีเมนู (เพิ่มได้ในหน้า Admin)',
+    menuNotFound: 'ไม่พบเมนู',
 
     // Order Summary Column
     orderTitle: 'สรุปออเดอร์',
+    itemsCount: 'รายการ',
     noItemsInOrder: 'ยังไม่มีรายการอาหาร',
     totalFoodPrice: 'รวมค่าอาหาร:',
+    foodAndDrinks: 'อาหาร / เครื่องดื่ม',
+    assignBill: 'ระบุเจ้าบิล',
     grandTotal: 'ยอดรวมทั้งสิ้น',
     btnConfirmOrder: 'ยืนยันออเดอร์',
     btnUpdateOrder: 'อัปเดตออเดอร์',
@@ -92,10 +98,53 @@ export const basicPosTranslations = {
     closePartyDirect: 'ปิดปาร์ตี้ทันที',
     orderStatusActive: 'กำลังเล่น',
     orderStatusPaid: 'ชำระแล้ว',
+    remainingDue: 'ยอดค้างชำระ',
+
+    // Additional UI Elements
+    saving: 'กำลังบันทึก...',
+    cancelParty: 'ยกเลิกตี้',
+    closePos: 'ปิดหน้า POS',
+    totalAmount: 'ยอดรวม',
+    free: 'ฟรี',
+    gamePriceLabel: 'ค่าเกม',
+    payBillBtn: 'ชำระเงิน',
+    orderModalTitle: 'สั่งให้ลูกค้าคนไหน?',
+    orderModalSubtitle: 'เลือกผู้สั่งเพื่อคิดบิลรายบุคคล หรือสั่งรวมทั้งโต๊ะ',
+    memberLabel: 'สมาชิก',
+    orderModalStartPrice: 'ราคาเริ่มต้น',
+    selectCustomerInParty: 'เลือกลูกค้าในตี้',
+    orderForTable: 'สั่งรวมทั้งโต๊ะ',
+    orderFor: 'สั่งให้:',
+    pleaseSelectCustomer: '* กรุณาเลือกคนที่สั่ง',
+    wholeTable: 'ทั้งโต๊ะ (สั่งรวม)',
+    splitBillCommon: 'หารบิลกลาง',
+    addonsTitle: 'ตัวเลือกเพิ่มเติม (Add-on)',
+    noteTitle: 'หมายเหตุ',
+    optional: '(ถ้ามี)',
+    orderNotePlaceholder: 'เช่น ไม่ใส่ผัก, เผ็ดน้อย, แยกน้ำแข็ง...',
+    qtyTitle: 'จำนวน',
+    totalItemsCount: 'ยอดรวม',
+    pleaseSelectCustomerBtn: 'กรุณาเลือกลูกค้าที่สั่งอาหาร',
+    orderForBtn: 'สั่งให้',
+    noMembersNotice: 'ยังไม่มีสมาชิกในปาร์ตี้นี้ (ระบบจะบันทึกเป็นบิลรวมทั้งโต๊ะ)',
+    btnClear: 'ล้าง',
+    btnDone: 'เสร็จ',
+    allPaid: 'ทุกคนจ่ายครบแล้ว',
+    tableFinished: 'ตี้นี้เล่นเสร็จแล้ว',
+    paidAmount: 'จ่ายแล้ว',
+    unpaidAmount: 'ค้าง',
+    groupPay: 'รวมบิลจ่ายกัน',
+    selectGroupPayMembers: 'เลือกสมาชิกที่จ่ายรวมกัน',
+    readOnlyNotice: 'ดูอย่างเดียว',
+    ownerDmPrefix: 'DM เจ้าของตี้:',
+    canAcceptOrdersNotice: 'คุณกดรับออเดอร์ได้',
+    cancelConfirmPrompt: 'ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR',
+    cancelSuccess: 'ยกเลิกตี้แล้ว',
+    cancelFailed: 'ยกเลิกล้มเหลว',
   },
 
   en: {
-    // Top Bar & Header
+    // Top Bar and Header
     basicPosBadge: 'BASIC POS (No Login Required)',
     todayParties: "Today's Parties:",
     rounds: 'rounds',
@@ -172,11 +221,17 @@ export const basicPosTranslations = {
     unitPrice: 'Price',
     outOfStock: 'Out of Stock',
     addToOrder: 'Add',
+    orderThisItem: 'Order this item',
+    noMenuConfigured: 'No menu items configured',
+    menuNotFound: 'Menu item not found',
 
     // Order Summary Column
     orderTitle: 'Order Summary',
+    itemsCount: 'items',
     noItemsInOrder: 'No food items ordered',
     totalFoodPrice: 'Total Food:',
+    foodAndDrinks: 'Food / Beverages',
+    assignBill: 'Assign to Member',
     grandTotal: 'Grand Total',
     btnConfirmOrder: 'Confirm Order',
     btnUpdateOrder: 'Update Order',
@@ -184,10 +239,53 @@ export const basicPosTranslations = {
     closePartyDirect: 'Close Party Now',
     orderStatusActive: 'Active',
     orderStatusPaid: 'Paid',
+    remainingDue: 'Remaining Due',
+
+    // Additional UI Elements
+    saving: 'Saving...',
+    cancelParty: 'Cancel Party',
+    closePos: 'Close POS',
+    totalAmount: 'Total',
+    free: 'Free',
+    gamePriceLabel: 'Game Fee',
+    payBillBtn: 'Pay Bill',
+    orderModalTitle: 'Who is ordering?',
+    orderModalSubtitle: 'Select player for individual bill, or order for whole table',
+    memberLabel: 'Member',
+    orderModalStartPrice: 'Starting Price',
+    selectCustomerInParty: 'Select player in party',
+    orderForTable: 'Order for table',
+    orderFor: 'Order for:',
+    pleaseSelectCustomer: '* Please select player',
+    wholeTable: 'Whole Table (Shared)',
+    splitBillCommon: 'Split evenly',
+    addonsTitle: 'Add-ons',
+    noteTitle: 'Note',
+    optional: '(Optional)',
+    orderNotePlaceholder: 'e.g. no veggies, less spicy, separate ice...',
+    qtyTitle: 'Quantity',
+    totalItemsCount: 'Total',
+    pleaseSelectCustomerBtn: 'Please select customer',
+    orderForBtn: 'Order for',
+    noMembersNotice: 'No members in this party yet (will record as shared table order)',
+    btnClear: 'Clear',
+    btnDone: 'Done',
+    allPaid: 'All Paid',
+    tableFinished: 'Party Completed',
+    paidAmount: 'Paid',
+    unpaidAmount: 'Due',
+    groupPay: 'Group Pay',
+    selectGroupPayMembers: 'Select members paying together',
+    readOnlyNotice: 'Read Only',
+    ownerDmPrefix: 'Table DM:',
+    canAcceptOrdersNotice: 'You can accept food orders',
+    cancelConfirmPrompt: 'Confirm cancel this party? Players will be redirected to QR page.',
+    cancelSuccess: 'Party cancelled',
+    cancelFailed: 'Cancel failed',
   },
 
   zh: {
-    // Top Bar & Header
+    // Top Bar and Header
     basicPosBadge: '简易 POS (无需登录)',
     todayParties: '今日场次:',
     rounds: '场',
@@ -264,11 +362,17 @@ export const basicPosTranslations = {
     unitPrice: '单价',
     outOfStock: '已售罄',
     addToOrder: '点单',
+    orderThisItem: '点此餐品',
+    noMenuConfigured: '暂未配置菜单 (可在Admin后台添加)',
+    menuNotFound: '未找到相关餐品',
 
     // Order Summary Column
     orderTitle: '订单明细',
+    itemsCount: '项',
     noItemsInOrder: '暂未点餐',
     totalFoodPrice: '餐品总计:',
+    foodAndDrinks: '餐饮酒水',
+    assignBill: '指定付款人',
     grandTotal: '应付总金额',
     btnConfirmOrder: '确认订单',
     btnUpdateOrder: '更新订单',
@@ -276,5 +380,220 @@ export const basicPosTranslations = {
     closePartyDirect: '立即结单',
     orderStatusActive: '进行中',
     orderStatusPaid: '已支付',
+    remainingDue: '剩余待付',
+
+    // Additional UI Elements
+    saving: '正在保存...',
+    cancelParty: '取消本桌',
+    closePos: '关闭POS',
+    totalAmount: '合计',
+    free: '免费',
+    gamePriceLabel: '剧本游戏费',
+    payBillBtn: '结账付款',
+    orderModalTitle: '为哪位玩家点餐?',
+    orderModalSubtitle: '选择具体玩家单独记账，或全桌公点',
+    memberLabel: '成员',
+    orderModalStartPrice: '起步价',
+    selectCustomerInParty: '选择点餐玩家',
+    orderForTable: '整桌共同点餐',
+    orderFor: '为TA点餐:',
+    pleaseSelectCustomer: '* 请选择点餐玩家',
+    wholeTable: '全桌公用 (合点)',
+    splitBillCommon: '均摊AA',
+    addonsTitle: '加料与规格 (Add-on)',
+    noteTitle: '备注',
+    optional: '(选填)',
+    orderNotePlaceholder: '例如: 免葱香菜、微辣、冰块分装...',
+    qtyTitle: '数量',
+    totalItemsCount: '小计',
+    pleaseSelectCustomerBtn: '请选择点餐玩家',
+    orderForBtn: '确认点餐',
+    noMembersNotice: '此桌暂无成员 (将记为整桌公点)',
+    btnClear: '清除',
+    btnDone: '完成',
+    allPaid: '全员已付清',
+    tableFinished: '本桌已结束',
+    paidAmount: '已付',
+    unpaidAmount: '待付',
+    groupPay: '合单付款',
+    selectGroupPayMembers: '勾选合单付款成员',
+    readOnlyNotice: '仅查看模式',
+    ownerDmPrefix: '本桌主持DM:',
+    canAcceptOrdersNotice: '您可协助点单',
+    cancelConfirmPrompt: '确认取消此桌派对? 玩家将返回扫码页面。',
+    cancelSuccess: '已成功取消本桌',
+    cancelFailed: '取消失败',
   },
+}
+
+// Category translation mappings
+export const categoryTranslations = {
+  'ของว่าง': { th: 'ของว่าง', en: 'Snacks', zh: '小吃点心' },
+  'เครื่องดื่มแช่เย็น': { th: 'เครื่องดื่มแช่เย็น', en: 'Cold Drinks', zh: '冰镇饮料' },
+  'เครื่องดื่มชง': { th: 'เครื่องดื่มชง', en: 'Crafted Drinks', zh: '现调饮品' },
+  'ม็อกเทล': { th: 'ม็อกเทล', en: 'Mocktails', zh: '特调无酒精' },
+  'กาแฟ': { th: 'กาแฟ', en: 'Coffee', zh: '咖啡系列' },
+  'ของหวาน': { th: 'ของหวาน', en: 'Desserts', zh: '甜品点心' },
+  'อาหารจานเดี่ยว': { th: 'อาหารจานเดี่ยว', en: 'Single Dishes', zh: '主食简餐' },
+  'อาหารจานเดียว': { th: 'อาหารจานเดียว', en: 'Single Dishes', zh: '主食简餐' },
+  'กับข้าว': { th: 'กับข้าว', en: 'Side Dishes', zh: '特色炒菜' },
+  'แอลกอฮอล์': { th: 'แอลกอฮอล์', en: 'Alcohol', zh: '酒类饮品' },
+  'ทั้งหมด': { th: 'ทั้งหมด', en: 'All Categories', zh: '全部品类' },
+  'อื่นๆ': { th: 'อื่นๆ', en: 'Others', zh: '其他' },
+}
+
+// Menu item name translation dictionary
+export const menuItemTranslations = {
+  // Snacks
+  'นักเก๊ต': { th: 'นักเก๊ต', en: 'Chicken Nuggets', zh: '麦乐鸡块' },
+  'มาม่าคัพ': { th: 'มาม่าคัพ', en: 'Cup Noodles', zh: '杯装泡面' },
+  'เฟรนช์ฟรายส์': { th: 'เฟรนช์ฟรายส์', en: 'French Fries', zh: '炸薯条' },
+  'ไก่ทอดไร้กระดูก': { th: 'ไก่ทอดไร้กระดูก', en: 'Boneless Fried Chicken', zh: '无骨炸鸡' },
+  'ไก่ป็อป': { th: 'ไก่ป็อป', en: 'Popcorn Chicken', zh: '鸡米花' },
+
+  // Cold Drinks
+  'ชเวปส์มะนาว': { th: 'ชเวปส์มะนาว', en: 'Schweppes Lime Soda', zh: '怡泉柠檬汽水' },
+  'น้ำเปล่า': { th: 'น้ำเปล่า', en: 'Drinking Water', zh: '纯净水' },
+  'น้ำแข็งแก้ว': { th: 'น้ำแข็งแก้ว', en: 'Cup of Ice', zh: '冰块杯' },
+  'มอนสเตอร์ขาว': { th: 'มอนสเตอร์ขาว', en: 'Monster Ultra (White)', zh: '魔爪白罐无糖' },
+  'มอนสเตอร์ดำ': { th: 'มอนสเตอร์ดำ', en: 'Monster Energy (Black)', zh: '魔爪黑罐原味' },
+  'สไปร์ท': { th: 'สไปร์ท', en: 'Sprite', zh: '雪碧' },
+  'สไปร์ท ซีโร่': { th: 'สไปร์ท ซีโร่', en: 'Sprite Zero', zh: '零度雪碧' },
+  'แฟนต้าน้ำส้ม': { th: 'แฟนต้าน้ำส้ม', en: 'Fanta Orange', zh: '芬达橙味' },
+  'แฟนต้าน้ำองุ่น': { th: 'แฟนต้าน้ำองุ่น', en: 'Fanta Grape', zh: '芬达葡萄味' },
+  'แฟนต้าน้ำเขียว': { th: 'แฟนต้าน้ำเขียว', en: 'Fanta Green Soda', zh: '芬达绿苹果味' },
+  'แฟนต้าน้ำแดง': { th: 'แฟนต้าน้ำแดง', en: 'Fanta Red Soda', zh: '芬达草莓味' },
+  'โค้ก': { th: 'โค้ก', en: 'Coca-Cola', zh: '可口可乐' },
+  'โค้กไม่มีกาแฟอีน': { th: 'โค้กไม่มีกาแฟอีน', en: 'Coke Caffeine-Free', zh: '无咖啡因可乐' },
+  'โค้กไม่มีน้ำตาล': { th: 'โค้กไม่มีน้ำตาล', en: 'Coke Zero Sugar', zh: '无糖可乐' },
+
+  // Crafted Teas and Drinks
+  'Mystery Drink ?': { th: 'Mystery Drink ?', en: 'Mystery Drink ?', zh: '盲盒特调饮品 ?' },
+  'ชาพีช': { th: 'ชาพีช', en: 'Peach Tea', zh: '水蜜桃冰茶' },
+  'ชามะนาว': { th: 'ชามะนาว', en: 'Lemon Iced Tea', zh: '柠檬红茶' },
+  'ชาลิ้นจี่ (หวานน้อย)': { th: 'ชาลิ้นจี่ (หวานน้อย)', en: 'Lychee Tea (Less Sweet)', zh: '荔枝红茶 (微糖)' },
+  'ชาลิ้นจี่': { th: 'ชาลิ้นจี่', en: 'Lychee Tea', zh: '荔枝红茶' },
+  'ชาเขียว': { th: 'ชาเขียว', en: 'Green Tea', zh: '日式绿茶' },
+  'ชาไทย': { th: 'ชาไทย', en: 'Thai Iced Tea', zh: '泰式奶茶' },
+  'อิตาเลี่ยนโซดา (เลือกไซรัป)': { th: 'อิตาเลี่ยนโซดา (เลือกไซรัป)', en: 'Italian Soda (Choice of Syrup)', zh: '意式苏打气泡饮 (自选糖浆)' },
+  'โกโก้': { th: 'โกโก้', en: 'Cocoa', zh: '浓香可可' },
+  'ช็อกโกแลต': { th: 'ช็อกโกแลต', en: 'Hot Chocolate', zh: '热巧克力' },
+  'นมช็อคโกแลต': { th: 'นมช็อคโกแลต', en: 'Chocolate Milk', zh: '巧克力牛奶' },
+  'นมเปรี้ยว': { th: 'นมเปรี้ยว', en: 'Drinking Yogurt', zh: '酸奶乳饮料' },
+  'Dream Night': { th: 'Dream Night', en: 'Dream Night Mocktail', zh: '梦幻之夜特调' },
+  'Sour Bomb': { th: 'Sour Bomb', en: 'Sour Bomb Mocktail', zh: '酸味炸弹特调' },
+
+  // Coffee
+  'กาแฟโบราณ': { th: 'กาแฟโบราณ', en: 'Traditional Coffee', zh: '泰式传统咖啡' },
+  'คาปูชิโน่': { th: 'คาปูชิโน่', en: 'Cappuccino', zh: '卡布奇诺' },
+  'คาปูชิโน': { th: 'คาปูชิโน', en: 'Cappuccino', zh: '卡布奇诺' },
+  'มอคค่า': { th: 'มอคค่า', en: 'Mocha', zh: '摩卡咖啡' },
+  'ลาเต้': { th: 'ลาเต้', en: 'Latte', zh: '拿铁咖啡' },
+  'อเมริกาโน่': { th: 'อเมริกาโน่', en: 'Americano', zh: '美式咖啡' },
+  'อเมริกาโน': { th: 'อเมริกาโน', en: 'Americano', zh: '美式咖啡' },
+  'เอสเปรสโซ่': { th: 'เอสเปรสโซ่', en: 'Espresso', zh: '意式浓缩' },
+  'เอสเพรสโซ': { th: 'เอสเพรสโซ', en: 'Espresso', zh: '意式浓缩' },
+
+  // Desserts
+  'ไอศกรีมมะนาว': { th: 'ไอศกรีมมะนาว', en: 'Lime Ice Cream', zh: '青柠冰淇淋' },
+  'ไอศกรีมวนิลา': { th: 'ไอศกรีมวนิลา', en: 'Vanilla Ice Cream', zh: '香草冰淇淋' },
+
+  // Rice and Main Dishes
+  'ข้าวกะเพรา หมู,ไก่': { th: 'ข้าวกะเพรา หมู,ไก่', en: 'Holy Basil Rice (Pork/Chicken)', zh: '打抛碎肉盖饭 (猪肉/鸡肉)' },
+  'ข้าวกะเพรา เนื้อ,หมูกรอบ': { th: 'ข้าวกะเพรา เนื้อ,หมูกรอบ', en: 'Holy Basil Rice (Beef/Crispy Pork)', zh: '打抛盖饭 (牛肉/脆皮五花)' },
+  'ข้าวกะเพราทะเล': { th: 'ข้าวกะเพราทะเล', en: 'Holy Basil Seafood Rice', zh: '打抛海鲜盖饭' },
+  'ข้าวกะเพราหมูสับ': { th: 'ข้าวกะเพราหมูสับ', en: 'Basil Minced Pork Rice', zh: '打抛碎猪肉盖饭' },
+  'ข้าวกะเพราไก่': { th: 'ข้าวกะเพราไก่', en: 'Basil Chicken Rice', zh: '打抛鸡肉盖饭' },
+  'ข้าวคอหมูย่าง': { th: 'ข้าวคอหมูย่าง', en: 'Grilled Pork Neck Rice', zh: '泰式烤猪颈肉盖饭' },
+  'ข้าวทอดกระเทียม หมู,ไก่': { th: 'ข้าวทอดกระเทียม หมู,ไก่', en: 'Garlic Rice (Pork/Chicken)', zh: '蒜香炸肉盖饭 (猪肉/鸡肉)' },
+  'ข้าวทอดกระเทียม เนื้อ,หมูกรอบ': { th: 'ข้าวทอดกระเทียม เนื้อ,หมูกรอบ', en: 'Garlic Rice (Beef/Crispy Pork)', zh: '蒜香盖饭 (牛肉/脆皮五花)' },
+  'ข้าวผัด กุนเชียง,แหนม,คอหมูย่าง,เบค่อน,เนื้อ,หมูกรอบ': { th: 'ข้าวผัด กุนเชียง,แหนม,คอหมูย่าง,เบค่อน,เนื้อ,หมูกรอบ', en: 'Special Fried Rice (Sausage/Pork/Beef/Crispy Pork)', zh: '特色炒饭 (腊肠/酸肉/猪颈肉/牛肉/脆皮五花)' },
+  'ข้าวผัด หมู,ไก่': { th: 'ข้าวผัด หมู,ไก่', en: 'Fried Rice (Pork/Chicken)', zh: '经典炒饭 (猪肉/鸡肉)' },
+  'ข้าวผัดหมู': { th: 'ข้าวผัดหมู', en: 'Pork Fried Rice', zh: '猪肉炒饭' },
+  'ข้าวผัดไก่': { th: 'ข้าวผัดไก่', en: 'Chicken Fried Rice', zh: '鸡肉炒饭' },
+  'ข้าวผัดทะเล': { th: 'ข้าวผัดทะเล', en: 'Seafood Fried Rice', zh: '海鲜炒饭' },
+  'ข้าวผัดแกงเขียวหวาน หมู,ไก่': { th: 'ข้าวผัดแกงเขียวหวาน หมู,ไก่', en: 'Green Curry Fried Rice (Pork/Chicken)', zh: '绿咖喱炒饭 (猪肉/鸡肉)' },
+  'ข้าวผัดแกงเขียวหวาน เนื้อ,หมูกรอบ': { th: 'ข้าวผัดแกงเขียวหวาน เนื้อ,หมูกรอบ', en: 'Green Curry Fried Rice (Beef/Crispy Pork)', zh: '绿咖喱炒饭 (牛肉/脆皮五花)' },
+  'ข้าวผัดแกงเขียวหวานทะเล': { th: 'ข้าวผัดแกงเขียวหวานทะเล', en: 'Green Curry Seafood Fried Rice', zh: '绿咖喱海鲜炒饭' },
+  'ข้าวราดผัดน้ำมันหอย หมู,ไก่': { th: 'ข้าวราดผัดน้ำมันหอย หมู,ไก่', en: 'Oyster Sauce Stir-Fry on Rice (Pork/Chicken)', zh: '蚝油炒肉盖饭 (猪肉/鸡肉)' },
+  'ข้าวราดผัดน้ำมันหอย เนื้อ,หมูกรอบ': { th: 'ข้าวราดผัดน้ำมันหอย เนื้อ,หมูกรอบ', en: 'Oyster Sauce Stir-Fry on Rice (Beef/Crispy Pork)', zh: '蚝油盖饭 (牛肉/脆皮五花)' },
+  'ข้าวราดผัดน้ำมันหอยทะเล': { th: 'ข้าวราดผัดน้ำมันหอยทะเล', en: 'Oyster Sauce Seafood on Rice', zh: '蚝油海鲜盖饭' },
+  'ข้าวราดผัดพริกเผา หมู,ไก่': { th: 'ข้าวราดผัดพริกเผา หมู,ไก่', en: 'Chili Paste Stir-Fry on Rice (Pork/Chicken)', zh: '辣椒酱炒肉盖饭 (猪肉/鸡肉)' },
+  'ข้าวราดผัดพริกเผา เนื้อ,หมูกรอบ': { th: 'ข้าวราดผัดพริกเผา เนื้อ,หมูกรอบ', en: 'Chili Paste Stir-Fry on Rice (Beef/Crispy Pork)', zh: '辣椒酱盖饭 (牛肉/脆皮五花)' },
+  'ข้าวราดผัดพริกเผาทะเล': { th: 'ข้าวราดผัดพริกเผาทะเล', en: 'Chili Paste Seafood on Rice', zh: '辣椒酱海鲜盖饭' },
+  'ข้าวไข่เจียว': { th: 'ข้าวไข่เจียว', en: 'Thai Omelet on Rice', zh: '泰式煎蛋盖饭' },
+  'ข้าวไข่เจียวกุ้งสับ': { th: 'ข้าวไข่เจียวกุ้งสับ', en: 'Minced Shrimp Omelet on Rice', zh: '虾仁煎蛋盖饭' },
+  'ข้าวไข่เจียวหมูสับ': { th: 'ข้าวไข่เจียวหมูสับ', en: 'Minced Pork Omelet on Rice', zh: '肉末煎蛋盖饭' },
+  'ข้าวไข่เจียวเนื้อสับ': { th: 'ข้าวไข่เจียวเนื้อสับ', en: 'Minced Beef Omelet on Rice', zh: '牛肉碎煎蛋盖饭' },
+  'ข้าวไข่เจียวแหนม': { th: 'ข้าวไข่เจียวแหนม', en: 'Sour Pork Omelet on Rice', zh: '酸肉煎蛋盖饭' },
+  'ข้าวมันไก่': { th: 'ข้าวมันไก่', en: 'Hainanese Chicken Rice', zh: '海南鸡饭' },
+
+  // Noodles
+  'ผัดซีอิ๊ว หมู,ไก่': { th: 'ผัดซีอิ๊ว หมู,ไก่', en: 'Pad See Ew (Pork/Chicken)', zh: '泰式炒河粉 (猪肉/鸡肉)' },
+  'ผัดซีอิ๊ว เนื้อ,หมูกรอบ': { th: 'ผัดซีอิ๊ว เนื้อ,หมูกรอบ', en: 'Pad See Ew (Beef/Crispy Pork)', zh: '泰式炒河粉 (牛肉/脆皮五花)' },
+  'ผัดซีอิ๊วทะเล': { th: 'ผัดซีอิ๊วทะเล', en: 'Seafood Pad See Ew', zh: '海鲜泰式炒河粉' },
+  'ผัดไทย หมู,ไก่': { th: 'ผัดไทย หมู,ไก่', en: 'Pad Thai (Pork/Chicken)', zh: '泰式炒金边粉 (猪肉/鸡肉)' },
+  'ผัดไทย เนื้อ,หมูกรอบ': { th: 'ผัดไทย เนื้อ,หมูกรอบ', en: 'Pad Thai (Beef/Crispy Pork)', zh: '泰式炒金边粉 (牛肉/脆皮五花)' },
+  'ผัดไทยทะเล': { th: 'ผัดไทยทะเล', en: 'Seafood Pad Thai', zh: '海鲜泰式炒金边粉' },
+  'สุกี้แห้ง หมู,ไก่': { th: 'สุกี้แห้ง หมู,ไก่', en: 'Dry Suki (Pork/Chicken)', zh: '泰式干炒寿喜粉 (猪肉/鸡肉)' },
+  'สุกี้แห้ง เนื้อ,หมูกรอบ': { th: 'สุกี้แห้ง เนื้อ,หมูกรอบ', en: 'Dry Suki (Beef/Crispy Pork)', zh: '泰式干炒寿喜粉 (牛肉/脆皮五花)' },
+  'สุกี้แห้งทะเล': { th: 'สุกี้แห้งทะเล', en: 'Seafood Dry Suki', zh: '海鲜泰式干炒寿喜粉' },
+
+  // Rice Side
+  'ข้าวเปล่า': { th: 'ข้าวเปล่า', en: 'Steamed Rice', zh: '白米饭' },
+  'ข้าวเหนียว': { th: 'ข้าวเหนียว', en: 'Sticky Rice', zh: '糯米饭' },
+
+  // Side Dishes
+  'คอหมูย่าง': { th: 'คอหมูย่าง', en: 'Grilled Pork Neck', zh: '泰式烤猪颈肉' },
+  'น้ำตก': { th: 'น้ำตก', en: 'Nam Tok Spicy Pork', zh: '瀑布烤肉沙拉' },
+  'ลาบ': { th: 'ลาบ', en: 'Larb Spicy Meat Salad', zh: '泰式肉末碎' },
+
+  // Beers and Alcohol
+  'Budweiser': { th: 'Budweiser', en: 'Budweiser', zh: '百威啤酒' },
+  'Hoegaarden Rose': { th: 'Hoegaarden Rose', en: 'Hoegaarden Rose', zh: '福佳红玫瑰啤酒' },
+  'Soju Green Apple': { th: 'Soju Green Apple', en: 'Green Apple Soju', zh: '青苹果真露烧酒' },
+  'Soju Green Grape': { th: 'Soju Green Grape', en: 'Green Grape Soju', zh: '青葡萄真露烧酒' },
+  'Soju Lychee': { th: 'Soju Lychee', en: 'Lychee Soju', zh: '荔枝真露烧酒' },
+  'Soju Peach': { th: 'Soju Peach', en: 'Peach Soju', zh: '水蜜桃真露烧酒' },
+  'Soju Yogurt': { th: 'Soju Yogurt', en: 'Yogurt Soju', zh: '乳酸菌原味烧酒' },
+  'ค่าเปิดขวด L': { th: 'ค่าเปิดขวด L', en: 'Corkage Fee (L)', zh: '开瓶费 (大瓶)' },
+  'ค่าเปิดขวด S': { th: 'ค่าเปิดขวด S', en: 'Corkage Fee (S)', zh: '开瓶费 (小瓶)' },
+  'โปรโซจู 3 ขวด': { th: 'โปรโซจู 3 ขวด', en: 'Soju Promo (3 Bottles)', zh: '真露烧酒 3瓶特惠套餐' },
+  'เบียร์สิงห์': { th: 'เบียร์สิงห์', en: 'Singha Beer', zh: '胜狮啤酒' },
+  'เบียร์ช้าง': { th: 'เบียร์ช้าง', en: 'Chang Beer', zh: '大象啤酒' },
+  'เบียร์ลีโอ': { th: 'เบียร์ลีโอ', en: 'Leo Beer', zh: '豹牌啤酒' },
+  'ไฮเนเก้น': { th: 'ไฮเนเก้น', en: 'Heineken', zh: '喜力啤酒' },
+}
+
+// Addon translation mappings
+export const addonTranslations = {
+  'ซอสทรัฟเฟิล': { th: 'ซอสทรัฟเฟิล', en: 'Truffle Sauce', zh: '松露酱' },
+  'ไข่ดาว': { th: 'ไข่ดาว', en: 'Fried Egg', zh: '荷包蛋' },
+  'ไข่เจียว': { th: 'ไข่เจียว', en: 'Omelet', zh: '泰式煎蛋' },
+  'พิเศษ': { th: 'พิเศษ', en: 'Extra / Special', zh: '大份 / 加量' },
+  'ธรรมดา': { th: 'ธรรมดา', en: 'Regular', zh: '普通份' },
+  'เผ็ดน้อย': { th: 'เผ็ดน้อย', en: 'Less Spicy', zh: '微辣' },
+  'เผ็ดมาก': { th: 'เผ็ดมาก', en: 'Extra Spicy', zh: '特辣' },
+  'ไม่เผ็ด': { th: 'ไม่เผ็ด', en: 'Not Spicy', zh: '不辣' },
+  'ไม่ใส่ผัก': { th: 'ไม่ใส่ผัก', en: 'No Veggies', zh: '免蔬菜' },
+  'แยกน้ำแข็ง': { th: 'แยกน้ำแข็ง', en: 'Separate Ice', zh: '冰块分装' },
+  'หวานน้อย': { th: 'หวานน้อย', en: 'Less Sweet', zh: '微糖' },
+  'ไม่หวาน': { th: 'ไม่หวาน', en: 'Unsweetened', zh: '无糖' },
+}
+
+export function translateCategory(cat, lang = 'th') {
+  if (!cat) return ''
+  return categoryTranslations[cat]?.[lang] || categoryTranslations[cat]?.th || cat
+}
+
+export function translateMenuItem(name, lang = 'th') {
+  if (!name) return ''
+  const trimmed = name.trim()
+  return menuItemTranslations[trimmed]?.[lang] || menuItemTranslations[trimmed]?.th || name
+}
+
+export function translateAddon(name, lang = 'th') {
+  if (!name) return ''
+  const trimmed = name.trim()
+  return addonTranslations[trimmed]?.[lang] || addonTranslations[trimmed]?.th || name
 }
