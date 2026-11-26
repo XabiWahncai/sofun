@@ -1,0 +1,280 @@
+// Multi-Language Dictionary for Basic POS (TH, EN, ZH)
+// Strictly zero emojis and zero em-dashes to satisfy scripts/check_no_emoji.py
+
+export const basicPosTranslations = {
+  th: {
+    // Top Bar & Header
+    basicPosBadge: 'BASIC POS (ไม่ต้องล็อกอิน)',
+    todayParties: 'ปาร์ตี้วันนี้:',
+    rounds: 'รอบ',
+    soundOn: 'เสียงเตือน (5วิ)',
+    soundMuted: 'ปิดเสียง',
+    soundTitleActive: 'เสียงเตือนเปิดอยู่ (ดังทุก 5 วินาทีเมื่อมีออเดอร์ใหม่)',
+    soundTitleMuted: 'คลิกเพื่อเปิดเสียงแจ้งเตือนออเดอร์',
+    printerPrimary: 'เครื่องปริ้นหลัก ON',
+    printerSet: 'ตั้งเป็นเครื่องปริ้น',
+    printerTitlePrimary: 'เครื่องนี้คือเครื่องปริ้นหลัก (รับงานปริ้นอัตโนมัติ)',
+    printerTitleSet: 'คลิกเพื่อตั้งเครื่องนี้เป็นเครื่องปริ้นหลัก',
+    newPartyTab: 'ปาร์ตี้ใหม่',
+    partyClosed: 'ปิดแล้ว',
+    partyOpen: 'เปิดอยู่',
+    tapToOpen: 'แตะเพื่อเปิด',
+    noOrdersToday: 'ยังไม่มีออเดอร์วันนี้',
+
+    // Session Close Confirm Modal
+    confirmCloseTitle: 'ยืนยันการปิดปาร์ตี้',
+    confirmCloseText: 'คุณต้องการปิดปาร์ตี้นี้จริงๆ ใช่หรือไม่?',
+    confirmCloseNotice: 'ออเดอร์และยอดเงินจะยังคงอยู่ในระบบ',
+    btnCancel: 'ยกเลิก',
+    btnConfirmClose: 'ยืนยันปิดปาร์ตี้',
+
+    // Mobile Tabs
+    tabMembers: 'สมาชิก',
+    tabMenu: 'เมนู',
+    tabOrder: 'สรุปออเดอร์',
+
+    // Lock / Edit Banner
+    viewOnlyMode: 'โหมดดูอย่างเดียว',
+    orderConfirmed: 'ยืนยันออเดอร์แล้ว',
+    editMode: 'โหมดแก้ไข',
+    btnEdit: 'แก้ไข',
+
+    // Members Column
+    membersTitle: 'สมาชิก',
+    peopleCount: 'คน',
+    addCustomerTitle: 'เพิ่มลูกค้า / ผู้เล่น',
+    addCustomerSub: 'พิมพ์ชื่อได้ทันที ไม่ต้องสแกน',
+    inputCustomerPlaceholder: 'พิมพ์ชื่อลูกค้า / ผู้เล่น...',
+    btnAdd: 'เพิ่ม',
+    quickPrefix: 'ด่วน:',
+    playerPrefix: 'ผู้เล่น',
+    noMembersYet: 'ยังไม่มีสมาชิก',
+    amountDue: 'ต้องจ่าย',
+    amountPaid: 'จ่ายแล้ว',
+    editName: 'แก้ไขชื่อผู้เล่น',
+    saveName: 'บันทึก',
+    removeMember: 'ลบสมาชิกออก',
+    confirmZero: 'ยืนยันยอด ฿0 (ไม่ต้องใช้สลิป)',
+    personalDiscount: 'ส่วนลดเพิ่มเติม / Topup (ลดราคาส่วนบุคคล)',
+    discountReasonPlaceholder: 'ชื่อ (เช่น Topup, คูปอง)',
+    currencyUnit: 'บาท',
+    paidCount: 'จ่ายแล้ว',
+    waitingEasySlip: 'รอตรวจ EasySlip',
+    checkSlip: 'ตรวจสลิป',
+    viewSlip: 'ดูสลิป',
+
+    // Game Section
+    gameSectionTitle: 'เกม',
+    chineseGameTitle: 'เกมจีน',
+    chineseDmBadge: 'DM จีน',
+    gamePricePerPerson: 'ราคาเกมต่อคน (฿)',
+    gamePriceInputPlaceholder: 'ระบุราคาเกมต่อคน เช่น 500...',
+    quickPriceLabel: 'ราคาด่วน:',
+    totalDuePerPerson: 'ราคาต้องจ่ายต่อคน:',
+    totalGamePrice: 'รวมค่าเกม:',
+
+    // Menu Column
+    menuTitle: 'อาหารและเครื่องดื่ม',
+    searchMenuPlaceholder: 'ค้นหาเมนู...',
+    allCategories: 'ทั้งหมด',
+    unitPrice: 'ราคา',
+    outOfStock: 'หมด',
+    addToOrder: 'สั่ง',
+
+    // Order Summary Column
+    orderTitle: 'สรุปออเดอร์',
+    noItemsInOrder: 'ยังไม่มีรายการอาหาร',
+    totalFoodPrice: 'รวมค่าอาหาร:',
+    grandTotal: 'ยอดรวมทั้งสิ้น',
+    btnConfirmOrder: 'ยืนยันออเดอร์',
+    btnUpdateOrder: 'อัปเดตออเดอร์',
+    btnPayBill: 'เช็คบิล / ชำระเงิน',
+    closePartyDirect: 'ปิดปาร์ตี้ทันที',
+    orderStatusActive: 'กำลังเล่น',
+    orderStatusPaid: 'ชำระแล้ว',
+  },
+
+  en: {
+    // Top Bar & Header
+    basicPosBadge: 'BASIC POS (No Login Required)',
+    todayParties: "Today's Parties:",
+    rounds: 'rounds',
+    soundOn: 'Alert Sound (5s)',
+    soundMuted: 'Muted',
+    soundTitleActive: 'Order sound alert is active (plays every 5s on new order)',
+    soundTitleMuted: 'Click to enable order alert sound',
+    printerPrimary: 'Primary Printer ON',
+    printerSet: 'Set as Printer',
+    printerTitlePrimary: 'This device is primary printer (auto print)',
+    printerTitleSet: 'Click to set this device as primary printer',
+    newPartyTab: 'New Party',
+    partyClosed: 'Closed',
+    partyOpen: 'Open',
+    tapToOpen: 'Tap to open',
+    noOrdersToday: 'No orders today',
+
+    // Session Close Confirm Modal
+    confirmCloseTitle: 'Confirm Close Party',
+    confirmCloseText: 'Are you sure you want to close this party?',
+    confirmCloseNotice: 'Orders and payments will remain in the system',
+    btnCancel: 'Cancel',
+    btnConfirmClose: 'Confirm Close',
+
+    // Mobile Tabs
+    tabMembers: 'Members',
+    tabMenu: 'Menu',
+    tabOrder: 'Order Summary',
+
+    // Lock / Edit Banner
+    viewOnlyMode: 'View Only Mode',
+    orderConfirmed: 'Order Confirmed',
+    editMode: 'Edit Mode',
+    btnEdit: 'Edit',
+
+    // Members Column
+    membersTitle: 'Members',
+    peopleCount: 'people',
+    addCustomerTitle: 'Add Customer / Player',
+    addCustomerSub: 'Type name directly, no scan required',
+    inputCustomerPlaceholder: 'Type player name...',
+    btnAdd: 'Add',
+    quickPrefix: 'Quick:',
+    playerPrefix: 'Player',
+    noMembersYet: 'No members yet',
+    amountDue: 'Due',
+    amountPaid: 'Paid',
+    editName: 'Edit player name',
+    saveName: 'Save',
+    removeMember: 'Remove Member',
+    confirmZero: 'Confirm 0 THB (No slip needed)',
+    personalDiscount: 'Personal Discount / Topup',
+    discountReasonPlaceholder: 'Note (e.g. Topup, Coupon)',
+    currencyUnit: 'THB',
+    paidCount: 'Paid',
+    waitingEasySlip: 'Waiting EasySlip',
+    checkSlip: 'Check Slip',
+    viewSlip: 'View Slip',
+
+    // Game Section
+    gameSectionTitle: 'Game',
+    chineseGameTitle: 'Chinese Script Game',
+    chineseDmBadge: 'Chinese DM',
+    gamePricePerPerson: 'Game Price / Person (฿)',
+    gamePriceInputPlaceholder: 'Enter price per person e.g. 500...',
+    quickPriceLabel: 'Quick Prices:',
+    totalDuePerPerson: 'Due per Person:',
+    totalGamePrice: 'Total Game Fee:',
+
+    // Menu Column
+    menuTitle: 'Food and Beverages',
+    searchMenuPlaceholder: 'Search menu...',
+    allCategories: 'All',
+    unitPrice: 'Price',
+    outOfStock: 'Out of Stock',
+    addToOrder: 'Add',
+
+    // Order Summary Column
+    orderTitle: 'Order Summary',
+    noItemsInOrder: 'No food items ordered',
+    totalFoodPrice: 'Total Food:',
+    grandTotal: 'Grand Total',
+    btnConfirmOrder: 'Confirm Order',
+    btnUpdateOrder: 'Update Order',
+    btnPayBill: 'Checkout / Pay',
+    closePartyDirect: 'Close Party Now',
+    orderStatusActive: 'Active',
+    orderStatusPaid: 'Paid',
+  },
+
+  zh: {
+    // Top Bar & Header
+    basicPosBadge: '简易 POS (无需登录)',
+    todayParties: '今日场次:',
+    rounds: '场',
+    soundOn: '提示音 (5秒)',
+    soundMuted: '静音',
+    soundTitleActive: '新订单提示音已开启 (每5秒提醒一次)',
+    soundTitleMuted: '点击开启新订单提示音',
+    printerPrimary: '主打印机开启',
+    printerSet: '设为主打印机',
+    printerTitlePrimary: '本机为主打印机 (自动出单)',
+    printerTitleSet: '点击设为本机打印机',
+    newPartyTab: '新建派对',
+    partyClosed: '已结单',
+    partyOpen: '进行中',
+    tapToOpen: '点击打开',
+    noOrdersToday: '今日暂无订单',
+
+    // Session Close Confirm Modal
+    confirmCloseTitle: '确认结单关闭',
+    confirmCloseText: '您确定要关闭该场次吗?',
+    confirmCloseNotice: '订单与支付记录将完整保存在系统中',
+    btnCancel: '取消',
+    btnConfirmClose: '确认关闭',
+
+    // Mobile Tabs
+    tabMembers: '成员',
+    tabMenu: '菜单',
+    tabOrder: '订单明细',
+
+    // Lock / Edit Banner
+    viewOnlyMode: '只读模式',
+    orderConfirmed: '订单已确认',
+    editMode: '编辑模式',
+    btnEdit: '编辑',
+
+    // Members Column
+    membersTitle: '成员列表',
+    peopleCount: '人',
+    addCustomerTitle: '添加顾客 / 玩家',
+    addCustomerSub: '直接输入姓名即可，无需扫码',
+    inputCustomerPlaceholder: '输入玩家姓名...',
+    btnAdd: '添加',
+    quickPrefix: '快捷:',
+    playerPrefix: '玩家',
+    noMembersYet: '暂无成员',
+    amountDue: '应付',
+    amountPaid: '已付',
+    editName: '修改玩家姓名',
+    saveName: '保存',
+    removeMember: '移除成员',
+    confirmZero: '确认 0 泰铢 (无需水单)',
+    personalDiscount: '个人额外折扣 / 充值抵扣',
+    discountReasonPlaceholder: '原因 (例如 充值抵扣, 优惠券)',
+    currencyUnit: '泰铢',
+    paidCount: '已付款',
+    waitingEasySlip: '等待查单',
+    checkSlip: '核对水单',
+    viewSlip: '查看水单',
+
+    // Game Section
+    gameSectionTitle: '剧本游戏',
+    chineseGameTitle: '中文剧本',
+    chineseDmBadge: '中文主持',
+    gamePricePerPerson: '每人游戏价格 (฿)',
+    gamePriceInputPlaceholder: '请输入每人价格 例如 500...',
+    quickPriceLabel: '快捷价格:',
+    totalDuePerPerson: '每人应付价格:',
+    totalGamePrice: '剧本费用小计:',
+
+    // Menu Column
+    menuTitle: '餐饮酒水',
+    searchMenuPlaceholder: '搜索餐品...',
+    allCategories: '全部',
+    unitPrice: '单价',
+    outOfStock: '已售罄',
+    addToOrder: '点单',
+
+    // Order Summary Column
+    orderTitle: '订单明细',
+    noItemsInOrder: '暂未点餐',
+    totalFoodPrice: '餐品总计:',
+    grandTotal: '应付总金额',
+    btnConfirmOrder: '确认订单',
+    btnUpdateOrder: '更新订单',
+    btnPayBill: '结账 / 收款',
+    closePartyDirect: '立即结单',
+    orderStatusActive: '进行中',
+    orderStatusPaid: '已支付',
+  },
+}

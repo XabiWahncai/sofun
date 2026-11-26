@@ -21,6 +21,7 @@ import QRPage from './components/QRPage'
 import ScanModal from './components/ScanModal'
 import AdminScanPage from './components/AdminScanPage'
 import POSPage, { newPOSSession, dedupeSessions } from './components/POSPage'
+import BasicPOSPage from './components/BasicPOSPage'
 import MemberOrderPage from './components/MemberOrderPage'
 import BookingPage from './components/BookingPage'
 import { handleDirectLineBooking } from './utils/bookingHelper'
@@ -37,12 +38,13 @@ import { syncMemberTierAchievements } from './utils/achievementTierSync'
 
 const LIFF_ID = import.meta.env.VITE_LIFF_ID || '2008759193-z2og6jZw'
 
-const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory', 'handbook', 'loykrathong', 'krathong', 'river']
+const PAGE_PATHS = ['games', 'party', 'profile', 'qr', 'order', 'adminscan', 'pos', 'admin', 'booking', 'random', 'allofuswilldie', 'rehistory', 'handbook', 'loykrathong', 'krathong', 'river', 'basicpos']
 
 function parseUrl(pathname) {
   const cleanPath = (pathname || '').split('?')[0].split('#')[0]
   const parts = cleanPath.replace(/^\//, '').split('/')
   const first = parts[0] || ''
+  if (first.toLowerCase() === 'basicpos') return { page: 'basicpos', detailId: null }
   if (first.toLowerCase() === 'allofuswilldie') return { page: 'allofuswilldie', detailId: null }
   if (first.toLowerCase() === 'loykrathong') return { page: 'loykrathong', detailId: null }
   if (first.toLowerCase() === 'krathong') return { page: 'krathong', detailId: null }
@@ -59,6 +61,7 @@ function parseUrl(pathname) {
 
 function buildUrl(page, id = null) {
   if (page === 'home') return '/'
+  if (page === 'basicpos') return '/basicPOS'
   if (page === 'detail' && id) return `/games/${id}`
   if (page === 'allofuswilldie') return '/AllOfUsWillDie'
   if (page === 'loykrathong') return '/LoyKrathong'
@@ -853,6 +856,16 @@ export default function App() {
       {currentPage === 'adminscan' && isEffectiveAdmin && (
         <ErrorBoundary title="สแกนเช็คอิน" resetKey={currentPage} onNavigateHome={() => showPage('home')}>
           <AdminScanPage lineUser={lineUser} allGames={allGames} showToast={showToast} onScanSuccess={(uid) => { setScanUid(uid); showPage('pos') }} onOpenPOS={() => { setScanUid(null); showPage('pos') }} />
+        </ErrorBoundary>
+      )}
+      {currentPage === 'basicpos' && (
+        <ErrorBoundary title="Basic POS" isPos resetKey={currentPage} onNavigateHome={() => showPage('home')}>
+          <BasicPOSPage
+            allGames={allGames}
+            showToast={showToast}
+            onClose={() => showPage('home')}
+            adminUser={lineUser || (firebaseUser ? { name: firebaseUser.email || 'Admin', role: 'admin', uid: firebaseUser.uid } : null)}
+          />
         </ErrorBoundary>
       )}
       {currentPage === 'pos' && (

@@ -1,0 +1,4940 @@
+import { basicPosTranslations } from '../constants/basicPosTranslations'
+import { useState, useEffect, useRef, useMemo } from 'react'
+import { db } from '../firebase'
+import {
+  doc, getDoc, collection, onSnapshot,
+  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, setDoc, Timestamp,
+  getDocs, limit
+} from 'firebase/firestore'
+import { Html5Qrcode } from 'html5-qrcode'
+import { viewSlipImage } from '../utils/slipVerifier'
+import QRScanner from './QRScanner'
+import PaymentModal from './PaymentModal'
+import { buildKitchenTicketHTML } from '../constants/receipt'
+import { playOrderAlertSound } from '../utils/soundAlert'
+import useBarcodeScanner from '../hooks/useBarcodeScanner'
+
+function parseUid(text) {
+  if (!text) return null
+  try {
+    const url = new URL(String(text).trim())
+    const uid = url.searchParams.get('scan')
+    return uid ? uid.trim() : String(text).trim()
+  } catch {
+    return String(text).trim() || null
+  }
+}
+
+// ── Admin slip verifier (camera scan QR → EasySlip v2) ──────────────────────
+function SlipVerifyModal({ member, payment, orderId, easySlipApiKey, showToast, onClose, onVerified }) {
+  const [scanning, setScanning] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [manualVerifying, setManualVerifying] = useState(false)
+  const [result, setResult] = useState(null)
+  const scannerRef = useRef(null)
+  const startedRef = useRef(false)
+  const manualVerifiedRef = useRef(false)
+
+  useEffect(() => () => {
+    if (scannerRef.current) scannerRef.current.stop().catch(() => {})
+  }, [])
+
+  const stopScanner = async () => {
+    if (scannerRef.current) {
+      try { await scannerRef.current.stop() } catch {}
+      scannerRef.current = null
+    }
+    setScanning(false)
+  }
+
+  const verifyPayload = async (payload) => {
+    if (!easySlipApiKey) { setResult({ ok: false, msg: 'ยังไม่ได้ตั้งค่า EasySlip API Key' }); return }
+    setVerifying(true)
+    try {
+      const body = { payload }
+      if (payment?.amount) body.matchAmount = payment.amount
+      const res = await fetch('https://api.easyslip.com/v2/verify/bank', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${easySlipApiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (manualVerifiedRef.current) return // Admin already manually verified
+      if (json.success) {
+        const slip = json.data?.rawSlip || {}
+        await updateDoc(doc(db, 'orders', orderId), {
+          [`memberPayments.${member.uid}.verified`]: true,
+          [`memberPayments.${member.uid}.pendingAdminReview`]: false,
+          [`memberPayments.${member.uid}.easyslipPending`]: false,
+          [`memberPayments.${member.uid}.verifiedAt`]: new Date().toISOString(),
+          [`memberPayments.${member.uid}.transRef`]: slip.transRef || '',
+          [`memberPayments.${member.uid}.bank`]: slip.sender?.bank?.short || '',
+        })
+        setResult({ ok: true, msg: `ยืนยันสำเร็จ ${slip.sender?.bank?.name ? ' ธนาคาร: ' + slip.sender.bank.name : ''}${slip.transRef ? '  Ref: ' + slip.transRef : ''}` })
+        showToast(`${member.name} จ่ายแล้ว `)
+        onVerified(member.uid)
+      } else {
+        const code = json.code || json.message || 'UNKNOWN'
+        const msgs = {
+          SLIP_NOT_FOUND: 'ไม่พบสลิปใน EasySlip - ลองสแกนอีกครั้ง',
+          INVALID_API_KEY: 'API Key ไม่ถูกต้อง',
+          IP_NOT_ALLOWED: 'IP ไม่ได้รับอนุญาต - ตั้งค่า Whitelist ใน EasySlip Dashboard',
+          BRANCH_INACTIVE: 'บัญชี EasySlip ไม่ Active',
+          QUOTA_EXCEEDED: 'Quota EasySlip หมดแล้ว',
+          AMOUNT_MISMATCH: `ยอดเงินไม่ตรง (ควรเป็น ฿${payment?.amount || '?'})`,
+          VALIDATION_ERROR: 'ข้อมูล QR ไม่ถูกต้อง',
+        }
+        setResult({ ok: false, msg: msgs[code] || `EasySlip: ${code}` })
+      }
+    } catch (e) {
+      if (!manualVerifiedRef.current) {
+        setResult({ ok: false, msg: 'เชื่อมต่อ EasySlip ล้มเหลว: ' + (e.message || e) })
+      }
+    } finally {
+      setVerifying(false)
+    }
+  }
+
+  const manualVerify = async () => {
+    if (!window.confirm(`ยืนยันสลิปของ ${member.name} ด้วยตนเอง?`)) return
+    manualVerifiedRef.current = true
+    setVerifying(false)
+    setManualVerifying(true)
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        [`memberPayments.${member.uid}.verified`]: true,
+        [`memberPayments.${member.uid}.pendingAdminReview`]: false,
+        [`memberPayments.${member.uid}.easyslipPending`]: false,
+        [`memberPayments.${member.uid}.verifiedAt`]: new Date().toISOString(),
+        [`memberPayments.${member.uid}.manualVerify`]: true,
+      })
+      setResult({ ok: true, msg: 'ยืนยันสลิปด้วยตนเองสำเร็จ (Admin อนุมัติ) ' })
+      showToast(`${member.name} จ่ายแล้ว `)
+      onVerified(member.uid)
+    } catch (e) {
+      setResult({ ok: false, msg: 'เกิดข้อผิดพลาด: ' + e.message })
+    } finally {
+      setManualVerifying(false)
+    }
+  }
+
+  const startScanner = async () => {
+    setScanning(true)
+    setResult(null)
+    startedRef.current = false
+    await new Promise(r => setTimeout(r, 50)) // let DOM mount
+    const scanner = new Html5Qrcode('slip-verify-qr-reader')
+    scannerRef.current = scanner
+    const cameraConfig = /Mobi|Android/i.test(navigator.userAgent)
+      ? { facingMode: 'environment' }
+      : { facingMode: 'user' }
+    scanner.start(
+      cameraConfig,
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      async (payload) => {
+        if (startedRef.current) return
+        startedRef.current = true
+        await stopScanner()
+        verifyPayload(payload)
+      },
+      () => {}
+    ).catch(e => {
+      setResult({ ok: false, msg: 'ไม่สามารถเข้าถึงกล้อง: ' + e.message })
+      setScanning(false)
+    })
+  }
+
+  return (
+    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) { stopScanner(); onClose() } }}>
+      <div className="slip-verify-modal">
+        <div className="slip-verify-header">
+          <span><i className="fas fa-shield-alt" /> ตรวจสลิป - {member.name}</span>
+          <button className="modal-close" onClick={() => { stopScanner(); onClose() }}><i className="fas fa-times" /></button>
+        </div>
+
+        {payment?.amount && (
+          <div className="slip-verify-amount">ยอดที่ควรโอน: <strong>฿{Number(payment.amount).toLocaleString()}</strong></div>
+        )}
+
+        {payment?.easyslipPending && (
+          <div style={{ background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309', padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <i className="fas fa-hourglass-half" /> กำลังรอตรวจ EasySlip / ธนาคาร - หากเช็คนานหรือติดขัด Admin กดยืนยันเองได้ทันที
+          </div>
+        )}
+
+        {payment?.slipUrl && (
+          <div className="slip-verify-img-wrap">
+            <img src={payment.slipUrl} alt="สลิป" className="slip-verify-img" />
+            <button
+              type="button"
+              onClick={() => viewSlipImage(payment.slipUrl)}
+              className="slip-verify-open-link"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Sarabun', sans-serif" }}
+            >
+              <i className="fas fa-external-link-alt" /> เปิดเต็มจอ
+            </button>
+          </div>
+        )}
+
+        {scanning && (
+          <div className="slip-verify-scanner-wrap">
+            <div id="slip-verify-qr-reader" />
+            <p className="slip-verify-hint">เล็งกล้องไปที่ QR บนสลิปลูกค้า</p>
+            <button className="pos-cancel-btn" style={{ marginTop: 8 }} onClick={stopScanner}>
+              <i className="fas fa-times" /> ยกเลิกสแกน
+            </button>
+          </div>
+        )}
+
+        {verifying && (
+          <div className="slip-verify-loading" style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center', padding: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1a1a1a', fontWeight: 600 }}>
+              <i className="fas fa-spinner fa-spin" /> กำลังตรวจสอบกับ EasySlip...
+            </div>
+            <div style={{ fontSize: 11, color: '#64748b', textAlign: 'center' }}>
+              หากเช็คนานหรือเกิด Error แอดมินสามารถกดยืนยันสลิปเองได้ทันทีด้านล่าง
+            </div>
+          </div>
+        )}
+
+        {result && (
+          <div className={`slip-verify-result ${result.ok ? 'ok' : 'err'}`}>
+            <i className={`fas fa-${result.ok ? 'check-circle' : 'exclamation-circle'}`} /> {result.msg}
+          </div>
+        )}
+
+        <div className="slip-verify-actions" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Admin manual verify button - ALWAYS accessible while not verified yet */}
+          {!result?.ok && !manualVerifying && (
+            <button
+              type="button"
+              className="pos-confirm-btn"
+              style={{ width: '100%', padding: '12px', fontSize: 13, background: '#16a34a', borderColor: '#16a34a', color: '#fff' }}
+              onClick={manualVerify}
+            >
+              <i className="fas fa-check-circle" /> ยืนยันสลิปด้วยตนเอง (Admin อนุมัติ)
+            </button>
+          )}
+
+          {!scanning && !verifying && !manualVerifying && !result?.ok && (
+            <div style={{ display: 'flex', gap: 8, width: '100%' }}>
+              <button type="button" className="pos-pay-btn" style={{ flex: 1 }} onClick={startScanner}>
+                <i className="fas fa-camera" /> สแกน QR บนสลิป
+              </button>
+              {payment?.easyslipPayload && (
+                <button
+                  type="button"
+                  className="pos-pay-btn"
+                  style={{ flex: 1, background: '#f59e0b', borderColor: '#d97706', color: '#fff' }}
+                  onClick={() => verifyPayload(payment.easyslipPayload)}
+                >
+                  <i className="fas fa-redo" /> ตรวจ EasySlip ซ้ำ
+                </button>
+              )}
+            </div>
+          )}
+
+          {manualVerifying && (
+            <div className="slip-verify-loading">
+              <i className="fas fa-spinner fa-spin" /> กำลังบันทึกการยืนยัน...
+            </div>
+          )}
+
+          {result?.ok ? (
+            <button type="button" className="pos-confirm-btn" style={{ width: '100%' }} onClick={() => { stopScanner(); onClose() }}>
+              <i className="fas fa-check" /> ปิด
+            </button>
+          ) : (
+            <button type="button" className="pos-cancel-btn" style={{ width: '100%' }} onClick={() => { stopScanner(); onClose() }}>
+              ปิด
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const ROOMS = ['1st Floor', '3rd Floor', 'Waiting Area 1', 'Waiting Area 2', '404 Bar', 'Japanese Room', 'Chinese Room', 'Europe Room', 'Ghost Room', 'Projector Room', '5 Floor', 'Yang', 'Chinese DM', 'Thai DM']
+
+let sessionCounter = 1
+const fmtDate = (d = new Date()) =>
+  `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')}/${d.getFullYear()}`
+
+const fmtCurrency = (val) => {
+  const n = Number(val) || 0
+  if (Number.isInteger(n)) return n.toLocaleString('th-TH')
+  return n.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+export const parseDiscountValue = (val) => {
+  if (val === null || val === undefined) return 0
+  if (typeof val === 'number') return isNaN(val) ? 0 : val
+  if (typeof val === 'string') {
+    const n = parseFloat(val)
+    return isNaN(n) ? 0 : n
+  }
+  if (typeof val === 'object') {
+    const n = val.value ?? val.applied ?? val.amount ?? 0
+    return Number(n) || 0
+  }
+  return 0
+}
+
+export const newBasicPOSSession = () => ({
+  id: Date.now() + Math.random(),
+  label: `ปาร์ตี้ ${sessionCounter++}`,
+  createdAt: new Date().toISOString(),
+  members: [],
+  scriptId: 'chinese-game-basic',
+  scriptTitle: 'เกมจีน',
+  customPrice: '',
+  dm: 'DM จีน',
+  npc: '',
+  npcUids: [],
+  room: '',
+  order: [],
+  confirmedOrderId: null,
+  promoName: '',
+  discount: 0,
+})
+
+export const newPOSSession = newBasicPOSSession
+
+// ── Deduplicate session tabs to prevent duplicate/ghost parties ──────────────
+export function dedupeSessions(sessions, activeId) {
+  if (!Array.isArray(sessions)) return []
+  const seenIds = new Set()
+  const seenOrderIds = new Map()
+  const result = []
+
+  for (const s of sessions) {
+    if (!s || typeof s !== 'object') continue
+
+    const sId = String(s.id ?? '')
+    if (!sId || seenIds.has(sId)) continue
+
+    const isActive = Boolean(activeId && String(s.id) === String(activeId))
+
+    if (s.confirmedOrderId) {
+      const ordId = String(s.confirmedOrderId)
+      if (seenOrderIds.has(ordId)) {
+        if (isActive) {
+          const prevIdx = seenOrderIds.get(ordId)
+          seenIds.delete(String(result[prevIdx].id))
+          result[prevIdx] = s
+          seenIds.add(sId)
+        }
+        continue
+      }
+
+      // Check if an unconfirmed draft with identical script + members already exists in result
+      const existingDraftIdx = result.findIndex(prev => {
+        if (prev.confirmedOrderId) return false
+        if (!s.scriptId || s.scriptId !== prev.scriptId) return false
+        if ((s.room || '') !== (prev.room || '')) return false
+        const sMems = s.members || []
+        const pMems = prev.members || []
+        if (sMems.length !== pMems.length || sMems.length === 0) return false
+        const pUids = new Set(pMems.map(m => m.uid || m.id))
+        return sMems.every(m => pUids.has(m.uid || m.id))
+      })
+
+      if (existingDraftIdx !== -1) {
+        const draft = result[existingDraftIdx]
+        seenIds.delete(String(draft.id))
+        const targetId = (activeId && String(draft.id) === String(activeId)) ? draft.id : s.id
+        result[existingDraftIdx] = { ...s, id: targetId }
+        seenIds.add(String(targetId))
+        seenOrderIds.set(ordId, existingDraftIdx)
+        continue
+      }
+
+      seenOrderIds.set(ordId, result.length)
+    } else {
+      // Unconfirmed session
+      const existingIdx = result.findIndex(prev => {
+        if (!s.scriptId || s.scriptId !== prev.scriptId) return false
+        if ((s.room || '') !== (prev.room || '')) return false
+        const sMems = s.members || []
+        const pMems = prev.members || []
+        if (sMems.length !== pMems.length || sMems.length === 0) return false
+        const pUids = new Set(pMems.map(m => m.uid || m.id))
+        return sMems.every(m => pUids.has(m.uid || m.id))
+      })
+
+      if (existingIdx !== -1) {
+        const prev = result[existingIdx]
+        if (!prev.confirmedOrderId && isActive) {
+          seenIds.delete(String(prev.id))
+          result[existingIdx] = s
+          seenIds.add(sId)
+        }
+        continue
+      }
+    }
+
+    seenIds.add(sId)
+    result.push(s)
+  }
+
+  return result
+}
+
+export default function BasicPOSPage({
+  allGames = [], showToast = () => {}, onClose = () => {},
+  adminUser = null,
+}) {
+  const [lang, setLang] = useState(() => {
+    try { return localStorage.getItem('sofun_basicpos_lang') || 'th' } catch { return 'th' }
+  })
+  const t = (key, fallback = '') => basicPosTranslations[lang]?.[key] || basicPosTranslations['th']?.[key] || fallback
+
+  const [basicSessions, setBasicSessions] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('sofun_basicpos_sessions'))
+      if (Array.isArray(saved?.sessions) && saved.sessions.length > 0) return dedupeSessions(saved.sessions)
+    } catch {}
+    return [newBasicPOSSession()]
+  })
+  const [basicActiveId, setBasicActiveId] = useState(() => {
+    try { return localStorage.getItem('sofun_basicpos_active_id') || basicSessions[0]?.id } catch {}
+    return basicSessions[0]?.id
+  })
+
+  const basicPosLoadedRef = useRef(false)
+  const basicPosWriteTimerRef = useRef(null)
+
+  // Sync basicpos sessions with Firestore doc `basicpos_live/current`
+  useEffect(() => {
+    const docRef = doc(db, 'basicpos_live', 'current')
+    const unsub = onSnapshot(docRef, snap => {
+      if (snap.exists()) {
+        const data = snap.data()
+        if (Array.isArray(data.sessions) && data.sessions.length > 0) {
+          setBasicSessions(dedupeSessions(data.sessions, basicActiveId))
+        }
+        basicPosLoadedRef.current = true
+      } else if (!basicPosLoadedRef.current) {
+        basicPosLoadedRef.current = true
+        const first = basicSessions.length > 0 ? dedupeSessions(basicSessions, basicActiveId) : [newBasicPOSSession()]
+        setDoc(docRef, { sessions: first }).catch(e => console.warn('BasicPOS init failed:', e))
+      }
+    }, err => console.warn('BasicPOS sync subscribe failed:', err))
+    return unsub
+  }, [basicActiveId])
+
+  // Persist to localStorage
+  useEffect(() => {
+    try {
+      if (Array.isArray(basicSessions) && basicSessions.length > 0) {
+        localStorage.setItem('sofun_basicpos_sessions', JSON.stringify({ sessions: basicSessions, activeId: basicActiveId }))
+      }
+      if (basicActiveId) localStorage.setItem('sofun_basicpos_active_id', String(basicActiveId))
+    } catch {}
+  }, [basicSessions, basicActiveId])
+
+  const setSessions = (updater) => {
+    setBasicSessions(prev => {
+      const rawNext = typeof updater === 'function' ? updater(prev) : updater
+      const next = dedupeSessions(rawNext, basicActiveId)
+      try {
+        if (Array.isArray(next) && next.length > 0) {
+          localStorage.setItem('sofun_basicpos_sessions', JSON.stringify({ sessions: next, activeId: basicActiveId }))
+        }
+      } catch {}
+      clearTimeout(basicPosWriteTimerRef.current)
+      const countChanged = !Array.isArray(prev) || !Array.isArray(next) || prev.length !== next.length
+      if (countChanged) {
+        setDoc(doc(db, 'basicpos_live', 'current'), { sessions: next })
+          .catch(e => console.warn('BasicPOS sync write failed:', e))
+      } else {
+        basicPosWriteTimerRef.current = setTimeout(() => {
+          setDoc(doc(db, 'basicpos_live', 'current'), { sessions: next })
+            .catch(e => console.warn('BasicPOS debounced sync failed:', e))
+        }, 600)
+      }
+      return next
+    })
+  }
+  const setActiveId = setBasicActiveId
+  const sessions = basicSessions
+  const activeId = basicActiveId
+  const initialUid = null
+  const onScanConsumed = () => {}
+  const propSoundMuted = undefined
+  const propToggleSoundMute = undefined
+
+  const [newCustomerName, setNewCustomerName] = useState('')
+  const [editingNameUid, setEditingNameUid] = useState(null)
+  const [editingNameVal, setEditingNameVal] = useState('')
+  const handleAddCustomer = (nameToAdd) => {
+    const trimmed = (nameToAdd || '').trim()
+    if (!trimmed) return
+    const newUid = 'guest_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6)
+    const newMember = {
+      uid: newUid,
+      name: trimmed,
+      avatar: '',
+      character: '',
+      scanInAt: new Date().toISOString(),
+      personalDiscount: 0,
+      personalDiscountNote: '',
+      customGamePrice: null,
+      unpaidDeposit: false,
+    }
+    updateActive({
+      members: [...(activeSession.members || []), newMember]
+    })
+    setNewCustomerName('')
+    showToast(`เพิ่ม ${trimmed} เรียบร้อยแล้ว`)
+  }
+
+  const startEditingName = (uid, curName) => {
+    setEditingNameUid(uid)
+    setEditingNameVal(curName || '')
+  }
+
+  const saveEditingName = (uid) => {
+    if (!editingNameVal.trim()) return
+    updateActive({
+      members: (activeSession.members || []).map(m => m.uid === uid ? { ...m, name: editingNameVal.trim() } : m)
+    })
+    setEditingNameUid(null)
+    setEditingNameVal('')
+  }
+
+  const [menuItems, setMenuItems] = useState([])
+  const [adminMembers, setAdminMembers] = useState([])
+  const [todayOrders, setTodayOrders] = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+  const [scannerOpen, setScannerOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [easySlipApiKey, setEasySlipApiKey] = useState('')
+  const [slipVerifyMember, setSlipVerifyMember] = useState(null)
+  const [gameSearch, setGameSearch] = useState('')
+  const [gameDropOpen, setGameDropOpen] = useState(false)
+  const [npcDropOpen, setNpcDropOpen] = useState(false)
+  const npcDropRef = useRef(null)
+
+  useEffect(() => {
+    if (!npcDropOpen) return
+    const handleOutside = (e) => {
+      if (npcDropRef.current && !npcDropRef.current.contains(e.target)) {
+        setNpcDropOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+    }
+  }, [npcDropOpen])
+  const [mobilePanel, setMobilePanel] = useState('members') // 'members' | 'menu' | 'order' - mobile only
+  const [expandedMembers, setExpandedMembers] = useState(() => new Set())
+  const [repriceOpenUids, setRepriceOpenUids] = useState(() => new Set())
+  const [repriceDrafts, setRepriceDrafts] = useState({})
+  const [editingUnlocked, setEditingUnlocked] = useState(false)
+  const [confirmCloseSession, setConfirmCloseSession] = useState(null)
+  const [isPrimaryPrinter, setIsPrimaryPrinter] = useState(() => {
+    try { return localStorage.getItem('sofun_basicpos_primary_printer') === '1' } catch { return false }
+  })
+  useEffect(() => {
+    try { localStorage.setItem('sofun_basicpos_primary_printer', isPrimaryPrinter ? '1' : '0') } catch {}
+  }, [isPrimaryPrinter])
+
+  // ── Local print helper (hidden iframe → window.print) ───────────────
+  const printHtmlLocal = (html, printWidth = '80mm') => {
+    const frame = document.createElement('iframe')
+    frame.style.cssText = `position:fixed;left:-9999px;top:0;width:${printWidth};height:297mm;border:0;visibility:hidden;pointer-events:none`
+    document.body.appendChild(frame)
+    frame.srcdoc = html
+    frame.onload = () => {
+      setTimeout(() => {
+        try { frame.contentWindow.focus(); frame.contentWindow.print() } catch (e) { console.warn('print error', e) }
+        setTimeout(() => { try { document.body.removeChild(frame) } catch {} }, 5000)
+      }, 300)
+    }
+  }
+
+  // Dispatch print - local if this device is primary printer, else write to Firestore queue
+  const dispatchPrint = async (html, printWidth = '80mm', label = '') => {
+    if (isPrimaryPrinter) {
+      printHtmlLocal(html, printWidth)
+    } else {
+      try {
+        await addDoc(collection(db, 'print_jobs'), {
+          html, printWidth, label,
+          createdAt: serverTimestamp(),
+        })
+      } catch (e) { console.warn('send print job failed:', e); showToast('ส่งคำสั่งปริ้นไม่สำเร็จ', 'error') }
+    }
+  }
+
+  // ── Primary printer: subscribe to print_jobs, print each new, delete after ──
+  useEffect(() => {
+    if (!isPrimaryPrinter) return
+    const q = query(collection(db, 'print_jobs'), orderBy('createdAt', 'asc'))
+    const printed = new Set()
+    let isFirstSnap = true
+    return onSnapshot(q, snap => {
+      snap.docs.forEach(d => {
+        if (printed.has(d.id)) return
+        printed.add(d.id)
+        const data = d.data()
+        if (!data.html) { deleteDoc(doc(db, 'print_jobs', d.id)).catch(() => {}); return }
+        // Immediate print - relies on Chrome --kiosk-printing flag for silent auto-print.
+        // Without the flag, browser will show print dialog that admin must confirm.
+        printHtmlLocal(data.html, data.printWidth || '80mm')
+        if (!isFirstSnap) {
+          showToast(`ปริ้นออเดอร์: ${data.label || 'ไม่ระบุ'}`)
+        }
+        // Delete after delay so content has time to render into print pipeline
+        setTimeout(() => { deleteDoc(doc(db, 'print_jobs', d.id)).catch(() => {}) }, 8000)
+      })
+      isFirstSnap = false
+    }, err => console.warn('print queue subscribe failed:', err))
+  }, [isPrimaryPrinter])
+  const [receiptSettings, setReceiptSettings] = useState(null)
+
+  useEffect(() => {
+    return onSnapshot(doc(db, 'settings', 'receipt'), snap => {
+      if (snap.exists()) setReceiptSettings(snap.data())
+    }, () => {})
+  }, [])
+
+  // sessions and activeId managed internally in BasicPOSPage
+
+  const fallbackSession = useMemo(() => newBasicPOSSession(), [])
+  const safeSessions = useMemo(() => {
+    const base = Array.isArray(sessions) && sessions.length > 0 ? sessions : [fallbackSession]
+    return dedupeSessions(base, activeId)
+  }, [sessions, activeId, fallbackSession])
+  const activeSession = safeSessions.find(s => String(s.id) === String(activeId)) || safeSessions[0]
+
+  // ── Auto-clean duplicate sessions from state/storage ──────────────
+  useEffect(() => {
+    if (!Array.isArray(sessions) || sessions.length === 0) return
+    const deduped = dedupeSessions(sessions, activeId)
+    if (deduped.length !== sessions.length) {
+      setSessions(deduped)
+    }
+  }, [sessions, activeId])
+  // Owner DM OR 'manager' admin - can edit/pay/cancel/close any party.
+  // Manager = either (a) LINE admin with 'manager' achievement
+  //           or (b) Firebase-authenticated admin (store owner/staff).
+  //              Firebase admins never have an `achievements` array; LINE users always do.
+  // If no DM set yet, anyone can act (party is still being setup).
+  const adminAchievements = adminUser?.achievements
+    || (adminUser?.achievement ? [adminUser.achievement] : null)
+  const hasManagerAchievement = Array.isArray(adminAchievements) && adminAchievements.includes('manager')
+  const isFirebaseAdmin = !!adminUser?.uid && !Array.isArray(adminUser.achievements)
+  const isAdminRole = adminUser?.role === 'admin'
+  const isManager = hasManagerAchievement || isFirebaseAdmin || isAdminRole
+  const isOwnerDM = true
+  const isLocked = (!!activeSession?.confirmedOrderId && !editingUnlocked)
+  useEffect(() => { setEditingUnlocked(false) }, [activeId])
+
+  // initialise with 1 session if empty
+  useEffect(() => {
+    const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : []
+    if (list.length === 0) {
+      const s = newBasicPOSSession()
+      setSessions([s])
+      setActiveId(s.id)
+    } else if (!activeId || !list.find(s => String(s.id) === String(activeId))) {
+      setActiveId(list[list.length - 1].id)
+    }
+  }, [sessions, activeId])
+
+  const updateSession = (id, patch) =>
+    setSessions(prev => (Array.isArray(prev) ? prev : [fallbackSession]).map(s => String(s.id) === String(id) ? { ...s, ...patch } : s))
+
+  const updateActive = (patch) => updateSession(activeSession.id, patch)
+
+  const isNpcSelected = (member) => {
+    if (!member) return false
+    const uids = Array.isArray(activeSession?.npcUids) ? activeSession.npcUids : []
+    if (uids.includes(member.id)) return true
+
+    const dmName = (member.nickname || member.firstname || '').trim().toLowerCase()
+    if (!dmName) return false
+    const names = (activeSession?.npc || '')
+      .split(',')
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean)
+    return names.includes(dmName)
+  }
+
+  const toggleNpc = (member) => {
+    if (!member) return
+    const isChecked = isNpcSelected(member)
+    const currentlySelected = adminMembers.filter(m => isNpcSelected(m))
+
+    const nextSelected = isChecked
+      ? currentlySelected.filter(m => m.id !== member.id)
+      : (currentlySelected.some(m => m.id === member.id) ? currentlySelected : [...currentlySelected, member])
+
+    const nextUids = nextSelected.map(m => m.id)
+    const nextNames = nextSelected
+      .map(m => m.nickname || m.firstname || '')
+      .filter(Boolean)
+      .join(', ')
+
+    updateActive({
+      npcUids: nextUids,
+      npc: nextNames,
+    })
+  }
+
+  const selectedNpcCount = useMemo(() => {
+    const matched = adminMembers.filter(m => isNpcSelected(m)).length
+    if (matched > 0) return matched
+    return activeSession?.npc ? activeSession.npc.split(',').map(s => s.trim()).filter(Boolean).length : 0
+  }, [adminMembers, activeSession?.npc, activeSession?.npcUids])
+
+  // ── load initialUid into active session once ──────────────────────
+  const handledUidRef = useRef(null)
+  useEffect(() => {
+    if (initialUid && initialUid !== handledUidRef.current && (activeSession || sessions[0])) {
+      handledUidRef.current = initialUid
+      fetchAndAddMember(activeId || sessions[0]?.id, initialUid)
+      onScanConsumed?.()
+    }
+  }, [initialUid, activeId])
+
+  // ── load EasySlip API key ────────────────────────────────────────
+  useEffect(() => {
+    getDoc(doc(db, 'settings', 'payment'))
+      .then(snap => { if (snap.exists()) setEasySlipApiKey(snap.data().easySlipApiKey || '') })
+      .catch(() => {})
+  }, [])
+
+  // ── load menu ────────────────────────────────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, 'menuItems'), orderBy('category'), orderBy('name'))
+    const unsub = onSnapshot(q,
+      snap => setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))),
+      () => {
+        onSnapshot(collection(db, 'menuItems'), snap => setMenuItems(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+      }
+    )
+    return unsub
+  }, [])
+
+  // ── load admin members ───────────────────────────────────────────
+  useEffect(() => {
+    const q = query(collection(db, 'members'), where('role', '==', 'admin'))
+    return onSnapshot(q, snap => setAdminMembers(snap.docs.map(d => ({ id: d.id, ...d.data() }))))
+  }, [])
+
+  // ── load today orders (client-side filter) ───────────────────────
+  // Includes orders created today OR any active orders still in progress (even across midnight)
+  useEffect(() => {
+    const q = query(collection(db, 'orders'), orderBy('createdAt', 'desc'))
+    return onSnapshot(q, snap => {
+      const start = new Date(); start.setHours(0, 0, 0, 0)
+      setTodayOrders(snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(o => {
+        if (o.status === 'active') return true
+        if (o.createdAt?.toDate?.() >= start) return true
+        return false
+      }))
+    }, () => {})
+  }, [])
+
+  // ── Auto-reconnect active orders into POS session tabs ───────────
+  useEffect(() => {
+    if (!Array.isArray(todayOrders) || todayOrders.length === 0) return
+    const activeOrders = todayOrders.filter(o => o.status === 'active')
+    if (activeOrders.length === 0) return
+
+    const currentSessions = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+    const missingOrders = activeOrders.filter(ao => !currentSessions.some(s => s.confirmedOrderId === ao.id))
+
+    if (missingOrders.length > 0) {
+      setSessions(prev => {
+        const list = Array.isArray(prev) ? [...prev] : []
+        let changed = false
+        missingOrders.forEach(mo => {
+          if (!list.some(s => s.confirmedOrderId === mo.id)) {
+            // Check if an unconfirmed draft with the same scriptId and matching members exists in list
+            const matchingDraftIdx = list.findIndex(s =>
+              !s.confirmedOrderId &&
+              s.scriptId === mo.scriptId &&
+              ((s.members || []).length > 0 && (mo.members || []).length > 0 &&
+                s.members.every(m => (mo.members || []).some(mom => mom.uid === m.uid)))
+            )
+            if (matchingDraftIdx !== -1) {
+              list[matchingDraftIdx] = {
+                ...list[matchingDraftIdx],
+                confirmedOrderId: mo.id,
+              }
+              changed = true
+              return
+            }
+
+            const orderItems = (mo.foodItems || []).map(x => ({
+              key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+              menuId: x.menuId || '',
+              name: x.name,
+              basePrice: x.price ?? x.totalPrice ?? 0,
+              addons: x.addons || [],
+              totalPrice: x.price ?? x.totalPrice ?? 0,
+              qty: x.qty || 1,
+              orderedBy: x.orderedBy || null,
+              note: x.note || '',
+            }))
+            const newTab = {
+              id: Date.now() + Math.random(),
+              label: mo.scriptTitle ? `${mo.scriptTitle} (${mo.room || 'ตี้'})` : 'ปาร์ตี้',
+              createdAt: mo.createdAt?.toDate ? mo.createdAt.toDate().toISOString() : new Date().toISOString(),
+              members: mo.members || [],
+              scriptId: mo.scriptId || '',
+              eventName: '',
+              dm: mo.dm || '',
+              npc: mo.npc || '',
+              npcUids: Array.isArray(mo.npcUids) ? mo.npcUids : [],
+              room: mo.room || '',
+              order: orderItems,
+              confirmedOrderId: mo.id,
+              status: mo.status || 'active',
+              promoName: mo.promoName || '',
+              discount: parseDiscountValue(mo.discount),
+              discountMode: mo.discountMode || 'perPerson',
+              discountMemberIds: Array.isArray(mo.discountMemberIds) ? mo.discountMemberIds : [],
+              customPrice: mo.customPrice ?? '',
+            }
+            if (list.length === 1 && !list[0].confirmedOrderId && (!list[0].members || list[0].members.length === 0) && (!list[0].order || list[0].order.length === 0) && !list[0].scriptId) {
+              list[0] = newTab
+            } else {
+              list.push(newTab)
+            }
+            changed = true
+          }
+        })
+        return changed ? dedupeSessions(list, activeId) : prev
+      })
+    }
+  }, [todayOrders, sessions])
+
+  const sessionHydratedRef = useRef(new Set())
+
+  // ── Hydrate sessions that have confirmedOrderId but lost their members ──
+  // Happens when pos_live/current sync drops member data (race condition / stale write)
+  useEffect(() => {
+    safeSessions.forEach(session => {
+      if (!session.confirmedOrderId || (session.members || []).length > 0) return
+      const key = `${session.id}:${session.confirmedOrderId}`
+      if (sessionHydratedRef.current.has(key)) return
+      sessionHydratedRef.current.add(key)
+      getDoc(doc(db, 'orders', session.confirmedOrderId)).then(snap => {
+        if (!snap.exists()) return
+        const orderData = snap.data()
+        if ((orderData.members || []).length > 0) {
+          updateSession(session.id, {
+            members: orderData.members,
+            scriptId: orderData.scriptId || session.scriptId,
+            dm: orderData.dm || session.dm,
+            room: orderData.room || session.room,
+            status: orderData.status || session.status || 'active',
+            promoName: orderData.promoName || session.promoName || '',
+            discount: orderData.discount !== undefined ? parseDiscountValue(orderData.discount) : parseDiscountValue(session.discount),
+            discountMode: orderData.discountMode || session.discountMode || 'perPerson',
+            discountMemberIds: Array.isArray(orderData.discountMemberIds) ? orderData.discountMemberIds : (session.discountMemberIds || []),
+            customPrice: orderData.customPrice ?? session.customPrice ?? '',
+          })
+        }
+      }).catch(() => {})
+    })
+  }, [sessions])
+
+  // ── fetch member and add to a session ───────────────────────────
+  const fetchAndAddMember = async (sessionId, uid) => {
+    const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+    const session = list.find(s => String(s.id) === String(sessionId)) || activeSession
+    if ((session?.members || []).find(m => m.uid === uid)) {
+      showToast('สมาชิกคนนี้อยู่ในปาร์ตี้นี้แล้ว', 'error'); return
+    }
+    try {
+      const snap = await getDoc(doc(db, 'members', uid))
+      if (!snap.exists()) { showToast('ไม่พบสมาชิก', 'error'); return }
+      const d = snap.data()
+
+      // Auto-detect deposit credit (overpaid from game change) or deposit debt from booking
+      let bookingCredit = 0
+      let bookingNote = ''
+      let isUnpaidDep = false
+      try {
+        const bQuery = query(
+          collection(db, 'bookings'),
+          where('status', 'in', ['confirmed', 'locked']),
+          orderBy('createdAt', 'desc'),
+          limit(25)
+        )
+        const bSnap = await getDocs(bQuery)
+        for (const bDoc of bSnap.docs) {
+          const bData = bDoc.data()
+          const matchedMem = (bData.members || []).find(bm => (bm.uid || bm.id) === uid)
+          if (matchedMem) {
+            const over = Number(matchedMem.depositOverpaid) || Number(matchedMem.cashierDiscount) || 0
+            if (over > 0) {
+              bookingCredit = over
+              bookingNote = 'ส่วนลดมัดจำรอบเดิม (เปลี่ยนเกม)'
+            }
+            if (Number(matchedMem.depositOwed) > 0 || !matchedMem.paidDeposit) {
+              isUnpaidDep = true
+            }
+            break
+          }
+        }
+      } catch (err) {
+        console.warn('Booking discount lookup fallback:', err)
+      }
+
+      const newMember = {
+        uid,
+        name: d.nickname || d.firstname || d.name || 'ไม่ระบุ',
+        avatar: d.pictureUrl || '',
+        character: '',
+        scanInAt: new Date().toISOString(),
+        personalDiscount: bookingCredit,
+        personalDiscountNote: bookingNote,
+        unpaidDeposit: isUnpaidDep,
+      }
+      const newMembers = [...session.members, newMember]
+      updateSession(sessionId, {
+        members: newMembers
+      })
+
+      const g = allGames.find(x => x.id === session.scriptId)
+      const gUnitPay = (session.customPrice !== '' && session.customPrice !== undefined)
+        ? Number(session.customPrice) || 0
+        : g ? (g.payPrice ?? g.price ?? 0) : 0
+      const gFullPrice = g
+        ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
+        : gUnitPay
+      const newGamePrice = newMembers.reduce((sum, m) => {
+        if (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null && !isNaN(Number(m.customGamePrice))) {
+          return sum + Math.max(0, Number(m.customGamePrice))
+        }
+        return sum + (m.unpaidDeposit ? gFullPrice : gUnitPay)
+      }, 0)
+      const fTotal = (session.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+      const dMode = session.discountMode || 'perPerson'
+      const dRaw = parseDiscountValue(session.discount)
+      const dSelIds = Array.isArray(session.discountMemberIds) ? session.discountMemberIds : []
+      const dEffIds = dSelIds.length > 0
+        ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
+        : newMembers.map(mm => mm.uid)
+      const nD = dEffIds.length
+      const totMemberPromo = newMembers.reduce((s, m) => s + (Number(m.discount) || 0), 0)
+      const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
+      const effectiveTotD = totD > 0 ? totD : totMemberPromo
+      const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+      const newGrandTotal = Math.max(0, fTotal + newGamePrice - effectiveTotD - totPersonal)
+
+      const membersPayload = newMembers.map(m => ({
+        uid: m.uid, name: m.name, character: m.character || '',
+        avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        unpaidDeposit: Boolean(m.unpaidDeposit),
+        ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+      }))
+
+      if (session.confirmedOrderId) {
+        const orderId = session.confirmedOrderId
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          memberUids: newMembers.map(m => m.uid),
+          gameTotal: newGamePrice,
+          grandTotal: newGrandTotal,
+          discount: dRaw,
+          discountMode: dMode,
+          discountMemberIds: dSelIds,
+          promoName: session.promoName || '',
+          customPrice: session.customPrice ?? '',
+          gameUnitPrice: gUnitPay,
+          updatedAt: serverTimestamp(),
+        })
+
+        if (session.scriptId) {
+          addDoc(collection(db, 'playHistory'), {
+            userId: newMember.uid,
+            userName: newMember.name,
+            userAvatar: newMember.avatar,
+            scriptId: session.scriptId,
+            scriptTitle: g?.title || '',
+            character: '',
+            dm: session.dm || '',
+            room: session.room || '',
+            playedAt: serverTimestamp(),
+            recordedBy: adminUser?.name || 'admin',
+          }).catch(e => console.warn('Record play history for new member failed:', e))
+        }
+      } else {
+        // Auto-create active order so scanned customer immediately gets food ordering screen
+        const orderRef = doc(collection(db, 'orders'))
+        const orderId = orderRef.id
+        updateSession(sessionId, {
+          confirmedOrderId: orderId,
+          members: newMembers,
+        })
+        await setDoc(orderRef, {
+          members: membersPayload,
+          memberUids: newMembers.map(m => m.uid),
+          scriptId: session.scriptId || '',
+          scriptTitle: g?.title || '',
+          dm: session.dm || '',
+          npc: session.npc || '',
+          room: session.room || '',
+          foodItems: (session.order || []).map(x => ({
+            menuId: x.menuId || '', name: x.name, addons: x.addons || [],
+            price: x.totalPrice ?? x.price ?? 0, qty: x.qty || 1,
+            orderedBy: x.orderedBy || null, note: x.note || '',
+          })),
+          memberFoodHistory: [],
+          customPrice: session.customPrice ?? '',
+          gameUnitPrice: gUnitPay,
+          foodTotal: fTotal,
+          gameTotal: newGamePrice,
+          discount: dRaw,
+          discountMode: dMode,
+          discountMemberIds: dSelIds,
+          promoName: session.promoName || '',
+          grandTotal: newGrandTotal,
+          createdBy: adminUser?.name || 'admin',
+          status: 'active', source: 'basic_pos',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        })
+
+        if (session.scriptId) {
+          addDoc(collection(db, 'playHistory'), {
+            userId: newMember.uid,
+            userName: newMember.name,
+            userAvatar: newMember.avatar,
+            scriptId: session.scriptId,
+            scriptTitle: g?.title || '',
+            character: '',
+            dm: session.dm || '',
+            room: session.room || '',
+            playedAt: serverTimestamp(),
+            recordedBy: adminUser?.name || 'admin',
+          }).catch(e => console.warn('Record play history for new member failed:', e))
+        }
+      }
+    } catch (err) {
+      console.warn('fetchAndAddMember error:', err)
+      showToast('โหลดข้อมูลสมาชิกล้มเหลว: ' + err.message, 'error')
+    }
+  }
+
+  const [orderModal, setOrderModal] = useState(null)
+  const [editingBillKey, setEditingBillKey] = useState(null)
+  const [showPayment, setShowPayment] = useState(false)
+  const [groupPayMode, setGroupPayMode] = useState(false)
+  const [groupPaySelected, setGroupPaySelected] = useState(new Set())
+  const [groupPaySaving, setGroupPaySaving] = useState(false)
+  const [memberQueue, setMemberQueue] = useState([])
+  const [memberPayments, setMemberPayments] = useState({})
+  const [showQueue, setShowQueue] = useState(false)
+  const [menuSearch, setMenuSearch] = useState('')
+  const [menuCategory, setMenuCategory] = useState('ทั้งหมด')
+  const [showPaidMembers, setShowPaidMembers] = useState(false)
+  const [showEndingModal, setShowEndingModal] = useState(false)
+  const [selectedEnding, setSelectedEnding] = useState('')
+  const autoClosedRef = useRef(new Set())
+
+  // Unlock Web Audio API on first user interaction
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext
+        if (AudioCtx) {
+          if (!window._posAudioCtx) window._posAudioCtx = new AudioCtx()
+          if (window._posAudioCtx.state === 'suspended') window._posAudioCtx.resume().catch(() => {})
+        }
+      } catch {}
+    }
+    window.addEventListener('click', unlock, { passive: true })
+    window.addEventListener('touchstart', unlock, { passive: true })
+    window.addEventListener('keydown', unlock, { passive: true })
+    return () => {
+      window.removeEventListener('click', unlock)
+      window.removeEventListener('touchstart', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
+
+  const [localSoundMuted, setLocalSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem('sofun_basicpos_sound_muted') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const soundMuted = propSoundMuted !== undefined ? propSoundMuted : localSoundMuted
+
+  const toggleSoundMute = () => {
+    if (propToggleSoundMute) {
+      propToggleSoundMute()
+      return
+    }
+    setLocalSoundMuted(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem('sofun_basicpos_sound_muted', String(next))
+      } catch {}
+      if (!next) {
+        playOrderAlertSound()
+        showToast('เปิดเสียงแจ้งเตือนออเดอร์แล้ว')
+      } else {
+        showToast('ปิดเสียงแจ้งเตือนแล้ว')
+      }
+      return next
+    })
+  }
+
+  // Other orders in today's orders that have pending member food items
+  const otherPendingOrders = useMemo(() => {
+    return todayOrders.filter(o =>
+      o.id !== activeSession?.confirmedOrderId &&
+      Array.isArray(o.memberFoodQueue) &&
+      o.memberFoodQueue.length > 0
+    )
+  }, [todayOrders, activeSession?.confirmedOrderId])
+
+  const totalPendingQueueCount = memberQueue.length + otherPendingOrders.reduce((sum, o) => sum + (o.memberFoodQueue?.length || 0), 0)
+
+  const soundTimerRef = useRef(null)
+
+  // Loop alert chime every 5 seconds while there are pending orders (fallback if not managed globally)
+  useEffect(() => {
+    if (propSoundMuted !== undefined) return // Handled globally by App.jsx
+    if (totalPendingQueueCount === 0 || soundMuted) {
+      if (soundTimerRef.current) {
+        clearInterval(soundTimerRef.current)
+        soundTimerRef.current = null
+      }
+      return
+    }
+
+    // Orders pending and not muted: start 5-second interval if not already running
+    if (!soundTimerRef.current) {
+      playOrderAlertSound()
+      soundTimerRef.current = setInterval(() => {
+        playOrderAlertSound()
+      }, 5000)
+    }
+  }, [totalPendingQueueCount, soundMuted, propSoundMuted])
+
+  // Cleanup sound interval on unmount
+  useEffect(() => {
+    return () => {
+      if (soundTimerRef.current) {
+        clearInterval(soundTimerRef.current)
+        soundTimerRef.current = null
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    setShowQueue(false)
+    setShowPaidMembers(false)
+  }, [activeId])
+
+  const activeOrderRef = useRef(activeSession?.order || [])
+  activeOrderRef.current = activeSession?.order || []
+
+  // Listen for member food requests and payments on the confirmed order
+  useEffect(() => {
+    const orderId = activeSession?.confirmedOrderId
+    if (!orderId) { setMemberQueue([]); setMemberPayments({}); return }
+    return onSnapshot(doc(db, 'orders', orderId), snap => {
+      const data = snap.data() || {}
+      setMemberQueue(data.memberFoodQueue || [])
+      setMemberPayments(data.memberPayments || {})
+
+      // Keep activeSession.order in sync with Firestore orders.foodItems
+      if (Array.isArray(data.foodItems)) {
+        const firestoreItems = data.foodItems.map(x => ({
+          key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+          menuId: x.menuId || '',
+          name: x.name,
+          basePrice: x.price ?? x.totalPrice ?? 0,
+          addons: x.addons || [],
+          totalPrice: x.price ?? x.totalPrice ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        }))
+        const curOrder = activeOrderRef.current || []
+        const isDiff = firestoreItems.length !== curOrder.length ||
+          firestoreItems.some((fi, idx) => {
+            const co = curOrder[idx]
+            return !co || co.name !== fi.name || co.qty !== fi.qty || co.totalPrice !== fi.totalPrice || co.note !== fi.note
+          })
+        if (isDiff) {
+          updateActive({ order: firestoreItems })
+        }
+      }
+
+      // Keep activeSession.members in sync with Firestore orders.members
+      if (Array.isArray(data.members) && data.members.length > 0) {
+        const curMembers = activeSession?.members || []
+        const isMembersDiff = data.members.length !== curMembers.length ||
+          data.members.some((m, idx) => !curMembers[idx] || curMembers[idx].uid !== m.uid || curMembers[idx].name !== m.name || curMembers[idx].customGamePrice !== m.customGamePrice || curMembers[idx].unpaidDeposit !== m.unpaidDeposit || curMembers[idx].personalDiscount !== m.personalDiscount || curMembers[idx].discount !== m.discount)
+        if (isMembersDiff) {
+          updateActive({ members: data.members })
+        }
+      }
+
+      // Keep activeSession discount, promo, and status in sync with Firestore orders
+      const firestoreDisc = parseDiscountValue(data.discount)
+      const firestorePromo = data.promoName || ''
+      const firestoreDiscMode = data.discountMode || 'perPerson'
+      const firestoreDiscMemberIds = Array.isArray(data.discountMemberIds) ? data.discountMemberIds : []
+      const firestoreStatus = data.status || 'active'
+
+      const discUpdates = {}
+      if (firestoreDisc > 0 && parseDiscountValue(activeSession?.discount) !== firestoreDisc) {
+        discUpdates.discount = firestoreDisc
+      }
+      if (firestorePromo && activeSession?.promoName !== firestorePromo) {
+        discUpdates.promoName = firestorePromo
+      }
+      if (data.discountMode && activeSession?.discountMode !== firestoreDiscMode) {
+        discUpdates.discountMode = firestoreDiscMode
+      }
+      if (data.discountMemberIds && JSON.stringify(activeSession?.discountMemberIds || []) !== JSON.stringify(firestoreDiscMemberIds)) {
+        discUpdates.discountMemberIds = firestoreDiscMemberIds
+      }
+      if (data.status && activeSession?.status !== firestoreStatus) {
+        discUpdates.status = firestoreStatus
+      }
+      if (Object.keys(discUpdates).length > 0) {
+        updateActive(discUpdates)
+      }
+    }, () => {})
+  }, [activeId, activeSession?.confirmedOrderId])
+
+  // ── derived values ───────────────────────────────────────────────
+  const selectedGame = allGames.find(g => g.id === activeSession?.scriptId)
+  const orderArr = Array.isArray(activeSession?.order) ? activeSession.order : []
+  const foodTotal = orderArr.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+  const gameUnitPay = (activeSession?.customPrice !== '' && activeSession?.customPrice !== undefined)
+    ? Number(activeSession.customPrice) || 0
+    : selectedGame ? (selectedGame.payPrice ?? selectedGame.price ?? 0) : 0
+  const gameFullPrice = selectedGame
+    ? (Number(selectedGame.fullPrice ?? selectedGame.price) || (gameUnitPay + (Number(selectedGame.deposit) || 0)))
+    : gameUnitPay
+  const getMemberGamePrice = (m, unitPay = gameUnitPay, fullPrice = gameFullPrice) => {
+    if (m?.customGamePrice !== undefined && m?.customGamePrice !== '' && m?.customGamePrice !== null && !isNaN(Number(m?.customGamePrice))) {
+      return Math.max(0, Number(m.customGamePrice))
+    }
+    return m?.unpaidDeposit ? fullPrice : unitPay
+  }
+  const sessionMembers = Array.isArray(activeSession?.members) ? activeSession.members : []
+  const gamePrice = sessionMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
+  const discountMode = activeSession?.discountMode || 'perPerson' // 'perPerson' | 'split'
+  const discountRaw = parseDiscountValue(activeSession?.discount)
+  // discountMemberIds: array of uids who get the discount. Empty = applies to all members.
+  const discountMemberIdsRaw = Array.isArray(activeSession?.discountMemberIds) ? activeSession.discountMemberIds : []
+  const discountEffectiveIds = discountMemberIdsRaw.length > 0
+    ? discountMemberIdsRaw.filter(uid => sessionMembers.some(m => m.uid === uid))
+    : sessionMembers.map(m => m.uid)
+  const nDiscounted = discountEffectiveIds.length
+
+  // Member-level promo discounts (e.g. from event promotions, coupons or member orders)
+  const totalMemberPromoDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.discount) || 0), 0)
+
+  const sessionDiscount = nDiscounted > 0
+    ? (discountMode === 'split' ? discountRaw : discountRaw * nDiscounted)
+    : 0
+
+  // Total promo discount: session-level discount, or sum of individual member promo discounts
+  let totalDiscount = sessionDiscount > 0 ? sessionDiscount : totalMemberPromoDiscounts
+  const totalPersonalDiscounts = sessionMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+
+  // Verified total from members
+  const verifiedTotal = Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0)
+  const allVerified = sessionMembers.length > 0 && sessionMembers.every(m => memberPayments[m.uid]?.verified)
+
+  // If all members are verified paid and their total paid is less than pre-discount total,
+  // the difference is the verified discount applied at payment time!
+  const preDiscountSubtotal = Math.max(0, foodTotal + gamePrice - totalPersonalDiscounts)
+  if (totalDiscount === 0 && allVerified && verifiedTotal > 0 && preDiscountSubtotal > verifiedTotal) {
+    totalDiscount = Math.round((preDiscountSubtotal - verifiedTotal) * 100) / 100
+  }
+
+  const grandTotal = Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDiscounts)
+
+  const discount = sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0  // effective per-person (across all)
+  const discountPerDiscounted = nDiscounted > 0
+    ? (discountMode === 'split' ? discountRaw / nDiscounted : discountRaw)
+    : (sessionMembers.length > 0 ? totalDiscount / sessionMembers.length : 0)  // per selected member
+  const isPartialDiscount = discountMemberIdsRaw.length > 0 && nDiscounted < sessionMembers.length
+
+  // Unassigned food items (orderedBy: null) shared across members in split mode
+  const unassignedFoodTotal = orderArr
+    .filter(x => !x.orderedBy?.uid)
+    .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+  const sharedFoodPerMember = sessionMembers.length > 0
+    ? (unassignedFoodTotal / sessionMembers.length)
+    : 0
+
+  const getMemberBill = (m) => {
+    if (!m) return 0
+    const myFood = orderArr
+      .filter(x => x.orderedBy?.uid === m.uid)
+      .reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+    const myBaseGame = getMemberGamePrice(m)
+    const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
+    let myDisc = 0
+    if (isMemberDiscounted && discountRaw > 0) {
+      if (discountMode === 'split' && nDiscounted > 0) {
+        const baseDisc = Math.floor((discountRaw / nDiscounted) * 100) / 100
+        const remainder = Math.round((discountRaw - baseDisc * nDiscounted) * 100) / 100
+        myDisc = (m.uid === discountEffectiveIds[0]) ? baseDisc + remainder : baseDisc
+      } else {
+        myDisc = discountRaw
+      }
+    } else if (Number(m.discount) > 0) {
+      myDisc = Number(m.discount)
+    } else if (totalDiscount > 0 && sessionMembers.length > 0) {
+      myDisc = Math.round((totalDiscount / sessionMembers.length) * 100) / 100
+    }
+    return Math.round(Math.max(0, myBaseGame + myFood + sharedFoodPerMember - (Number(m.personalDiscount) || 0) - myDisc) * 100) / 100
+  }
+
+  const isMemberFullyPaid = (m) => {
+    if (!m) return false
+    const p = memberPayments[m.uid]
+    if (!p?.verified) return false
+    const paidAmt = Number(p.amount) || 0
+    const bill = getMemberBill(m)
+    return paidAmt >= (bill - 0.05)
+  }
+
+  // ── payment status helpers ───────────────────────────────────────
+  const allMembersPaid = Boolean(
+    activeSession?.confirmedOrderId &&
+    sessionMembers.length > 0 &&
+    (
+      sessionMembers.every(m => isMemberFullyPaid(m)) ||
+      allVerified ||
+      activeSession?.status === 'paid'
+    )
+  )
+  const remainingAmount = allMembersPaid ? 0 : Math.max(0, grandTotal - verifiedTotal)
+
+  // ── Auto-sync active confirmed order to Firestore so customer device is ALWAYS in real-time sync ──
+  const lastSyncedOrderRef = useRef('')
+  const syncOrderTimerRef = useRef(null)
+
+  useEffect(() => {
+    const orderId = activeSession?.confirmedOrderId
+    if (!orderId) return
+    if (activeSession?.status === 'paid') return
+
+    clearTimeout(syncOrderTimerRef.current)
+    syncOrderTimerRef.current = setTimeout(async () => {
+      try {
+        const membersPayload = (activeSession.members || []).map(m => ({
+          uid: m.uid,
+          name: m.name,
+          character: m.character || '',
+          avatar: m.avatar || '',
+          scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+        }))
+
+        const payloadKey = JSON.stringify({
+          orderId,
+          scriptId: activeSession.scriptId || '',
+          room: activeSession.room || '',
+          dm: activeSession.dm || '',
+          npc: activeSession.npc || '',
+          npcUids: activeSession.npcUids || [],
+          customPrice: activeSession.customPrice ?? '',
+          gameUnitPrice: gameUnitPay,
+          gameTotal: gamePrice,
+          foodTotal,
+          discount: discountRaw || totalDiscount,
+          discountMode,
+          discountMemberIds: discountMemberIdsRaw,
+          promoName: activeSession.promoName || '',
+          grandTotal,
+          members: membersPayload.map(m => ({ uid: m.uid, pd: m.personalDiscount, pdn: m.personalDiscountNote, ud: m.unpaidDeposit, ch: m.character, cgp: m.customGamePrice })),
+        })
+
+        if (lastSyncedOrderRef.current === payloadKey) return
+        lastSyncedOrderRef.current = payloadKey
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          discount: discountRaw || totalDiscount,
+          discountMode,
+          discountMemberIds: discountMemberIdsRaw,
+          promoName: activeSession.promoName || '',
+          customPrice: activeSession.customPrice ?? '',
+          gameUnitPrice: gameUnitPay,
+          gameTotal: gamePrice,
+          foodTotal,
+          grandTotal,
+          members: membersPayload,
+          memberUids: membersPayload.map(m => m.uid),
+          scriptId: activeSession.scriptId || '',
+          scriptTitle: selectedGame?.title || 'เกมจีน',
+          dm: activeSession.dm || '',
+          npc: activeSession.npc || '',
+          npcUids: activeSession.npcUids || [],
+          room: activeSession.room || '',
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Auto-sync order to Firestore failed:', err)
+      }
+    }, 250)
+
+    return () => clearTimeout(syncOrderTimerRef.current)
+  }, [
+    activeId,
+    activeSession?.confirmedOrderId,
+    discountRaw,
+    discountMode,
+    discountMemberIdsRaw,
+    activeSession?.promoName,
+    activeSession?.members,
+    activeSession?.customPrice,
+    activeSession?.scriptId,
+    activeSession?.room,
+    activeSession?.dm,
+    activeSession?.npc,
+    activeSession?.npcUids,
+    selectedGame?.title,
+    gamePrice,
+    foodTotal,
+    grandTotal,
+    gameUnitPay,
+  ])
+
+  // Accept all queued items into in-memory order and sync Firestore immediately
+  const acceptQueue = async () => {
+    const orderId = activeSession?.confirmedOrderId
+    if (!orderId || memberQueue.length === 0) return
+
+    const queuedItems = [...memberQueue]
+    // Optimistically clear immediately to silence sound and update UI instantaneously
+    setMemberQueue([])
+
+    let existingFoodItems = []
+    try {
+      const snap = await getDoc(doc(db, 'orders', orderId))
+      if (snap.exists()) {
+        existingFoodItems = snap.data().foodItems || []
+      }
+    } catch (e) {
+      console.warn('Fetch live foodItems for acceptQueue failed:', e)
+    }
+
+    const cur = existingFoodItems.length > 0
+      ? existingFoodItems.map(x => ({
+          key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+          menuId: x.menuId || '',
+          name: x.name,
+          basePrice: x.price ?? x.totalPrice ?? 0,
+          addons: x.addons || [],
+          totalPrice: x.price ?? x.totalPrice ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        }))
+      : ((Array.isArray(activeSession.order) && activeSession.order.length > 0)
+          ? activeSession.order
+          : (todayOrders.find(o => o.id === orderId)?.foodItems || []).map(x => ({
+              key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).sort().join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+              menuId: x.menuId || '',
+              name: x.name,
+              basePrice: x.price ?? x.totalPrice ?? 0,
+              addons: x.addons || [],
+              totalPrice: x.price ?? x.totalPrice ?? 0,
+              qty: x.qty || 1,
+              orderedBy: x.orderedBy || null,
+              note: x.note || '',
+            })))
+
+    const updated = [...cur]
+    for (const qi of queuedItems) {
+      // Include note in key so same item + different notes = separate order lines
+      const key = (qi.menuId || qi.name) + '|' + (qi.addons || []).map(a => a.name || a).sort().join(',') + '|' + (qi.orderedBy?.uid || '') + '|' + (qi.note || '')
+      const idx = updated.findIndex(x => x.key === key)
+      if (idx >= 0) {
+        updated[idx] = { ...updated[idx], qty: updated[idx].qty + qi.qty }
+      } else {
+        updated.push({
+          key,
+          menuId: qi.menuId || '',
+          name: qi.name,
+          basePrice: qi.totalPrice,
+          addons: qi.addons || [],
+          note: qi.note || '',
+          totalPrice: qi.totalPrice,
+          qty: qi.qty,
+          orderedBy: qi.orderedBy || null
+        })
+      }
+    }
+    updateActive({ order: updated })
+    const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+    await updateDoc(doc(db, 'orders', orderId), {
+      memberFoodQueue: [],
+      memberFoodHistory: arrayUnion(...queuedItems),
+      foodItems: updated.map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        price: x.totalPrice,
+        qty: x.qty,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      })),
+      foodTotal: newFoodTotal,
+      gameTotal: gamePrice,
+      discount: discountRaw,
+      discountMode,
+      discountMemberIds: discountMemberIdsRaw,
+      promoName: activeSession.promoName || '',
+      grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
+    })
+    setShowQueue(false)
+    showToast(`รับ ${queuedItems.length} รายการจากลูกค้าแล้ว `)
+
+    // Dispatch print - local if primary printer, else via Firestore queue
+    const now = new Date()
+    const isPaid = activeSession.members.length > 0 &&
+      activeSession.members.every(m => memberPayments[m.uid]?.verified)
+    const html = buildKitchenTicketHTML(queuedItems, activeSession, now, isPaid, receiptSettings)
+    const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
+    dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${queuedItems.length} รายการ`)
+  }
+
+  const handleScan = (scannedText) => {
+    setScannerOpen(false)
+    const uid = parseUid(scannedText)
+    if (uid) fetchAndAddMember(activeId, uid)
+  }
+
+  useBarcodeScanner((scannedText) => {
+    const uid = parseUid(scannedText)
+    if (uid) fetchAndAddMember(activeId || sessions[0]?.id, uid)
+  }, !scannerOpen && !orderModal && !showPayment && !showEndingModal)
+
+  const setCharacter = async (uid, val) => {
+    const updated = activeSession.members.map(m => m.uid === uid ? { ...m, character: val } : m)
+    updateActive({ members: updated })
+    if (activeSession.confirmedOrderId) {
+      try {
+        await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+          members: updated.map(m => ({
+            uid: m.uid, name: m.name, character: m.character || '',
+            avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+            personalDiscount: Number(m.personalDiscount) || 0,
+            personalDiscountNote: m.personalDiscountNote || '',
+            unpaidDeposit: Boolean(m.unpaidDeposit),
+            ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+          })),
+          discount: discountRaw,
+          discountMode,
+          discountMemberIds: discountMemberIdsRaw,
+          promoName: activeSession.promoName || '',
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync orders on setCharacter:', err)
+      }
+    }
+  }
+
+  const setPersonalDiscount = (uid, val) => {
+    const updated = activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscount: Number(val) || 0 } : m)
+    updateActive({ members: updated })
+    if (activeSession.confirmedOrderId) {
+      const membersPayload = updated.map(m => ({
+        uid: m.uid, name: m.name, character: m.character || '',
+        avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        unpaidDeposit: Boolean(m.unpaidDeposit),
+        ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+      }))
+      const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
+      updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+        members: membersPayload,
+        discount: discountRaw,
+        discountMode,
+        discountMemberIds: discountMemberIdsRaw,
+        promoName: activeSession.promoName || '',
+        grandTotal: Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDisc),
+        updatedAt: serverTimestamp(),
+      }).catch(err => console.warn('Failed to sync personal discount to orders:', err))
+    }
+  }
+
+  const setPersonalDiscountNote = (uid, val) => {
+    const updated = activeSession.members.map(m => m.uid === uid ? { ...m, personalDiscountNote: val } : m)
+    updateActive({ members: updated })
+    if (activeSession.confirmedOrderId) {
+      const membersPayload = updated.map(m => ({
+        uid: m.uid, name: m.name, character: m.character || '',
+        avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+        personalDiscount: Number(m.personalDiscount) || 0,
+        personalDiscountNote: m.personalDiscountNote || '',
+        unpaidDeposit: Boolean(m.unpaidDeposit),
+        ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+      }))
+      updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+        members: membersPayload,
+        discount: discountRaw,
+        discountMode,
+        discountMemberIds: discountMemberIdsRaw,
+        promoName: activeSession.promoName || '',
+        updatedAt: serverTimestamp(),
+      }).catch(err => console.warn('Failed to sync personal discount note to orders:', err))
+    }
+  }
+
+  const toggleReprice = (uid, currentVal) => {
+    setRepriceOpenUids(prev => {
+      const next = new Set(prev)
+      if (next.has(uid)) {
+        next.delete(uid)
+      } else {
+        next.add(uid)
+        setRepriceDrafts(d => ({ ...d, [uid]: (currentVal !== undefined && currentVal !== null) ? String(currentVal) : '' }))
+      }
+      return next
+    })
+  }
+
+  const setMemberCustomPrice = async (uid, val) => {
+    const isReset = val === '' || val === null || val === undefined
+    const parsedPrice = isReset ? null : Math.max(0, Number(val) || 0)
+    const updatedMembers = activeSession.members.map(m => {
+      if (m.uid !== uid) return m
+      if (isReset) {
+        const { customGamePrice, ...rest } = m
+        return rest
+      }
+      return { ...m, customGamePrice: parsedPrice }
+    })
+
+    updateActive({ members: updatedMembers })
+    showToast(
+      isReset
+        ? 'รีเซ็ตราคาเกมเป็นราคาปกติแล้ว'
+        : `ปรับราคาเกมเฉพาะคนเป็น ฿${fmtCurrency(parsedPrice)} เรียบร้อยแล้ว`
+    )
+
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      try {
+        const membersPayload = updatedMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+        }))
+        const newGamePrice = updatedMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
+        const dMode = activeSession.discountMode || 'perPerson'
+        const rawD = Number(activeSession.discount) || 0
+        const selIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+        const effIds = selIds.length > 0
+          ? selIds.filter(id => updatedMembers.some(mm => mm.uid === id))
+          : updatedMembers.map(mm => mm.uid)
+        const nD = effIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? rawD : rawD * nD) : 0
+        const totalPersonal = updatedMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          gameTotal: newGamePrice,
+          discount: rawD,
+          discountMode: dMode,
+          discountMemberIds: selIds,
+          promoName: activeSession.promoName || '',
+          grandTotal: Math.max(0, foodTotal + newGamePrice - totD - totalPersonal),
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync order on setMemberCustomPrice:', err)
+      }
+    }
+  }
+
+  const toggleUnpaidDeposit = async (uid) => {
+    const updatedMembers = activeSession.members.map(m =>
+      m.uid === uid ? { ...m, unpaidDeposit: !m.unpaidDeposit } : m
+    )
+    const isNowUnpaid = updatedMembers.find(m => m.uid === uid)?.unpaidDeposit
+    updateActive({ members: updatedMembers })
+    showToast(
+      isNowUnpaid
+        ? `คิดราคาเกมเต็ม (฿${fmtCurrency(gameFullPrice)}) สำหรับคนนี้แล้ว`
+        : 'ยกเลิกสถานะ "ยังไม่ได้จ่ายมัดจำ" แล้ว'
+    )
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      try {
+        const membersPayload = updatedMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+        }))
+        const newGamePrice = updatedMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
+        const dMode = activeSession.discountMode || 'perPerson'
+        const rawD = Number(activeSession.discount) || 0
+        const selIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+        const effIds = selIds.length > 0
+          ? selIds.filter(id => updatedMembers.some(mm => mm.uid === id))
+          : updatedMembers.map(mm => mm.uid)
+        const nD = effIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? rawD : rawD * nD) : 0
+        const totalPersonal = updatedMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          gameTotal: newGamePrice,
+          discount: rawD,
+          discountMode: dMode,
+          discountMemberIds: selIds,
+          promoName: activeSession.promoName || '',
+          grandTotal: Math.max(0, foodTotal + newGamePrice - totD - totalPersonal),
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync order on unpaidDeposit toggle:', err)
+      }
+    }
+  }
+
+  const syncMembersDiscount = async () => {
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) return
+    const membersPayload = activeSession.members.map(m => ({
+      uid: m.uid, name: m.name, character: m.character || '',
+      avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+      personalDiscount: Number(m.personalDiscount) || 0,
+      personalDiscountNote: m.personalDiscountNote || '',
+      unpaidDeposit: Boolean(m.unpaidDeposit),
+      ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+    }))
+    const totalPersonalDisc = membersPayload.reduce((s, m) => s + m.personalDiscount, 0)
+    await updateDoc(doc(db, 'orders', orderId), {
+      members: membersPayload,
+      grandTotal: Math.max(0, foodTotal + gamePrice - totalDiscount - totalPersonalDisc),
+    })
+    showToast('อัปเดตส่วนลดรายบุคคลแล้ว ')
+  }
+
+  const removeMember = async (uid) => {
+    const newMembers = activeSession.members.filter(m => m.uid !== uid)
+    updateActive({ members: newMembers })
+    if (activeSession.confirmedOrderId) {
+      try {
+        const orderId = activeSession.confirmedOrderId
+        const g = selectedGame
+        const gUnitPay = (activeSession.customPrice !== '' && activeSession.customPrice !== undefined)
+          ? Number(activeSession.customPrice) || 0
+          : g ? (g.payPrice ?? g.price ?? 0) : 0
+        const gFullPrice = g
+          ? (Number(g.fullPrice ?? g.price) || (gUnitPay + (Number(g.deposit) || 0)))
+          : gUnitPay
+        const newGamePrice = newMembers.reduce((sum, m) => sum + getMemberGamePrice(m), 0)
+        const fTotal = (activeSession.order || []).reduce((s, x) => s + (x.totalPrice || 0) * (x.qty || 1), 0)
+        const dMode = activeSession.discountMode || 'perPerson'
+        const dRaw = Number(activeSession.discount) || 0
+        const dSelIds = Array.isArray(activeSession.discountMemberIds) ? activeSession.discountMemberIds : []
+        const dEffIds = dSelIds.length > 0
+          ? dSelIds.filter(id => newMembers.some(mm => mm.uid === id))
+          : newMembers.map(mm => mm.uid)
+        const nD = dEffIds.length
+        const totD = nD > 0 ? (dMode === 'split' ? dRaw : dRaw * nD) : 0
+        const totPersonal = newMembers.reduce((s, m) => s + (Number(m.personalDiscount) || 0), 0)
+        const newGrandTotal = Math.max(0, fTotal + newGamePrice - totD - totPersonal)
+
+        const membersPayload = newMembers.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+        }))
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          members: membersPayload,
+          memberUids: newMembers.map(m => m.uid),
+          gameTotal: newGamePrice,
+          grandTotal: newGrandTotal,
+          discount: dRaw,
+          discountMode: dMode,
+          discountMemberIds: dSelIds,
+          promoName: activeSession.promoName || '',
+          updatedAt: serverTimestamp(),
+        })
+      } catch (err) {
+        console.warn('Failed to sync orders on removeMember:', err)
+      }
+    }
+  }
+
+  // order is now array: [{ key, menuId, name, basePrice, addons, totalPrice, qty, orderedBy, note }]
+  const addItem = (menuItem) => {
+    const members = activeSession?.members || []
+    setOrderModal({
+      item: menuItem,
+      member: members.length === 1 ? members[0] : (members.length === 0 ? 'all' : undefined),
+      selectedAddons: [],
+      note: '',
+      qty: 1,
+    })
+  }
+
+  const commitAddItem = async (menuItem, selectedAddons = [], orderedBy = null, note = '', qty = 1) => {
+    const addonTotal = (selectedAddons || []).reduce((s, a) => s + (a.price || 0), 0)
+    const unitPrice = (menuItem.price || 0) + addonTotal
+    const addQty = Math.max(1, Number(qty) || 1)
+    const trimmedNote = (note || '').trim()
+
+    // Include orderedBy + note in key so same item for different members / notes = separate order lines
+    const memberUid = orderedBy?.uid || ''
+    const key = menuItem.id + '|' + (selectedAddons || []).map(a => a.name).sort().join(',') + '|' + memberUid + '|' + trimmedNote
+    const cur = activeSession.order || []
+    const idx = cur.findIndex(x => x.key === key)
+    let updated
+    if (idx >= 0) {
+      updated = [...cur]
+      updated[idx] = { ...updated[idx], qty: updated[idx].qty + addQty }
+    } else {
+      updated = [...cur, {
+        key,
+        menuId: menuItem.id,
+        name: menuItem.name,
+        basePrice: menuItem.price,
+        addons: selectedAddons || [],
+        note: trimmedNote,
+        totalPrice: unitPrice,
+        qty: addQty,
+        orderedBy: orderedBy ? {
+          uid: orderedBy.uid,
+          name: orderedBy.name,
+          avatar: orderedBy.avatar || '',
+          character: orderedBy.character || '',
+        } : null,
+      }]
+    }
+
+    updateActive({ order: updated })
+
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+
+      const newItemsHistory = [{
+        menuId: menuItem.id,
+        name: menuItem.name,
+        addons: selectedAddons || [],
+        totalPrice: unitPrice,
+        qty: addQty,
+        note: trimmedNote,
+        orderedBy: orderedBy ? {
+          uid: orderedBy.uid,
+          name: orderedBy.name,
+          avatar: orderedBy.avatar || '',
+          character: orderedBy.character || '',
+        } : null,
+        addedAt: new Date().toISOString(),
+      }]
+
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          foodItems: updated.map(x => ({
+            menuId: x.menuId || '',
+            name: x.name,
+            addons: x.addons || [],
+            price: x.totalPrice,
+            qty: x.qty,
+            orderedBy: x.orderedBy || null,
+            note: x.note || '',
+          })),
+          memberFoodHistory: arrayUnion(...newItemsHistory),
+          foodTotal: newFoodTotal,
+          gameTotal: gamePrice,
+          grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
+        })
+
+        // Print kitchen ticket for this newly ordered item
+        const now = new Date()
+        const isPaid = (activeSession.members || []).length > 0 &&
+          activeSession.members.every(m => memberPayments[m.uid]?.verified)
+        const html = buildKitchenTicketHTML(newItemsHistory, activeSession, now, isPaid, receiptSettings)
+        const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
+        dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${menuItem.name} × ${addQty}`)
+      } catch (err) {
+        console.error('Failed to sync new order item to firestore:', err)
+      }
+    }
+
+    const recipientName = orderedBy ? (orderedBy.name || '').split(' ')[0] : 'ทั้งโต๊ะ'
+    showToast(`สั่ง ${menuItem.name} ${addQty > 1 ? `× ${addQty} ` : ''}ให้ ${recipientName} สำเร็จ `)
+  }
+
+  const removeItem = async (key) => {
+    const cur = activeSession.order || []
+    const idx = cur.findIndex(x => x.key === key)
+    if (idx < 0) return
+    let updated
+    if (cur[idx].qty <= 1) {
+      updated = cur.filter(x => x.key !== key)
+    } else {
+      updated = [...cur]
+      updated[idx] = { ...updated[idx], qty: updated[idx].qty - 1 }
+    }
+    updateActive({ order: updated })
+    const orderId = activeSession.confirmedOrderId
+    if (orderId) {
+      const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+      try {
+        await updateDoc(doc(db, 'orders', orderId), {
+          foodItems: updated.map(x => ({
+            menuId: x.menuId || '',
+            name: x.name,
+            addons: x.addons || [],
+            price: x.totalPrice,
+            qty: x.qty,
+            orderedBy: x.orderedBy || null,
+            note: x.note || '',
+          })),
+          foodTotal: newFoodTotal,
+          grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
+        })
+      } catch (err) {
+        console.warn('Failed to sync removed item to firestore:', err)
+      }
+    }
+  }
+
+  // getMemberBill is defined in outer component scope
+
+  const confirmGroupPayment = async () => {
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) { showToast('กรุณายืนยันออเดอร์ก่อน', 'error'); return }
+    const selectedUids = [...groupPaySelected]
+    if (selectedUids.length < 2) { showToast('เลือกอย่างน้อย 2 คน', 'error'); return }
+    const updates = {}
+    selectedUids.forEach(uid => {
+      const m = activeSession.members.find(x => x.uid === uid)
+      if (!m) return
+      updates[`memberPayments.${uid}.verified`] = true
+      updates[`memberPayments.${uid}.amount`] = Math.round(getMemberBill(m) * 100) / 100
+      updates[`memberPayments.${uid}.verifiedAt`] = new Date().toISOString()
+      updates[`memberPayments.${uid}.groupPay`] = true
+      updates[`memberPayments.${uid}.groupWith`] = selectedUids.filter(x => x !== uid)
+      updates[`memberPayments.${uid}.pendingAdminReview`] = false
+    })
+    setGroupPaySaving(true)
+    try {
+      await updateDoc(doc(db, 'orders', orderId), updates)
+      setGroupPayMode(false)
+      setGroupPaySelected(new Set())
+      showToast(`รับชำระรวม ${selectedUids.length} คน `)
+    } catch (e) { showToast('บันทึกล้มเหลว: ' + e.message, 'error') }
+    finally { setGroupPaySaving(false) }
+  }
+
+  const confirmZeroMember = async (m) => {
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) { showToast('กรุณายืนยันออเดอร์ก่อน', 'error'); return }
+    if (!window.confirm(`ยืนยันยอด ฿0 ของ ${m.name} โดยไม่ต้องใช้สลิป?`)) return
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        [`memberPayments.${m.uid}.verified`]: true,
+        [`memberPayments.${m.uid}.amount`]: 0,
+        [`memberPayments.${m.uid}.zeroAmount`]: true,
+        [`memberPayments.${m.uid}.verifiedAt`]: new Date().toISOString(),
+        [`memberPayments.${m.uid}.pendingAdminReview`]: false,
+        [`memberPayments.${m.uid}.easyslipPending`]: false,
+      })
+      showToast(`${m.name} ยืนยันยอด ฿0 เรียบร้อย `)
+    } catch (e) {
+      showToast('บันทึกล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  const quickManualVerify = async (m, billAmount) => {
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) { showToast('กรุณายืนยันออเดอร์ก่อน', 'error'); return }
+    const amountVal = memberPayments[m.uid]?.amount || billAmount || 0
+    if (!window.confirm(`ยืนยันรับเงิน ฿${fmtCurrency(amountVal)} ของ ${m.name} ทันที? (Admin อนุมัติ)`)) return
+    try {
+      await updateDoc(doc(db, 'orders', orderId), {
+        [`memberPayments.${m.uid}.verified`]: true,
+        [`memberPayments.${m.uid}.amount`]: amountVal,
+        [`memberPayments.${m.uid}.verifiedAt`]: new Date().toISOString(),
+        [`memberPayments.${m.uid}.pendingAdminReview`]: false,
+        [`memberPayments.${m.uid}.easyslipPending`]: false,
+        [`memberPayments.${m.uid}.manualVerify`]: true,
+      })
+      showToast(`${m.name} ยืนยันรับเงินเรียบร้อย`)
+    } catch (e) {
+      showToast('บันทึกล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  const assignBillOwner = async (key, member) => {
+    const cur = activeSession.order || []
+    const updated = cur.map(x => x.key === key ? { ...x, orderedBy: member } : x)
+    updateActive({ order: updated })
+    setEditingBillKey(null)
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) return
+    await updateDoc(doc(db, 'orders', orderId), {
+      foodItems: updated.map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        price: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      })),
+      memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        totalPrice: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy,
+        note: x.note || '',
+      })),
+    })
+  }
+
+  const voidItem = async (key) => {
+    const cur = activeSession.order || []
+    const updated = cur.filter(x => x.key !== key)
+    updateActive({ order: updated })
+    const orderId = activeSession.confirmedOrderId
+    if (!orderId) return
+    const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+    await updateDoc(doc(db, 'orders', orderId), {
+      foodItems: updated.map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        price: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      })),
+      memberFoodHistory: updated.filter(x => x.orderedBy).map(x => ({
+        menuId: x.menuId || '',
+        name: x.name,
+        addons: x.addons || [],
+        totalPrice: x.totalPrice ?? x.price ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy,
+        note: x.note || '',
+      })),
+      foodTotal: newFoodTotal,
+      gameTotal: gamePrice,
+      discount: discountRaw,
+      discountMode,
+      discountMemberIds: discountMemberIdsRaw,
+      promoName: activeSession.promoName || '',
+      grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
+    })
+  }
+
+  const addSession = () => {
+    const s = newBasicPOSSession()
+    setSessions(prev => dedupeSessions([...(Array.isArray(prev) ? prev : []), s], s.id))
+    setActiveId(s.id)
+  }
+
+  const removeSession = (id) => {
+    const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+    const session = list.find(s => String(s.id) === String(id))
+
+    // Close confirmed order in the background without blocking the UI
+    if (session?.confirmedOrderId) {
+      // Only close in Firestore if no other session shares this confirmedOrderId (protect against duplicate tab closure)
+      const hasDuplicateOrder = list.some(s => String(s.id) !== String(id) && s.confirmedOrderId === session.confirmedOrderId)
+      if (!hasDuplicateOrder) {
+        updateDoc(doc(db, 'orders', session.confirmedOrderId), {
+          status: 'closed',
+          closedAt: serverTimestamp(),
+        }).catch(e => console.warn('close order failed:', e.message))
+      }
+    }
+
+    setSessions(prev => {
+      const curList = Array.isArray(prev) && prev.length > 0 ? prev : list
+      const remaining = curList.filter(s => String(s.id) !== String(id))
+      if (remaining.length === 0) {
+        const fresh = newBasicPOSSession()
+        setActiveId(fresh.id)
+        return [fresh]
+      }
+      if (String(activeId) === String(id)) {
+        const nextActive = remaining[remaining.length - 1]
+        setActiveId(nextActive ? nextActive.id : null)
+      }
+      return dedupeSessions(remaining, activeId)
+    })
+    showToast('ปิดปาร์ตี้แล้ว')
+  }
+
+  const acceptOtherQueue = async (order) => {
+    const queue = order.memberFoodQueue || []
+    if (queue.length === 0) return
+    try {
+      let existingFoodItems = order.foodItems || []
+      try {
+        const snap = await getDoc(doc(db, 'orders', order.id))
+        if (snap.exists()) {
+          existingFoodItems = snap.data().foodItems || existingFoodItems
+        }
+      } catch (err) {
+        console.warn('Fetch fresh order doc failed in acceptOtherQueue:', err)
+      }
+
+      const cur = existingFoodItems.map(x => ({
+        key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+        menuId: x.menuId || '',
+        name: x.name,
+        basePrice: x.price ?? x.totalPrice ?? 0,
+        addons: x.addons || [],
+        totalPrice: x.price ?? x.totalPrice ?? 0,
+        qty: x.qty || 1,
+        orderedBy: x.orderedBy || null,
+        note: x.note || '',
+      }))
+      const updated = [...cur]
+      for (const qi of queue) {
+        const key = (qi.menuId || qi.name) + '|' + (qi.addons || []).map(a => a.name || a).sort().join(',') + '|' + (qi.orderedBy?.uid || '') + '|' + (qi.note || '')
+        const idx = updated.findIndex(x => x.key === key)
+        if (idx >= 0) {
+          updated[idx] = { ...updated[idx], qty: updated[idx].qty + qi.qty }
+        } else {
+          updated.push({
+            key,
+            menuId: qi.menuId || '',
+            name: qi.name,
+            basePrice: qi.totalPrice,
+            addons: qi.addons || [],
+            totalPrice: qi.totalPrice,
+            qty: qi.qty,
+            orderedBy: qi.orderedBy || null,
+            note: qi.note || '',
+          })
+        }
+      }
+      const newFoodTotal = updated.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+      const membersCount = (order.members || []).length
+      const gameUnitPrice = order.gameUnitPrice || (order.gameTotal && membersCount ? Math.round(order.gameTotal / membersCount) : 0)
+      const gameTotal = membersCount * gameUnitPrice
+      const d = Number(order.discount) || 0
+      await updateDoc(doc(db, 'orders', order.id), {
+        memberFoodQueue: [],
+        memberFoodHistory: arrayUnion(...queue),
+        foodItems: updated.map(x => ({
+          menuId: x.menuId || '',
+          name: x.name,
+          addons: x.addons || [],
+          price: x.totalPrice,
+          qty: x.qty,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        })),
+        foodTotal: newFoodTotal,
+        grandTotal: Math.max(0, newFoodTotal + gameTotal - d * membersCount),
+      })
+
+      // Sync to matching session in POS immediately
+      const targetSession = safeSessions.find(s => s.confirmedOrderId === order.id)
+      if (targetSession) {
+        updateSession(targetSession.id, { order: updated })
+      }
+
+      showToast(`รับ ${queue.length} รายการจาก ${order.room || order.scriptTitle || 'ลูกค้า'} แล้ว `)
+
+      // Dispatch print - local if primary printer, else via Firestore queue
+      const now = new Date()
+      const isPaid = (order.members || []).length > 0 &&
+        order.members.every(m => order.memberPayments?.[m.uid]?.verified)
+      const html = buildKitchenTicketHTML(queue, order, now, isPaid, receiptSettings)
+      const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
+      dispatchPrint(html, printWidth, `${order.room || order.scriptTitle || 'ตี้'} · ${queue.length} รายการ`)
+    } catch (e) {
+      showToast('รับออเดอร์ล้มเหลว: ' + e.message, 'error')
+    }
+  }
+
+  const openExistingOrder = (order) => {
+    const orderItems = (order.foodItems || []).map(x => ({
+      key: (x.menuId || x.name) + '|' + (x.addons || []).map(a => a.name || a).join(',') + '|' + (x.orderedBy?.uid || '') + '|' + (x.note || ''),
+      menuId: x.menuId || '',
+      name: x.name,
+      basePrice: x.price ?? x.totalPrice ?? 0,
+      addons: x.addons || [],
+      totalPrice: x.price ?? x.totalPrice ?? 0,
+      qty: x.qty || 1,
+      orderedBy: x.orderedBy || null,
+      note: x.note || '',
+    }))
+
+    setSessions(prev => {
+      const list = Array.isArray(prev) ? [...prev] : []
+      const existing = list.find(s => s.confirmedOrderId === order.id)
+
+      if (existing) {
+        setActiveId(existing.id)
+        if (orderItems.length > 0 || ((existing.members || []).length === 0 && (order.members || []).length > 0)) {
+          return list.map(s => s.id === existing.id ? {
+            ...s,
+            order: orderItems.length > 0 ? orderItems : s.order,
+            members: (s.members || []).length === 0 && (order.members || []).length > 0 ? order.members : s.members,
+          } : s)
+        }
+        return list
+      }
+
+      const newS = {
+        id: Date.now() + Math.random(),
+        label: order.scriptTitle ? `${order.scriptTitle} (${order.room || 'ตี้'})` : `ปาร์ตี้ ${sessionCounter++}`,
+        createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : new Date().toISOString(),
+        members: order.members || [],
+        scriptId: order.scriptId || '',
+        eventName: '',
+        customPrice: order.customPrice ?? '',
+        dm: order.dm || '',
+        npc: order.npc || '',
+        room: order.room || '',
+        order: orderItems,
+        confirmedOrderId: order.id,
+        promoName: order.promoName || '',
+        discount: order.discount || 0,
+        discountMode: order.discountMode || 'perPerson',
+        discountMemberIds: Array.isArray(order.discountMemberIds) ? order.discountMemberIds : [],
+      }
+
+      setActiveId(newS.id)
+      if (list.length === 1 && !list[0].confirmedOrderId && (!list[0].members || list[0].members.length === 0) && (!list[0].order || list[0].order.length === 0) && !list[0].scriptId) {
+        return [newS]
+      }
+      return dedupeSessions([...list, newS], newS.id)
+    })
+  }
+
+  const closeTable = () => {
+    setSelectedEnding('')
+    setShowEndingModal(true)
+  }
+
+  const doCloseTable = async (ending) => {
+    setShowEndingModal(false)
+    const orderId = activeSession.confirmedOrderId
+    try {
+      const orderSnap = await getDoc(doc(db, 'orders', orderId))
+      if (orderSnap.exists() && orderSnap.data().status !== 'paid') {
+        let serial = 1
+        try {
+          const counterRef = doc(db, 'settings', 'counter')
+          const snap = await getDoc(counterRef)
+          serial = ((snap.exists() ? snap.data().slipSerial : 0) || 0) + 1
+          setDoc(counterRef, { slipSerial: serial }, { merge: true }).catch(() => {})
+        } catch {
+          const now = new Date()
+          serial = (now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()) % 10000 || 1
+        }
+
+        const expectedTableTotal = Math.max(0, (gamePrice || 0) + (foodTotal || 0) - (totalDiscount || 0))
+
+        // Sum unique payments (deduplicate identical transRef from forAll / proxy payments)
+        const seenTransRefs = new Set()
+        let totalPaid = 0
+        Object.values(memberPayments).forEach(p => {
+          if (!p) return
+          if (p.transRef) {
+            if (seenTransRefs.has(p.transRef)) return
+            seenTransRefs.add(p.transRef)
+          }
+          totalPaid += Number(p.amount) || 0
+        })
+
+        const finalGrandTotal = expectedTableTotal > 0 ? expectedTableTotal : totalPaid
+
+        const memberBills = activeSession.members.map(m => {
+          const mFood = orderArr.filter(x => x.orderedBy?.uid === m.uid)
+          const mUnassigned = orderArr.filter(x => !x.orderedBy?.uid)
+          const mSharedFood = mUnassigned.map(x => ({
+            name: `${x.name} (ส่วนกลาง)`,
+            addons: x.addons || [],
+            price: Math.round(((x.totalPrice || x.price || 0) / (activeSession.members.length || 1)) * 100) / 100,
+            qty: x.qty || 1,
+          }))
+          const mBillTotal = getMemberBill(m)
+          const isMemberDiscounted = discountEffectiveIds.includes(m.uid)
+          let mDisc = 0
+          if (isMemberDiscounted) {
+            if (discountMode === 'split' && nDiscounted > 0) {
+              const baseDisc = Math.floor((discountRaw / nDiscounted) * 100) / 100
+              const remainder = Math.round((discountRaw - baseDisc * nDiscounted) * 100) / 100
+              mDisc = (m.uid === discountEffectiveIds[0]) ? baseDisc + remainder : baseDisc
+            } else {
+              mDisc = discountRaw
+            }
+          }
+          return {
+            uid: m.uid,
+            name: m.name,
+            character: m.character || '',
+            avatar: m.avatar || '',
+            gamePrice: getMemberGamePrice(m),
+            foodItems: [...mFood, ...mSharedFood],
+            discount: mDisc,
+            promoName: activeSession.promoName || '',
+            personalDiscount: Number(m.personalDiscount) || 0,
+            personalDiscountNote: m.personalDiscountNote || '',
+            customGamePrice: (m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null) ? Number(m.customGamePrice) : null,
+            total: mBillTotal,
+          }
+        })
+
+        const orderData = orderSnap.exists() ? orderSnap.data() : null
+
+        // Anchor bill recording to game play date (when party was added into POS, NOT when closing party)
+        let partyAddedTimestamp = null
+        if (orderData?.createdAt) {
+          if (typeof orderData.createdAt.toDate === 'function') {
+            partyAddedTimestamp = orderData.createdAt
+          } else if (orderData.createdAt.seconds) {
+            partyAddedTimestamp = new Timestamp(orderData.createdAt.seconds, orderData.createdAt.nanoseconds || 0)
+          } else {
+            const d = new Date(orderData.createdAt)
+            if (!isNaN(d.getTime())) partyAddedTimestamp = Timestamp.fromDate(d)
+          }
+        }
+        if (!partyAddedTimestamp && activeSession?.createdAt) {
+          const d = new Date(activeSession.createdAt)
+          if (!isNaN(d.getTime())) partyAddedTimestamp = Timestamp.fromDate(d)
+        }
+        if (!partyAddedTimestamp) {
+          partyAddedTimestamp = Timestamp.now()
+        }
+        const openAtDate = partyAddedTimestamp.toDate()
+
+        await addDoc(collection(db, 'payments'), {
+          orderId,
+          sessionLabel: activeSession.label,
+          scriptId: activeSession.scriptId || 'chinese-game-basic',
+          scriptTitle: selectedGame?.title || 'เกมจีน',
+          dm: activeSession.dm || 'DM จีน',
+          npc: activeSession.npc || '',
+          npcUids: activeSession.npcUids || [],
+          room: activeSession.room,
+          members: activeSession.members.map(m => ({
+            uid: m.uid, name: m.name, character: m.character || '',
+            avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          })),
+          memberUids: activeSession.members.map(m => m.uid),
+          memberBills,
+          gameUnitPrice: gameUnitPay,
+          gameTotal: gamePrice,
+          foodItems: orderArr.map(x => ({ name: x.name, addons: x.addons || [], price: x.totalPrice, qty: x.qty, orderedBy: x.orderedBy || null })),
+          foodTotal,
+          discount: { type: 'amount', value: totalDiscount, applied: totalDiscount },
+          promoName: activeSession.promoName || '',
+          grandTotal: finalGrandTotal,
+          memberPayments,
+          serial,
+          ending,
+          openAt: openAtDate,
+          playedAt: partyAddedTimestamp,
+          paidAt: partyAddedTimestamp,
+          closedAt: serverTimestamp(),
+          printCount: 0,
+          confirmedBy: adminUser?.name || 'BasicPOS', source: 'basic_pos',
+        })
+
+        await updateDoc(doc(db, 'orders', orderId), {
+          status: 'paid',
+          paidAt: partyAddedTimestamp,
+          closedAt: serverTimestamp(),
+          paidTotal: totalPaid,
+          ending,
+        })
+      }
+
+      const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+      const remaining = list.filter(s => String(s.id) !== String(activeId) && (!orderId || s.confirmedOrderId !== orderId))
+      if (remaining.length === 0) {
+        const fresh = newBasicPOSSession(); setSessions([fresh]); setActiveId(fresh.id)
+      } else {
+        setSessions(dedupeSessions(remaining, remaining[remaining.length - 1].id)); setActiveId(remaining[remaining.length - 1].id)
+      }
+      showToast('บันทึก report และปิดตี้แล้ว')
+    } catch (e) { showToast('ปิดตี้ล้มเหลว: ' + e.message, 'error') }
+  }
+
+  const MENU_CATEGORY_ORDER = [
+    'ของว่าง',
+    'เครื่องดื่มแช่เย็น',
+    'เครื่องดื่มชง',
+    'ม็อกเทล',
+    'กาแฟ',
+    'ของหวาน',
+    'อาหารจานเดียว',
+    'กับข้าว',
+    'แอลกอฮอล์',
+    'อาหาร',
+    'เครื่องดื่ม',
+    'เพิ่มเติม',
+  ]
+
+  const sortMenuCategories = (cats) => {
+    const getCatRank = (c) => {
+      const norm = c === 'อาหารจานเดี่ยว' ? 'อาหารจานเดียว' : c
+      const idx = MENU_CATEGORY_ORDER.indexOf(norm)
+      return idx !== -1 ? idx : 999
+    }
+    return [...cats].sort((a, b) => {
+      const rankA = getCatRank(a)
+      const rankB = getCatRank(b)
+      if (rankA !== rankB) return rankA - rankB
+      return a.localeCompare(b, 'th')
+    })
+  }
+
+  const menuCategories = ['ทั้งหมด', ...sortMenuCategories(Array.from(new Set(menuItems.map(m => m.category).filter(Boolean))))]
+
+  const filteredMenuItems = menuItems.filter(item => {
+    if (item.available === false) return false
+    if (menuCategory !== 'ทั้งหมด' && item.category !== menuCategory) return false
+    if (menuSearch && !item.name.toLowerCase().includes(menuSearch.toLowerCase())) return false
+    return true
+  })
+
+  const groupedMenu = useMemo(() => {
+    const rawGroups = filteredMenuItems.reduce((g, item) => {
+      const cat = item.category || 'อื่นๆ'
+      if (!g[cat]) g[cat] = []
+      g[cat].push(item)
+      return g
+    }, {})
+
+    const sortedCats = sortMenuCategories(Object.keys(rawGroups))
+    const ordered = {}
+    sortedCats.forEach(cat => {
+      ordered[cat] = rawGroups[cat]
+    })
+    return ordered
+  }, [filteredMenuItems])
+
+  // ── confirm / update order ───────────────────────────────────────
+  const handleConfirm = async () => {
+    const s = activeSession
+    if (s.members.length === 0) { showToast('ยังไม่มีสมาชิกในปาร์ตี้', 'error'); return }
+    // Script ID defaults to chinese-game-basic for BasicPOS
+    setSaving(true)
+    try {
+      const payload = {
+        members: s.members.map(m => ({
+          uid: m.uid, name: m.name, character: m.character || '',
+          avatar: m.avatar || '', scanInAt: m.scanInAt || null,
+          personalDiscount: Number(m.personalDiscount) || 0,
+          personalDiscountNote: m.personalDiscountNote || '',
+          unpaidDeposit: Boolean(m.unpaidDeposit),
+          ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
+        })),
+        memberUids: s.members.map(m => m.uid),
+        scriptId: s.scriptId || 'chinese-game-basic',
+        scriptTitle: selectedGame?.title || 'เกมจีน',
+        dm: s.dm || 'DM จีน',
+        npc: s.npc || '',
+        room: s.room,
+        foodItems: orderArr.map(x => ({
+          menuId: x.menuId || '',
+          name: x.name,
+          addons: x.addons || [],
+          price: x.totalPrice ?? x.price ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy || null,
+          note: x.note || '',
+        })),
+        memberFoodHistory: orderArr.filter(x => x.orderedBy).map(x => ({
+          menuId: x.menuId || '',
+          name: x.name,
+          addons: x.addons || [],
+          totalPrice: x.totalPrice ?? x.price ?? 0,
+          qty: x.qty || 1,
+          orderedBy: x.orderedBy,
+          note: x.note || '',
+        })),
+        customPrice: s.customPrice ?? '',
+        gameUnitPrice: gameUnitPay,
+        foodTotal,
+        gameTotal: gamePrice,
+        discount: discountRaw,  // raw input value (per-person or lump sum)
+        discountMode,           // 'perPerson' | 'split'
+        discountMemberIds: discountMemberIdsRaw,  // [] = all members, else selected uids
+        promoName: s.promoName || '',
+        grandTotal,
+        createdBy: adminUser?.name || 'admin',
+        status: 'active', source: 'basic_pos',
+      }
+
+      if (s.confirmedOrderId) {
+        // ── update existing order (เพิ่มของกิน / สมาชิกใหม่) ──────
+        await updateDoc(doc(db, 'orders', s.confirmedOrderId), {
+          ...payload, updatedAt: serverTimestamp()
+        })
+        showToast('อัปเดตออเดอร์สำเร็จ ')
+        setEditingUnlocked(false)
+      } else {
+        // ── create new order ──────────────────────────────────────
+        for (const m of s.members) {
+          await addDoc(collection(db, 'playHistory'), {
+            userId: m.uid, userName: m.name, userAvatar: m.avatar,
+            scriptId: s.scriptId || 'chinese-game-basic', scriptTitle: selectedGame?.title || 'เกมจีน',
+            character: m.character, dm: s.dm || 'DM จีน', room: s.room,
+            playedAt: serverTimestamp(), recordedBy: adminUser?.name || 'admin',
+          })
+        }
+        const orderRef = doc(collection(db, 'orders'))
+        const orderId = orderRef.id
+        // Associate confirmedOrderId to active session BEFORE writing to Firestore to eliminate onSnapshot race condition
+        updateActive({ confirmedOrderId: orderId })
+        await setDoc(orderRef, { ...payload, createdAt: serverTimestamp() })
+        showToast('บันทึกออเดอร์สำเร็จ ')
+      }
+    } catch (e) {
+      showToast('บันทึกล้มเหลว: ' + e.message, 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div id="pos-page" className="page active" data-mobile-panel={mobilePanel}>
+
+      {/* ─── POS redesign overrides - white-red, cleaner, less chrome ─── */}
+      <style>{`
+        /* Shell */
+        #pos-page { background: #faf7f5 !important; min-height: 100vh; padding-top: 60px; }
+
+        /* ── Today bar - flatter, calmer ── */
+        .pos-today-bar { background: #ffffff !important; border-bottom: 1px solid rgba(26,26,26,0.06) !important; box-shadow: none !important; padding: 10px 0 !important; }
+        .pos-today-bar-inner { max-width: 1340px !important; padding: 0 20px !important; }
+        .pos-today-info { color: #1a1a1a !important; font-weight: 700 !important; font-size: 13px !important; display: flex !important; align-items: center !important; gap: 8px !important; }
+        .pos-today-info i { color: #c62419 !important; }
+        .pos-today-count { padding: 2px 10px !important; background: rgba(198,36,25,0.08) !important; color: #c62419 !important; border-radius: 999px !important; font-size: 11px !important; font-weight: 800 !important; border: 1px solid rgba(198,36,25,0.2) !important; margin-left: 4px !important; }
+        .pos-today-sum { color: rgba(26,26,26,0.6) !important; font-size: 12.5px !important; font-weight: 600 !important; }
+        .pos-today-list { background: #ffffff !important; border-radius: 14px !important; border: 1px solid rgba(26,26,26,0.06) !important; margin-top: 8px !important; }
+
+        /* ── Session tabs - card-like, modern ── */
+        .pos-tabs-wrap { background: transparent !important; border: none !important; padding: 14px 20px 6px !important; max-width: 1340px !important; margin: 0 auto !important; }
+        .pos-tabs { gap: 6px !important; }
+        .pos-tab {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 6px !important;
+          position: relative !important;
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.08) !important;
+          color: rgba(26,26,26,0.65) !important;
+          padding: 8px 10px 8px 14px !important;
+          border-radius: 10px !important;
+          font-weight: 700 !important;
+          font-size: 12.5px !important;
+          transition: all 0.14s !important;
+          box-shadow: 0 1px 2px rgba(26,26,26,0.03) !important;
+          cursor: pointer !important;
+          user-select: none !important;
+        }
+        .pos-tab:hover { color: #1a1a1a !important; border-color: rgba(26,26,26,0.2) !important; }
+        .pos-tab.active {
+          background: #c62419 !important;
+          border-color: #c62419 !important;
+          color: #ffffff !important;
+          box-shadow: 0 4px 14px rgba(198,36,25,0.3) !important;
+          transform: translateY(-1px);
+        }
+        .pos-tab.confirmed:not(.active) {
+          border-color: rgba(200,160,80,0.5) !important;
+          background: rgba(200,160,80,0.07) !important;
+          color: #1a1a1a !important;
+        }
+        .pos-tab.active .pos-tab-count { background: rgba(255,255,255,0.22) !important; color: #ffffff !important; }
+        .pos-tab-count { background: rgba(198,36,25,0.1) !important; color: #c62419 !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10.5px !important; font-weight: 800 !important; margin-left: 6px !important; border: none !important; flex-shrink: 0 !important; }
+        .pos-tab-label {
+          display: inline-flex !important;
+          align-items: center !important;
+          min-width: 0 !important;
+          flex: 1 1 auto !important;
+          overflow: hidden !important;
+        }
+        .pos-tab-text {
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+          white-space: nowrap !important;
+          min-width: 0 !important;
+          display: inline-block !important;
+        }
+        .pos-tab-close {
+          display: inline-flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          width: 24px !important;
+          height: 24px !important;
+          min-width: 24px !important;
+          min-height: 24px !important;
+          margin-left: 6px !important;
+          border-radius: 50% !important;
+          border: none !important;
+          background: rgba(0,0,0,0.06) !important;
+          cursor: pointer !important;
+          color: rgba(26,26,26,0.5) !important;
+          opacity: 0.8 !important;
+          transition: all 0.15s ease !important;
+          padding: 0 !important;
+          flex-shrink: 0 !important;
+          z-index: 10 !important;
+          pointer-events: auto !important;
+          position: relative !important;
+        }
+        .pos-tab:hover .pos-tab-close { opacity: 1 !important; color: #1a1a1a !important; }
+        .pos-tab-close:hover {
+          color: #c62419 !important;
+          background: rgba(198,36,25,0.15) !important;
+          opacity: 1 !important;
+          transform: scale(1.12) !important;
+        }
+        .pos-tab.active .pos-tab-close {
+          color: rgba(255,255,255,0.9) !important;
+          background: rgba(255,255,255,0.2) !important;
+          opacity: 0.9 !important;
+        }
+        .pos-tab.active .pos-tab-close:hover {
+          color: #ffffff !important;
+          background: rgba(255,255,255,0.35) !important;
+          opacity: 1 !important;
+          transform: scale(1.12) !important;
+        }
+        .pos-tab-add {
+          background: transparent !important;
+          color: #c62419 !important;
+          border: 1.5px dashed rgba(198,36,25,0.4) !important;
+          padding: 7px 14px !important;
+          border-radius: 10px !important;
+          font-weight: 700 !important;
+          font-size: 12.5px !important;
+        }
+        .pos-tab-add:hover { background: rgba(198,36,25,0.06) !important; border-color: #c62419 !important; }
+        .pos-tab-alert-badge { background: #c62419 !important; color: #fff !important; padding: 1px 7px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 800 !important; margin-left: 6px !important; }
+
+        /* ── Main layout proportions ── */
+        .pos-layout { padding: 10px 20px 60px !important; gap: 12px !important; grid-template-columns: 340px 1fr 320px !important; }
+        .pos-left, .pos-middle, .pos-right {
+          background: #ffffff !important;
+          border-radius: 18px !important;
+          border: 1px solid rgba(26,26,26,0.06) !important;
+          box-shadow: 0 2px 8px rgba(26,26,26,0.04) !important;
+        }
+
+        /* ── Section titles - quieter, no shouting ── */
+        .pos-section-title {
+          font-size: 11px !important;
+          letter-spacing: 0.14em !important;
+          color: rgba(26,26,26,0.42) !important;
+          font-weight: 800 !important;
+          padding: 14px 18px 12px !important;
+          border-bottom: 1px solid rgba(26,26,26,0.05) !important;
+        }
+        .pos-section-title i { color: #c62419 !important; font-size: 11px !important; }
+        .pos-divider { margin: 8px 18px !important; background: rgba(26,26,26,0.05) !important; }
+
+        /* ── Member row - cleaner ── */
+        .pos-members-list { padding: 10px 14px !important; gap: 6px !important; }
+        .pos-member-row {
+          background: #faf7f5 !important;
+          border: 1px solid rgba(26,26,26,0.05) !important;
+          border-radius: 12px !important;
+          padding: 10px 12px !important;
+          gap: 10px !important;
+        }
+        .pos-member-row.pos-member-collapsible {
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 0 !important;
+          padding: 10px 12px !important;
+          transition: background 0.14s, border-color 0.14s;
+        }
+        .pos-member-row.pos-member-collapsible.is-expanded {
+          background: #ffffff !important;
+          border-color: rgba(198,36,25,0.18) !important;
+          box-shadow: 0 4px 14px rgba(198,36,25,0.08);
+        }
+        .pos-member-row.pos-member-collapsible .pos-member-head:hover {
+          opacity: 0.92;
+        }
+
+        /* ── Locked state - hide inputs/edit controls, keep view interactions ── */
+        .pos-left.is-locked .pos-remove-btn,
+        .pos-left.is-locked .pos-scan-more-btn,
+        .pos-left.is-locked .pos-lock-hide-when-locked { display: none !important; }
+
+        /* Editing mode - subtle crimson ring to show "unlocked" */
+        .pos-left.is-editing {
+          box-shadow: 0 0 0 2px rgba(198,36,25,0.18), 0 2px 8px rgba(26,26,26,0.04) !important;
+        }
+
+        /* Member Order Picker Modal */
+        .pos-order-modal {
+          background: #ffffff !important;
+          border-radius: 22px !important;
+          width: 94vw !important;
+          max-width: 480px !important;
+          max-height: 90vh !important;
+          display: flex !important;
+          flex-direction: column !important;
+          overflow: hidden !important;
+          box-shadow: 0 25px 60px rgba(0,0,0,0.35) !important;
+          animation: posModalIn 0.16s ease-out !important;
+        }
+        @keyframes posModalIn {
+          from { opacity: 0; transform: scale(0.96) translateY(10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .pos-order-modal-header {
+          padding: 16px 20px 14px !important;
+          border-bottom: 1px solid rgba(26,26,26,0.07) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+        }
+        .pos-order-modal-title {
+          font-size: 16.5px !important;
+          font-weight: 800 !important;
+          color: #1a1a1a !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 8px !important;
+        }
+        .pos-order-modal-subtitle {
+          font-size: 11.5px !important;
+          color: rgba(26,26,26,0.55) !important;
+          margin-top: 2px !important;
+        }
+        .pos-order-item-banner {
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          gap: 12px !important;
+          padding: 12px 20px !important;
+          background: #faf7f5 !important;
+          border-bottom: 1px solid rgba(26,26,26,0.06) !important;
+        }
+        .pos-order-modal-body {
+          padding: 16px 20px !important;
+          overflow-y: auto !important;
+          flex: 1 !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 15px !important;
+        }
+        .pos-order-section-title {
+          font-size: 11px !important;
+          font-weight: 800 !important;
+          text-transform: uppercase !important;
+          letter-spacing: 0.08em !important;
+          color: rgba(26,26,26,0.5) !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: space-between !important;
+          margin-bottom: 8px !important;
+        }
+        .pos-order-members-grid {
+          display: grid !important;
+          grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)) !important;
+          gap: 8px !important;
+        }
+        .pos-order-member-card {
+          padding: 10px 12px !important;
+          border-radius: 12px !important;
+          background: #ffffff !important;
+          border: 1.5px solid rgba(26,26,26,0.1) !important;
+          cursor: pointer !important;
+          display: flex !important;
+          align-items: center !important;
+          gap: 10px !important;
+          text-align: left !important;
+          transition: all 0.14s ease !important;
+          font-family: 'Sarabun', sans-serif !important;
+          user-select: none !important;
+        }
+        .pos-order-member-card:hover {
+          border-color: #c62419 !important;
+          background: #fffafa !important;
+          transform: translateY(-1px) !important;
+        }
+        .pos-order-member-card.selected {
+          background: #fff5f5 !important;
+          border-color: #c62419 !important;
+          box-shadow: 0 0 0 1px #c62419, 0 4px 12px rgba(198,36,25,0.12) !important;
+        }
+        .pos-order-member-avatar {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 50% !important;
+          object-fit: cover !important;
+          flex-shrink: 0 !important;
+        }
+        .pos-order-member-avatar-ph {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 50% !important;
+          background: #ebe4e1 !important;
+          color: #1a1a1a !important;
+          font-weight: 800 !important;
+          font-size: 13.5px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          flex-shrink: 0 !important;
+        }
+        .pos-order-all-icon {
+          width: 36px !important;
+          height: 36px !important;
+          border-radius: 10px !important;
+          background: rgba(198,36,25,0.08) !important;
+          color: #c62419 !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          font-size: 15px !important;
+          flex-shrink: 0 !important;
+        }
+        .pos-order-modal-footer {
+          padding: 14px 20px 18px !important;
+          background: #faf7f5 !important;
+          border-top: 1px solid rgba(26,26,26,0.06) !important;
+          display: flex !important;
+          flex-direction: column !important;
+          gap: 10px !important;
+        }
+        .pos-member-avatar, .pos-member-avatar-ph { width: 36px !important; height: 36px !important; }
+        .pos-member-avatar-ph { background: #ebe4e1 !important; color: #1a1a1a !important; font-weight: 800 !important; font-size: 13px !important; display: flex !important; align-items: center !important; justify-content: center !important; }
+        .pos-member-name { color: #1a1a1a !important; font-weight: 700 !important; font-size: 13.5px !important; gap: 6px !important; }
+        .pos-member-paid-badge { background: #c62419 !important; color: #fff !important; border: none !important; padding: 2px 8px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 800 !important; }
+        .pos-member-slip-badge { background: rgba(198,36,25,0.08) !important; color: #c62419 !important; border: 1px solid rgba(198,36,25,0.25) !important; padding: 3px 8px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 700 !important; }
+        .pos-member-slip-badge:hover { background: rgba(198,36,25,0.14) !important; }
+        .pos-member-pending-badge { background: rgba(26,26,26,0.06) !important; color: rgba(26,26,26,0.6) !important; padding: 2px 7px !important; border-radius: 999px !important; font-size: 10px !important; font-weight: 700 !important; }
+        .pos-paid-collapse-btn { background: transparent !important; color: rgba(26,26,26,0.55) !important; font-size: 12px !important; font-weight: 700 !important; padding: 10px 14px !important; border-top: 1px solid rgba(26,26,26,0.05) !important; }
+        .pos-paid-collapse-btn:hover { background: #faf7f5 !important; }
+        .pos-char-select, .pos-char-input {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          color: #1a1a1a !important;
+          font-size: 12px !important;
+          padding: 6px 10px !important;
+          border-radius: 8px !important;
+        }
+        .pos-char-select:focus, .pos-char-input:focus { border-color: #c62419 !important; box-shadow: 0 0 0 3px rgba(198,36,25,0.08) !important; outline: none !important; }
+        .pos-remove-btn { color: rgba(26,26,26,0.3) !important; }
+        .pos-remove-btn:hover { color: #c62419 !important; }
+
+        /* ── Discount row ── */
+        .pos-personal-disc-amt, .pos-personal-disc-note {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          font-size: 11.5px !important;
+          padding: 6px 9px !important;
+          border-radius: 8px !important;
+        }
+        .pos-personal-disc-amt:focus, .pos-personal-disc-note:focus { border-color: #c62419 !important; box-shadow: 0 0 0 3px rgba(198,36,25,0.08) !important; outline: none !important; }
+
+        /* ── Scan button, Sync button ── */
+        .pos-scan-more-btn {
+          background: #1a1a1a !important;
+          color: #ffffff !important;
+          font-weight: 800 !important;
+          font-size: 13px !important;
+          padding: 10px 14px !important;
+          border-radius: 10px !important;
+        }
+        .pos-scan-more-btn:hover { background: #000000 !important; }
+        .pos-sync-disc-btn {
+          background: #ffffff !important;
+          color: #1a1a1a !important;
+          border: 1px solid rgba(26,26,26,0.14) !important;
+          font-weight: 700 !important;
+          font-size: 12px !important;
+          padding: 8px 12px !important;
+          border-radius: 10px !important;
+        }
+        .pos-sync-disc-btn:hover { background: #faf7f5 !important; }
+
+        /* ── Form inputs ── */
+        .form-input, .form-select, .form-textarea {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          color: #1a1a1a !important;
+          border-radius: 8px !important;
+          padding: 8px 12px !important;
+          font-size: 13px !important;
+          transition: all 0.14s !important;
+        }
+        .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: #c62419 !important; box-shadow: 0 0 0 3px rgba(198,36,25,0.08) !important; outline: none !important; }
+        .form-label { color: rgba(26,26,26,0.5) !important; font-size: 11px !important; font-weight: 700 !important; letter-spacing: 0.03em !important; margin-bottom: 4px !important; }
+
+        /* ── Promo / discount section ── */
+        .pos-promo-wrap { padding: 8px 16px 16px !important; display: flex !important; flex-direction: column !important; gap: 10px !important; box-sizing: border-box !important; width: 100% !important; }
+        .pos-promo-name-input {
+          background: #faf7f5 !important;
+          border: 1px solid rgba(26,26,26,0.08) !important;
+          color: #1a1a1a !important;
+          padding: 9px 12px !important;
+          border-radius: 10px !important;
+          font-size: 12.5px !important;
+        }
+        .pos-promo-name-input:focus { border-color: #c62419 !important; background: #ffffff !important; outline: none !important; }
+        .pos-promo-amount-input {
+          background: #ffffff !important;
+          border: 1px solid rgba(26,26,26,0.1) !important;
+          color: #c62419 !important;
+          font-weight: 800 !important;
+          font-size: 14px !important;
+          padding: 7px 10px !important;
+          border-radius: 8px !important;
+          text-align: right !important;
+        }
+        .pos-promo-amount-input:focus { border-color: #c62419 !important; outline: none !important; }
+        .pos-promo-label { color: rgba(26,26,26,0.5) !important; font-size: 11.5px !important; font-weight: 700 !important; }
+        .pos-promo-unit { color: rgba(26,26,26,0.4) !important; font-size: 11px !important; }
+
+        /* ── Pay/CTA buttons ── */
+        .pos-pay-btn {
+          background: #c62419 !important;
+          color: #ffffff !important;
+          font-weight: 800 !important;
+          font-size: 14px !important;
+          padding: 12px 18px !important;
+          border-radius: 12px !important;
+          box-shadow: 0 6px 18px rgba(198,36,25,0.3) !important;
+        }
+        .pos-pay-btn:hover { background: #9a1c13 !important; }
+
+        /* ── Right summary panel padding ── */
+        .pos-right-content { padding: 12px 14px !important; }
+        .pos-right-footer { background: #fdfbfa !important; }
+
+        /* ── Empty state ── */
+        .pos-empty { color: rgba(26,26,26,0.3) !important; font-size: 12.5px !important; padding: 24px 18px !important; }
+
+        /* ── Queue bar (incoming orders) - more prominent ── */
+        .pos-queue-bar { background: linear-gradient(135deg, #c62419 0%, #9a1c13 100%) !important; border: none !important; border-radius: 14px !important; box-shadow: 0 8px 24px rgba(198,36,25,0.3) !important; margin: 10px 20px 0 !important; max-width: calc(1340px - 40px) !important; margin-left: auto !important; margin-right: auto !important; }
+        .pos-queue-bar.other-table { background: linear-gradient(135deg, #1a1a1a 0%, #000000 100%) !important; box-shadow: 0 8px 24px rgba(26,26,26,0.2) !important; }
+        .pos-queue-badge { background: rgba(255,255,255,0.2) !important; color: #ffffff !important; backdrop-filter: blur(4px); }
+
+        /* ─── RESPONSIVE ─── */
+
+        /* Tablet: 2-col - left sidebar + merged middle+right */
+        @media (max-width: 1200px) {
+          .pos-layout { grid-template-columns: 320px 1fr !important; }
+          .pos-right { grid-column: 2 !important; }
+          .pos-middle, .pos-right { position: static !important; max-height: none !important; }
+        }
+
+        /* Mobile - segmented view: 1 panel at a time, top shortcut tabs */
+        @media (max-width: 820px) {
+          html, body { overflow-x: hidden !important; }
+          #pos-page {
+            padding-top: 60px; padding-bottom: 20px !important;
+            overflow-x: hidden !important;
+            max-width: 100vw !important;
+          }
+          .pos-today-bar, .pos-tabs-wrap, .pos-queue-bar, .pos-today-list { max-width: 100% !important; box-sizing: border-box !important; }
+          .pos-today-bar-inner { padding: 0 14px !important; flex-wrap: wrap !important; gap: 8px !important; }
+          .pos-today-info { font-size: 12.5px !important; }
+
+          .pos-tabs-wrap { padding: 12px 14px 4px !important; overflow-x: auto !important; overflow-y: hidden !important; -webkit-overflow-scrolling: touch; width: 100% !important; box-sizing: border-box !important; margin: 0 !important; }
+          .pos-tabs-wrap::-webkit-scrollbar { height: 0 !important; }
+          .pos-tabs { flex-wrap: nowrap !important; min-width: min-content !important; }
+          .pos-tab { flex-shrink: 0 !important; white-space: nowrap !important; max-width: 78vw !important; }
+          .pos-tab-label { min-width: 0 !important; flex: 1 1 auto !important; overflow: hidden !important; }
+          .pos-tab-close { width: 28px !important; height: 28px !important; min-width: 28px !important; min-height: 28px !important; flex-shrink: 0 !important; }
+          .pos-tab-add { flex-shrink: 0 !important; white-space: nowrap !important; }
+
+          .pos-queue-bar { margin: 8px 14px 0 !important; width: calc(100% - 28px) !important; max-width: calc(100% - 28px) !important; }
+          .pos-today-list { margin: 6px 14px 0 !important; width: calc(100% - 28px) !important; max-width: calc(100% - 28px) !important; }
+
+          .pos-layout {
+            grid-template-columns: 1fr !important;
+            padding: 8px 14px 20px !important;
+            gap: 0 !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+          }
+          .pos-left, .pos-middle, .pos-right {
+            position: static !important;
+            max-height: none !important;
+            overflow: visible !important;
+            border-radius: 16px !important;
+            grid-column: 1 / -1 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            box-sizing: border-box !important;
+          }
+
+          /* Show only the active mobile panel */
+          #pos-page[data-mobile-panel="members"] .pos-middle,
+          #pos-page[data-mobile-panel="members"] .pos-right { display: none !important; }
+          #pos-page[data-mobile-panel="menu"] .pos-left,
+          #pos-page[data-mobile-panel="menu"] .pos-right { display: none !important; }
+          #pos-page[data-mobile-panel="order"] .pos-left,
+          #pos-page[data-mobile-panel="order"] .pos-middle { display: none !important; }
+
+          .pos-section-title { padding: 12px 14px 10px !important; font-size: 10.5px !important; }
+          .pos-members-list { padding: 8px 10px !important; }
+          .pos-member-row { padding: 9px 10px !important; }
+          .pos-member-avatar, .pos-member-avatar-ph { width: 34px !important; height: 34px !important; }
+          .pos-member-name { font-size: 13px !important; }
+          .pos-personal-disc-row { flex-wrap: wrap !important; }
+          .pos-personal-disc-amt { flex: 0 0 90px !important; min-width: 0 !important; }
+          .pos-personal-disc-note { flex: 1 1 120px !important; min-width: 0 !important; }
+
+          .pos-member-actions { padding: 0 10px 12px !important; }
+          .pos-divider { margin: 6px 14px !important; }
+          .pos-promo-wrap { padding: 8px 10px 12px !important; }
+
+          .pos-queue-bar { margin: 8px 14px 0 !important; max-width: calc(100% - 28px) !important; }
+          .pos-queue-bar-top { flex-wrap: wrap !important; gap: 8px !important; }
+
+          .pos-today-list { margin: 6px 14px 0 !important; max-width: calc(100% - 28px) !important; }
+          .pos-today-item-left { min-width: 0 !important; }
+          .pos-today-game { font-size: 13px !important; overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+
+          .pos-pay-btn { font-size: 13.5px !important; padding: 11px 14px !important; }
+
+          /* Mobile top shortcut tabs */
+          .pos-mobile-shortcut { display: flex !important; }
+          #pos-page { padding-bottom: 20px !important; }
+        }
+
+        /* Desktop: hide mobile shortcut */
+        .pos-mobile-shortcut { display: none; }
+        @media (min-width: 821px) {
+          .pos-mobile-shortcut { display: none !important; }
+        }
+
+        /* ── Mobile top shortcut tabs (sticky under party tabs) ── */
+        .pos-mobile-shortcut {
+          position: sticky; top: 60px; z-index: 30;
+          display: none;
+          gap: 6px;
+          padding: 10px 14px;
+          background: rgba(250,247,245,0.92);
+          backdrop-filter: blur(14px);
+          border-bottom: 1px solid rgba(26,26,26,0.06);
+          width: 100%;
+          max-width: 100%;
+          box-sizing: border-box;
+        }
+        .pos-mobile-shortcut-btn {
+          flex: 1; display: flex; align-items: center; justify-content: center;
+          gap: 6px; padding: 9px 8px;
+          background: #ffffff;
+          border: 1px solid rgba(26,26,26,0.08);
+          border-radius: 10px;
+          color: rgba(26,26,26,0.6);
+          font-size: 12px; font-weight: 800;
+          font-family: 'Sarabun', sans-serif;
+          cursor: pointer; transition: all 0.14s;
+          position: relative;
+          letter-spacing: 0.01em;
+        }
+        .pos-mobile-shortcut-btn.active {
+          background: #c62419;
+          border-color: #c62419;
+          color: #ffffff;
+          box-shadow: 0 4px 14px rgba(198,36,25,0.3);
+          transform: translateY(-1px);
+        }
+        .pos-mobile-shortcut-badge {
+          display: inline-flex; align-items: center; justify-content: center;
+          min-width: 18px; height: 18px; padding: 0 5px;
+          border-radius: 999px;
+          background: rgba(198,36,25,0.1); color: #c62419;
+          font-size: 10px; font-weight: 900;
+          margin-left: 2px;
+        }
+        .pos-mobile-shortcut-btn.active .pos-mobile-shortcut-badge {
+          background: rgba(255,255,255,0.22); color: #ffffff;
+        }
+
+        /* Very small (iPhone SE etc.) */
+        @media (max-width: 400px) {
+          .pos-today-bar-inner { padding: 0 10px !important; }
+          .pos-tabs-wrap { padding: 10px 10px 4px !important; }
+          .pos-layout { padding: 6px 10px 100px !important; gap: 8px !important; }
+          .pos-section-title { padding: 10px 12px 8px !important; }
+          .pos-members-list { padding: 6px 8px !important; }
+          .pos-member-row { padding: 8px 9px !important; gap: 8px !important; }
+          .pos-member-avatar, .pos-member-avatar-ph { width: 32px !important; height: 32px !important; }
+          .pos-member-name { font-size: 12.5px !important; gap: 4px !important; flex-wrap: wrap !important; }
+          .pos-char-select, .pos-char-input { font-size: 11.5px !important; padding: 5px 8px !important; }
+          .pos-personal-disc-amt, .pos-personal-disc-note { font-size: 11px !important; padding: 5px 8px !important; }
+
+          .pos-tab { padding: 7px 11px !important; font-size: 11.5px !important; }
+          .pos-tab-add { padding: 6px 11px !important; font-size: 11.5px !important; }
+          .pos-queue-bar { margin: 6px 10px 0 !important; max-width: calc(100% - 20px) !important; }
+          .pos-today-list { margin: 4px 10px 0 !important; max-width: calc(100% - 20px) !important; }
+        }
+      `}</style>
+
+      {/* ── TODAY BAR ── */}
+      <div className="pos-today-bar">
+        <div className="pos-today-bar-inner">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ padding: '4px 10px', borderRadius: 8, background: '#c62419', color: '#fff', fontSize: 11, fontWeight: 800, letterSpacing: '0.04em' }}>
+              {t('basicPosBadge', 'BASIC POS (ไม่ต้องล็อกอิน)')}
+            </span>
+            <div style={{ display: 'flex', background: 'rgba(26,26,26,0.06)', padding: 2, borderRadius: 8, gap: 2 }}>
+              {[
+                { key: 'th', label: 'ไทย' },
+                { key: 'en', label: 'EN' },
+                { key: 'zh', label: '中文' },
+              ].map(item => (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => {
+                    setLang(item.key)
+                    try { localStorage.setItem('sofun_basicpos_lang', item.key) } catch {}
+                  }}
+                  style={{
+                    padding: '3px 8px', borderRadius: 6, border: 'none',
+                    background: lang === item.key ? '#ffffff' : 'transparent',
+                    color: lang === item.key ? '#c62419' : 'rgba(26,26,26,0.6)',
+                    fontWeight: lang === item.key ? 800 : 600, fontSize: 11,
+                    cursor: 'pointer',
+                    boxShadow: lang === item.key ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                    fontFamily: "'Sarabun', sans-serif",
+                  }}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="pos-today-info" onClick={() => setShowHistory(h => !h)}>
+            <i className="fas fa-calendar-day" />
+            <span>ปาร์ตี้วันนี้: <strong>{todayOrders.length} รอบ</strong></span>
+            <span className="pos-today-total">฿{todayOrders.reduce((s, o) => s + (o.grandTotal || 0), 0).toLocaleString()}</span>
+            <i className={`fas fa-chevron-${showHistory ? 'up' : 'down'}`} style={{ fontSize: 11, opacity: 0.6 }} />
+          </div>
+          <button
+            className={`pos-sound-header-btn${soundMuted ? ' muted' : (totalPendingQueueCount > 0 ? ' sounding' : '')}`}
+            onClick={(e) => { e.stopPropagation(); toggleSoundMute() }}
+            title={soundMuted ? 'คลิกเพื่อเปิดเสียงแจ้งเตือนออเดอร์' : 'เสียงเตือนเปิดอยู่ (ดังทุก 5 วินาทีเมื่อมีออเดอร์ใหม่)'}
+          >
+            <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}${totalPendingQueueCount > 0 && !soundMuted ? ' fa-shake' : ''}`} />
+            <span>{soundMuted ? 'ปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
+          </button>
+
+          {/* Primary printer toggle - only this device prints receipts */}
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); setIsPrimaryPrinter(v => !v) }}
+            title={isPrimaryPrinter
+              ? 'เครื่องนี้คือเครื่องปริ้นหลัก - รับงานปริ้นจากทุก admin อัตโนมัติ'
+              : 'คลิกเพื่อตั้งเครื่องนี้เป็นเครื่องปริ้นหลัก - รับงานปริ้นจากมือถือ admin อื่น'}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '7px 12px', borderRadius: 10,
+              background: isPrimaryPrinter ? 'rgba(198,36,25,0.1)' : '#faf7f5',
+              color: isPrimaryPrinter ? '#c62419' : 'rgba(26,26,26,0.55)',
+              border: `1px solid ${isPrimaryPrinter ? 'rgba(198,36,25,0.3)' : 'rgba(26,26,26,0.1)'}`,
+              fontSize: 12, fontWeight: 800, cursor: 'pointer',
+              fontFamily: "'Sarabun', sans-serif",
+            }}
+          >
+            <i className={`fas fa-${isPrimaryPrinter ? 'print' : 'print'}`} style={{ fontSize: 11 }} />
+            <span>{isPrimaryPrinter ? 'เครื่องปริ้นหลัก ON' : 'ตั้งเป็นเครื่องปริ้น'}</span>
+          </button>
+        </div>
+        {showHistory && (
+          <div className="pos-today-list">
+            {todayOrders.length === 0 && <div className="pos-empty">ยังไม่มีออเดอร์วันนี้</div>}
+            {todayOrders.map(o => {
+              const isAlreadyOpen = safeSessions.some(s => s.confirmedOrderId === o.id)
+              const isClosed = o.status === 'paid' || o.status === 'closed'
+              return (
+                <div
+                  key={o.id}
+                  className="pos-today-item"
+                  onClick={() => { if (!isClosed) { openExistingOrder(o); setShowHistory(false) } }}
+                  style={{ cursor: isClosed ? 'default' : 'pointer' }}
+                >
+                  <div className="pos-today-item-left">
+                    <div className="pos-today-game">{o.scriptTitle || 'ไม่ระบุ'}</div>
+                    <div className="pos-today-members">
+                      <i className="fas fa-users" /> {o.members?.length || 0} คน
+                      {o.dm && <span> · DM: {o.dm}</span>}
+                      {o.room && <span> · {o.room}</span>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 3 }}>
+                    <div className="pos-today-price">฿{(o.grandTotal || 0).toLocaleString()}</div>
+                    {isClosed
+                      ? <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.35)', fontWeight: 700 }}>ปิดแล้ว</span>
+                      : isAlreadyOpen
+                        ? <span style={{ fontSize: 10, color: '#c62419', fontWeight: 700 }}>เปิดอยู่</span>
+                        : <span style={{ fontSize: 10, color: '#555555', fontWeight: 700 }}>แตะเพื่อเปิด</span>
+                    }
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── SESSION TABS ── */}
+      <div className="pos-tabs-wrap">
+        <div className="pos-tabs">
+          {safeSessions.map(s => {
+            const isCurrent = String(s.id) === String(activeSession.id)
+            const pendingCount = isCurrent
+              ? memberQueue.length
+              : (todayOrders.find(o => o.id === s.confirmedOrderId)?.memberFoodQueue?.length || 0)
+            return (
+              <div
+                key={s.id}
+                className={`pos-tab${isCurrent ? ' active' : ''}${s.confirmedOrderId ? ' confirmed' : ''}${pendingCount > 0 ? ' has-pending' : ''}`}
+                onClick={() => setActiveId(s.id)}
+              >
+                <span className="pos-tab-label">
+                  {s.confirmedOrderId && <i className="fas fa-check-circle" style={{ marginRight: 5, color: 'var(--feedback-success-icon)', fontSize: 10, flexShrink: 0 }} />}
+                  <span className="pos-tab-text">
+                    {(() => {
+                      const game = allGames.find(g => g.id === s.scriptId)
+                      const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
+                      return game ? `${game.title} ${date}` : s.label
+                    })()}
+                  </span>
+                  {(s.members || []).length > 0 && <span className="pos-tab-count">{s.members.length}</span>}
+                  {pendingCount > 0 && (
+                    <span className="pos-tab-alert-badge" title={`มีออเดอร์ใหม่รอรับ ${pendingCount} รายการ`}>
+                      <i className="fas fa-bell fa-shake" /> {pendingCount}
+                    </span>
+                  )}
+                </span>
+                {(safeSessions.length > 1 || s.confirmedOrderId || (s.members || []).length > 0 || (s.order || []).length > 0) && (
+                  <button
+                    type="button"
+                    className="pos-tab-close"
+                    title="ปิดปาร์ตี้"
+                    aria-label="ปิดปาร์ตี้"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      const game = allGames.find(g => g.id === s.scriptId)
+                      const date = fmtDate(s.createdAt ? new Date(s.createdAt) : new Date())
+                      const label = game ? `${game.title} ${date}` : s.label
+                      setConfirmCloseSession({
+                        id: s.id,
+                        title: label,
+                        confirmedOrderId: s.confirmedOrderId,
+                      })
+                    }}
+                  >
+                    <i className="fas fa-times" style={{ pointerEvents: 'none', fontSize: 11 }} />
+                  </button>
+                )}
+              </div>
+            )
+          })}
+          <button className="pos-tab-add" onClick={addSession}>
+            <i className="fas fa-plus" /> ปาร์ตี้ใหม่
+          </button>
+        </div>
+      </div>
+
+      {/* ── MOBILE TOP SHORTCUT TABS (visible <820px) ── */}
+      <div className="pos-mobile-shortcut">
+        {[
+          { key: 'members', icon: 'fa-users', label: 'สมาชิก', badge: (activeSession.members || []).length },
+          { key: 'menu', icon: 'fa-utensils', label: 'เมนู', badge: 0 },
+          { key: 'order', icon: 'fa-receipt', label: 'สรุปออเดอร์', badge: orderArr.length },
+        ].map(t => {
+          const active = mobilePanel === t.key
+          return (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => {
+                setMobilePanel(t.key)
+                // Scroll to top so user sees the panel from start
+                window.scrollTo({ top: 0, behavior: 'smooth' })
+              }}
+              className={`pos-mobile-shortcut-btn${active ? ' active' : ''}`}
+            >
+              <i className={`fas ${t.icon}`} style={{ fontSize: 12 }} />
+              <span>{t.label}</span>
+              {t.badge > 0 && (
+                <span className="pos-mobile-shortcut-badge">{t.badge}</span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* ── OTHER TABLES QUEUE ALERTS ── */}
+      {otherPendingOrders.map(o => (
+        <div key={o.id} className="pos-queue-bar other-table">
+          <div className="pos-queue-bar-top">
+            <span className="pos-queue-badge other">
+              <i className="fas fa-bell fa-shake" /> มีออเดอร์ใหม่จาก {o.room ? `ห้อง ${o.room}` : (o.scriptTitle || 'ปาร์ตี้อื่น')} ({(o.memberFoodQueue || []).length} รายการ)
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className={`pos-queue-sound-btn ${soundMuted ? 'muted' : 'active'}`}
+                onClick={toggleSoundMute}
+                title={soundMuted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน'}
+              >
+                <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}`} />
+              </button>
+              <button className="pos-queue-switch-btn" onClick={() => openExistingOrder(o)}>
+                <i className="fas fa-arrow-right" /> ไปที่ปาร์ตี้นี้
+              </button>
+              <button className="pos-queue-accept-all" onClick={() => acceptOtherQueue(o)}>
+                <i className="fas fa-check-double" /> รับทั้งหมด
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
+
+      {/* ── MEMBER FOOD QUEUE (CURRENT SESSION) ── */}
+      {memberQueue.length > 0 && (
+        <div className="pos-queue-bar">
+          <div className="pos-queue-bar-top">
+            <span className="pos-queue-badge">
+              <i className="fas fa-bell fa-shake" /> {memberQueue.length} รายการจากลูกค้า
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                className={`pos-queue-sound-btn ${soundMuted ? 'muted' : 'active'}`}
+                onClick={toggleSoundMute}
+                title={soundMuted ? 'เปิดเสียงเตือน' : 'ปิดเสียงเตือน (เตือนทุก 5 วินาที)'}
+              >
+                <i className={`fas fa-${soundMuted ? 'volume-mute' : 'volume-up'}`} />
+                <span>{soundMuted ? 'เปิดเสียง' : 'เสียงเตือน (5วิ)'}</span>
+              </button>
+              <button className="pos-queue-toggle" onClick={() => setShowQueue(v => !v)}>
+                {showQueue ? 'ซ่อน' : 'ดูรายการ'} <i className={`fas fa-chevron-${showQueue ? 'up' : 'down'}`} />
+              </button>
+              <button className="pos-queue-accept-all" onClick={acceptQueue}>
+                <i className="fas fa-check-double" /> รับทั้งหมด
+              </button>
+            </div>
+          </div>
+          {showQueue && (
+            <div className="pos-queue-list">
+              {memberQueue.map((qi, i) => (
+                <div key={i} className="pos-queue-item" style={{ flexWrap: 'wrap', rowGap: 4 }}>
+                  <span className="pos-queue-item-name">
+                    {qi.name}{qi.addons?.length ? ` (${qi.addons.map(a => a.name).join(',')})` : ''}
+                  </span>
+                  {qi.orderedBy && <span className="pos-queue-item-by"><i className="fas fa-user" /> {(qi.orderedBy.name || '').split(' ')[0]}</span>}
+                  <span className="pos-queue-item-price">฿{qi.totalPrice}</span>
+                  {qi.note && (
+                    <span style={{ flexBasis: '100%', fontSize: 11, color: '#c62419', fontStyle: 'italic', padding: '3px 8px', background: 'rgba(198,36,25,0.08)', borderRadius: 6, border: '1px solid rgba(198,36,25,0.18)' }}>
+                      <i className="fas fa-sticky-note" style={{ marginRight: 5, fontSize: 9 }} />{qi.note}
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── MAIN 2-COL ── */}
+      <div className="pos-layout">
+
+        {/* LEFT */}
+        <div className={`pos-left${isLocked ? ' is-locked' : ''}${editingUnlocked ? ' is-editing' : ''}`}>
+          {/* Lock / edit banner - show when confirmed OR when not the DM owner */}
+          {(activeSession?.confirmedOrderId || !isOwnerDM) && (
+            <div className="pos-lock-banner" style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '12px 16px',
+              background: !isOwnerDM ? '#faf7f5' : (isLocked ? '#faf7f5' : 'rgba(198,36,25,0.08)'),
+              borderBottom: `1px solid ${!isOwnerDM ? 'rgba(26,26,26,0.08)' : (isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.2)')}`,
+            }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10,
+                background: !isOwnerDM ? 'rgba(26,26,26,0.08)' : (isLocked ? 'rgba(26,26,26,0.06)' : 'rgba(198,36,25,0.15)'),
+                color: !isOwnerDM ? 'rgba(26,26,26,0.65)' : (isLocked ? 'rgba(26,26,26,0.55)' : '#c62419'),
+                display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              }}>
+                <i className={`fas fa-${!isOwnerDM ? 'eye' : (isLocked ? 'lock' : 'pen')}`} style={{ fontSize: 13 }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                  {!isOwnerDM ? 'โหมดดูอย่างเดียว' : (isLocked ? 'ยืนยันออเดอร์แล้ว' : 'โหมดแก้ไข')}
+                </div>
+                <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', marginTop: 2 }}>
+                  {!isOwnerDM
+                    ? `DM เจ้าของตี้: ${activeSession.dm || '-'} · คุณกดรับออเดอร์ได้`
+                    : (isLocked ? 'กด "แก้ไข" เพื่อปรับข้อมูล' : 'กดอัปเดตเมื่อเสร็จ หรือยกเลิก')}
+                </div>
+              </div>
+              {isOwnerDM && (
+                <button
+                  type="button"
+                  onClick={() => setEditingUnlocked(v => !v)}
+                  style={{
+                    padding: '7px 14px', borderRadius: 10,
+                    background: isLocked ? '#1a1a1a' : '#ffffff',
+                    color: isLocked ? '#ffffff' : '#1a1a1a',
+                    border: isLocked ? 'none' : '1px solid rgba(26,26,26,0.14)',
+                    fontSize: 12.5, fontWeight: 800, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 6,
+                    fontFamily: "'Sarabun', sans-serif",
+                    flexShrink: 0,
+                  }}
+                >
+                  <i className={`fas fa-${isLocked ? 'pen' : 'times'}`} style={{ fontSize: 10 }} />
+                  {isLocked ? 'แก้ไข' : 'ยกเลิก'}
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="pos-section-title"><i className="fas fa-users" /> สมาชิก <span style={{ marginLeft: 'auto', fontWeight: 700, color: 'rgba(26,26,26,0.4)', textTransform: 'none', letterSpacing: 0, fontSize: 11 }}>{(activeSession.members || []).length} คน</span></div>
+
+          {/* Manual Customer Add Section */}
+          <div style={{
+            margin: '10px 16px 6px',
+            padding: '12px 14px',
+            background: '#faf7f5',
+            border: '1.5px solid rgba(26,26,26,0.08)',
+            borderRadius: 12,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 10,
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a' }}>
+                  <i className="fas fa-user-plus" style={{ color: '#c62419', marginRight: 6 }} />
+                  {t('addCustomerTitle', 'เพิ่มลูกค้า / ผู้เล่น')}
+                </div>
+                <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 1 }}>
+                  {t('addCustomerSub', 'พิมพ์ชื่อได้ทันที ไม่ต้องสแกน')}
+                </div>
+              </div>
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: '#c62419', background: 'rgba(198,36,25,0.08)', padding: '2px 8px', borderRadius: 999 }}>
+                {sessionMembers.length} {t('peopleCount', 'คน')}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                type="text"
+                value={newCustomerName}
+                onChange={e => setNewCustomerName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && newCustomerName.trim()) {
+                    handleAddCustomer(newCustomerName.trim())
+                  }
+                }}
+                placeholder={t('inputCustomerPlaceholder', 'พิมพ์ชื่อลูกค้า / ผู้เล่น...')}
+                style={{
+                  flex: 1, height: 36, padding: '0 12px', borderRadius: 8,
+                  border: '1.5px solid rgba(26,26,26,0.14)', background: '#fff',
+                  fontSize: 12.5, color: '#1a1a1a', outline: 'none',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (newCustomerName.trim()) handleAddCustomer(newCustomerName.trim())
+                }}
+                disabled={!newCustomerName.trim()}
+                style={{
+                  padding: '0 14px', height: 36, borderRadius: 8,
+                  background: newCustomerName.trim() ? '#c62419' : 'rgba(26,26,26,0.08)',
+                  color: newCustomerName.trim() ? '#fff' : 'rgba(26,26,26,0.4)',
+                  border: 'none', fontWeight: 800, fontSize: 12, cursor: newCustomerName.trim() ? 'pointer' : 'default',
+                  display: 'flex', alignItems: 'center', gap: 4,
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                <i className="fas fa-plus" /> {t('btnAdd', 'เพิ่ม')}
+              </button>
+            </div>
+
+            {/* Quick Preset Buttons */}
+            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center' }}>
+              <span style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>{t('quickPrefix', 'ด่วน:')}</span>
+              {[1, 2, 3, 4, 5, 6, 7, 8].map(n => {
+                const pName = `${t('playerPrefix', 'ผู้เล่น')} ${n}`
+                const exists = sessionMembers.some(m => m.name === pName)
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => handleAddCustomer(pName)}
+                    disabled={exists}
+                    style={{
+                      fontSize: 10.5, padding: '2px 7px', borderRadius: 6,
+                      background: exists ? 'rgba(26,26,26,0.04)' : '#ffffff',
+                      border: `1px solid ${exists ? 'rgba(26,26,26,0.06)' : 'rgba(26,26,26,0.12)'}`,
+                      color: exists ? 'rgba(26,26,26,0.3)' : '#1a1a1a',
+                      cursor: exists ? 'default' : 'pointer',
+                      fontWeight: 600, fontFamily: "'Sarabun', sans-serif",
+                    }}
+                  >
+                    + {pName}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="pos-members-list">
+            {(activeSession.members || []).length === 0 && <div className="pos-empty">ยังไม่มีสมาชิก</div>}
+
+            {/* Unpaid members */}
+            {(activeSession.members || []).filter(m => !memberPayments[m.uid]?.verified).map(m => {
+              const expanded = expandedMembers.has(m.uid)
+              const myItems = orderArr.filter(x => x.orderedBy?.uid === m.uid)
+              const bill = getMemberBill(m)
+              const myFoodTotal = myItems.reduce((s, x) => s + (x.totalPrice || 0) * x.qty, 0)
+              const memberIsDiscounted = discountEffectiveIds.includes(m.uid)
+              const discountPerPerson = memberIsDiscounted ? discountPerDiscounted : 0
+              const toggleMember = () => setExpandedMembers(prev => {
+                const next = new Set(prev)
+                if (next.has(m.uid)) next.delete(m.uid); else next.add(m.uid)
+                return next
+              })
+              return (
+                <div key={m.uid} className={`pos-member-row pos-member-collapsible${expanded ? ' is-expanded' : ''}`}>
+                  {/* ── Collapsed head ── */}
+                  <button
+                    type="button"
+                    onClick={toggleMember}
+                    className="pos-member-head"
+                    style={{
+                      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                      background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                      textAlign: 'left', fontFamily: 'inherit',
+                    }}
+                  >
+                    {m.avatar
+                      ? <img src={m.avatar} alt="" className="pos-member-avatar" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }} />
+                      : null}
+                    <div className="pos-member-avatar-ph" style={{ display: m.avatar ? 'none' : 'flex' }}>{(m.name || '?')[0]}</div>
+                    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                      <div className="pos-member-name" style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        {editingNameUid === m.uid ? (
+                          <div style={{ display: 'flex', gap: 4, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                            <input
+                              type="text"
+                              value={editingNameVal}
+                              onChange={e => setEditingNameVal(e.target.value)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') saveEditingName(m.uid)
+                                if (e.key === 'Escape') setEditingNameUid(null)
+                              }}
+                              autoFocus
+                              style={{
+                                padding: '2px 6px', borderRadius: 4, border: '1.5px solid #c62419',
+                                fontSize: 12, fontWeight: 700, outline: 'none', width: 110,
+                                fontFamily: "'Sarabun', sans-serif",
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveEditingName(m.uid)}
+                              style={{ padding: '2px 6px', borderRadius: 4, background: '#c62419', color: '#fff', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                            >
+                              <i className="fas fa-check" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 800 }}>{m.name || 'ไม่ระบุ'}</span>
+                            {!isLocked && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); startEditingName(m.uid, m.name) }}
+                                  title={t('editName', 'แก้ไขชื่อผู้เล่น')}
+                                  style={{ background: 'none', border: 'none', padding: '1px 3px', cursor: 'pointer', color: 'rgba(26,26,26,0.35)', fontSize: 10.5 }}
+                                >
+                                  <i className="fas fa-pencil-alt" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={e => { e.stopPropagation(); removeMember(m.uid) }}
+                                  title={t('removeMember', 'ลบสมาชิกออก')}
+                                  style={{ background: 'none', border: 'none', padding: '1px 3px', cursor: 'pointer', color: 'rgba(26,26,26,0.3)', fontSize: 10.5 }}
+                                  onMouseEnter={e => { e.currentTarget.style.color = '#c62419' }}
+                                  onMouseLeave={e => { e.currentTarget.style.color = 'rgba(26,26,26,0.3)' }}
+                                >
+                                  <i className="fas fa-trash-alt" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {Number(m.personalDiscount) > 0 && (
+                          <span style={{ fontSize: 10, padding: '1px 6px', borderRadius: 6, background: '#fef2f2', color: '#c62419', border: '1px solid #fecaca', fontWeight: 700 }}>
+                            -฿{fmtCurrency(Number(m.personalDiscount))}
+                          </span>
+                        )}
+                        {m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              borderRadius: 6,
+                              background: '#fef2f2',
+                              color: '#c62419',
+                              border: '1px solid #fecaca',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            title={`ปรับราคาเกมเฉพาะคน: ฿${fmtCurrency(m.customGamePrice)}`}
+                          >
+                            <i className="fas fa-tags" style={{ fontSize: 8 }} /> ปรับราคา ฿{fmtCurrency(m.customGamePrice)}
+                          </span>
+                        ) : m.unpaidDeposit ? (
+                          <span
+                            style={{
+                              fontSize: 10,
+                              padding: '1px 6px',
+                              borderRadius: 6,
+                              background: '#fffbeb',
+                              color: '#b45309',
+                              border: '1px solid #fde68a',
+                              fontWeight: 700,
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 3,
+                            }}
+                            title="ไม่ได้ร่วมจ่ายมัดจำ คิดราคาเกมเต็ม"
+                          >
+                            <i className="fas fa-circle-exclamation" style={{ fontSize: 8 }} /> ราคาเต็ม ฿{fmtCurrency(gameFullPrice)}
+                          </span>
+                        ) : null}
+                        {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.easyslipPending && (
+                          <span
+                            className="pos-member-pending-badge"
+                            onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
+                            title="EasySlip กำลังตรวจ - คลิกดูสลิป / แอดมินยืนยันเอง"
+                            role="button"
+                            style={{ cursor: 'pointer', background: '#fffbeb', border: '1px solid #fde68a', color: '#b45309' }}
+                          >
+                            <i className="fas fa-hourglass-half" /> รอตรวจ EasySlip
+                          </span>
+                        )}
+                        {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.pendingAdminReview && (
+                          <span
+                            className="pos-member-slip-badge"
+                            onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
+                            title="สลิปรอแอดมินยืนยัน - คลิกเพื่อตรวจหรืออนุมัติ"
+                            role="button"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-camera" /> ตรวจสลิป
+                          </span>
+                        )}
+                        {!memberPayments[m.uid]?.verified && memberPayments[m.uid]?.slipUrl && !memberPayments[m.uid]?.pendingAdminReview && !memberPayments[m.uid]?.easyslipPending && (
+                          <span
+                            className="pos-member-slip-badge"
+                            onClick={e => { e.stopPropagation(); setSlipVerifyMember(m) }}
+                            title="มีสลิป - คลิกตรวจสลิป"
+                            role="button"
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <i className="fas fa-receipt" /> ดูสลิป
+                          </span>
+                        )}
+                      </div>
+                      {m.character && (
+                        <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          <i className="fas fa-user-tag" style={{ marginRight: 4, color: '#c62419', fontSize: 9 }} />{m.character}
+                        </div>
+                      )}
+                    </div>
+                    <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                      <div style={{ fontSize: 15, fontWeight: 900, color: '#c62419', lineHeight: 1 }}>฿{fmtCurrency(bill)}</div>
+                      <div style={{ fontSize: 10, color: 'rgba(26,26,26,0.5)', fontWeight: 700 }}>ต้องจ่าย</div>
+                    </div>
+                    <i className={`fas fa-chevron-${expanded ? 'up' : 'down'}`} style={{ color: 'rgba(26,26,26,0.35)', fontSize: 11, marginLeft: 2 }} />
+                  </button>
+
+                  {/* ── Expanded detail (BasicPOS: Personal Discount only) ── */}
+                  {expanded && (
+                    <div style={{
+                      marginTop: 10, paddingTop: 10,
+                      borderTop: '1px dashed rgba(26,26,26,0.1)',
+                      display: 'flex', flexDirection: 'column', gap: 10,
+                    }}>
+                      {/* Personal discount only */}
+                      {isLocked ? (
+                        Number(m.personalDiscount) > 0 && (
+                          <div>
+                            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)', marginBottom: 5 }}>
+                              {t('personalDiscount', 'ส่วนลดเพิ่มเติม / Topup (ลดราคาส่วนบุคคล)')}
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#1a1a1a' }}>
+                              <span style={{ fontWeight: 600 }}>{m.personalDiscountNote || t('personalDiscount', 'ส่วนลดเพิ่มเติม')}</span>
+                              <span style={{ fontWeight: 800, color: '#c62419' }}>-฿{fmtCurrency(Number(m.personalDiscount))}</span>
+                            </div>
+                          </div>
+                        )
+                      ) : (
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)', marginBottom: 5 }}>
+                            {t('personalDiscount', 'ส่วนลดเพิ่มเติม / Topup (ลดราคาส่วนบุคคล)')}
+                          </div>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <input
+                              className="pos-personal-disc-note"
+                              placeholder={t('discountReasonPlaceholder', 'ชื่อ (เช่น Topup, คูปอง)')}
+                              value={m.personalDiscountNote || ''}
+                              onChange={e => setPersonalDiscountNote(m.uid, e.target.value)}
+                              style={{ flex: 1 }}
+                            />
+                            <input
+                              className="pos-personal-disc-amt"
+                              type="number" min="0"
+                              placeholder="฿"
+                              value={m.personalDiscount || ''}
+                              onChange={e => setPersonalDiscount(m.uid, e.target.value)}
+                              style={{ width: 90 }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Zero-baht quick confirm button if bill is 0 and not yet verified */}
+                      {bill <= 0 && !memberPayments[m.uid]?.verified && activeSession.confirmedOrderId && (
+                        <button
+                          type="button"
+                          onClick={() => confirmZeroMember(m)}
+                          style={{
+                            padding: '9px 12px',
+                            borderRadius: 10,
+                            background: 'rgba(22,163,74,0.1)',
+                            border: '1.5px solid #16a34a',
+                            color: '#16a34a',
+                            cursor: 'pointer',
+                            fontSize: 12,
+                            fontWeight: 700,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: 6,
+                            fontFamily: "'Sarabun', sans-serif",
+                            transition: 'all 0.14s',
+                          }}
+                        >
+                          <i className="fas fa-check-circle" /> {t('confirmZero', 'ยืนยันยอด ฿0 (ไม่ต้องใช้สลิป)')}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+
+            {/* Paid members - collapsible */}
+            {activeSession.members.filter(m => memberPayments[m.uid]?.verified).length > 0 && (
+              <div className="pos-paid-section">
+                <button
+                  className="pos-paid-collapse-btn"
+                  onClick={() => setShowPaidMembers(v => !v)}
+                >
+                  <span><i className="fas fa-check-circle" style={{ color: 'var(--feedback-success-icon)' }} /> จ่ายแล้ว {activeSession.members.filter(m => memberPayments[m.uid]?.verified).length} คน · ฿{Object.values(memberPayments).filter(p => p.verified).reduce((s, p) => s + (Number(p.amount) || 0), 0).toLocaleString()}</span>
+                  <i className={`fas fa-chevron-${showPaidMembers ? 'up' : 'down'}`} />
+                </button>
+                {showPaidMembers && activeSession.members.filter(m => memberPayments[m.uid]?.verified).map(m => (
+                  <div key={m.uid} className="pos-member-row" style={{ opacity: 0.5 }}>
+                    {m.avatar
+                      ? <img src={m.avatar} alt="" className="pos-member-avatar" onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling.style.display = 'flex' }} />
+                      : null}
+                    <div className="pos-member-avatar-ph" style={{ display: m.avatar ? 'none' : 'flex' }}>{(m.name || '?')[0]}</div>
+                    <div className="pos-member-info">
+                      <div className="pos-member-name">
+                        {m.name || 'ไม่ระบุ'}
+                        <span className="pos-member-paid-badge">
+                          <i className="fas fa-check-circle" /> ฿{Number(memberPayments[m.uid].amount || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      {m.character && <div style={{ fontSize: 12, color: '#555555' }}>{m.character}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="pos-member-actions">
+            {activeSession.confirmedOrderId && totalPersonalDiscounts > 0 && (
+              <button className="pos-sync-disc-btn" onClick={syncMembersDiscount}>
+                <i className="fas fa-sync" /> อัปเดตส่วนลด
+              </button>
+            )}
+          </div>
+
+          <div className="pos-divider" />
+
+          <div className="pos-section-title"><i className="fas fa-scroll" /> {t('gameSectionTitle', 'เกม')}</div>
+
+          {/* Direct Game Price Input Card */}
+          <div style={{ padding: '8px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10, width: '100%', boxSizing: 'border-box' }}>
+            {/* Game Title & DM Badge */}
+            <div style={{
+              padding: '12px 14px', background: '#faf7f5', border: '1px solid rgba(26,26,26,0.08)',
+              borderRadius: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <i className="fas fa-scroll" style={{ color: '#c62419', fontSize: 15 }} />
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1a1a1a' }}>{t('chineseGameTitle', 'เกมจีน')}</div>
+                  <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)' }}>Basic POS Session</div>
+                </div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, color: '#c62419', background: 'rgba(198,36,25,0.08)', padding: '3px 8px', borderRadius: 6 }}>
+                {t('chineseDmBadge', 'DM จีน')}
+              </span>
+            </div>
+
+            {/* Direct Game Price Input */}
+            <div style={{
+              padding: '12px 14px', background: '#ffffff', border: '1.5px solid rgba(198,36,25,0.25)',
+              borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              <label style={{ fontSize: 11.5, fontWeight: 800, color: '#c62419', margin: 0, display: 'flex', justifyContent: 'space-between' }}>
+                <span><i className="fas fa-tag" style={{ marginRight: 5 }} />{t('gamePricePerPerson', 'ราคาเกมต่อคน (฿)')}</span>
+                <span style={{ color: 'rgba(26,26,26,0.5)', fontWeight: 600 }}>{sessionMembers.length} {t('peopleCount', 'คน')}</span>
+              </label>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#c62419', fontSize: 15, fontWeight: 800 }}>฿</span>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder={t('gamePriceInputPlaceholder', 'ระบุราคาเกมต่อคน เช่น 500...')}
+                  value={activeSession?.customPrice ?? ''}
+                  onChange={e => updateActive({ customPrice: e.target.value })}
+                  disabled={isLocked}
+                  style={{
+                    width: '100%', padding: '8px 12px 8px 30px', borderRadius: 8,
+                    border: '1.5px solid rgba(26,26,26,0.16)', fontSize: 15, fontWeight: 800,
+                    color: '#1a1a1a', outline: 'none', fontFamily: "'Sarabun', sans-serif",
+                    background: isLocked ? '#f5f5f5' : '#fff', boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+
+              {/* Quick Price Chips */}
+              {!isLocked && (
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', alignItems: 'center', marginTop: 2 }}>
+                  <span style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>{t('quickPriceLabel', 'ราคาด่วน:')}</span>
+                  {[300, 400, 500, 600, 700, 800].map(amt => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => updateActive({ customPrice: String(amt) })}
+                      style={{
+                        fontSize: 11, padding: '3px 8px', borderRadius: 6,
+                        background: String(activeSession?.customPrice) === String(amt) ? '#c62419' : '#f3f4f6',
+                        color: String(activeSession?.customPrice) === String(amt) ? '#ffffff' : '#374151',
+                        border: `1px solid ${String(activeSession?.customPrice) === String(amt) ? '#c62419' : 'rgba(26,26,26,0.1)'}`,
+                        cursor: 'pointer', fontWeight: 700, fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    >
+                      ฿{amt}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Summary Row */}
+              <div style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                paddingTop: 8, marginTop: 4, borderTop: '1px dashed rgba(26,26,26,0.1)',
+                fontSize: 12,
+              }}>
+                <span style={{ color: 'rgba(26,26,26,0.6)' }}>{t('totalDuePerPerson', 'ราคาต้องจ่ายต่อคน:')}</span>
+                <span style={{ fontSize: 13, fontWeight: 900, color: '#c62419' }}>฿{fmtCurrency(gameUnitPay)}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="pos-divider" />
+
+          <div className="pos-section-title"><i className="fas fa-utensils" /> เมนูอาหาร</div>
+
+          {menuItems.length > 0 && (
+            <div className="pos-menu-filter">
+              <div className="pos-menu-search-wrap">
+                <i className="fas fa-search pos-menu-search-icon" />
+                <input
+                  className="pos-menu-search-input"
+                  type="text"
+                  placeholder="ค้นหาเมนู..."
+                  value={menuSearch}
+                  onChange={e => setMenuSearch(e.target.value)}
+                />
+                {menuSearch && (
+                  <button className="pos-menu-search-clear" onClick={() => setMenuSearch('')}>
+                    <i className="fas fa-times" />
+                  </button>
+                )}
+              </div>
+              <div className="pos-menu-cat-chips">
+                {menuCategories.filter(c => c !== 'ทั้งหมด').map(cat => (
+                  <button
+                    key={cat}
+                    className={`pos-menu-cat-chip${menuCategory === cat ? ' active' : ''}`}
+                    onClick={() => setMenuCategory(menuCategory === cat ? 'ทั้งหมด' : cat)}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="pos-menu-scroll">
+            {menuItems.length === 0 && <div className="pos-empty">ยังไม่มีเมนู (เพิ่มได้ในหน้า Admin)</div>}
+            {menuItems.length > 0 && filteredMenuItems.length === 0 && (
+              <div className="pos-empty">ไม่พบเมนู "{menuSearch}"</div>
+            )}
+            {Object.entries(groupedMenu).map(([cat, items]) => (
+              <div key={cat} className="pos-menu-group">
+                <div className="pos-menu-cat">{menuCategory === 'ทั้งหมด' ? cat : ''}</div>
+                {items.map(item => {
+                  const itemQty = orderArr.filter(x => x.menuId === item.id).reduce((s, x) => s + x.qty, 0)
+                  return (
+                    <div
+                      key={item.id}
+                      className={`pos-menu-item${itemQty > 0 ? ' in-order' : ''}`}
+                      onClick={() => addItem(item)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      {item.imageUrl && <img src={item.imageUrl} alt="" className="pos-menu-item-img" />}
+                      <div className="pos-menu-item-info">
+                        <div className="pos-menu-item-name">
+                          {item.name}
+                          {item.addons?.length > 0 && <span className="pos-menu-has-addon"><i className="fas fa-plus-circle" /></span>}
+                        </div>
+                        <div className="pos-menu-item-price">฿{item.price}</div>
+                      </div>
+                      <div className="pos-menu-qty">
+                        {itemQty > 0 && <span className="pos-qty-badge">{itemQty}</span>}
+                        <button
+                          type="button"
+                          className="pos-qty-btn add"
+                          onClick={(e) => { e.stopPropagation(); addItem(item) }}
+                          title="สั่งอาหารรายการนี้"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* RIGHT - order summary */}
+        <div className="pos-right">
+          <div className="pos-section-title">
+            <i className="fas fa-receipt" /> สรุปออเดอร์
+            {orderArr.length > 0 && (
+              <span style={{ marginLeft: 'auto', fontWeight: 800, color: 'rgba(26,26,26,0.5)', textTransform: 'none', letterSpacing: 0, fontSize: 11, padding: '2px 9px', borderRadius: 999, background: 'rgba(26,26,26,0.05)' }}>
+                {orderArr.length} รายการ
+              </span>
+            )}
+          </div>
+
+          <div className="pos-right-content">
+            <div className="pos-summary">
+              {/* Game card */}
+              {selectedGame && (
+                <div style={{
+                  padding: '14px 14px', borderRadius: 14,
+                  background: 'linear-gradient(135deg, #faf7f5 0%, #ffffff 100%)',
+                  border: '1px solid rgba(26,26,26,0.06)',
+                  display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 10,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(198,36,25,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <i className="fas fa-scroll" style={{ color: '#c62419', fontSize: 13 }} />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13.5, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{selectedGame.title}</div>
+                      <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 1, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        {selectedGame.players && <span><i className="fas fa-users" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.players} คน</span>}
+                        {selectedGame.time && <span><i className="fas fa-clock" style={{ fontSize: 9, marginRight: 3 }} />{selectedGame.time}</span>}
+                      </div>
+                    </div>
+                  </div>
+                  {gameUnitPay > 0 ? (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
+                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>
+                        {activeSession.members.some(m => m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null)
+                          ? `ค่าเกม (${activeSession.members.length} คน · ปรับราคาเฉพาะคน)`
+                          : activeSession.members.some(m => m.unpaidDeposit)
+                            ? `ค่าเกม (${activeSession.members.filter(m => !m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameUnitPay)} + ${activeSession.members.filter(m => m.unpaidDeposit).length} คน × ฿${fmtCurrency(gameFullPrice)})`
+                            : `฿${fmtCurrency(gameUnitPay)} × ${activeSession.members.length} คน`}
+                      </span>
+                      <span style={{ fontSize: 16, fontWeight: 900, color: '#c62419' }}>฿{fmtCurrency(gamePrice)}</span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', paddingTop: 8, borderTop: '1px dashed rgba(26,26,26,0.1)' }}>
+                      <span style={{ fontSize: 11.5, color: 'rgba(26,26,26,0.55)' }}>ค่าเกม</span>
+                      <span style={{ fontSize: 14, fontWeight: 900, color: '#c8a050' }}>ฟรี</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Food/drink items */}
+              {orderArr.length > 0 && (
+                <>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '2px 2px 6px' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'rgba(26,26,26,0.5)' }}>
+                      <i className="fas fa-utensils" style={{ color: '#c62419', marginRight: 5, fontSize: 10 }} />
+                      อาหาร / เครื่องดื่ม
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 800, color: '#1a1a1a' }}>฿{foodTotal.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', background: '#ffffff', borderRadius: 12, border: '1px solid rgba(26,26,26,0.06)', overflow: 'hidden' }}>
+                    {orderArr.map((x, i) => (
+                      <div key={x.key} style={{
+                        padding: '10px 12px',
+                        borderTop: i > 0 ? '1px solid rgba(26,26,26,0.05)' : 'none',
+                        display: 'flex', flexDirection: 'column', gap: 6,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a', lineHeight: 1.3 }}>
+                              {x.name} <span style={{ color: 'rgba(26,26,26,0.45)', fontWeight: 600 }}>× {x.qty}</span>
+                            </div>
+                            {x.addons?.length > 0 && (
+                              <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
+                                {x.addons.map(a => a.name).join(', ')}
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                            <span style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a' }}>฿{(x.totalPrice * x.qty).toLocaleString()}</span>
+                            {!isLocked && (
+                              <button onClick={() => voidItem(x.key)} title="ยกเลิกรายการนี้" style={{ width: 24, height: 24, borderRadius: 6, background: 'rgba(26,26,26,0.04)', border: 'none', color: 'rgba(26,26,26,0.4)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(198,36,25,0.1)'; e.currentTarget.style.color = '#c62419' }}
+                                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(26,26,26,0.04)'; e.currentTarget.style.color = 'rgba(26,26,26,0.4)' }}
+                              >
+                                <i className="fas fa-trash-alt" style={{ fontSize: 10 }} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Bill owner - compact chip row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+                          {editingBillKey === x.key ? (
+                            <>
+                              {activeSession.members.map(m => (
+                                <button key={m.uid} onClick={() => assignBillOwner(x.key, { uid: m.uid, name: m.name, avatar: m.avatar || '' })} style={{
+                                  fontSize: 10.5, padding: '3px 8px', borderRadius: 999,
+                                  background: x.orderedBy?.uid === m.uid ? '#c62419' : '#faf7f5',
+                                  color: x.orderedBy?.uid === m.uid ? '#fff' : '#1a1a1a',
+                                  border: `1px solid ${x.orderedBy?.uid === m.uid ? '#c62419' : 'rgba(26,26,26,0.1)'}`,
+                                  cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 700,
+                                }}>
+                                  {(m.name || '').split(' ')[0]}
+                                </button>
+                              ))}
+                              {x.orderedBy && (
+                                <button onClick={() => assignBillOwner(x.key, null)} style={{
+                                  fontSize: 10.5, padding: '3px 8px', borderRadius: 999,
+                                  background: 'transparent', color: 'rgba(26,26,26,0.5)',
+                                  border: '1px solid rgba(26,26,26,0.14)', cursor: 'pointer',
+                                  fontFamily: "'Sarabun',sans-serif", fontWeight: 600,
+                                }}>ล้าง</button>
+                              )}
+                              <button onClick={() => setEditingBillKey(null)} style={{
+                                fontSize: 10, padding: '3px 7px', borderRadius: 999,
+                                background: '#1a1a1a', color: '#fff', border: 'none', cursor: 'pointer',
+                                fontWeight: 700,
+                              }}>
+                                <i className="fas fa-check" /> เสร็จ
+                              </button>
+                            </>
+                          ) : isLocked ? (
+                            x.orderedBy && (
+                              <span style={{
+                                fontSize: 10.5, padding: '2px 8px', borderRadius: 999,
+                                background: 'rgba(198,36,25,0.07)', color: '#c62419',
+                                border: '1px solid rgba(198,36,25,0.2)', fontWeight: 700,
+                                display: 'inline-flex', alignItems: 'center', gap: 4,
+                              }}>
+                                <i className="fas fa-user" style={{ fontSize: 8 }} />{x.orderedBy.name.split(' ')[0]}
+                              </span>
+                            )
+                          ) : (
+                            <button onClick={() => setEditingBillKey(x.key)} style={{
+                              fontSize: 10.5, padding: '3px 9px', borderRadius: 999,
+                              background: x.orderedBy ? 'rgba(198,36,25,0.08)' : 'transparent',
+                              color: x.orderedBy ? '#c62419' : 'rgba(26,26,26,0.45)',
+                              border: `1px dashed ${x.orderedBy ? 'rgba(198,36,25,0.3)' : 'rgba(26,26,26,0.15)'}`,
+                              cursor: 'pointer', fontFamily: "'Sarabun',sans-serif", fontWeight: 700,
+                            }}>
+                              <i className="fas fa-user-tag" style={{ marginRight: 4, fontSize: 9 }} />
+                              {x.orderedBy ? x.orderedBy.name.split(' ')[0] : 'ระบุเจ้าบิล'}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Discounts */}
+              {(totalDiscount > 0 || sessionMembers.some(m => Number(m.personalDiscount) > 0)) && (
+                <div style={{ marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(198,36,25,0.04)', border: '1px solid rgba(198,36,25,0.15)', display: 'flex', flexDirection: 'column', gap: 5 }}>
+                  {totalDiscount > 0 && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.75)' }}>
+                        <i className="fas fa-tag" style={{ color: '#c62419', fontSize: 10, marginRight: 5 }} />
+                        {activeSession.promoName || sessionMembers.find(m => m.promoName)?.promoName || 'ส่วนลดโปรโมชัน'}
+                        <span style={{ color: 'rgba(26,26,26,0.4)', fontSize: 10, marginLeft: 4 }}>
+                          ({discountMode === 'split' ? 'เฉลี่ย' : `฿${fmtCurrency(discountRaw || (totalDiscount / (nDiscounted || sessionMembers.length || 1)))}×${nDiscounted || sessionMembers.length}`})
+                        </span>
+                      </span>
+                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{fmtCurrency(totalDiscount)}</span>
+                    </div>
+                  )}
+                  {sessionMembers.filter(m => Number(m.personalDiscount) > 0).map(m => (
+                    <div key={m.uid} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 12 }}>
+                      <span style={{ color: 'rgba(26,26,26,0.65)' }}>
+                        <i className="fas fa-user-tag" style={{ color: '#c62419', fontSize: 9, marginRight: 5 }} />
+                        {m.name.split(' ')[0]}{m.personalDiscountNote ? ` · ${m.personalDiscountNote}` : ''}
+                      </span>
+                      <span style={{ color: '#c62419', fontWeight: 800 }}>−฿{fmtCurrency(Number(m.personalDiscount))}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Grand total hero */}
+              {(selectedGame || orderArr.length > 0) ? (
+                <div style={{
+                  marginTop: 12, padding: '14px 16px', borderRadius: 14,
+                  background: 'linear-gradient(135deg, #c62419 0%, #9a1c13 100%)',
+                  color: '#fff', boxShadow: '0 6px 20px rgba(198,36,25,0.3)',
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 800, opacity: 0.9 }}>ยอดรวม</span>
+                  <span style={{ fontSize: 22, fontWeight: 900 }}>฿{fmtCurrency(grandTotal)}</span>
+                </div>
+              ) : (
+                <div style={{ padding: '28px 18px', textAlign: 'center', color: 'rgba(26,26,26,0.3)', fontSize: 13 }}>
+                  <i className="fas fa-receipt" style={{ fontSize: 24, marginBottom: 8, display: 'block' }} />
+                  ยังไม่มีรายการ
+                </div>
+              )}
+            </div>
+
+            {allMembersPaid ? (
+              <div className="pos-all-paid-banner">
+                <div className="pos-all-paid-label"><i className="fas fa-check-double" /> ทุกคนจ่ายครบแล้ว</div>
+                <button className="pos-close-table-btn" onClick={closeTable}>
+                  <i className="fas fa-flag-checkered" /> ตี้นี้เล่นเสร็จแล้ว
+                </button>
+              </div>
+            ) : verifiedTotal > 0 && (
+              <div className="pos-partial-paid-banner">
+                <i className="fas fa-check-circle" /> จ่ายแล้ว ฿{fmtCurrency(verifiedTotal)} · ค้าง ฿{fmtCurrency(remainingAmount)}
+              </div>
+            )}
+
+            {/* ── GROUP PAY ── */}
+            {activeSession.confirmedOrderId && !allMembersPaid && (
+              <div style={{ marginTop: 12, borderTop: '1px solid var(--border-default)', paddingTop: 12 }}>
+                {!groupPayMode ? (
+                  <button onClick={() => { setGroupPayMode(true); setGroupPaySelected(new Set()) }} style={{
+                    width: '100%', padding: '9px 14px', borderRadius: 8,
+                    background: 'rgba(0,0,0,0.04)', border: '1px solid var(--border-default)',
+                    color: 'var(--text-secondary)', fontSize: 13, fontWeight: 700,
+                    cursor: 'pointer', fontFamily: "'Sarabun',sans-serif",
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                  }}>
+                    <i className="fas fa-object-group" /> รวมบิลจ่ายกัน
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)' }}>
+                      เลือกสมาชิกที่จ่ายรวมกัน
+                    </div>
+                    {activeSession.members
+                      .filter(m => !memberPayments[m.uid]?.verified)
+                      .map(m => {
+                        const bill = getMemberBill(m)
+                        const sel = groupPaySelected.has(m.uid)
+                        return (
+                          <button key={m.uid} onClick={() => setGroupPaySelected(prev => {
+                            const s = new Set(prev)
+                            s.has(m.uid) ? s.delete(m.uid) : s.add(m.uid)
+                            return s
+                          })} style={{
+                            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
+                            background: sel ? 'rgba(198,36,25,0.07)' : 'rgba(0,0,0,0.03)',
+                            border: `1px solid ${sel ? 'var(--crimson-500)' : 'var(--border-default)'}`,
+                            fontFamily: "'Sarabun',sans-serif", textAlign: 'left',
+                          }}>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <i className={`fas fa-${sel ? 'check-square' : 'square'}`} style={{ color: sel ? 'var(--crimson-500)' : 'var(--border-strong)', fontSize: 13 }} />
+                              <span style={{ fontSize: 13, fontWeight: sel ? 700 : 400, color: 'var(--text-primary)' }}>{(m.name || '').split(' ')[0]}</span>
+                            </span>
+                            <span style={{ fontSize: 13, fontWeight: 700, color: sel ? 'var(--crimson-500)' : 'var(--text-secondary)' }}>
+                              ฿{fmtCurrency(bill)}
+                            </span>
+                          </button>
+                        )
+                      })}
+                    {groupPaySelected.size >= 2 && (
+                      <div style={{ background: 'rgba(198,36,25,0.06)', border: '1px solid rgba(198,36,25,0.2)', borderRadius: 8, padding: '10px 12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>
+                          รวม {groupPaySelected.size} คน
+                        </span>
+                        <span style={{ fontSize: 15, fontWeight: 800, color: 'var(--crimson-500)' }}>
+                          ฿{fmtCurrency([...groupPaySelected].reduce((s, uid) => {
+                            const m = (activeSession.members || []).find(x => x.uid === uid)
+                            return s + (m ? getMemberBill(m) : 0)
+                          }, 0))}
+                        </span>
+                      </div>
+                    )}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={() => { setGroupPayMode(false); setGroupPaySelected(new Set()) }} style={{
+                        flex: 1, padding: '8px', borderRadius: 8, border: '1px solid var(--border-default)',
+                        background: 'transparent', color: 'var(--text-secondary)', cursor: 'pointer',
+                        fontSize: 13, fontFamily: "'Sarabun',sans-serif",
+                      }}>ยกเลิก</button>
+                      <button onClick={confirmGroupPayment} disabled={groupPaySelected.size < 2 || groupPaySaving} style={{
+                        flex: 2, padding: '8px', borderRadius: 8, border: 'none',
+                        background: groupPaySelected.size >= 2 ? 'var(--crimson-500)' : 'var(--border-default)',
+                        color: '#fff', cursor: groupPaySelected.size >= 2 ? 'pointer' : 'default',
+                        fontSize: 13, fontWeight: 700, fontFamily: "'Sarabun',sans-serif",
+                        opacity: groupPaySaving ? 0.7 : 1,
+                      }}>
+                        {groupPaySaving ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</> : <><i className="fas fa-check" /> ยืนยันรับเงิน</>}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="pos-right-footer" style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '12px 14px 14px', borderTop: '1px solid rgba(26,26,26,0.06)' }}>
+            {/* Non-owner view - show a notice, hide all edit/pay/close actions */}
+            {!isOwnerDM ? (
+              <div style={{
+                padding: '12px 14px', borderRadius: 12,
+                background: '#faf7f5', border: '1px solid rgba(26,26,26,0.08)',
+                display: 'flex', alignItems: 'center', gap: 10,
+              }}>
+                <div style={{ width: 32, height: 32, borderRadius: 10, background: 'rgba(26,26,26,0.08)', color: 'rgba(26,26,26,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <i className="fas fa-eye" style={{ fontSize: 13 }} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 800, color: '#1a1a1a' }}>ดูอย่างเดียว</div>
+                  <div style={{ fontSize: 11, color: 'rgba(26,26,26,0.55)', marginTop: 2 }}>
+                    DM เจ้าของตี้: <strong>{activeSession.dm || '-'}</strong> · คุณกดรับออเดอร์ได้
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Primary action - Pay if confirmed+unpaid, else Confirm/Update */}
+                {activeSession.confirmedOrderId && !allMembersPaid ? (
+                  <button
+                    onClick={() => setShowPayment(true)}
+                    style={{
+                      width: '100%', padding: '14px 16px', borderRadius: 12,
+                      background: '#c62419', color: '#fff', border: 'none',
+                      fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                      boxShadow: '0 6px 18px rgba(198,36,25,0.3)',
+                      transition: 'all 0.14s',
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = '#9a1c13'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = '#c62419'; e.currentTarget.style.transform = 'translateY(0)' }}
+                  >
+                    <i className="fas fa-qrcode" />
+                    ชำระเงิน{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={saving}
+                    style={{
+                      width: '100%', padding: '14px 16px', borderRadius: 12,
+                      background: saving ? '#f0ebe9' : (activeSession.confirmedOrderId ? '#1a1a1a' : '#c62419'),
+                      color: saving ? 'rgba(26,26,26,0.4)' : '#fff', border: 'none',
+                      fontSize: 14.5, fontWeight: 800, cursor: saving ? 'wait' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                      boxShadow: saving ? 'none' : (activeSession.confirmedOrderId ? '0 6px 18px rgba(26,26,26,0.2)' : '0 6px 18px rgba(198,36,25,0.3)'),
+                    }}
+                  >
+                    {saving
+                      ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                      : activeSession.confirmedOrderId
+                        ? <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                        : <><i className="fas fa-check-circle" /> ยืนยันออเดอร์</>
+                    }
+                  </button>
+                )}
+
+                {/* When already confirmed+unpaid: show secondary Update option */}
+                {activeSession.confirmedOrderId && !allMembersPaid && editingUnlocked && (
+                  <button
+                    onClick={handleConfirm}
+                    disabled={saving}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: 10,
+                      background: '#ffffff', color: '#1a1a1a',
+                      border: '1px solid rgba(26,26,26,0.14)',
+                      fontSize: 12.5, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                    }}
+                  >
+                    {saving
+                      ? <><i className="fas fa-spinner fa-spin" /> กำลังบันทึก...</>
+                      : <><i className="fas fa-sync" /> อัปเดตออเดอร์</>
+                    }
+                  </button>
+                )}
+
+                {/* Secondary ghost actions row */}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {activeSession.confirmedOrderId && (
+                    <button
+                      onClick={async () => {
+                        if (!window.confirm('ยืนยันยกเลิกตี้นี้? ลูกค้าจะถูกส่งกลับหน้า QR')) return
+                        try {
+                          await updateDoc(doc(db, 'orders', activeSession.confirmedOrderId), {
+                            status: 'closed', closedAt: serverTimestamp()
+                          })
+                          const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+                          const remaining = list.filter(s => String(s.id) !== String(activeId))
+                          if (remaining.length === 0) {
+                            const fresh = newBasicPOSSession()
+                            setSessions([fresh]); setActiveId(fresh.id)
+                          } else {
+                            setSessions(remaining); setActiveId(remaining[remaining.length - 1].id)
+                          }
+                          showToast('ยกเลิกตี้แล้ว')
+                        } catch (e) { showToast('ยกเลิกล้มเหลว', 'error') }
+                      }}
+                      style={{
+                        flex: 1, padding: '9px 10px', borderRadius: 10,
+                        background: 'rgba(198,36,25,0.06)', color: '#c62419',
+                        border: '1px solid rgba(198,36,25,0.22)',
+                        fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                        fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    >
+                      <i className="fas fa-ban" style={{ fontSize: 10 }} /> ยกเลิกตี้
+                    </button>
+                  )}
+                  <button
+                    onClick={onClose}
+                    style={{
+                      flex: 1, padding: '9px 10px', borderRadius: 10,
+                      background: 'transparent', color: 'rgba(26,26,26,0.55)',
+                      border: '1px solid rgba(26,26,26,0.12)',
+                      fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                      fontFamily: "'Sarabun', sans-serif",
+                    }}
+                  >
+                    <i className="fas fa-times" style={{ fontSize: 10 }} /> ปิดหน้า POS
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {scannerOpen && <QRScanner onScan={handleScan} onClose={() => setScannerOpen(false)} />}
+
+      {slipVerifyMember && (
+        <SlipVerifyModal
+          member={slipVerifyMember}
+          payment={memberPayments[slipVerifyMember.uid]}
+          orderId={activeSession.confirmedOrderId}
+          easySlipApiKey={easySlipApiKey}
+          showToast={showToast}
+          onClose={() => setSlipVerifyMember(null)}
+          onVerified={() => setTimeout(() => setSlipVerifyMember(null), 2000)}
+        />
+      )}
+
+      {showPayment && (
+        <PaymentModal
+          session={activeSession}
+          selectedGame={selectedGame}
+          adminUser={adminUser}
+          showToast={showToast}
+          memberPayments={memberPayments}
+          getMemberBill={getMemberBill}
+          grandTotal={grandTotal}
+          remainingAmount={remainingAmount}
+          totalDiscount={totalDiscount}
+          totalPersonalDiscounts={totalPersonalDiscounts}
+          gameUnitPay={gameUnitPay}
+          gameFullPrice={gameFullPrice}
+          discountEffectiveIds={discountEffectiveIds}
+          discountPerDiscounted={discountPerDiscounted}
+          onClose={() => setShowPayment(false)}
+          onPaid={() => {
+            setShowPayment(false)
+            const list = Array.isArray(sessions) && sessions.length > 0 ? sessions : safeSessions
+            const remaining = list.filter(s => String(s.id) !== String(activeId))
+            if (remaining.length === 0) {
+              const fresh = newBasicPOSSession()
+              setSessions([fresh])
+              setActiveId(fresh.id)
+            } else {
+              setSessions(remaining)
+              setActiveId(remaining[remaining.length - 1].id)
+            }
+          }}
+        />
+      )}
+
+      {/* ── Order Member Picker Modal (สั่งให้ลูกค้าคนไหน) ── */}
+      {orderModal && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setOrderModal(null)}>
+          <div className="pos-order-modal">
+            {/* Header */}
+            <div className="pos-order-modal-header">
+              <div>
+                <div className="pos-order-modal-title">
+                  <i className="fas fa-user-tag" style={{ color: '#c62419' }} />
+                  <span>สั่งให้ลูกค้าคนไหน?</span>
+                </div>
+                <div className="pos-order-modal-subtitle">
+                  เลือกผู้สั่งเพื่อคิดบิลรายบุคคล หรือสั่งรวมทั้งโต๊ะ
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => setOrderModal(null)}
+                style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: '#faf7f5', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: '#1a1a1a', fontSize: 13
+                }}
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+
+            {/* Item preview banner */}
+            <div className="pos-order-item-banner">
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {orderModal.item.imageUrl ? (
+                  <img
+                    src={orderModal.item.imageUrl}
+                    alt=""
+                    style={{ width: 44, height: 44, borderRadius: 10, objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 10,
+                    background: 'rgba(198,36,25,0.08)', color: '#c62419',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18
+                  }}>
+                    <i className="fas fa-utensils" />
+                  </div>
+                )}
+                <div>
+                  <div style={{ fontSize: 15, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                    {orderModal.item.name}
+                  </div>
+                  {orderModal.item.category && (
+                    <span style={{
+                      fontSize: 11, fontWeight: 600, color: 'rgba(26,26,26,0.5)',
+                      background: 'rgba(26,26,26,0.05)', padding: '2px 7px',
+                      borderRadius: 6, display: 'inline-block', marginTop: 3
+                    }}>
+                      {orderModal.item.category}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.45)', fontWeight: 700, textTransform: 'uppercase' }}>ราคาเริ่มต้น</div>
+                <div style={{ fontSize: 17, fontWeight: 900, color: '#c62419' }}>
+                  ฿{(orderModal.item.price || 0).toLocaleString()}
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="pos-order-modal-body">
+              {/* Member Selection */}
+              <div>
+                <div className="pos-order-section-title">
+                  <span>
+                    <i className="fas fa-users" style={{ color: '#c62419', marginRight: 6 }} />
+                    เลือกลูกค้าในตี้ ({(activeSession?.members || []).length} คน)
+                  </span>
+                  {orderModal.member === 'all' ? (
+                    <span style={{ color: '#c62419', fontWeight: 800 }}>สั่งรวมทั้งโต๊ะ</span>
+                  ) : orderModal.member ? (
+                    <span style={{ color: '#c62419', fontWeight: 800 }}>สั่งให้: {orderModal.member.name}</span>
+                  ) : (
+                    <span style={{ color: '#e53e3e', fontWeight: 800 }}>* กรุณาเลือกคนที่สั่ง</span>
+                  )}
+                </div>
+
+                <div className="pos-order-members-grid">
+                  {/* Table-wide option */}
+                  <button
+                    type="button"
+                    className={`pos-order-member-card${orderModal.member === 'all' ? ' selected' : ''}`}
+                    onClick={() => setOrderModal(p => ({ ...p, member: 'all' }))}
+                  >
+                    <div className="pos-order-all-icon">
+                      <i className="fas fa-users" />
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a', lineHeight: 1.2 }}>
+                        ทั้งโต๊ะ (สั่งรวม)
+                      </div>
+                      <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.5)', marginTop: 2 }}>
+                        หารบิลกลาง
+                      </div>
+                    </div>
+                    {orderModal.member === 'all' && (
+                      <i className="fas fa-check-circle" style={{ color: '#c62419', fontSize: 16 }} />
+                    )}
+                  </button>
+
+                  {/* Individual members */}
+                  {(activeSession?.members || []).map(m => {
+                    const isPicked = orderModal.member && orderModal.member !== 'all' && orderModal.member.uid === m.uid
+                    return (
+                      <button
+                        key={m.uid}
+                        type="button"
+                        className={`pos-order-member-card${isPicked ? ' selected' : ''}`}
+                        onClick={() => setOrderModal(p => ({ ...p, member: m }))}
+                      >
+                        {m.avatar ? (
+                          <img src={m.avatar} alt="" className="pos-order-member-avatar" />
+                        ) : (
+                          <div className="pos-order-member-avatar-ph">
+                            {(m.name || '?')[0].toUpperCase()}
+                          </div>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: '#1a1a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', lineHeight: 1.2 }}>
+                            {m.name || 'ไม่ระบุ'}
+                          </div>
+                          {m.character ? (
+                            <div style={{ fontSize: 10.5, color: '#c62419', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 2 }}>
+                              <i className="fas fa-mask" style={{ marginRight: 4 }} />{m.character}
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 10.5, color: 'rgba(26,26,26,0.4)', marginTop: 2 }}>
+                              สมาชิก
+                            </div>
+                          )}
+                        </div>
+                        {isPicked && (
+                          <i className="fas fa-check-circle" style={{ color: '#c62419', fontSize: 16 }} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {(activeSession?.members || []).length === 0 && (
+                  <div style={{ marginTop: 8, padding: '10px 14px', borderRadius: 10, background: '#faf7f5', border: '1px dashed rgba(26,26,26,0.12)', fontSize: 12, color: 'rgba(26,26,26,0.6)', display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <i className="fas fa-info-circle" style={{ color: '#c62419' }} />
+                    <span>ยังไม่มีสมาชิกในปาร์ตี้นี้ (ระบบจะบันทึกเป็นบิลรวมทั้งโต๊ะ)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Addons (if item has them) */}
+              {(orderModal.item.addons || []).length > 0 && (
+                <div>
+                  <div className="pos-order-section-title">
+                    <span><i className="fas fa-layer-group" style={{ color: '#c62419', marginRight: 6 }} /> ตัวเลือกเพิ่มเติม (Add-on)</span>
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {orderModal.item.addons.map((a, i) => {
+                      const isSelected = (orderModal.selectedAddons || []).some(s => s.name === a.name)
+                      return (
+                        <button
+                          key={i}
+                          type="button"
+                          className={`pos-addon-chip${isSelected ? ' selected' : ''}`}
+                          onClick={() => setOrderModal(p => ({
+                            ...p,
+                            selectedAddons: isSelected
+                              ? (p.selectedAddons || []).filter(s => s.name !== a.name)
+                              : [...(p.selectedAddons || []), a]
+                          }))}
+                          style={{
+                            padding: '7px 12px',
+                            borderRadius: 10,
+                            fontSize: 12.5,
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 6,
+                          }}
+                        >
+                          <span>{a.name}</span>
+                          {(a.price || 0) > 0 && <span style={{ opacity: 0.8 }}>+฿{a.price}</span>}
+                          {isSelected && <i className="fas fa-check" style={{ fontSize: 10 }} />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Note */}
+              <div>
+                <div className="pos-order-section-title">
+                  <span><i className="fas fa-pen" style={{ color: '#c62419', marginRight: 6 }} /> หมายเหตุ</span>
+                  <span style={{ fontSize: 10, color: 'rgba(26,26,26,0.4)', textTransform: 'none' }}>(ถ้ามี)</span>
+                </div>
+                <input
+                  type="text"
+                  value={orderModal.note || ''}
+                  onChange={e => setOrderModal(p => ({ ...p, note: e.target.value }))}
+                  placeholder="เช่น ไม่ใส่ผัก, เผ็ดน้อย, แยกน้ำแข็ง..."
+                  maxLength={120}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '10px 12px', borderRadius: 10,
+                    background: '#faf7f5', border: '1px solid rgba(26,26,26,0.1)',
+                    fontSize: 13, fontFamily: "'Sarabun', sans-serif",
+                    color: '#1a1a1a', outline: 'none',
+                  }}
+                  onFocus={e => { e.target.style.borderColor = '#c62419'; e.target.style.boxShadow = '0 0 0 3px rgba(198,36,25,0.08)' }}
+                  onBlur={e => { e.target.style.borderColor = 'rgba(26,26,26,0.1)'; e.target.style.boxShadow = 'none' }}
+                />
+              </div>
+
+              {/* Quantity */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '10px 14px', borderRadius: 12, background: '#faf7f5',
+                border: '1px solid rgba(26,26,26,0.06)'
+              }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: '#1a1a1a' }}>
+                  <i className="fas fa-sort-numeric-up" style={{ color: '#c62419', marginRight: 6 }} />
+                  จำนวน
+                </span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <button
+                    type="button"
+                    onClick={() => setOrderModal(p => ({ ...p, qty: Math.max(1, (p.qty || 1) - 1) }))}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: '#ffffff', border: '1px solid rgba(26,26,26,0.14)',
+                      fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a1a1a'
+                    }}
+                  >
+                    −
+                  </button>
+                  <span style={{ fontSize: 16, fontWeight: 800, minWidth: 24, textAlign: 'center', color: '#1a1a1a' }}>
+                    {orderModal.qty || 1}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setOrderModal(p => ({ ...p, qty: (p.qty || 1) + 1 }))}
+                    style={{
+                      width: 32, height: 32, borderRadius: 8,
+                      background: '#c62419', color: '#ffffff', border: 'none',
+                      fontSize: 16, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pos-order-modal-footer">
+              {(() => {
+                const addonSum = (orderModal.selectedAddons || []).reduce((s, a) => s + (a.price || 0), 0)
+                const unitTotal = (orderModal.item.price || 0) + addonSum
+                const itemTotal = unitTotal * (orderModal.qty || 1)
+                const isSelected = orderModal.member !== undefined
+                const isAll = orderModal.member === 'all'
+                const memberObj = !isAll ? orderModal.member : null
+                const recipientLabel = isAll ? 'ทั้งโต๊ะ' : (memberObj?.name ? memberObj.name.split(' ')[0] : '')
+
+                return (
+                  <>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'rgba(26,26,26,0.55)' }}>
+                        ยอดรวม ({orderModal.qty || 1} รายการ)
+                      </div>
+                      <div style={{ fontSize: 20, fontWeight: 900, color: '#1a1a1a' }}>
+                        ฿{itemTotal.toLocaleString()}
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      disabled={!isSelected}
+                      onClick={() => {
+                        if (!isSelected) return
+                        commitAddItem(
+                          orderModal.item,
+                          orderModal.selectedAddons || [],
+                          isAll ? null : memberObj,
+                          orderModal.note || '',
+                          orderModal.qty || 1
+                        )
+                        setOrderModal(null)
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '14px 18px',
+                        borderRadius: 12,
+                        background: isSelected ? '#c62419' : 'rgba(26,26,26,0.08)',
+                        color: isSelected ? '#ffffff' : 'rgba(26,26,26,0.35)',
+                        border: 'none',
+                        fontSize: 14.5,
+                        fontWeight: 800,
+                        cursor: isSelected ? 'pointer' : 'not-allowed',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        boxShadow: isSelected ? '0 6px 18px rgba(198,36,25,0.28)' : 'none',
+                        transition: 'all 0.15s ease',
+                        fontFamily: "'Sarabun', sans-serif",
+                      }}
+                    >
+                      {!isSelected ? (
+                        <>
+                          <i className="fas fa-hand-pointer" />
+                          <span>กรุณาเลือกลูกค้าที่สั่งอาหาร</span>
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-plus-circle" />
+                          <span>สั่งให้ {recipientLabel} · ฿{itemTotal.toLocaleString()}</span>
+                        </>
+                      )}
+                    </button>
+                  </>
+                )
+              })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Ending selection modal ── */}
+      {showEndingModal && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setShowEndingModal(false)}>
+          <div className="pos-ending-modal">
+            <div className="pos-ending-title">
+              <i className="fas fa-flag-checkered" /> เลือก Ending ของปาร์ตี้
+            </div>
+            <div className="pos-ending-subtitle">ผลลัพธ์ที่ทีมนักสืบได้รับในคืนนี้</div>
+
+            <div className="pos-ending-grid">
+              {[
+                { id: 'good-ending',  icon: 'fa-smile',  label: 'Good Ending',  sub: 'คดีถูกไขบางส่วน',  color: 'var(--feedback-success-icon)', bg: 'rgba(var(--feedback-success-rgb), 0.08)',  border: 'rgba(var(--feedback-success-rgb), 0.35)' },
+                { id: 'true-ending',  icon: 'fa-star',   label: 'True Ending',  sub: 'ไขคดีครบสมบูรณ์',  color: 'var(--case-amber)',             bg: 'rgba(var(--case-amber-rgb), 0.08)',           border: 'rgba(var(--case-amber-rgb), 0.40)' },
+                { id: 'bad-ending',   icon: 'fa-skull',  label: 'Bad Ending',   sub: 'ทีมล้มเหลว',       color: 'var(--crimson-500)',            bg: 'rgba(var(--crimson-500-rgb), 0.08)',          border: 'rgba(var(--crimson-500-rgb), 0.35)' },
+              ].map(opt => (
+                <button
+                  key={opt.id}
+                  className={`pos-ending-card${selectedEnding === opt.id ? ' selected' : ''}`}
+                  style={{ '--ec': opt.color, '--eb': opt.bg, '--ebr': opt.border }}
+                  onClick={() => setSelectedEnding(opt.id)}
+                >
+                  <div className="pos-ending-icon"><i className={`fas ${opt.icon}`} /></div>
+                  <div className="pos-ending-label">{opt.label}</div>
+                  <div className="pos-ending-sub">{opt.sub}</div>
+                  {selectedEnding === opt.id && (
+                    <div className="pos-ending-check"><i className="fas fa-check-circle" /></div>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="pos-ending-actions">
+              <button className="btn-secondary" onClick={() => setShowEndingModal(false)}>ยกเลิก</button>
+              <button
+                className="pos-confirm-btn"
+                style={{ flex: 1 }}
+                disabled={!selectedEnding}
+                onClick={() => doCloseTable(selectedEnding)}
+              >
+                <i className="fas fa-door-closed" /> ยืนยันปิดตี้
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Confirm Close Session Modal ── */}
+      {confirmCloseSession && (
+        <div className="modal-backdrop" onClick={e => e.target === e.currentTarget && setConfirmCloseSession(null)}>
+          <div style={{
+            background: '#ffffff',
+            borderRadius: 16,
+            padding: '24px 22px',
+            maxWidth: 380,
+            width: '90%',
+            boxShadow: '0 20px 48px rgba(0,0,0,0.3)',
+            textAlign: 'center',
+            animation: 'posModalIn 0.16s ease-out',
+            fontFamily: "'Sarabun', sans-serif",
+          }}>
+            <div style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: 'rgba(198,36,25,0.1)',
+              color: '#c62419',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 14px',
+              fontSize: 22,
+            }}>
+              <i className="fas fa-question-circle" />
+            </div>
+            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#1a1a1a' }}>
+              ว่าจะปิดจริงๆ หรอ?
+            </h3>
+            <p style={{ margin: '0 0 20px', fontSize: 13.5, color: 'rgba(26,26,26,0.65)', lineHeight: 1.5 }}>
+              คุณต้องการปิด <strong>{confirmCloseSession.title}</strong> จริงๆ ใช่หรือไม่?
+              {confirmCloseSession.confirmedOrderId && (
+                <span style={{ display: 'block', marginTop: 4, color: '#c62419', fontSize: 12.5 }}>
+                  * ออเดอร์ของปาร์ตี้นี้จะถูกปิดด้วย
+                </span>
+              )}
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setConfirmCloseSession(null)}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: '1px solid rgba(26,26,26,0.15)',
+                  background: '#ffffff',
+                  color: '#1a1a1a',
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                ไม่ปิด
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const id = confirmCloseSession.id
+                  setConfirmCloseSession(null)
+                  removeSession(id)
+                }}
+                style={{
+                  flex: 1,
+                  padding: '11px 14px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: '#c62419',
+                  color: '#ffffff',
+                  fontSize: 13.5,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  fontFamily: "'Sarabun', sans-serif",
+                }}
+              >
+                ปิดจริงๆ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+    </div>
+  )
+}
