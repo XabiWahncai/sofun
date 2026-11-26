@@ -1879,15 +1879,26 @@ export default function BasicPOSPage({
           foodTotal: newFoodTotal,
           gameTotal: gamePrice,
           grandTotal: Math.max(0, newFoodTotal + gamePrice - totalDiscount - totalPersonalDiscounts),
+          basicPosAlert: {
+            message: 'DM จีน สั่งอาหารที่เครื่อง',
+            itemsCount: addQty,
+            timestamp: Date.now(),
+          },
+          updatedAt: serverTimestamp(),
         })
 
         // Print kitchen ticket for this newly ordered item
         const now = new Date()
         const isPaid = (activeSession.members || []).length > 0 &&
           activeSession.members.every(m => memberPayments[m.uid]?.verified)
-        const html = buildKitchenTicketHTML(newItemsHistory, activeSession, now, isPaid, receiptSettings)
+        const html = buildKitchenTicketHTML(newItemsHistory, {
+          ...activeSession,
+          room: activeSession.room || 'DM จีน',
+          dm: 'DM จีน',
+          scriptTitle: 'เกมจีน',
+        }, now, isPaid, receiptSettings)
         const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
-        dispatchPrint(html, printWidth, `${activeSession?.room || activeSession?.scriptTitle || 'ตี้'} · ${menuItem.name} × ${addQty}`)
+        dispatchPrint(html, printWidth, `DM จีน สั่งอาหารที่เครื่อง · ${menuItem.name} × ${addQty}`)
       } catch (err) {
         console.error('Failed to sync new order item to firestore:', err)
       }
@@ -2463,12 +2474,51 @@ export default function BasicPOSPage({
   // ── confirm / update order ───────────────────────────────────────
   const handleConfirm = async () => {
     const s = activeSession
-    if (s.members.length === 0) { showToast('ยังไม่มีสมาชิกในปาร์ตี้', 'error'); return }
+    if ((s.members || []).length === 0 && (orderArr || []).length === 0) {
+      showToast('กรุณาเลือกรายการอาหาร หรือเพิ่มสมาชิกก่อนสั่ง', 'error')
+      return
+    }
     // Script ID defaults to chinese-game-basic for BasicPOS
     setSaving(true)
     try {
+      const effectiveMembers = (s.members && s.members.length > 0)
+        ? s.members
+        : [{ uid: 'dm_chinese_table', name: 'ทั้งโต๊ะ / DM จีน', character: '', avatar: '' }]
+
+      // Calculate which items need to be printed on this order/update
+      let itemsToPrint = []
+      if (!s.confirmedOrderId) {
+        itemsToPrint = orderArr
+      } else {
+        let existingItems = []
+        try {
+          const snap = await getDoc(doc(db, 'orders', s.confirmedOrderId))
+          if (snap.exists()) {
+            existingItems = snap.data().foodItems || []
+          }
+        } catch (err) {}
+        orderArr.forEach(item => {
+          const prevItem = existingItems.find(ex =>
+            ex.name === item.name &&
+            JSON.stringify(ex.addons || []) === JSON.stringify(item.addons || []) &&
+            (ex.note || '') === (item.note || '') &&
+            (ex.orderedBy?.uid || '') === (item.orderedBy?.uid || '')
+          )
+          const prevQty = prevItem ? (prevItem.qty || 1) : 0
+          const diffQty = (item.qty || 1) - prevQty
+          if (diffQty > 0) {
+            itemsToPrint.push({ ...item, qty: diffQty })
+          }
+        })
+        if (itemsToPrint.length === 0 && orderArr.length > 0) {
+          itemsToPrint = orderArr
+        }
+      }
+
+      const alertTimestamp = Date.now()
+
       const payload = {
-        members: s.members.map(m => ({
+        members: effectiveMembers.map(m => ({
           uid: m.uid, name: m.name, character: m.character || '',
           avatar: m.avatar || '', scanInAt: m.scanInAt || null,
           personalDiscount: Number(m.personalDiscount) || 0,
@@ -2476,12 +2526,12 @@ export default function BasicPOSPage({
           unpaidDeposit: Boolean(m.unpaidDeposit),
           ...(m.customGamePrice !== undefined && m.customGamePrice !== '' && m.customGamePrice !== null ? { customGamePrice: Number(m.customGamePrice) } : {}),
         })),
-        memberUids: s.members.map(m => m.uid),
+        memberUids: effectiveMembers.map(m => m.uid),
         scriptId: s.scriptId || 'chinese-game-basic',
         scriptTitle: selectedGame?.title || 'เกมจีน',
-        dm: s.dm || 'DM จีน',
+        dm: 'DM จีน',
         npc: s.npc || '',
-        room: s.room,
+        room: s.room || 'DM จีน',
         foodItems: orderArr.map(x => ({
           menuId: x.menuId || '',
           name: x.name,
@@ -2491,13 +2541,13 @@ export default function BasicPOSPage({
           orderedBy: x.orderedBy || null,
           note: x.note || '',
         })),
-        memberFoodHistory: orderArr.filter(x => x.orderedBy).map(x => ({
+        memberFoodHistory: orderArr.map(x => ({
           menuId: x.menuId || '',
           name: x.name,
           addons: x.addons || [],
           totalPrice: x.totalPrice ?? x.price ?? 0,
           qty: x.qty || 1,
-          orderedBy: x.orderedBy,
+          orderedBy: x.orderedBy || null,
           note: x.note || '',
         })),
         customPrice: s.customPrice ?? '',
@@ -2509,33 +2559,63 @@ export default function BasicPOSPage({
         discountMemberIds: discountMemberIdsRaw,  // [] = all members, else selected uids
         promoName: s.promoName || '',
         grandTotal,
-        createdBy: adminUser?.name || 'admin',
+        createdBy: adminUser?.name || 'DM จีน',
         status: 'active', source: 'basic_pos',
+        basicPosAlert: {
+          message: 'DM จีน สั่งอาหารที่เครื่อง',
+          itemsCount: itemsToPrint.length,
+          timestamp: alertTimestamp,
+        },
       }
 
-      if (s.confirmedOrderId) {
+      let orderId = s.confirmedOrderId
+      if (orderId) {
         // ── update existing order (เพิ่มของกิน / สมาชิกใหม่) ──────
-        await updateDoc(doc(db, 'orders', s.confirmedOrderId), {
+        await updateDoc(doc(db, 'orders', orderId), {
           ...payload, updatedAt: serverTimestamp()
         })
-        showToast('อัปเดตออเดอร์สำเร็จ ')
+        showToast(t('orderSuccessToast', 'สั่งอาหารสำเร็จ! ส่งไปที่เครื่องปริ้นหลักแล้ว (DM จีน สั่งอาหารที่เครื่อง)'))
         setEditingUnlocked(false)
       } else {
         // ── create new order ──────────────────────────────────────
-        for (const m of s.members) {
-          await addDoc(collection(db, 'playHistory'), {
-            userId: m.uid, userName: m.name, userAvatar: m.avatar,
-            scriptId: s.scriptId || 'chinese-game-basic', scriptTitle: selectedGame?.title || 'เกมจีน',
-            character: m.character, dm: s.dm || 'DM จีน', room: s.room,
-            playedAt: serverTimestamp(), recordedBy: adminUser?.name || 'admin',
-          })
+        for (const m of effectiveMembers) {
+          if (m.uid !== 'dm_chinese_table') {
+            await addDoc(collection(db, 'playHistory'), {
+              userId: m.uid, userName: m.name, userAvatar: m.avatar,
+              scriptId: s.scriptId || 'chinese-game-basic', scriptTitle: selectedGame?.title || 'เกมจีน',
+              character: m.character, dm: 'DM จีน', room: s.room || 'DM จีน',
+              playedAt: serverTimestamp(), recordedBy: adminUser?.name || 'DM จีน',
+            })
+          }
         }
         const orderRef = doc(collection(db, 'orders'))
-        const orderId = orderRef.id
+        orderId = orderRef.id
         // Associate confirmedOrderId to active session BEFORE writing to Firestore to eliminate onSnapshot race condition
         updateActive({ confirmedOrderId: orderId })
         await setDoc(orderRef, { ...payload, createdAt: serverTimestamp() })
-        showToast('บันทึกออเดอร์สำเร็จ ')
+        showToast(t('orderSuccessToast', 'สั่งอาหารสำเร็จ! ส่งไปที่เครื่องปริ้นหลักแล้ว (DM จีน สั่งอาหารที่เครื่อง)'))
+      }
+
+      // ── Dispatch kitchen ticket printing immediately ───────────────
+      if (itemsToPrint.length > 0) {
+        const now = new Date()
+        const isPaid = (effectiveMembers || []).length > 0 &&
+          effectiveMembers.every(m => memberPayments[m.uid]?.verified)
+        const html = buildKitchenTicketHTML(
+          itemsToPrint,
+          {
+            ...s,
+            room: s.room || 'DM จีน',
+            dm: 'DM จีน',
+            scriptTitle: selectedGame?.title || 'เกมจีน',
+            members: effectiveMembers,
+          },
+          now,
+          isPaid,
+          receiptSettings
+        )
+        const printWidth = receiptSettings?.orderIn?.paperWidth || '80mm'
+        await dispatchPrint(html, printWidth, `DM จีน สั่งอาหารที่เครื่อง (${itemsToPrint.length} รายการ)`)
       }
     } catch (e) {
       showToast('บันทึกล้มเหลว: ' + e.message, 'error')
@@ -4311,66 +4391,62 @@ export default function BasicPOSPage({
               </div>
             ) : (
               <>
-                {/* Primary action - Pay if confirmed+unpaid, else Confirm/Update */}
-                {activeSession.confirmedOrderId && !allMembersPaid ? (
-                  <button
-                    onClick={() => setShowPayment(true)}
-                    style={{
-                      width: '100%', padding: '14px 16px', borderRadius: 12,
-                      background: '#c62419', color: '#fff', border: 'none',
-                      fontSize: 14.5, fontWeight: 800, cursor: 'pointer',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      fontFamily: "'Sarabun', sans-serif",
-                      boxShadow: '0 6px 18px rgba(198,36,25,0.3)',
-                      transition: 'all 0.14s',
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = '#9a1c13'; e.currentTarget.style.transform = 'translateY(-1px)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = '#c62419'; e.currentTarget.style.transform = 'translateY(0)' }}
-                  >
-                    <i className="fas fa-qrcode" />
-                    {t('payBillBtn', 'ชำระเงิน')}{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
-                  </button>
-                ) : (
+                {/* Primary action - Send Food Order (always available when items are in cart) */}
+                {orderArr.length > 0 ? (
                   <button
                     onClick={handleConfirm}
                     disabled={saving}
                     style={{
                       width: '100%', padding: '14px 16px', borderRadius: 12,
-                      background: saving ? '#f0ebe9' : (activeSession.confirmedOrderId ? '#1a1a1a' : '#c62419'),
+                      background: saving ? '#f0ebe9' : '#c62419',
                       color: saving ? 'rgba(26,26,26,0.4)' : '#fff', border: 'none',
                       fontSize: 14.5, fontWeight: 800, cursor: saving ? 'wait' : 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       fontFamily: "'Sarabun', sans-serif",
-                      boxShadow: saving ? 'none' : (activeSession.confirmedOrderId ? '0 6px 18px rgba(26,26,26,0.2)' : '0 6px 18px rgba(198,36,25,0.3)'),
+                      boxShadow: saving ? 'none' : '0 6px 18px rgba(198,36,25,0.3)',
+                      transition: 'all 0.14s',
                     }}
                   >
-                    {saving
-                      ? <><i className="fas fa-spinner fa-spin" /> {t('saving', 'กำลังบันทึก...')}</>
-                      : activeSession.confirmedOrderId
-                        ? <><i className="fas fa-sync" /> {t('btnUpdateOrder', 'อัปเดตออเดอร์')}</>
-                        : <><i className="fas fa-check-circle" /> {t('btnConfirmOrder', 'ยืนยันออเดอร์')}</>
-                    }
+                    {saving ? (
+                      <><i className="fas fa-spinner fa-spin" /> {t('saving', 'กำลังบันทึก...')}</>
+                    ) : (
+                      <><i className="fas fa-paper-plane" /> {t('btnSendOrderNow', 'สั่งอาหารทันที (ปริ้นบิลเข้าครัว)')}</>
+                    )}
                   </button>
-                )}
-
-                {/* When already confirmed+unpaid: show secondary Update option */}
-                {activeSession.confirmedOrderId && !allMembersPaid && editingUnlocked && (
+                ) : !activeSession.confirmedOrderId && (
                   <button
                     onClick={handleConfirm}
                     disabled={saving}
                     style={{
-                      width: '100%', padding: '10px 14px', borderRadius: 10,
-                      background: '#ffffff', color: '#1a1a1a',
-                      border: '1px solid rgba(26,26,26,0.14)',
-                      fontSize: 12.5, fontWeight: 700, cursor: saving ? 'wait' : 'pointer',
+                      width: '100%', padding: '14px 16px', borderRadius: 12,
+                      background: '#c62419', color: '#fff', border: 'none',
+                      fontSize: 14.5, fontWeight: 800, cursor: saving ? 'wait' : 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
                       fontFamily: "'Sarabun', sans-serif",
+                      boxShadow: '0 6px 18px rgba(198,36,25,0.3)',
                     }}
                   >
-                    {saving
-                      ? <><i className="fas fa-spinner fa-spin" /> {t('saving', 'กำลังบันทึก...')}</>
-                      : <><i className="fas fa-sync" /> {t('btnUpdateOrder', 'อัปเดตออเดอร์')}</>
-                    }
+                    <i className="fas fa-check-circle" /> {t('btnConfirmOrder', 'ยืนยันออเดอร์')}
+                  </button>
+                )}
+
+                {/* Payment button if confirmed and has unpaid amount */}
+                {activeSession.confirmedOrderId && !allMembersPaid && (
+                  <button
+                    onClick={() => setShowPayment(true)}
+                    style={{
+                      width: '100%', padding: orderArr.length > 0 ? '11px 14px' : '14px 16px', borderRadius: 12,
+                      background: orderArr.length > 0 ? '#1a1a1a' : '#c62419',
+                      color: '#fff', border: 'none',
+                      fontSize: orderArr.length > 0 ? 13.5 : 14.5, fontWeight: 800, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                      fontFamily: "'Sarabun', sans-serif",
+                      boxShadow: orderArr.length > 0 ? '0 4px 12px rgba(26,26,26,0.18)' : '0 6px 18px rgba(198,36,25,0.3)',
+                      transition: 'all 0.14s',
+                    }}
+                  >
+                    <i className="fas fa-qrcode" />
+                    {t('payBillBtn', 'ชำระเงิน')}{remainingAmount < grandTotal && grandTotal > 0 ? ` · ฿${remainingAmount.toLocaleString()}` : ` · ฿${grandTotal.toLocaleString()}`}
                   </button>
                 )}
 

@@ -468,6 +468,7 @@ export default function POSPage({
         // Without the flag, browser will show print dialog that admin must confirm.
         printHtmlLocal(data.html, data.printWidth || '80mm')
         if (!isFirstSnap) {
+          playOrderAlertSound()
           showToast(`ปริ้นออเดอร์: ${data.label || 'ไม่ระบุ'}`)
         }
         // Delete after delay so content has time to render into print pipeline
@@ -668,7 +669,9 @@ export default function POSPage({
             }))
             const newTab = {
               id: Date.now() + Math.random(),
-              label: mo.scriptTitle ? `${mo.scriptTitle} (${mo.room || 'ตี้'})` : 'ปาร์ตี้',
+              label: mo.source === 'basic_pos'
+                ? `DM จีน (${mo.room || 'สั่งอาหารที่เครื่อง'})`
+                : (mo.scriptTitle ? `${mo.scriptTitle} (${mo.room || 'ตี้'})` : 'ปาร์ตี้'),
               createdAt: mo.createdAt?.toDate ? mo.createdAt.toDate().toISOString() : new Date().toISOString(),
               members: mo.members || [],
               scriptId: mo.scriptId || '',
@@ -986,6 +989,30 @@ export default function POSPage({
       o.memberFoodQueue.length > 0
     )
   }, [todayOrders, activeSession?.confirmedOrderId])
+
+  // Basic POS (DM จีน) orders that placed food orders
+  const [dismissedBasicAlerts, setDismissedBasicAlerts] = useState(() => new Set())
+  const basicPosOrders = useMemo(() => {
+    return todayOrders.filter(o =>
+      o.source === 'basic_pos' &&
+      o.status === 'active' &&
+      Array.isArray(o.foodItems) &&
+      o.foodItems.length > 0 &&
+      !dismissedBasicAlerts.has(o.id)
+    )
+  }, [todayOrders, dismissedBasicAlerts])
+
+  const lastBasicOrderAlertRef = useRef({})
+  useEffect(() => {
+    basicPosOrders.forEach(o => {
+      const ts = o.basicPosAlert?.timestamp || (o.updatedAt?.toDate ? o.updatedAt.toDate().getTime() : o.createdAt?.toDate ? o.createdAt.toDate().getTime() : 0)
+      if (ts && (!lastBasicOrderAlertRef.current[o.id] || lastBasicOrderAlertRef.current[o.id] < ts)) {
+        lastBasicOrderAlertRef.current[o.id] = ts
+        playOrderAlertSound()
+        showToast(`DM จีน สั่งอาหารที่เครื่อง (${(o.foodItems || []).reduce((s, x) => s + (x.qty || 1), 0)} รายการ) - สั่งปริ้นบิลทันทีแล้ว`)
+      }
+    })
+  }, [basicPosOrders, showToast])
 
   const totalPendingQueueCount = memberQueue.length + otherPendingOrders.reduce((sum, o) => sum + (o.memberFoodQueue?.length || 0), 0)
 
@@ -2101,7 +2128,9 @@ export default function POSPage({
 
       const newS = {
         id: Date.now() + Math.random(),
-        label: order.scriptTitle ? `${order.scriptTitle} (${order.room || 'ตี้'})` : `ปาร์ตี้ ${sessionCounter++}`,
+        label: order.source === 'basic_pos'
+          ? `DM จีน (${order.room || 'สั่งอาหารที่เครื่อง'})`
+          : (order.scriptTitle ? `${order.scriptTitle} (${order.room || 'ตี้'})` : `ปาร์ตี้ ${sessionCounter++}`),
         createdAt: order.createdAt?.toDate ? order.createdAt.toDate().toISOString() : new Date().toISOString(),
         members: order.members || [],
         scriptId: order.scriptId || '',
@@ -3162,6 +3191,57 @@ export default function POSPage({
           )
         })}
       </div>
+
+      {/* ── BASIC POS (DM จีน) ORDER ALERTS ── */}
+      {basicPosOrders.map(o => (
+        <div key={`basic-${o.id}`} className="pos-queue-bar other-table" style={{ background: '#fff5f5', border: '1.5px solid rgba(198,36,25,0.3)', boxShadow: '0 4px 12px rgba(198,36,25,0.08)' }}>
+          <div className="pos-queue-bar-top">
+            <span className="pos-queue-badge other" style={{ background: '#c62419', color: '#ffffff', fontWeight: 800 }}>
+              <i className="fas fa-utensils fa-shake" /> DM จีน สั่งอาหารที่เครื่อง ({(o.foodItems || []).reduce((s, x) => s + (x.qty || 1), 0)} รายการ) · สั่งปริ้นบิลทันทีแล้ว
+            </span>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                type="button"
+                className="pos-queue-switch-btn"
+                onClick={() => {
+                  openExistingOrder(o)
+                  setDismissedBasicAlerts(prev => new Set(prev).add(o.id))
+                }}
+              >
+                <i className="fas fa-arrow-right" /> ไปที่ปาร์ตี้นี้
+              </button>
+              <button
+                type="button"
+                className="pos-queue-accept-all"
+                style={{ background: '#1a1a1a', color: '#ffffff' }}
+                onClick={() => {
+                  const now = new Date()
+                  const isPaid = (o.members || []).length > 0 && o.members.every(m => o.memberPayments?.[m.uid]?.verified)
+                  const html = buildKitchenTicketHTML(
+                    o.foodItems || [],
+                    { ...o, room: o.room || 'DM จีน', dm: 'DM จีน', scriptTitle: 'เกมจีน' },
+                    now,
+                    isPaid,
+                    receiptSettings
+                  )
+                  dispatchPrint(html, receiptSettings?.orderIn?.paperWidth || '80mm', 'DM จีน สั่งอาหารที่เครื่อง')
+                  showToast('สั่งปริ้นบิลซ้ำแล้ว')
+                }}
+              >
+                <i className="fas fa-print" /> สั่งปริ้นซ้ำ
+              </button>
+              <button
+                type="button"
+                onClick={() => setDismissedBasicAlerts(prev => new Set(prev).add(o.id))}
+                style={{ background: 'transparent', border: '1px solid rgba(26,26,26,0.15)', color: 'rgba(26,26,26,0.5)', borderRadius: 8, padding: '5px 10px', fontSize: 11, cursor: 'pointer', fontWeight: 700 }}
+                title="ปิดการแจ้งเตือน"
+              >
+                <i className="fas fa-times" />
+              </button>
+            </div>
+          </div>
+        </div>
+      ))}
 
       {/* ── OTHER TABLES QUEUE ALERTS ── */}
       {otherPendingOrders.map(o => (
