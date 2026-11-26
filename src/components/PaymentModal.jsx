@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { QRCodeSVG } from 'qrcode.react'
 import { db } from '../firebase'
-import { doc, getDoc, addDoc, updateDoc, collection, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, addDoc, updateDoc, collection, serverTimestamp, setDoc, Timestamp } from 'firebase/firestore'
 import SlipPrint from './SlipPrint'
 
 // ── PromptPay QR generator (EMVCo / BOT standard) ──────────────────────────
@@ -239,7 +239,28 @@ export default function PaymentModal({
     setSaving(true)
     try {
       const orderSnap = await getDoc(doc(db, 'orders', session.confirmedOrderId))
-      const openAt = orderSnap.data()?.createdAt?.toDate() || null
+      const orderData = orderSnap.exists() ? orderSnap.data() : null
+
+      // Anchor bill recording to game play date (when party was added into POS, NOT when closing party)
+      let partyAddedTimestamp = null
+      if (orderData?.createdAt) {
+        if (typeof orderData.createdAt.toDate === 'function') {
+          partyAddedTimestamp = orderData.createdAt
+        } else if (orderData.createdAt.seconds) {
+          partyAddedTimestamp = new Timestamp(orderData.createdAt.seconds, orderData.createdAt.nanoseconds || 0)
+        } else {
+          const d = new Date(orderData.createdAt)
+          if (!isNaN(d.getTime())) partyAddedTimestamp = Timestamp.fromDate(d)
+        }
+      }
+      if (!partyAddedTimestamp && session?.createdAt) {
+        const d = new Date(session.createdAt)
+        if (!isNaN(d.getTime())) partyAddedTimestamp = Timestamp.fromDate(d)
+      }
+      if (!partyAddedTimestamp) {
+        partyAddedTimestamp = Timestamp.now()
+      }
+      const openAt = partyAddedTimestamp.toDate()
 
       let serial = 1
       try {
@@ -254,7 +275,8 @@ export default function PaymentModal({
 
       const updates = {
         status: 'paid',
-        paidAt: serverTimestamp(),
+        paidAt: partyAddedTimestamp,
+        closedAt: serverTimestamp(),
         paidTotal: calcGrandTotal,
         discount: propTotalDiscount || 0,
         promoName: session?.promoName || '',
@@ -329,8 +351,10 @@ export default function PaymentModal({
         grandTotal: calcGrandTotal,
         serial,
         openAt,
+        playedAt: partyAddedTimestamp,
+        paidAt: partyAddedTimestamp,
+        closedAt: serverTimestamp(),
         printCount: 0,
-        paidAt: serverTimestamp(),
         confirmedBy: adminUser?.name || 'admin',
       }
 

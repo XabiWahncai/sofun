@@ -259,7 +259,9 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
   const filteredPayments = useMemo(() => {
     return payments
       .filter(p => {
-        const d = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+        const d = p.openAt?.toDate?.() || (p.openAt?.seconds ? new Date(p.openAt.seconds * 1000) : (p.openAt ? new Date(p.openAt) : null)) ||
+                  p.playedAt?.toDate?.() || (p.playedAt?.seconds ? new Date(p.playedAt.seconds * 1000) : (p.playedAt ? new Date(p.playedAt) : null)) ||
+                  p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
         if (!d) return false
         if (d < filterStartDate || d > filterEndDate) return false
         if (selectedRoom !== 'ALL' && p.room !== selectedRoom) return false
@@ -390,7 +392,9 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
       const ds = new Date(d.getFullYear(), d.getMonth(), d.getDate())
       const de = new Date(ds.getTime() + 86400000)
       const dp = filteredPayments.filter(p => {
-        const pd = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+        const pd = p.openAt?.toDate?.() || (p.openAt?.seconds ? new Date(p.openAt.seconds * 1000) : (p.openAt ? new Date(p.openAt) : null)) ||
+                   p.playedAt?.toDate?.() || (p.playedAt?.seconds ? new Date(p.playedAt.seconds * 1000) : (p.playedAt ? new Date(p.playedAt) : null)) ||
+                   p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
         return pd && pd >= ds && pd < de
       })
       const gTot = dp.reduce((s, p) => s + (p.trueGameRevenue || 0), 0)
@@ -3981,7 +3985,9 @@ function DashboardTab({ allGames = [], members = [], onGoTab }) {
             </thead>
             <tbody>
               {filteredLedgerPayments.slice(0, 20).map(p => {
-                const dt = p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
+                const dt = p.openAt?.toDate?.() || (p.openAt?.seconds ? new Date(p.openAt.seconds * 1000) : (p.openAt ? new Date(p.openAt) : null)) ||
+                           p.playedAt?.toDate?.() || (p.playedAt?.seconds ? new Date(p.playedAt.seconds * 1000) : (p.playedAt ? new Date(p.playedAt) : null)) ||
+                           p.paidAt?.toDate?.() || (p.paidAt ? new Date(p.paidAt) : null)
                 const serialStr = p.serial ? `#${p.serial}` : (p.id ? `#${p.id.slice(0, 6)}` : '-')
                 return (
                   <tr

@@ -1266,7 +1266,7 @@ export default function HistoryTab({
 
   const filteredPayments = useMemo(() => {
     return payments.filter(p => {
-      const paidDate = toDateObj(p.paidAt) || toDateObj(p.openAt)
+      const paidDate = toDateObj(p.openAt) || toDateObj(p.playedAt) || toDateObj(p.paidAt)
 
       // Date preset filter
       if (dateFilter === 'today') {
@@ -1671,9 +1671,10 @@ export default function HistoryTab({
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {filteredPayments.map(p => {
-            const paidAt = toDateObj(p.paidAt)
-            const openAt = toDateObj(p.openAt)
-            const duration = calcDuration(openAt, paidAt)
+            const openAt = toDateObj(p.openAt) || toDateObj(p.playedAt) || toDateObj(p.paidAt)
+            const closeAt = toDateObj(p.closedAt) || toDateObj(p.paidAt)
+            const paidAt = openAt
+            const duration = calcDuration(openAt, closeAt)
             const members = p.members || []
             const isExpanded = expandedIds.has(p.id)
             const gameObj = allGames.find(g => g.id === p.scriptId || g.title === p.scriptTitle)

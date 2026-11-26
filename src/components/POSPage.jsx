@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { db } from '../firebase'
 import {
   doc, getDoc, collection, onSnapshot,
-  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, setDoc,
+  addDoc, updateDoc, deleteDoc, arrayUnion, serverTimestamp, query, orderBy, where, setDoc, Timestamp,
   getDocs, limit
 } from 'firebase/firestore'
 import { Html5Qrcode } from 'html5-qrcode'
@@ -2201,6 +2201,29 @@ export default function POSPage({
           }
         })
 
+        const orderData = orderSnap.exists() ? orderSnap.data() : null
+
+        // Anchor bill recording to game play date (when party was added into POS, NOT when closing party)
+        let partyAddedTimestamp = null
+        if (orderData?.createdAt) {
+          if (typeof orderData.createdAt.toDate === 'function') {
+            partyAddedTimestamp = orderData.createdAt
+          } else if (orderData.createdAt.seconds) {
+            partyAddedTimestamp = new Timestamp(orderData.createdAt.seconds, orderData.createdAt.nanoseconds || 0)
+          } else {
+            const d = new Date(orderData.createdAt)
+            if (!isNaN(d.getTime())) partyAddedTimestamp = Timestamp.fromDate(d)
+          }
+        }
+        if (!partyAddedTimestamp && activeSession?.createdAt) {
+          const d = new Date(activeSession.createdAt)
+          if (!isNaN(d.getTime())) partyAddedTimestamp = Timestamp.fromDate(d)
+        }
+        if (!partyAddedTimestamp) {
+          partyAddedTimestamp = Timestamp.now()
+        }
+        const openAtDate = partyAddedTimestamp.toDate()
+
         await addDoc(collection(db, 'payments'), {
           orderId,
           sessionLabel: activeSession.label,
@@ -2226,14 +2249,20 @@ export default function POSPage({
           memberPayments,
           serial,
           ending,
-          openAt: orderSnap.data()?.createdAt?.toDate() || null,
+          openAt: openAtDate,
+          playedAt: partyAddedTimestamp,
+          paidAt: partyAddedTimestamp,
+          closedAt: serverTimestamp(),
           printCount: 0,
-          paidAt: serverTimestamp(),
           confirmedBy: adminUser?.name || 'admin',
         })
 
         await updateDoc(doc(db, 'orders', orderId), {
-          status: 'paid', paidAt: serverTimestamp(), paidTotal: totalPaid, ending,
+          status: 'paid',
+          paidAt: partyAddedTimestamp,
+          closedAt: serverTimestamp(),
+          paidTotal: totalPaid,
+          ending,
         })
       }
 
